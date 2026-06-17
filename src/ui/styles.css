@@ -1,0 +1,688 @@
+/* styles.css — HCT Palette Generator UI.
+   App-shell as a CSS grid; gallery, drawer, swatch, slider, analysis rail,
+   ramp navigator, segmented inspector.
+
+   DOGFOODING: the chrome themes itself with the tokens the tool generates. On
+   boot app.js injects <style id="hct-app-theme"> — exportCSS() over the 8 default
+   palettes — into <head>, emitting per-palette --{n}-{stop} raw vars and 37
+   --c-{n}{suffix} semantic roles in :root. The app-internal variables below
+   (--bg/--panel/--ink/--accent/…) are now thin aliases onto those generated
+   --c-* roles, each with a CSS fallback so the chrome survives if a token is
+   absent (e.g. the stylesheet loads before the <style> is injected).
+
+   The chrome's neutral surfaces/text/borders come from the NEUTRAL palette's
+   roles; accents from the PRIMARY palette; status from WARNING/DANGER/SUCCESS.
+   Every --c-* role flips light/dark via light-dark(); the ◐ toggle sets
+   color-scheme on :root (and <hct-app>) so the whole chrome flips with it. */
+
+:root {
+  color-scheme: light dark;
+
+  /* ── surfaces / panels (neutral palette roles) ── */
+  --bg:        var(--c-neutral-background, light-dark(#f4f5f8, #16181d));
+  --panel:     var(--c-neutral-surface, light-dark(#ffffff, #1d2026));
+  --panel-2:   var(--c-neutral-surface-low, light-dark(#fafbfc, #22252c));
+  --container: var(--c-neutral-container, light-dark(#eef0f3, #262a32));
+  /* ── text (neutral on-surface roles) ── */
+  --ink:       var(--c-neutral-on-surface, light-dark(#15171c, #e9ebef));
+  --ink-dim:   var(--c-neutral-on-surface-variant, light-dark(#5b6270, #9aa1ad));
+  --ink-faint: var(--c-neutral-on-surface-variant, light-dark(#8a909c, #6b7280));
+  /* ── borders / dividers (neutral outline roles) ── */
+  --line:      var(--c-neutral-outline-variant, light-dark(#e2e5ea, #2e323b));
+  --line-2:    var(--c-neutral-container-low, light-dark(#eef0f3, #262a32));
+  /* ── primary actions / accents / active states (primary palette) ── */
+  --accent:     var(--c-primary, light-dark(#0062d5, #5b9dff));
+  --accent-ink: var(--c-primary-on-primary, #ffffff);
+  --on-accent-soft: var(--c-primary-container, light-dark(#e7f0fe, #1b2a44));
+  /* ── status (warning / danger / success palette primes) ── */
+  --warn:      var(--c-warning, light-dark(#9a6a00, #e8b04b));
+  --danger:    var(--c-danger, light-dark(#c0392b, #ff6b5b));
+  --ok:        var(--c-success, light-dark(#1a7f37, #4ec76f));
+
+  --shadow:    light-dark(0 1px 3px rgba(20,30,50,.12), 0 1px 3px rgba(0,0,0,.5));
+  --shadow-lg: light-dark(0 12px 40px rgba(20,30,50,.22), 0 12px 40px rgba(0,0,0,.6));
+
+  --r-sm: 5px;
+  --r:    8px;
+  --r-lg: 12px;
+  --hh: 48px;   /* header height */
+  --ch: 42px;   /* canvas-header height */
+  --fh: 30px;   /* footer height */
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+body {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+hct-app { display: block; height: 100vh; }
+hct-app[data-theme="light"] { color-scheme: light; }
+hct-app[data-theme="dark"]  { color-scheme: dark; }
+
+/* Hidden scrollbars — content still scrolls; the bar is just not painted. Keeps the
+   chrome clean and avoids the bright native scrollbar in a Figma plugin iframe. */
+* { scrollbar-width: none; }                    /* Firefox / modern */
+*::-webkit-scrollbar { width: 0; height: 0; }   /* WebKit */
+
+button {
+  font: inherit;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+button:hover { background: var(--line-2); }
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
+}
+button.primary:hover { filter: brightness(1.07); }
+button.ghost { border-color: var(--line); }
+button.ghost:hover { background: var(--line-2); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* non-button focusables (the ●/○ enable toggle is a role=button span) */
+[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--r-sm); }
+button:disabled, button[disabled] {
+  opacity: .4; cursor: default; pointer-events: none;
+}
+
+input[type="text"], input[type="search"], select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 5px 8px;
+  width: 100%;
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* ───────────────────────── GALLERY ───────────────────────── */
+.gallery { display: flex; flex-direction: column; height: 100%; }
+.gallery-header {
+  height: var(--hh);
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.gallery-header .brand { font-weight: 650; letter-spacing: -.01em; }
+.gallery-header .brand .dia { color: var(--accent); margin-right: 6px; }
+.gallery-header .spacer { flex: 1; }
+.gallery-body { flex: 1; overflow: auto; padding: 22px 24px; }
+/* the "read a project that has no config yet" row — shown above the sets when the Figma file
+   already carries a compatible raw-colors structure (renderFigmaImportRow). */
+.figma-import-row {
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 0 18px; padding: 12px 14px;
+  border: 1px solid var(--accent); border-radius: var(--r);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+.figma-import-row .fir-icon { color: var(--accent); font-size: 16px; }
+.figma-import-row .fir-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.figma-import-row .fir-text strong { font-weight: 600; }
+.figma-import-row .fir-sub { color: var(--ink-dim); font-size: 12px; }
+.figma-import-row .spacer { flex: 1; }
+.figma-import-row button { white-space: nowrap; }
+/* the approximate (variable-derived) fallback reads as secondary, not the accented "exact" row. */
+.figma-import-row.is-approx { border-color: var(--line); background: var(--panel-2); }
+.figma-import-row.is-approx .fir-icon { color: var(--ink-faint); }
+.gallery-title {
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 0 18px;
+}
+.gallery-title h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.gallery-title .spacer { flex: 1; }
+.gallery-title input[type="search"] { width: 220px; }
+
+.set-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 16px;
+}
+.set-tile {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform .08s ease, box-shadow .12s ease;
+  text-align: left;
+  padding: 0;
+  display: block;
+  width: 100%;
+}
+.set-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); background: var(--panel); }
+.set-thumb { display: flex; flex-direction: column; height: 96px; }
+.set-thumb .strip { flex: 1; display: flex; }
+.set-thumb .strip i { flex: 1; }
+.set-meta { padding: 10px 12px; border-top: 1px solid var(--line-2); }
+.set-meta .nm { font-weight: 600; }
+.set-meta .sub { color: var(--ink-dim); font-size: 11.5px; margin-top: 2px; display: flex; gap: 6px; align-items: center; }
+.set-meta .del {
+  float: right; color: var(--ink-faint); padding: 0 4px; border-radius: 4px;
+  font-size: 13px;
+}
+.set-meta .del:hover { color: var(--danger); background: var(--line-2); }
+
+.new-tile {
+  border: 1.5px dashed var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel-2);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; min-height: 138px; cursor: pointer;
+  color: var(--ink-dim); font-weight: 550;
+}
+.new-tile:hover { border-color: var(--accent); color: var(--accent); }
+.new-tile .plus { font-size: 26px; line-height: 1; }
+.empty-note { color: var(--ink-dim); padding: 40px 0; text-align: center; }
+
+/* ───────────────────────── EDITOR SHELL ───────────────────────── */
+.editor {
+  display: grid;
+  height: 100%;
+  grid-template-columns: 290px 1fr 300px;
+  grid-template-rows: var(--hh) 1fr var(--fh);
+  grid-template-areas:
+    "header header header"
+    "left   center right"
+    "footer footer footer";
+}
+
+.app-header {
+  grid-area: header;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.app-header .brand { font-weight: 650; letter-spacing: -.01em; white-space: nowrap; }
+.app-header .brand .dia { color: var(--accent); margin-right: 6px; }
+/* the brand doubles as the "back to gallery" affordance (replaced the ◀ Gallery button). */
+.brand-link { cursor: pointer; display: inline-flex; align-items: center; padding: 4px 6px; margin-left: -6px; border-radius: var(--r-sm); }
+.brand-link:hover { background: var(--line-2); }
+.brand-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.app-header .docname {
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 4px 9px; max-width: 180px;
+}
+.app-header .spacer { flex: 1; }
+
+/* left pane = ANALYSIS rail (stacked, scrollable graphs for the selected palette) */
+.left-pane {
+  grid-area: left;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column;
+  padding: 8px;
+}
+.pane-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-faint);
+  padding: 6px 8px 8px; display: flex; align-items: baseline; gap: 8px;
+}
+.pane-label .an-sel {
+  text-transform: none; letter-spacing: 0; font-weight: 600;
+  color: var(--accent); font-size: 11px;
+}
+.an-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 8px 8px 6px;
+  margin-bottom: 8px;
+}
+.an-label {
+  font-size: 10.5px; font-weight: 600; color: var(--ink-dim);
+  margin-bottom: 4px;
+}
+.an-svg { display: flex; justify-content: center; }
+.an-svg svg { display: block; max-width: 100%; height: auto; }
+.an-svg.hw { padding-top: 2px; }
+.an-empty { color: var(--ink-faint); padding: 14px 0; text-align: center; font-size: 11px; }
+
+/* graph legend (keys the overlaid series) */
+.an-legend { display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 5px; font-size: 9.5px; color: var(--ink-dim); }
+.an-leg { display: inline-flex; align-items: center; gap: 4px; }
+.an-leg-mark { width: 12px; height: 3px; border-radius: 999px; flex: none; }
+.an-leg-mark.solid { background: var(--accent); }
+.an-leg-mark.faint { background: var(--ink-faint); }
+.an-leg-mark.fill {
+  height: 9px; border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* analysis contrast bars */
+.an-contrast { display: flex; flex-direction: column; gap: 6px; padding: 2px 0; }
+.an-bar { display: flex; align-items: center; gap: 6px; font-size: 10.5px; }
+.an-bar .an-bk { width: 46px; color: var(--ink-dim); flex: none; }
+.an-bar .an-track {
+  flex: 1; height: 7px; border-radius: 999px; background: var(--line);
+  overflow: hidden; position: relative;
+}
+.an-bar .an-fill { display: block; height: 100%; background: var(--ok); border-radius: 999px; }
+.an-bar .an-fill.bad { background: var(--warn); }
+/* the 4.5:1 WCAG pass line, drawn over the fill so it reads as a fixed reference */
+.an-bar .an-thresh { position: absolute; top: 0; bottom: 0; left: 64.3%; width: 1px; background: var(--ink); opacity: .55; z-index: 1; }
+.an-bar b { width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
+.an-bar b.pass { color: var(--ok); }
+.an-bar b.fail { color: var(--warn); }
+
+/* hue wheel */
+.hw-circle { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.hw-dot { stroke: var(--panel); stroke-width: 1.5; }
+.hw-ring { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.an-svg.hw text { fill: var(--ink-faint); font-size: 9px; font-family: var(--sans); }
+
+/* center column = canvas-header / canvas-area / canvas-footer */
+.center {
+  grid-area: center;
+  display: grid;
+  grid-template-rows: var(--ch) 1fr var(--fh);
+  min-width: 0; min-height: 0;
+  background: var(--bg);
+  position: relative; z-index: 0; /* the canvas column sits BELOW the panes (which are z-index 2) */
+}
+/* the panes always paint ABOVE the canvas (defends against any canvas-scene overflow). */
+.left-pane, .right-pane { position: relative; z-index: 2; }
+.canvas-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.canvas-header .spacer { flex: 1; }
+.canvas-header .add-pal-btn { border: 1px dashed var(--line); }
+.canvas-header .add-pal-btn:hover { border-color: var(--accent); color: var(--accent); }
+.zoom-readout { color: var(--ink-dim); min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+
+.canvas-area {
+  position: relative;
+  overflow: hidden;
+  /* contain:paint force-clips composited descendants (the .canvas-scene has will-change:transform,
+     which otherwise escapes overflow:hidden in Chromium → the canvas bled over the right pane). */
+  contain: paint;
+  min-height: 0;
+  cursor: grab;
+  touch-action: none; /* let pointer-drag pan, don't scroll the page */
+  /* backdrop neutral comes from the global tonal range: lmax in light preview,
+     lmin in dark preview (set inline as --canvas-bg by app.js#canvasBg). */
+  background: var(--canvas-bg, var(--bg));
+}
+.canvas-area.panning { cursor: grabbing; }
+/* canvas color-scheme — flips ONLY the preview's color-scheme, independent of app
+   chrome; the backdrop fill itself is the lmin/lmax-derived --canvas-bg above. */
+.canvas-area.canvas-scheme-light { color-scheme: light; }
+.canvas-area.canvas-scheme-dark  { color-scheme: dark; }
+.canvas-scene {
+  position: absolute; top: 50%; left: 50%;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.origin-dot {
+  position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px;
+  border-radius: 50%; background: var(--ink-faint); opacity: .5;
+  pointer-events: none; z-index: 1;
+}
+
+/* canvas = the ramps as the 2D space; each row IS the palette navigator */
+.ramp-stack { display: flex; flex-direction: column; gap: 12px; padding: 4px; }
+.ramp-row {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px; border-radius: var(--r);
+  border: 1px solid transparent; cursor: pointer;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+.ramp-row:hover { border-color: var(--line); }
+.ramp-row.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.ramp-row.off { opacity: .55; }
+.ramp-head { display: flex; align-items: center; gap: 8px; }
+.ramp-row .enable {
+  flex: none; width: 18px; text-align: center; color: var(--ink-dim);
+  border-radius: 4px; cursor: pointer;
+}
+.ramp-row .enable:hover { background: var(--line); color: var(--ink); }
+
+/* drag handle (⋮⋮) — grabs the row for reorder; never pans the canvas / selects */
+.ramp-row .drag-handle {
+  flex: none; width: 16px; align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-faint); cursor: grab; border-radius: 4px;
+  touch-action: none; /* claim the pointer for drag, not page scroll */
+  user-select: none;
+}
+.ramp-row .drag-handle::before {
+  content: "⋮⋮"; font-size: 12px; letter-spacing: -2px; line-height: 1;
+}
+.ramp-row .drag-handle:hover { color: var(--ink); background: var(--line); }
+.ramp-row .drag-handle:active { cursor: grabbing; }
+hct-app.reordering { cursor: grabbing; }
+hct-app.reordering .ramp-row { transition: transform .08s ease; }
+/* drop indicator — a tinted edge on the row the drop will land before/after */
+.ramp-row.drop-before { box-shadow: 0 -3px 0 -1px var(--accent); }
+.ramp-row.drop-after { box-shadow: 0 3px 0 -1px var(--accent); }
+.ramp-strip { display: flex; box-shadow: var(--shadow); border-radius: 6px; overflow: hidden; width: fit-content; }
+.ramp-strip i {
+  width: 26px; height: 40px; display: block; position: relative;
+}
+.ramp-strip i.oog::after {
+  content: ""; position: absolute; inset: 0;
+  background: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,0,0,.45) 4px 5px);
+}
+.ramp-strip i:hover { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 2; }
+
+/* scrim view — 7 translucent 750-base overlays per palette, painted over a neutral
+   checkerboard (the universal "this is translucent" indicator) so the alpha reads clearly. */
+.scrim-strip { display: flex; box-shadow: var(--shadow); border-radius: 6px; overflow: hidden; width: fit-content; }
+.scrim-cell {
+  width: 26px; height: 40px; display: block; position: relative;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, #c9ced6 25%, transparent 25%, transparent 75%, #c9ced6 75%),
+    linear-gradient(45deg, #c9ced6 25%, transparent 25%, transparent 75%, #c9ced6 75%);
+  background-size: 14px 14px; background-position: 0 0, 7px 7px;
+}
+.scrim-fill { position: absolute; inset: 0; display: block; }
+.scrim-cell:hover { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 2; }
+/* small scrim swatches for the right-pane sub-variant preview */
+.scrim-cell.sm { width: 28px; height: 24px; }
+
+/* Semantic Mapping view — a DATA TABLE in the canvas slot: scrolls, no pan/zoom. */
+.canvas-area.is-table { cursor: default; overflow: hidden; }
+.canvas-area.is-table .canvas-scene {
+  position: static; transform: none !important; inset: auto;
+  width: 100%; height: 100%; max-height: 100%; overflow: auto; display: block; padding: 14px;
+}
+.map-wrap { max-width: 720px; margin: 0 auto; }
+.map-head { display: flex; align-items: baseline; gap: 10px; margin: 0 2px 10px; }
+.map-head small { color: var(--ink-dim); }
+.map-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.map-table th { text-align: left; font-weight: 600; color: var(--ink-dim); padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--panel-2); position: sticky; top: 0; z-index: 1; }
+.map-table td { padding: 5px 10px; border-bottom: 1px solid var(--line-2); }
+.map-row.map-role-top td { border-top: 2px solid var(--line); }
+.map-mode { color: var(--ink-dim); width: 52px; }
+.map-table td.map-sw, .map-table th.map-sw { width: 30px; }
+.map-swatch {
+  position: relative; display: inline-block; width: 22px; height: 22px; border-radius: 5px;
+  border: 1px solid var(--line); overflow: hidden; vertical-align: middle; background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #c9ced6 25%, transparent 25%, transparent 75%, #c9ced6 75%),
+    linear-gradient(45deg, #c9ced6 25%, transparent 25%, transparent 75%, #c9ced6 75%);
+  background-size: 10px 10px; background-position: 0 0, 5px 5px;
+}
+.map-swatch-fill { position: absolute; inset: 0; display: block; }
+.map-table code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); }
+.map-sem code { color: var(--accent); font-weight: 600; }
+/* the editable raw-token cell — a select menu, or a free text input (⇄ toggle in the head). */
+.map-raw-select, .map-raw-input {
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 2px 6px; border: 1px solid var(--line); border-radius: 5px;
+  background: var(--panel-2); color: var(--ink); max-width: 210px;
+}
+.map-raw-input { width: 150px; }
+.map-raw-select.ov, .map-raw-input.ov { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.map-row.map-ov td.map-mode { box-shadow: inset 2px 0 0 var(--accent); }
+.map-reset { border: none; background: none; cursor: pointer; color: var(--ink-dim); font-size: 13px; padding: 0 2px; margin-left: 4px; vertical-align: middle; }
+.map-reset:hover { color: var(--accent); }
+.map-head .spacer { flex: 1; }
+.map-head .ghost { padding: 4px 10px; }
+/* drift diff (#3) — does the file match what we'd generate? */
+.map-file { width: 38px; text-align: center; }
+.map-drift { display: inline-block; min-width: 16px; text-align: center; font-weight: 700; }
+.map-drift-match { color: #2e9e5b; }
+.map-drift-drift { color: #d9534f; }
+.map-drift-absent, .map-drift-none { color: var(--ink-faint); font-weight: 400; }
+.map-drift-sum { font-size: 12px; padding: 2px 9px; border-radius: 10px; font-weight: 600; }
+.map-drift-sum.in-sync { background: color-mix(in srgb, #2e9e5b 16%, transparent); color: #2e9e5b; }
+.map-drift-sum.has-drift { background: color-mix(in srgb, #d9534f 16%, transparent); color: #d9534f; }
+.scrim-context { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; margin-bottom: 12px; background: var(--panel-2); }
+.scrim-ctx-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.scrim-ctx-head small { color: var(--ink-dim); font-weight: 400; }
+.scrim-ctx-strip { display: flex; border-radius: 5px; overflow: hidden; width: fit-content; box-shadow: var(--shadow); }
+.scrim-ctx-note { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: var(--ink-dim); }
+.ramp-name { font-weight: 600; color: var(--ink); }
+.ramp-name.off { text-decoration: line-through; color: var(--ink-faint); }
+.ramp-name small { color: var(--ink-dim); font-weight: 400; margin-left: 6px; }
+
+/* shared analysis-graph SVG styles (left-pane graphs) */
+/* differential damping controls + curve (Global tab) */
+.sub-head { font-size: 10px; font-weight: 600; color: var(--ink-dim); margin: 12px 0 2px; text-transform: uppercase; letter-spacing: .05em; }
+.mini-check { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-dim); margin: -2px 0 10px; cursor: pointer; }
+.mini-check input { width: 13px; height: 13px; accent-color: var(--accent); cursor: pointer; }
+.damp-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 10px; }
+.damp-presets .preset {
+  padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px;
+  font-size: 10.5px; font-weight: 550; color: var(--ink-dim); background: var(--panel-2);
+}
+.damp-presets .preset:hover { background: var(--line-2); color: var(--ink); }
+.damp-presets .preset.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: var(--shadow); }
+.damp-graph { margin-top: 6px; padding: 6px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--panel-2); }
+.dg-unity { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 2 2; }
+
+.lc-axis { stroke: var(--line); stroke-width: 1; }
+.lc-ceiling { fill: color-mix(in srgb, var(--accent) 16%, transparent); stroke: none; }
+.lc-toneline { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+.lc-applied { stroke: var(--accent); stroke-width: 1.5; fill: none; }
+.lc-dot { fill: var(--accent); }
+.an-svg text { fill: var(--ink-dim); font-size: 9px; font-family: var(--sans); }
+
+.canvas-footer, .app-footer {
+  display: flex; align-items: center; gap: 14px;
+  font-size: 11.5px; color: var(--ink-dim);
+  padding: 0 12px; font-variant-numeric: tabular-nums;
+}
+.canvas-footer {
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+.canvas-footer .sw {
+  width: 12px; height: 12px; border-radius: 3px; display: inline-block;
+  border: 1px solid rgba(128,128,128,.4); vertical-align: -2px; margin-right: 4px;
+}
+.app-footer {
+  grid-area: footer;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+.app-footer .spacer { flex: 1; }
+.app-footer .dirty { color: var(--warn); }
+.app-footer .saved { color: var(--ok); }
+.app-footer .warn { color: var(--warn); }
+
+/* right-pane = segmented inspector [ Palette | Global | Roles ] */
+.right-pane {
+  grid-area: right;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.segmented {
+  display: flex; gap: 2px; margin: 12px 14px 0;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 2px; flex: none;
+}
+.segmented button {
+  flex: 1; border: none; border-radius: var(--r-sm); padding: 6px 8px;
+  color: var(--ink-dim); font-weight: 550; justify-content: center;
+}
+.segmented button.on {
+  background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow);
+}
+.segmented button:not(.on):hover { background: var(--line-2); color: var(--ink); }
+/* canvas-header variant of .segmented — inline + compact (no right-pane margins, auto-width). */
+.canvas-seg { margin: 0; }
+.canvas-seg button { flex: 0 0 auto; padding: 5px 14px; }
+.seg-body { flex: 1; overflow: auto; padding: 14px; }
+/* live component preview — pinned below the panel on every tab, painted from the
+   selected palette's semantic roles (surface / onSurface / onSurfaceVariant / primary). */
+.seg-example { flex: none; border-top: 1px solid var(--line); padding: 14px; background: var(--panel); }
+.example-card { border-radius: 14px; padding: 16px 18px; }
+.ex-title { font-weight: 700; font-size: 15px; line-height: 1.2; }
+.ex-sub { font-size: 13px; margin-top: 3px; }
+.ex-btn {
+  margin-top: 14px; border: none; border-radius: 10px;
+  padding: 9px 18px; font-weight: 650; font-size: 14px; cursor: default;
+}
+.insp-title { font-size: 14px; font-weight: 650; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+.insp-sub { color: var(--ink-dim); font-size: 11.5px; margin-bottom: 14px; }
+.field { margin-bottom: 14px; }
+.field > label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11.5px; color: var(--ink-dim); margin-bottom: 5px;
+}
+.field > label b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.row { display: flex; align-items: center; gap: 8px; }
+
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
+  background: var(--line); border-radius: 999px; outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--panel);
+  box-shadow: var(--shadow); cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--panel); cursor: pointer;
+}
+
+.toggle {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+}
+.toggle .track {
+  width: 34px; height: 19px; border-radius: 999px; background: var(--line);
+  position: relative; transition: background .12s;
+}
+.toggle .track::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 15px; height: 15px; border-radius: 50%; background: #fff;
+  box-shadow: var(--shadow); transition: transform .12s;
+}
+.toggle.on .track { background: var(--accent); }
+.toggle.on .track::after { transform: translateX(15px); }
+
+.contrast-box {
+  background: var(--container); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 10px; font-size: 11.5px;
+}
+.contrast-box .cr { display: flex; justify-content: space-between; padding: 2px 0; }
+.contrast-box .cr b { font-variant-numeric: tabular-nums; }
+.contrast-box .pass { color: var(--ok); }
+.contrast-box .fail { color: var(--warn); }
+
+.insp-actions { display: flex; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.insp-actions .danger:hover { color: var(--danger); }
+
+.roles-table { font-size: 11px; }
+.roles-table .rrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.roles-table .rrow.rhead { color: var(--ink-faint); font-weight: 600; border-bottom: 1px solid var(--line); padding-bottom: 5px; margin-bottom: 3px; }
+.roles-table .rrow .sw { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(128,128,128,.4); flex: none; }
+.roles-table .rrow .k { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.roles-table .rrow .suf { width: 92px; flex: none; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.roles-table .rrow .sw-pair { display: flex; gap: 3px; flex: none; align-items: center; }
+.roles-table .rrow.rhead .sw-pair { gap: 6px; }
+.roles-table .rrow.rhead .sw-pair span { width: 16px; text-align: center; }
+
+/* ───────────────────────── EXPORT DRAWER ───────────────────────── */
+.drawer-scrim {
+  position: fixed; inset: 0; background: rgba(10,14,22,.34);
+  z-index: 40; opacity: 0; pointer-events: none; transition: opacity .14s;
+}
+.drawer-scrim.open { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed; top: 0; right: 0; height: 100%; width: 480px; max-width: 92vw;
+  background: var(--panel); border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-lg); z-index: 41;
+  transform: translateX(100%); transition: transform .18s ease;
+  display: flex; flex-direction: column;
+}
+.drawer.open { transform: none; }
+.drawer-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid var(--line);
+}
+.drawer-head h3 { margin: 0; font-size: 14px; }
+.drawer-head .spacer { flex: 1; }
+.drawer-tabs { display: flex; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid var(--line); }
+.drawer-tabs button {
+  border-radius: var(--r-sm) var(--r-sm) 0 0; padding: 6px 12px;
+  color: var(--ink-dim); font-weight: 550; border: 1px solid transparent; border-bottom: none;
+}
+.drawer-tabs button.on { background: var(--panel-2); color: var(--ink); border-color: var(--line); }
+/* Figma sub-bar: the import hint on its own row, then [mode-file segmented | Binder plugin] below. */
+.figma-bar { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.figma-bar-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.figma-files { display: flex; gap: 2px; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px; }
+.figma-files button { border-radius: var(--r-sm); padding: 4px 10px; font-size: 11.5px; font-weight: 550; color: var(--ink-dim); }
+.figma-files button.on { background: var(--accent); color: var(--accent-ink); }
+.figma-note { color: var(--ink-dim); font-size: 11px; line-height: 1.5; }
+.figma-plugin-btn { white-space: nowrap; }
+/* Config sub-bar: the project source-of-truth actions sit ABOVE the code (not in the footer). */
+.config-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.config-note { color: var(--ink-dim); font-size: 11px; flex: 1; min-width: 160px; }
+/* the code block hosts a floating copy affordance in its top-right corner. */
+.drawer-code { position: relative; flex: 1; min-height: 0; display: flex; }
+.copy-float {
+  position: absolute; top: 8px; right: 16px; z-index: 2;
+  padding: 4px 9px; font-size: 11.5px; gap: 5px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-sm);
+  color: var(--ink-dim); box-shadow: var(--shadow);
+}
+.copy-float:hover { background: var(--line-2); color: var(--ink); }
+.drawer-pre {
+  flex: 1; overflow: auto; margin: 0; padding: 14px 16px;
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
+  background: var(--panel-2); white-space: pre; tab-size: 2;
+  color: var(--ink);
+}
+.drawer-foot {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border-top: 1px solid var(--line);
+  flex-wrap: wrap; /* footer actions wrap to a 2nd row rather than clipping (narrow plugin window) */
+}
+.drawer-foot .meta { color: var(--ink-dim); font-size: 11.5px; flex: 1; min-width: 140px; font-variant-numeric: tabular-nums; }
+
+/* ── responsive toolbars — the plugin window can be narrow; toolbars must never overflow ── */
+/* never break a button's own label across lines (no 3-line "⚑ Add Variables → Figma"). */
+.app-header button, .canvas-header button, .drawer-foot button, .drawer-head button { white-space: nowrap; }
+@media (max-width: 1240px) { /* tighten the fixed-height header toolbars so buttons still fit */
+  .app-header, .canvas-header { gap: 6px; }
+  .app-header button, .canvas-header button { padding: 4px 7px; }
+  .canvas-seg button { padding: 5px 10px; }
+  .segmented button { padding: 5px 8px; }
+}
+
+.toast {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--ink); color: var(--bg);
+  padding: 9px 16px; border-radius: var(--r); box-shadow: var(--shadow-lg);
+  z-index: 60; opacity: 0; transition: opacity .15s, transform .15s; font-size: 12.5px;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }

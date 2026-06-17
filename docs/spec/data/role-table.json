@@ -1,0 +1,366 @@
+{
+  "constants": {
+    "PEAK": 500,
+    "LITE": 450,
+    "DARK": 550,
+    "STOPS": [
+      50,
+      100,
+      150,
+      200,
+      250,
+      300,
+      350,
+      400,
+      450,
+      500,
+      550,
+      600,
+      650,
+      700,
+      750,
+      800,
+      850,
+      900,
+      950
+    ],
+    "EXTRA_STOPS": [
+      75,
+      125,
+      175,
+      825,
+      875,
+      925
+    ],
+    "EXPORT_STOPS": [
+      50,
+      75,
+      100,
+      125,
+      150,
+      175,
+      200,
+      250,
+      300,
+      350,
+      400,
+      450,
+      500,
+      550,
+      600,
+      650,
+      700,
+      750,
+      800,
+      825,
+      850,
+      875,
+      900,
+      925,
+      950
+    ],
+    "SCRIM_BASES": [
+      500
+    ],
+    "SCRIM_STEPS": [
+      100,
+      175,
+      250,
+      300,
+      400,
+      450,
+      550
+    ]
+  },
+  "rolesPerPalette": 37,
+  "roleTable": [
+    {
+      "key": "primary",
+      "suffix": "",
+      "light": "550",
+      "dark": "450"
+    },
+    {
+      "key": "primaryDim",
+      "suffix": "-dim",
+      "light": "650",
+      "dark": "700"
+    },
+    {
+      "key": "primaryBright",
+      "suffix": "-bright",
+      "light": "350",
+      "dark": "400"
+    },
+    {
+      "key": "primaryLow",
+      "suffix": "-low",
+      "light": "350",
+      "dark": "700"
+    },
+    {
+      "key": "primaryHigh",
+      "suffix": "-high",
+      "light": "650",
+      "dark": "400"
+    },
+    {
+      "key": "onPrimary",
+      "suffix": "-on-primary",
+      "light": "50",
+      "dark": "50"
+    },
+    {
+      "key": "onPrimaryVariant",
+      "suffix": "-on-primary-variant",
+      "light": "200",
+      "dark": "200"
+    },
+    {
+      "key": "onSurface",
+      "suffix": "-on-surface",
+      "light": "950",
+      "dark": "50"
+    },
+    {
+      "key": "onSurfaceVariant",
+      "suffix": "-on-surface-variant",
+      "light": "750",
+      "dark": "250"
+    },
+    {
+      "key": "outline",
+      "suffix": "-outline",
+      "light": "500-550",
+      "dark": "500-550"
+    },
+    {
+      "key": "outlineVariant",
+      "suffix": "-outline-variant",
+      "light": "500-400",
+      "dark": "500-400"
+    },
+    {
+      "key": "container",
+      "suffix": "-container",
+      "light": "500-175",
+      "dark": "500-175"
+    },
+    {
+      "key": "containerLow",
+      "suffix": "-container-low",
+      "light": "500-100",
+      "dark": "500-100"
+    },
+    {
+      "key": "containerHigh",
+      "suffix": "-container-high",
+      "light": "500-250",
+      "dark": "500-250"
+    },
+    {
+      "key": "scrimWeakest",
+      "suffix": "-scrim-weakest",
+      "light": "500-100",
+      "dark": "500-100"
+    },
+    {
+      "key": "scrimWeaker",
+      "suffix": "-scrim-weaker",
+      "light": "500-175",
+      "dark": "500-175"
+    },
+    {
+      "key": "scrimWeak",
+      "suffix": "-scrim-weak",
+      "light": "500-250",
+      "dark": "500-250"
+    },
+    {
+      "key": "scrim",
+      "suffix": "-scrim",
+      "light": "500-300",
+      "dark": "500-300"
+    },
+    {
+      "key": "scrimStrong",
+      "suffix": "-scrim-strong",
+      "light": "500-400",
+      "dark": "500-400"
+    },
+    {
+      "key": "scrimStronger",
+      "suffix": "-scrim-stronger",
+      "light": "500-450",
+      "dark": "500-450"
+    },
+    {
+      "key": "scrimStrongest",
+      "suffix": "-scrim-strongest",
+      "light": "500-550",
+      "dark": "500-550"
+    },
+    {
+      "key": "inverseSurface",
+      "suffix": "-inverse-surface",
+      "light": "900",
+      "dark": "100"
+    },
+    {
+      "key": "inverseOnSurface",
+      "suffix": "-inverse-on-surface",
+      "light": "50",
+      "dark": "950"
+    },
+    {
+      "key": "background",
+      "suffix": "-background",
+      "light": "100",
+      "dark": "900"
+    },
+    {
+      "key": "surface",
+      "suffix": "-surface",
+      "light": "125",
+      "dark": "875"
+    },
+    {
+      "key": "surfaceDimmest",
+      "suffix": "-surface-dimmest",
+      "light": "200",
+      "dark": "950"
+    },
+    {
+      "key": "surfaceDimmer",
+      "suffix": "-surface-dimmer",
+      "light": "175",
+      "dark": "925"
+    },
+    {
+      "key": "surfaceDim",
+      "suffix": "-surface-dim",
+      "light": "150",
+      "dark": "900"
+    },
+    {
+      "key": "surfaceBright",
+      "suffix": "-surface-bright",
+      "light": "100",
+      "dark": "850"
+    },
+    {
+      "key": "surfaceBrighter",
+      "suffix": "-surface-brighter",
+      "light": "75",
+      "dark": "825"
+    },
+    {
+      "key": "surfaceBrightest",
+      "suffix": "-surface-brightest",
+      "light": "50",
+      "dark": "800"
+    },
+    {
+      "key": "surfaceLowest",
+      "suffix": "-surface-lowest",
+      "light": "50",
+      "dark": "950"
+    },
+    {
+      "key": "surfaceLower",
+      "suffix": "-surface-lower",
+      "light": "75",
+      "dark": "925"
+    },
+    {
+      "key": "surfaceLow",
+      "suffix": "-surface-low",
+      "light": "100",
+      "dark": "900"
+    },
+    {
+      "key": "surfaceHigh",
+      "suffix": "-surface-high",
+      "light": "150",
+      "dark": "850"
+    },
+    {
+      "key": "surfaceHigher",
+      "suffix": "-surface-higher",
+      "light": "175",
+      "dark": "825"
+    },
+    {
+      "key": "surfaceHighest",
+      "suffix": "-surface-highest",
+      "light": "200",
+      "dark": "800"
+    }
+  ],
+  "defaults": [
+    {
+      "name": "Neutral",
+      "hue": 267,
+      "chroma": 29,
+      "skew": -20,
+      "lift": 0,
+      "on": true
+    },
+    {
+      "name": "Primary",
+      "hue": 267,
+      "chroma": 95,
+      "skew": -20,
+      "lift": 0,
+      "on": true
+    },
+    {
+      "name": "Secondary",
+      "hue": 165,
+      "chroma": 100,
+      "skew": 0,
+      "lift": 0,
+      "on": true
+    },
+    {
+      "name": "Tertiary",
+      "hue": 315,
+      "chroma": 33,
+      "skew": -20,
+      "lift": 0,
+      "on": true
+    },
+    {
+      "name": "Info",
+      "hue": 235,
+      "chroma": 40,
+      "skew": -20,
+      "lift": 0,
+      "on": true
+    },
+    {
+      "name": "Success",
+      "hue": 145,
+      "chroma": 55,
+      "skew": -20,
+      "lift": -5,
+      "on": true
+    },
+    {
+      "name": "Warning",
+      "hue": 70,
+      "chroma": 100,
+      "skew": 40,
+      "lift": 15,
+      "on": true
+    },
+    {
+      "name": "Danger",
+      "hue": 27,
+      "chroma": 55,
+      "skew": -20,
+      "lift": -5,
+      "on": true
+    }
+  ]
+}

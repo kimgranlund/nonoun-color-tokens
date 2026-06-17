@@ -1,0 +1,20 @@
+{
+  "name": "hct-palette-generator",
+  "version": "1.0.0",
+  "description": "Perceptually-even HCT color-palette generator — pure engine, <hct-app> web component, and Figma plugin.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "gen:figma-assets": "node scripts/gen-figma-assets.mjs",
+    "bundle": "node scripts/bundle.mjs",
+    "gen:figma-ui": "node scripts/gen-figma-ui.mjs",
+    "build": "npm run gen:figma-assets && tsc && vite build && npm run bundle && npm run gen:figma-ui",
+    "preview": "vite preview",
+    "test": "npm run gen:figma-assets && npm run bundle && npm run gen:figma-ui && node test/run.mjs"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12"
+  }
+}

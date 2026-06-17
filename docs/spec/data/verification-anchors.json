@@ -1,0 +1,107 @@
+{
+  "note": "Engine correctness anchors: cam16FromRgb + L* forward, then hctToRgb inverse roundtrip. max_channel_delta is per-channel sRGB error after a full forward+inverse cycle. Acceptance tolerance: max_channel_delta <= 2.",
+  "anchors": [
+    {
+      "name": "red",
+      "srgb": [
+        255,
+        0,
+        0
+      ],
+      "cam16_hue": 27.41,
+      "cam16_chroma": 113.36,
+      "lstar": 53.23,
+      "roundtrip_rgb": [
+        255,
+        0,
+        0
+      ],
+      "max_channel_delta": 0
+    },
+    {
+      "name": "green",
+      "srgb": [
+        0,
+        255,
+        0
+      ],
+      "cam16_hue": 142.14,
+      "cam16_chroma": 108.41,
+      "lstar": 87.74,
+      "roundtrip_rgb": [
+        0,
+        255,
+        0
+      ],
+      "max_channel_delta": 0
+    },
+    {
+      "name": "blue",
+      "srgb": [
+        0,
+        0,
+        255
+      ],
+      "cam16_hue": 282.79,
+      "cam16_chroma": 87.23,
+      "lstar": 32.3,
+      "roundtrip_rgb": [
+        0,
+        0,
+        255
+      ],
+      "max_channel_delta": 0
+    },
+    {
+      "name": "white",
+      "srgb": [
+        255,
+        255,
+        255
+      ],
+      "cam16_hue": 209.49,
+      "cam16_chroma": 2.87,
+      "lstar": 100,
+      "roundtrip_rgb": [
+        255,
+        255,
+        255
+      ],
+      "max_channel_delta": 0
+    },
+    {
+      "name": "black",
+      "srgb": [
+        0,
+        0,
+        0
+      ],
+      "cam16_hue": 0,
+      "cam16_chroma": 0,
+      "lstar": 0,
+      "roundtrip_rgb": [
+        0,
+        0,
+        0
+      ],
+      "max_channel_delta": 0
+    },
+    {
+      "name": "mid-gray",
+      "srgb": [
+        119,
+        119,
+        119
+      ],
+      "cam16_hue": 209.49,
+      "cam16_chroma": 1.82,
+      "lstar": 50.03,
+      "roundtrip_rgb": [
+        119,
+        119,
+        119
+      ],
+      "max_channel_delta": 0
+    }
+  ]
+}
