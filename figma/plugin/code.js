@@ -46,7 +46,7 @@ figma.ui.onmessage = async (msg) => {
       // Embed the exact params in the file ALONGSIDE the variables, so a later read round-trips
       // losslessly (the variables alone can only seed an approximate hue/chroma).
       if (msg.config) writeConfig(msg.config);
-      figma.notify(`HCT: ${r.raw} raw + ${r.semantic} semantic vars (Light/Dark)`);
+      figma.notify(`HCT: ${r.raw} raw + ${r.semantic} semantic vars (Light/Dark)` + (r.pruned ? `, ${r.pruned} stale pruned` : ""));
     } else if (msg.type === "save-config") {
       writeConfig(msg.config);
       figma.notify("HCT: config saved into this file");
@@ -126,6 +126,7 @@ async function applyBundle(dtcg) {
   raw.renameMode(raw.modes[0].modeId, "Value");
   const rawMode = raw.modes[0].modeId;
   const rawByName = await varsByName(raw.id);
+  const currentRaw = new Set(); // names this bundle WANTS in raw-colors — everything else is stale
   let rawCount = 0;
   for (const n of childKeys(rawTree)) {
     for (const key of childKeys(rawTree[n])) {
@@ -133,6 +134,7 @@ async function applyBundle(dtcg) {
       const v = rawByName[name] || figma.variables.createVariable(name, raw, "COLOR");
       v.setValueForMode(rawMode, rgbaOf(rawTree[n][key]));
       rawByName[name] = v;
+      currentRaw.add(name);
       rawCount++;
     }
   }
@@ -144,6 +146,7 @@ async function applyBundle(dtcg) {
   const darkMode = (sem.modes[1] && sem.modes[1].modeId) || sem.addMode("Dark");
   if (sem.modes[1]) sem.renameMode(darkMode, "Dark");
   const semByName = await varsByName(sem.id);
+  const currentSem = new Set(); // names this bundle WANTS in Semantic — everything else is stale
   let semCount = 0;
   for (const n of childKeys(semLight)) {
     for (const key of childKeys(semLight[n])) {
@@ -156,11 +159,27 @@ async function applyBundle(dtcg) {
       v.setValueForMode(lightMode, lt ? figma.variables.createVariableAlias(lt) : rgbaOf(semLight[n][key]));
       v.setValueForMode(darkMode, dt ? figma.variables.createVariableAlias(dt) : rgbaOf(semDark[n][key]));
       semByName[name] = v;
+      currentSem.add(name);
       semCount++;
     }
   }
 
-  return { raw: rawCount, semantic: semCount };
+  // 3) PRUNE orphans — make each GENERATED collection mirror the current bundle exactly, so a
+  // scrim-model/format change or a removed/renamed/disabled palette can't leave stale variables
+  // behind (e.g. the old base-index scrims 250-*/500-0..6/750-*). Scoped to these two generated
+  // collections ONLY: rawByName/semByName are filtered by collection id (varsByName), so no other
+  // collection is ever touched. Delete SEMANTIC orphans first — a stale semantic var may alias a
+  // stale raw var we then remove, whereas every CURRENT semantic var aliases a CURRENT (kept) raw
+  // var, so no live alias is broken.
+  let pruned = 0;
+  for (const name of Object.keys(semByName)) {
+    if (!currentSem.has(name)) { semByName[name].remove(); pruned++; }
+  }
+  for (const name of Object.keys(rawByName)) {
+    if (!currentRaw.has(name)) { rawByName[name].remove(); pruned++; }
+  }
+
+  return { raw: rawCount, semantic: semCount, pruned: pruned };
 }
 
 // Exposed for the headless verifier (a no-op inside Figma's VM).

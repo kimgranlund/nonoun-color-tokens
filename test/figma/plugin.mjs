@@ -73,7 +73,8 @@ function mockFigma() {
       createVariable(name, coll, type) {
         const vm = {}; // shared: real Figma exposes valuesByMode; the cascade test reads .values
         const v = { id: "v" + id++, name, variableCollectionId: coll.id, type, values: vm, valuesByMode: vm,
-          setValueForMode(mid, val) { vm[mid] = val; } };
+          setValueForMode(mid, val) { vm[mid] = val; },
+          remove() { const i = variables.indexOf(this); if (i >= 0) variables.splice(i, 1); } };
         variables.push(v); return v;
       },
       createVariableAlias(v) { return { type: "VARIABLE_ALIAS", id: v.id }; },
@@ -136,6 +137,22 @@ if (applyBundle) {
     if (semVars2 !== semExpect) FAIL("idempotent", `re-apply left ${semVars2} semantic vars, want ${semExpect} (no duplicates)`);
     if (sem && sem.modes.map((m) => m.name).join() !== "Light,Dark") FAIL("idempotent", `re-apply left Semantic modes = ${sem && sem.modes.map((m) => m.name)}, want Light,Dark (no duplicate mode)`);
     if (res2.raw !== rawExpect || res2.semantic !== semExpect) FAIL("idempotent", `re-apply reported ${res2.raw}/${res2.semantic} vars, want ${rawExpect}/${semExpect}`);
+
+    // ── ORPHAN PRUNE: re-apply removes any var NOT in the current bundle, in BOTH generated
+    //    collections — old-format scrims (250-*/500-0..6/750-*) and removed/renamed/disabled
+    //    palettes — so the file mirrors the generator exactly (full-mirror pruning). ──
+    F.figma.variables.createVariable("neutral/500-0", raw, "COLOR"); // old base-index scrim
+    F.figma.variables.createVariable("neutral/750-3", raw, "COLOR"); // old 750-base scrim
+    F.figma.variables.createVariable("ghost/050", raw, "COLOR");     // removed-palette raw solid
+    F.figma.variables.createVariable("ghost/primary", sem, "COLOR"); // removed-palette semantic var
+    const res3 = await applyBundle(bundle);
+    const inColl = (cid) => F.variables.filter((v) => v.variableCollectionId === cid).map((v) => v.name);
+    const rawNames3 = inColl(raw.id), semNames3 = inColl(sem.id);
+    for (const dead of ["neutral/500-0", "neutral/750-3", "ghost/050"]) if (rawNames3.includes(dead)) FAIL("prune", `orphan raw var '${dead}' not pruned`);
+    if (semNames3.includes("ghost/primary")) FAIL("prune", "orphan semantic var 'ghost/primary' not pruned");
+    if (rawNames3.length !== rawExpect) FAIL("prune", `raw-colors has ${rawNames3.length} vars after prune, want ${rawExpect}`);
+    if (semNames3.length !== semExpect) FAIL("prune", `Semantic has ${semNames3.length} vars after prune, want ${semExpect}`);
+    if (res3.pruned !== 4) FAIL("prune", `apply reported pruned=${res3.pruned}, expected 4`);
   } catch (e) { FAIL("apply", "applyBundle threw: " + e.message); }
 
   // ── CONFIG round-trip via the file's root pluginData (the project source of truth, travels with the
@@ -173,7 +190,7 @@ if (applyBundle) {
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "config", "read"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "config", "read"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
