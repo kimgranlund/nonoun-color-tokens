@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 1.5 — 2026-06-18 — gallery: palette-count + "preset" become overlay tags on the preview
+
+The gallery tile's palette count (`N palettes`) and the presets shelf's `preset` badge now ride
+the preview strip as **tags** (overlaid pills) instead of sitting in the meta row below. The count
+gets the same pill treatment as the preset badge — a shared `.tile-tag` (translucent dark scrim +
+white text, `pointer-events:none` so the tile button still takes the click): count bottom-left,
+`preset` top-right. The meta row keeps the name (+ timestamp/delete on your own sets). UI-only —
+no data/export change; the `.set-tile.preset` class is unchanged so the `(hh)` preset tests still
+key off it. `src/ui/app.js` (`buildTiles`/`buildPresetTiles`) + `styles.css` (`.tile-tag`).
+
 ## 1.4 — 2026-06-18 — canvas backdrop uses the 100 / 900 near-edge stop (was 050 / 950)
 
 The editor canvas preview backdrop (`app.js#canvasBg`) now samples the selected palette's **100**

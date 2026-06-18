@@ -575,7 +575,15 @@ class HctApp extends HTMLElement {
       const tile = h(
         "button",
         { class: "set-tile", onclick: () => this.openSet(rec.id) },
-        h("div", { class: "set-thumb" }, strip),
+        // the palette-count rides the preview as a tag (overlaid bottom-left); the meta row
+        // below keeps the name + timestamp. tile-tags are pointer-events:none so the tile
+        // button still receives the click.
+        h(
+          "div",
+          { class: "set-thumb" },
+          strip,
+          h("span", { class: "tile-tag tile-count" }, `${enabled.length} ${enabled.length === 1 ? "palette" : "palettes"}`),
+        ),
         h(
           "div",
           { class: "set-meta" },
@@ -592,7 +600,7 @@ class HctApp extends HTMLElement {
             "🗑",
           ),
           h("div", { class: "nm" }, rec.name),
-          h("div", { class: "sub" }, `${enabled.length} palettes`, "·", ago(rec.updated)),
+          h("div", { class: "sub" }, ago(rec.updated)),
         ),
       );
       return tile;
@@ -637,13 +645,19 @@ class HctApp extends HTMLElement {
       return h(
         "button",
         { class: "set-tile preset", title: `Open a copy of “${preset.name}”`, onclick: () => this.openConfigAsSet(preset, `Opened “${preset.name}”`) },
-        h("div", { class: "set-thumb" }, strip),
+        // both the "preset" tag (top-right) and the palette-count (bottom-left) ride the preview;
+        // the meta row below carries just the name.
+        h(
+          "div",
+          { class: "set-thumb" },
+          strip,
+          h("span", { class: "tile-tag tile-preset" }, "preset"),
+          h("span", { class: "tile-tag tile-count" }, `${enabled.length} palettes`),
+        ),
         h(
           "div",
           { class: "set-meta" },
-          h("span", { class: "preset-badge" }, "preset"),
           h("div", { class: "nm" }, preset.name),
-          h("div", { class: "sub" }, `${enabled.length} palettes`),
         ),
       );
     });
