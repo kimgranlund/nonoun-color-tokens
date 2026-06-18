@@ -172,11 +172,14 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
   transition: transform .08s ease, box-shadow .12s ease;
   text-align: left;
   padding: 0;
-  display: block;
+  display: flex;        /* column so the swatch thumb can grow to fill a grid-stretched tile */
+  flex-direction: column;
   width: 100%;
 }
 .set-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); background: var(--panel); }
-.set-thumb { display: flex; flex-direction: column; height: 96px; }
+/* thumb GROWS to fill the tile height (min 96px): grid stretches tiles to the row's tallest (multi-line
+   names), and a fixed-height thumb left an empty gap below the colors. flex:1 makes the colors fill it. */
+.set-thumb { display: flex; flex-direction: column; flex: 1; min-height: 96px; }
 .set-thumb .strip { flex: 1; display: flex; }
 .set-thumb .strip i { flex: 1; }
 .set-meta { padding: 10px 12px; border-top: 1px solid var(--line-2); }
@@ -2993,7 +2996,7 @@ class HctApp extends HTMLElement {
     return [newTile, ...tiles];
   }
 
-  // buildPresetTiles — the read-only "Travel presets" shelf. Presets ship in code (TRAVEL_PRESETS,
+  // buildPresetTiles — the read-only "Presets" shelf. Presets ship in code (TRAVEL_PRESETS,
   // generated from docs/spec/colors/), never in localStorage; clicking one OPENS AN EDITABLE COPY into
   // the user's sets (openConfigAsSet hydrates + appends + opens). Filtered by the same search box.
   buildPresetTiles() {
@@ -3063,7 +3066,7 @@ class HctApp extends HTMLElement {
     }
 
     this._gridHost = h("div", { class: "set-grid" }, ...this.buildTiles());
-    // Read-only curated "Travel presets" — ship in code (TRAVEL_PRESETS), open as an editable copy.
+    // Read-only curated "Presets" — ship in code (TRAVEL_PRESETS), open as an editable copy.
     this._presetGridHost = h("div", { class: "set-grid preset-grid" }, ...this.buildPresetTiles());
 
     return h(
@@ -3084,22 +3087,22 @@ class HctApp extends HTMLElement {
         "div",
         { class: "gallery-body" },
         this.renderFigmaImportRow(), // a separate row ABOVE the sets when this Figma file already has palette variables
-        // Curated presets shelf (read-only). Opening one copies it into "Your palette sets".
         h(
           "div",
           { class: "gallery-title" },
-          h("h2", {}, "Travel presets"),
-          h("span", { class: "title-count" }, String(TRAVEL_PRESETS.length)),
-        ),
-        this._presetGridHost,
-        h(
-          "div",
-          { class: "gallery-title" },
-          h("h2", {}, "Your palette sets"),
+          h("h2", {}, "Your Palettes"),
           h("div", { class: "spacer" }),
           this._searchInput,
         ),
         this._gridHost,
+        // Curated presets shelf (read-only), below your own palettes. Opening one copies it into Your Palettes.
+        h(
+          "div",
+          { class: "gallery-title" },
+          h("h2", {}, "Presets"),
+          h("span", { class: "title-count" }, String(TRAVEL_PRESETS.length)),
+        ),
+        this._presetGridHost,
       ),
     );
   }
@@ -3117,7 +3120,7 @@ class HctApp extends HTMLElement {
     } catch { /* no frame */ }
   }
 
-  // renderFigmaImportRow — the "read a project" affordance ABOVE "Your palette sets" (Figma only).
+  // renderFigmaImportRow — the "read a project" affordance ABOVE "Your Palettes" (Figma only).
   // Prefers the file's embedded config (an EXACT round-trip); falls back to seeding from the raw-colors
   // variables (APPROXIMATE — only each family's 500 hue+chroma, no skew/lift/curves).
   renderFigmaImportRow() {

@@ -602,7 +602,7 @@ class HctApp extends HTMLElement {
     return [newTile, ...tiles];
   }
 
-  // buildPresetTiles — the read-only "Travel presets" shelf. Presets ship in code (TRAVEL_PRESETS,
+  // buildPresetTiles — the read-only "Presets" shelf. Presets ship in code (TRAVEL_PRESETS,
   // generated from docs/spec/colors/), never in localStorage; clicking one OPENS AN EDITABLE COPY into
   // the user's sets (openConfigAsSet hydrates + appends + opens). Filtered by the same search box.
   buildPresetTiles() {
@@ -672,7 +672,7 @@ class HctApp extends HTMLElement {
     }
 
     this._gridHost = h("div", { class: "set-grid" }, ...this.buildTiles());
-    // Read-only curated "Travel presets" — ship in code (TRAVEL_PRESETS), open as an editable copy.
+    // Read-only curated "Presets" — ship in code (TRAVEL_PRESETS), open as an editable copy.
     this._presetGridHost = h("div", { class: "set-grid preset-grid" }, ...this.buildPresetTiles());
 
     return h(
@@ -693,22 +693,22 @@ class HctApp extends HTMLElement {
         "div",
         { class: "gallery-body" },
         this.renderFigmaImportRow(), // a separate row ABOVE the sets when this Figma file already has palette variables
-        // Curated presets shelf (read-only). Opening one copies it into "Your palette sets".
         h(
           "div",
           { class: "gallery-title" },
-          h("h2", {}, "Travel presets"),
-          h("span", { class: "title-count" }, String(TRAVEL_PRESETS.length)),
-        ),
-        this._presetGridHost,
-        h(
-          "div",
-          { class: "gallery-title" },
-          h("h2", {}, "Your palette sets"),
+          h("h2", {}, "Your Palettes"),
           h("div", { class: "spacer" }),
           this._searchInput,
         ),
         this._gridHost,
+        // Curated presets shelf (read-only), below your own palettes. Opening one copies it into Your Palettes.
+        h(
+          "div",
+          { class: "gallery-title" },
+          h("h2", {}, "Presets"),
+          h("span", { class: "title-count" }, String(TRAVEL_PRESETS.length)),
+        ),
+        this._presetGridHost,
       ),
     );
   }
@@ -726,7 +726,7 @@ class HctApp extends HTMLElement {
     } catch { /* no frame */ }
   }
 
-  // renderFigmaImportRow — the "read a project" affordance ABOVE "Your palette sets" (Figma only).
+  // renderFigmaImportRow — the "read a project" affordance ABOVE "Your Palettes" (Figma only).
   // Prefers the file's embedded config (an EXACT round-trip); falls back to seeding from the raw-colors
   // variables (APPROXIMATE — only each family's 500 hue+chroma, no skew/lift/curves).
   renderFigmaImportRow() {

@@ -169,11 +169,14 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
   transition: transform .08s ease, box-shadow .12s ease;
   text-align: left;
   padding: 0;
-  display: block;
+  display: flex;        /* column so the swatch thumb can grow to fill a grid-stretched tile */
+  flex-direction: column;
   width: 100%;
 }
 .set-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); background: var(--panel); }
-.set-thumb { display: flex; flex-direction: column; height: 96px; }
+/* thumb GROWS to fill the tile height (min 96px): grid stretches tiles to the row's tallest (multi-line
+   names), and a fixed-height thumb left an empty gap below the colors. flex:1 makes the colors fill it. */
+.set-thumb { display: flex; flex-direction: column; flex: 1; min-height: 96px; }
 .set-thumb .strip { flex: 1; display: flex; }
 .set-thumb .strip i { flex: 1; }
 .set-meta { padding: 10px 12px; border-top: 1px solid var(--line-2); }
