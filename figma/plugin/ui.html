@@ -7,7 +7,7 @@
    ramp navigator, segmented inspector.
 
    DOGFOODING: the chrome themes itself with the tokens the tool generates. On
-   boot app.js injects <style id="hct-app-theme"> — exportCSS() over the 8 default
+   boot app.js injects <style id="nonoun-color-tokens-theme"> — exportCSS() over the 8 default
    palettes — into <head>, emitting per-palette --{n}-{stop} raw vars and 37
    --c-{n}{suffix} semantic roles in :root. The app-internal variables below
    (--bg/--panel/--ink/--accent/…) are now thin aliases onto those generated
@@ -17,7 +17,7 @@
    The chrome's neutral surfaces/text/borders come from the NEUTRAL palette's
    roles; accents from the PRIMARY palette; status from WARNING/DANGER/SUCCESS.
    Every --c-* role flips light/dark via light-dark(); the ◐ toggle sets
-   color-scheme on :root (and <hct-app>) so the whole chrome flips with it. */
+   color-scheme on :root (and <nonoun-color-tokens>) so the whole chrome flips with it. */
 
 :root {
   color-scheme: light dark;
@@ -71,9 +71,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-hct-app { display: block; height: 100vh; }
-hct-app[data-theme="light"] { color-scheme: light; }
-hct-app[data-theme="dark"]  { color-scheme: dark; }
+nonoun-color-tokens { display: block; height: 100vh; }
+nonoun-color-tokens[data-theme="light"] { color-scheme: light; }
+nonoun-color-tokens[data-theme="dark"]  { color-scheme: dark; }
 
 /* Hidden scrollbars — content still scrolls; the bar is just not painted. Keeps the
    chrome clean and avoids the bright native scrollbar in a Figma plugin iframe. */
@@ -438,8 +438,8 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 }
 .ramp-row .drag-handle:hover { color: var(--ink); background: var(--line); }
 .ramp-row .drag-handle:active { cursor: grabbing; }
-hct-app.reordering { cursor: grabbing; }
-hct-app.reordering .ramp-row { transition: transform .08s ease; }
+nonoun-color-tokens.reordering { cursor: grabbing; }
+nonoun-color-tokens.reordering .ramp-row { transition: transform .08s ease; }
 /* drop indicator — a tinted edge on the row the drop will land before/after */
 .ramp-row.drop-before { box-shadow: 0 -3px 0 -1px var(--accent); }
 .ramp-row.drop-after { box-shadow: 0 3px 0 -1px var(--accent); }
@@ -752,7 +752,7 @@ input[type="range"]::-moz-range-thumb {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style></head>
-<body><hct-app></hct-app>
+<body><nonoun-color-tokens></nonoun-color-tokens>
 <script type="module">
 const __M = {};
 __M.hct = (function(){
@@ -1377,7 +1377,8 @@ __M.persist = (function(){
 // No dependencies.
 
 // The persistence key — the exact slot the storage chain reads/writes (spec-draft §11).
-const STORAGE_KEY = "hct-palette-state-v1";
+// Renamed from "hct-palette-state-v1" with the product rename; app.js migrates old saved data forward.
+const STORAGE_KEY = "nonoun-color-tokens";
 
 // ── DOMAINS ────────────────────────────────────────────────────────────────────
 // One descriptor per State field. Two kinds:
@@ -2487,7 +2488,7 @@ function round2(x) {
 // editing). This is the dogfooding hook — the same `exportCSS` the tool ships to
 // users generates the `--{n}-{stop}` raw vars + 37 `--c-{n}{suffix}` semantic
 // roles per palette that the app's own styles.css then consumes as design tokens.
-// Injected once on boot as <style id="hct-app-theme"> (see app.js).
+// Injected once on boot as <style id="nonoun-color-tokens-theme"> (see app.js).
 function appThemeCSS() {
   const d = defaultDocument();
   const state = {
@@ -2521,7 +2522,7 @@ return { configFromVariables, slug, defaultDocument, figmaBundle, contrastRatio,
 (function(){
 // app.js — the DOM app for the HCT Palette Generator.
 //
-// One <hct-app> web component. The `document` (a palette SET) is the single
+// One <nonoun-color-tokens> web component. The `document` (a palette SET) is the single
 // source of truth; the whole right side is projectView(document), recomputed on
 // every edit — NEVER stored. Palette SETS persist to localStorage; the gallery
 // lists them. The six validated capability modules do all the color/token work
@@ -2542,6 +2543,19 @@ const SETS_KEY = STORAGE_KEY + "-sets";
 // The single "source of truth" config slot. In the browser it's a localStorage key; in a Figma
 // plugin the config lives IN the file on the document's root pluginData (round-tripped over the bridge).
 const PROJECT_KEY = STORAGE_KEY + "-project";
+
+// One-time storage-key migration: the key prefix was renamed "hct-palette-state-v1" -> "nonoun-color-tokens"
+// (the product rename, CHANGELOG 1.12). Copy any sets/config saved under the OLD keys into the new ones so a
+// returning user keeps their work. Idempotent (only fills an ABSENT new key) and tolerates a throwing
+// localStorage (a Figma sandboxed iframe) the same way save() does.
+function migrateStorageKeys() {
+  try {
+    for (const [oldK, newK] of [["hct-palette-state-v1-sets", SETS_KEY], ["hct-palette-state-v1-project", PROJECT_KEY]]) {
+      const old = localStorage.getItem(oldK);
+      if (old != null && localStorage.getItem(newK) == null) localStorage.setItem(newK, old);
+    }
+  } catch {}
+}
 
 function loadSets() {
   let raw = null;
@@ -2580,10 +2594,10 @@ function newSet(name) {
 // ── app-theme injection (dogfooding) ────────────────────────────────────────────
 // The chrome themes itself with the tokens the tool generates. On boot we run the
 // tool's own `exportCSS` over the FIXED 8 default palettes (appThemeCSS) and inject
-// the result once as <style id="hct-app-theme"> into <head>, so every --c-* role and
+// the result once as <style id="nonoun-color-tokens-theme"> into <head>, so every --c-* role and
 // raw var is available globally for styles.css to consume. We use the FIXED default
 // set (not the user's edited doc) so the chrome stays stable while a doc is edited.
-const APP_THEME_STYLE_ID = "hct-app-theme";
+const APP_THEME_STYLE_ID = "nonoun-color-tokens-theme";
 function ensureAppTheme() {
   if (typeof document === "undefined" || !document.head) return;
   if (document.getElementById(APP_THEME_STYLE_ID)) return; // inject exactly once
@@ -2644,6 +2658,7 @@ const DAMP_PRESETS = [
 class HctApp extends HTMLElement {
   connectedCallback() {
     ensureAppTheme(); // inject the generated --c-* design tokens once, globally
+    migrateStorageKeys(); // copy any pre-rename saved sets/config into the new key namespace
     this.sets = loadSets();
     // session (UI-only, not persisted with the doc)
     this.view = "gallery"; // gallery | editor
@@ -5406,7 +5421,7 @@ class HctApp extends HTMLElement {
   }
 }
 
-customElements.define("hct-app", HctApp);
+customElements.define("nonoun-color-tokens", HctApp);
 
 // expose a couple of pure helpers for any console poking / future tests.
 
@@ -5416,13 +5431,13 @@ customElements.define("hct-app", HctApp);
 (function(){
   // Tell the generator it's inside Figma so it reveals its own "⚑ Add Variables → Figma"
   // action in the Export drawer. code.js posts {type:"figma-init"} right after showUI; the
-  // message can land before <hct-app> is upgraded, so poll briefly until setInFigma exists.
+  // message can land before <nonoun-color-tokens> is upgraded, so poll briefly until setInFigma exists.
   function markInFigma(){
-    var app=document.querySelector("hct-app");
+    var app=document.querySelector("nonoun-color-tokens");
     if(app&&typeof app.setInFigma==="function"){ app.setInFigma(true); return; }
     setTimeout(markInFigma,50);
   }
-  function app(){ return document.querySelector("hct-app"); }
+  function app(){ return document.querySelector("nonoun-color-tokens"); }
   addEventListener("message",function(e){
     var m=e.data&&e.data.pluginMessage;       // sandbox→UI: read e.data.pluginMessage, not e.data
     if(!m) return;

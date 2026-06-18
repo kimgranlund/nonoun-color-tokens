@@ -309,7 +309,7 @@ function round2(x) {
 // editing). This is the dogfooding hook — the same `exportCSS` the tool ships to
 // users generates the `--{n}-{stop}` raw vars + 37 `--c-{n}{suffix}` semantic
 // roles per palette that the app's own styles.css then consumes as design tokens.
-// Injected once on boot as <style id="hct-app-theme"> (see app.js).
+// Injected once on boot as <style id="nonoun-color-tokens-theme"> (see app.js).
 export function appThemeCSS() {
   const d = defaultDocument();
   const state = {

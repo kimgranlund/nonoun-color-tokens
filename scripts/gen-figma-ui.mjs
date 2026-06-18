@@ -19,13 +19,13 @@ const BRIDGE = `
 (function(){
   // Tell the generator it's inside Figma so it reveals its own "⚑ Add Variables → Figma"
   // action in the Export drawer. code.js posts {type:"figma-init"} right after showUI; the
-  // message can land before <hct-app> is upgraded, so poll briefly until setInFigma exists.
+  // message can land before <nonoun-color-tokens> is upgraded, so poll briefly until setInFigma exists.
   function markInFigma(){
-    var app=document.querySelector("hct-app");
+    var app=document.querySelector("nonoun-color-tokens");
     if(app&&typeof app.setInFigma==="function"){ app.setInFigma(true); return; }
     setTimeout(markInFigma,50);
   }
-  function app(){ return document.querySelector("hct-app"); }
+  function app(){ return document.querySelector("nonoun-color-tokens"); }
   addEventListener("message",function(e){
     var m=e.data&&e.data.pluginMessage;       // sandbox→UI: read e.data.pluginMessage, not e.data
     if(!m) return;

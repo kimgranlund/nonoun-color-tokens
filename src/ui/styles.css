@@ -3,7 +3,7 @@
    ramp navigator, segmented inspector.
 
    DOGFOODING: the chrome themes itself with the tokens the tool generates. On
-   boot app.js injects <style id="hct-app-theme"> — exportCSS() over the 8 default
+   boot app.js injects <style id="nonoun-color-tokens-theme"> — exportCSS() over the 8 default
    palettes — into <head>, emitting per-palette --{n}-{stop} raw vars and 37
    --c-{n}{suffix} semantic roles in :root. The app-internal variables below
    (--bg/--panel/--ink/--accent/…) are now thin aliases onto those generated
@@ -13,7 +13,7 @@
    The chrome's neutral surfaces/text/borders come from the NEUTRAL palette's
    roles; accents from the PRIMARY palette; status from WARNING/DANGER/SUCCESS.
    Every --c-* role flips light/dark via light-dark(); the ◐ toggle sets
-   color-scheme on :root (and <hct-app>) so the whole chrome flips with it. */
+   color-scheme on :root (and <nonoun-color-tokens>) so the whole chrome flips with it. */
 
 :root {
   color-scheme: light dark;
@@ -67,9 +67,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-hct-app { display: block; height: 100vh; }
-hct-app[data-theme="light"] { color-scheme: light; }
-hct-app[data-theme="dark"]  { color-scheme: dark; }
+nonoun-color-tokens { display: block; height: 100vh; }
+nonoun-color-tokens[data-theme="light"] { color-scheme: light; }
+nonoun-color-tokens[data-theme="dark"]  { color-scheme: dark; }
 
 /* Hidden scrollbars — content still scrolls; the bar is just not painted. Keeps the
    chrome clean and avoids the bright native scrollbar in a Figma plugin iframe. */
@@ -434,8 +434,8 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 }
 .ramp-row .drag-handle:hover { color: var(--ink); background: var(--line); }
 .ramp-row .drag-handle:active { cursor: grabbing; }
-hct-app.reordering { cursor: grabbing; }
-hct-app.reordering .ramp-row { transition: transform .08s ease; }
+nonoun-color-tokens.reordering { cursor: grabbing; }
+nonoun-color-tokens.reordering .ramp-row { transition: transform .08s ease; }
 /* drop indicator — a tinted edge on the row the drop will land before/after */
 .ramp-row.drop-before { box-shadow: 0 -3px 0 -1px var(--accent); }
 .ramp-row.drop-after { box-shadow: 0 3px 0 -1px var(--accent); }

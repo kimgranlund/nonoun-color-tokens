@@ -12,7 +12,7 @@ A perceptually-even color-palette tool. It generates tonal ramps in the **HCT** 
 (surfaces, on-colors, outlines, containers, scrims, inverse), and exports to CSS, OKLCH, JSON,
 DTCG, Figma variables, and Material UI3 — plus a one-click `.zip` of all of them.
 
-It ships three ways: a **Vite web app**, a single **`<hct-app>` web component**, and a **Figma
+It ships three ways: a **Vite web app**, a single **`<nonoun-color-tokens>` web component**, and a **Figma
 plugin** that writes the palette straight into the file's variable collections.
 
 <!-- Hero: regenerate with `npm run gen:preview` (rendered straight from the engine via projectView). -->
@@ -59,7 +59,7 @@ cascade, persistence round-trip, the config I/O + editable-mapping additions) pl
 src/
   engine/   hct.js · tonal.js · semantic.js · exports.js   — pure ES modules, no DOM
   ui/       model.mjs · app.js · styles.css · persist.js · zip.mjs · figma-plugin-assets.js
-  main.ts   — Vite entry (imports the stylesheet + <hct-app>, mounts it)
+  main.ts   — Vite entry (imports the stylesheet + <nonoun-color-tokens>, mounts it)
 figma/
   plugin/   code.js · manifest.json · ui.html              — the generator AS a Figma plugin
   binder/   bind-plan.mjs · figma-semantic-binder/          — the standalone Semantic Binder plugin
@@ -68,7 +68,7 @@ docs/spec/  the product specification + the canonical data/role-table.json (the 
 test/       engine/ · ui/ · figma/ · run.mjs
 ```
 
-The engine is pure and DOM-free; `src/ui/app.js` defines the `<hct-app>` web component over it; the
+The engine is pure and DOM-free; `src/ui/app.js` defines the `<nonoun-color-tokens>` web component over it; the
 Figma plugin reuses the exact same bundle. `docs/spec/data/role-table.json` is the **canonical contract**
 the semantic / export / figma verifiers validate against — it is the spec, not a derived file.
 
