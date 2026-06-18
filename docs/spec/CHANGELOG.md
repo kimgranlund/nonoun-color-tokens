@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 1.8 — 2026-06-18 — editor: retune the backdrop / container stops (125 bg · 75 container)
+
+Adjusts the two canvas tints introduced in 1.7 (`app.js`, UI-only):
+
+- Canvas **backdrop** (`canvasBg`): the selected palette's **125** stop in light preview, **875** in
+  dark (was 100/900).
+- Palette **container** rows (`containerBg`): the palette's **75** stop in light, **925** in dark
+  (was 150/850).
+
+Both are now read from **`fullRamp`** (the 25-stop EXPORT set), since 75/125/875/925 are EXPORT-only
+half-steps absent from the 19-stop display `ramp` — so the tints resolve regardless of the Core/All
+stops mode. The dark mirrors (875, 925) keep the row's `var(--ink)` name text readable on the tint.
+Note the figure-ground vs 1.7: the container (75) is now LIGHTER than the backdrop (125) in light
+preview (cards lift as lighter panels), mirrored in dark. headless-boot `(j)` updated to the new
+stops + `fullRamp` lookups.
+
 ## 1.7 — 2026-06-18 — editor: palette-container tint (150/850) + click-empty-canvas to deselect
 
 Two canvas-navigator tweaks (`app.js`, UI-only — no token/export/persistence change):

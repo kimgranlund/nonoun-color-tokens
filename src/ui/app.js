@@ -1481,30 +1481,32 @@ class HctApp extends HTMLElement {
   }
 
   // canvasBg — the canvas backdrop. When a palette is EXPLICITLY selected it's that palette's
-  // NEAR-EDGE color: its 100 stop in light preview, its 900 stop in dark (one step in from the
-  // 050/950 extremes — so the backdrop carries a touch of the palette's own hue/tint rather than
-  // washing to pure white/black at lmax=100/lmin=0). Follows selection (selectPalette → render) and
-  // lmin/lmax. With NO explicit selection (Esc, or a click on empty canvas → _deselect), it reverts
-  // to the DEFAULT neutral gray at the tonal extreme — same fallback used when no ramp exists yet.
+  // NEAR-EDGE color: its 125 stop in light preview, its 875 stop in dark (a faintly-hued near-edge
+  // tone, so the backdrop carries a touch of the palette's own hue rather than washing to pure
+  // white/black). Read from fullRamp — 125/875 are EXPORT-only half-steps, absent from the 19-stop
+  // display `ramp`. Follows selection (selectPalette → render) and lmin/lmax. With NO explicit
+  // selection (Esc, or a click on empty canvas → _deselect), it reverts to the DEFAULT neutral gray.
   canvasBg() {
     const v = this._view || projectView(this.doc);
     const pal = this.sel.kind === "palette" && v && v.palettes[this.selectedIndex()];
-    const stop = pal && pal.ramp.find((s) => s.stop === (this.canvasTheme === "dark" ? 900 : 100));
+    const ramp = pal && (pal.fullRamp || pal.ramp);
+    const stop = ramp && ramp.find((s) => s.stop === (this.canvasTheme === "dark" ? 875 : 125));
     if (stop) return stop.hex;
     const L = this.canvasTheme === "dark" ? (this.doc.lmin ?? 5) : (this.doc.lmax ?? 100);
     const g = hctToRgb(0, 0, L).rgb[0].toString(16).padStart(2, "0").toUpperCase();
     return "#" + g + g + g;
   }
 
-  // containerBg — a palette ROW container is tinted with that palette's OWN faintly-hued near-edge
-  // tone, so each card carries a wash of its palette. It tracks the CANVAS preview scheme (150 in
-  // light, 850 in dark — symmetric, mirroring canvasBg's 100/900): the row's name text is var(--ink),
-  // which resolves per the canvas-area's color-scheme (= canvasTheme), so a fixed light 150 in dark
-  // preview would land light text on a light card. Per-palette (unlike the single canvasBg backdrop).
-  // Returns "" when the stop is absent, so the CSS default (a theme-aware panel wash) holds.
+  // containerBg — a palette ROW container is tinted with that palette's OWN faintly-hued tone, so
+  // each card carries a wash of its palette. It tracks the CANVAS preview scheme (75 in light, 925
+  // in dark — symmetric, mirroring canvasBg's 125/875): the row's name text is var(--ink), which
+  // resolves per the canvas-area's color-scheme (= canvasTheme), so a fixed light 75 in dark preview
+  // would land light text on a light card. Read from fullRamp — 75/925 are EXPORT-only half-steps,
+  // absent from the 19-stop display ramp. Returns "" if absent, so the theme-aware CSS default holds.
   containerBg(vp) {
-    if (!vp || !vp.ramp) return "";
-    const s = vp.ramp.find((x) => x.stop === (this.canvasTheme === "dark" ? 850 : 150));
+    const ramp = vp && (vp.fullRamp || vp.ramp);
+    if (!ramp) return "";
+    const s = ramp.find((x) => x.stop === (this.canvasTheme === "dark" ? 925 : 75));
     return s ? s.hex : "";
   }
 
