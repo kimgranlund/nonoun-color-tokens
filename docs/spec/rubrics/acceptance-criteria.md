@@ -42,7 +42,11 @@
   `Dark_tokens.json`; each is valid JSON; passes `unzip -t`.
 - **AC-X5** DTCG: every `colorLeaf` has `colorSpace:"srgb"`, `components` in [0,1], `alpha`
   in [0,1], and a hex matching the components.
-- **AC-X6** DTCG semantic leaves carry **no** `aliasData` when `rawColl` is blank.
+- **AC-X6** DTCG semantic leaves carry **no** `aliasData` when `rawColl` is blank; when `rawColl`
+  is set, **every** semantic leaf carries the full documented name+collection alias shape —
+  `aliasData.targetVariableName` = `{n}/{refKey}` **and** `aliasData.targetVariableSetName` = the
+  `rawColl` collection (the OD-004 spike; ADR-002 re-verify). The shape is gated here; the
+  native-import cascade is validated in Figma, not by this check.
 - **AC-X7** All token names (CSS, JSON keys, DTCG names, UI3 keys) use 3-digit stop padding.
 
 ## AC-P · Plugin
