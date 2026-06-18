@@ -394,6 +394,10 @@ flushRaf();
 const palCount0 = app.doc.palettes.length;
 app.addPalette(); // commit() path → full render
 ok(app.doc.palettes.length === palCount0 + 1, "add palette (full-render path) still works");
+// a NEW palette starts from clean shaping defaults — it must NOT inherit a non-default tweak.
+const newPal = app.doc.palettes[app.doc.palettes.length - 1];
+ok(newPal.skew === 0 && newPal.lift === 0 && (newPal.hueShift ?? 0) === 0 && newPal.hueSameDir !== true,
+  `(add) a new palette resets all shaping config to neutral (got skew ${newPal.skew}, lift ${newPal.lift}, hueShift ${newPal.hueShift}, sameDir ${newPal.hueSameDir})`);
 app.setSegment("roles");
 ok(app.segment === "roles" && !!app.querySelector(".roles-table"), "segmented control still switches panels (full render)");
 app.setSegment("palette");
