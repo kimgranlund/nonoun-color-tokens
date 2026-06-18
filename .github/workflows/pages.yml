@@ -1,0 +1,46 @@
+name: Deploy demo to GitHub Pages
+
+# Publishes the dependency-free single-file build (dist/hct-palette-generator.html)
+# as the site root, so the public repo has a one-click live demo.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Grant the GITHUB_TOKEN the scopes the Pages deploy needs (and nothing more).
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One publish at a time; let an in-flight deploy finish rather than cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run build
+      # The offline single-file build IS the demo — copy it to the site root as index.html.
+      # It has no external assets, so no base-path juggling is needed under the project subpath.
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp dist/hct-palette-generator.html _site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
