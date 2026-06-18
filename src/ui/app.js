@@ -872,14 +872,6 @@ class HctApp extends HTMLElement {
         h("span", { class: "dia" }, "◆"),
         "HCT",
       ),
-      h("button", {
-        class: "ghost pane-toggle" + (this.panesLeft ? " on" : ""),
-        "data-fk": "pane-left",
-        title: "Toggle the analysis pane ([)",
-        "aria-label": "Toggle left analysis pane",
-        "aria-pressed": this.panesLeft ? "true" : "false",
-        onclick: () => this.toggleLeftPane(),
-      }, "▌"),
       h("input", {
         class: "docname",
         "data-fk": "docname",
@@ -922,14 +914,6 @@ class HctApp extends HTMLElement {
         { class: "primary", title: "Open export drawer", onclick: () => this.toggleDrawer(true) },
         "⇪ Export",
       ),
-      h("button", {
-        class: "ghost pane-toggle" + (this.panesRight ? " on" : ""),
-        "data-fk": "pane-right",
-        title: "Toggle the inspector pane (])",
-        "aria-label": "Toggle right inspector pane",
-        "aria-pressed": this.panesRight ? "true" : "false",
-        onclick: () => this.toggleRightPane(),
-      }, "▐"),
       this.themeBtn(),
     );
   }
@@ -938,6 +922,24 @@ class HctApp extends HTMLElement {
   // Ephemeral ui-session state (like segment); a full render re-applies the modifier class.
   toggleLeftPane() { this.panesLeft = !this.panesLeft; this.render(); }
   toggleRightPane() { this.panesRight = !this.panesRight; this.render(); }
+
+  // paneToggle — the collapse/expand control for one side pane. The SAME button renders
+  // in two places by state: while the pane is OPEN it lives in that pane's own header
+  // (left → the Analysis label, right → the Inspector tab row); once COLLAPSED it pops to
+  // the canvas-header (left → its left edge, right → its right edge) so there's always a
+  // visible affordance to bring the pane back. `.on` + aria-pressed track "pane shown".
+  paneToggle(side) {
+    const left = side === "left";
+    const shown = left ? this.panesLeft : this.panesRight;
+    return h("button", {
+      class: "ghost pane-toggle pane-toggle-" + side + (shown ? " on" : ""),
+      "data-fk": "pane-" + side,
+      title: (shown ? "Collapse" : "Show") + (left ? " the analysis pane ([)" : " the inspector pane (])"),
+      "aria-label": (shown ? "Collapse" : "Show") + (left ? " left analysis pane" : " right inspector pane"),
+      "aria-pressed": shown ? "true" : "false",
+      onclick: () => (left ? this.toggleLeftPane() : this.toggleRightPane()),
+    }, left ? "▌" : "▐");
+  }
 
   toGallery() {
     this.view = "gallery";
@@ -976,7 +978,10 @@ class HctApp extends HTMLElement {
     return h(
       "aside",
       { class: "left-pane" },
-      h("div", { class: "pane-label" }, "Analysis", h("span", { class: "an-sel" }, name)),
+      h("div", { class: "pane-label" }, "Analysis", h("span", { class: "an-sel" }, name),
+        // while OPEN the left toggle hugs this header's inner (canvas-side) edge; once
+        // collapsed it is rendered in the canvas-header instead (see renderCanvasHeader).
+        this.panesLeft ? this.paneToggle("left") : false),
       // .an-body wraps just the graph cards so liveRefresh can rebuild them in
       // place (replaceChildren) without touching the pane label or the pane shell.
       h("div", { class: "an-body" }, ...this.analysisCards(view)),
@@ -1339,6 +1344,8 @@ class HctApp extends HTMLElement {
     return h(
       "div",
       { class: "canvas-header" },
+      // when the LEFT pane is collapsed its toggle pops here, at the canvas's left edge.
+      !this.panesLeft ? this.paneToggle("left") : false,
       // canvas content toggle — palette ramps vs the scrim overlays.
       h(
         "div",
@@ -1413,6 +1420,8 @@ class HctApp extends HTMLElement {
       h("button", { class: "ghost", "aria-label": "Zoom in", onclick: () => this.zoomBy(1) }, "+"),
       h("div", { class: "spacer" }),
       h("button", { class: "ghost add-pal-btn", onclick: () => this.addPalette() }, "+ Palette"),
+      // when the RIGHT pane is collapsed its toggle pops here, at the canvas's right edge.
+      !this.panesRight ? this.paneToggle("right") : false,
     );
   }
 
@@ -2080,7 +2089,11 @@ class HctApp extends HTMLElement {
     return h(
       "aside",
       { class: "right-pane" },
-      h("div", { class: "segmented", role: "tablist", "aria-label": "Inspector" }, seg("palette", "Palette"), seg("global", "Global"), seg("roles", "Roles")),
+      // header row: while OPEN the right toggle hugs the inner (canvas-side) edge, left of
+      // the Inspector tabs; once collapsed it is rendered in the canvas-header instead.
+      h("div", { class: "pane-head" },
+        this.panesRight ? this.paneToggle("right") : false,
+        h("div", { class: "segmented", role: "tablist", "aria-label": "Inspector" }, seg("palette", "Palette"), seg("global", "Global"), seg("roles", "Roles"))),
       h("div", { class: "seg-body", "data-scroll": "seg-body", role: "tabpanel", id: "seg-panel", "aria-labelledby": "tab-" + this.segment }, body),
       // Pinned below the panel on EVERY tab: a live component preview wired to the
       // selected palette's roles (surface / onSurface / onSurfaceVariant + primary).
