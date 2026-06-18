@@ -100,6 +100,7 @@ export function defaultDocument() {
     dampAmp: DEFAULT_CONTROLS.dampAmp,
     dampBias: DEFAULT_CONTROLS.dampBias,
     hueSpace: DEFAULT_CONTROLS.hueSpace,
+    relChroma: DEFAULT_CONTROLS.relChroma,
     theme: "auto",
     selected: 0,
     roleOverrides: {}, // per-doc semantic-mapping re-points (empty = canonical role table)
@@ -118,6 +119,7 @@ function controlsOf(doc) {
     dampAmp: doc.dampAmp ?? DEFAULT_CONTROLS.dampAmp,
     dampBias: doc.dampBias ?? DEFAULT_CONTROLS.dampBias,
     hueSpace: doc.hueSpace ?? DEFAULT_CONTROLS.hueSpace,
+    relChroma: doc.relChroma ?? DEFAULT_CONTROLS.relChroma,
   };
 }
 
@@ -138,6 +140,7 @@ function stateOf(doc) {
     dampAmp: c.dampAmp,
     dampBias: c.dampBias,
     hueSpace: c.hueSpace,
+    relChroma: c.relChroma,
   };
 }
 

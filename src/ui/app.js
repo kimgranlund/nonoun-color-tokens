@@ -2430,6 +2430,20 @@ class HctApp extends HTMLElement {
           h("span", {}, d.hueSpace),
         ),
       ),
+      h(
+        "div",
+        { class: "field" },
+        h("label", { title: "peak: chroma is % of each hue's own peak. gamut: % of every stop's gamut ceiling — palettes harmonize across hue." }, "Chroma basis"),
+        h(
+          "div",
+          {
+            class: "toggle" + (d.relChroma ? " on" : ""),
+            onclick: () => this.commit((doc) => (doc.relChroma = !doc.relChroma)),
+          },
+          h("span", { class: "track" }),
+          h("span", {}, d.relChroma ? "gamut" : "peak"),
+        ),
+      ),
     );
   }
 

@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 1.13 — 2026-06-18 — relative-chroma mode: harmonize palette saturation across hue (Option A)
+
+A new global control **`relChroma`** (UI: Global → "Chroma basis" · peak ⇄ gamut; default **off**, so
+the existing output is byte-identical — guarded by the tonal `rel-chroma` gate (c)). It changes what
+the per-palette chroma slider means:
+
+- **peak** (default): chroma is `% of each hue's PEAK` chroma — per-hue, but a hue's ABSOLUTE chroma
+  still depends on its gamut, so different hues come out unequally saturated.
+- **gamut** (`relChroma`): chroma is `% of EACH STOP's own gamut ceiling`, so every hue fills the same
+  fraction of its gamut envelope → palettes read as equally saturated **regardless of hue** (a high-gamut
+  blue is reined in to match a lower-gamut hue). A cheap stand-in for OKHSL-style perceptual-saturation
+  normalization — one branch in `paletteStops`, no new color-space math.
+
+Pipeline: `DEFAULT_CONTROLS.relChroma` (tonal.js) → `controlsOf`/`stateOf`/`defaultDocument` (model.mjs)
+→ `paletteStops` chroma branch → persisted (`persist.js` hydrate, boolean) → UI toggle. Engine-only
+behavior; exports/roles/stops unchanged. New tonal `rel-chroma` gate proves in-gamut, the cross-hue
+harmonization invariant (`chroma/maxc` equal across hues at each stop), off==default, and not-a-no-op;
+persist roundtrip covers the new field.
+
 ## 1.12 — 2026-06-18 — rename the held-back STORAGE_KEY + `<hct-app>` element (follow-up to 1.11)
 
 Per follow-up, two of 1.11's held-back identifiers are now renamed:

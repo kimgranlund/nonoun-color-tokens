@@ -37,6 +37,12 @@ export const DEFAULT_CONTROLS = {
   dampAmp: 0,
   dampBias: 0,
   hueSpace: "cam16",
+  // Chroma basis. false (default): the chroma control is % of the BASE-hue PEAK — per-hue, but the
+  // ABSOLUTE chroma still varies with each hue's gamut, so hues come out unequally saturated. true:
+  // it's % of EACH STOP's own gamut ceiling, so every hue fills the same fraction of its gamut →
+  // palettes harmonize across hue regardless of the hue picked (see paletteStops). A cheap stand-in
+  // for OKHSL-style perceptual-saturation normalization.
+  relChroma: false,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -132,7 +138,14 @@ export function paletteStops(palette, controls, stops) {
       0,
       1 + ((controls.dampAmp ?? 0) / 100) * (1 - uG) - (controls.damp / 100) * sideW * uG,
     );
-    const chroma = Math.min(target * m, maxc); // never exceed the ceiling
+    // Chroma basis (controls.relChroma): default scales the base-hue PEAK target by the damping m and
+    // caps at the per-stop ceiling — the chroma is a constant target shaped by damping, then clamped.
+    // Relative mode scales EACH stop by its OWN gamut ceiling, so every hue fills the same fraction of
+    // its gamut envelope and palettes read as equally saturated regardless of hue. min(·, maxc) keeps
+    // it in-gamut either way (m can exceed 1 via dampAmp).
+    const chroma = controls.relChroma
+      ? Math.min((palette.chroma / 100) * maxc * m, maxc)
+      : Math.min(target * m, maxc);
     // Emit via the engine at the per-stop (hue, chroma, tone): in-gamut, hits the
     // tone, holds the SPECIFIED hue (constant when hueShift=0, else edge-rotated).
     const out = hctToRgb(hue, chroma, tone);
