@@ -398,29 +398,30 @@ app.setSegment("roles");
 ok(app.segment === "roles" && !!app.querySelector(".roles-table"), "segmented control still switches panels (full render)");
 app.setSegment("palette");
 
-// ── (j) canvas backdrop = the SELECTED palette's NEAR-EDGE color (100 light / 900 dark) + the ◐ ───
+// ── (j) canvas backdrop = the SELECTED palette's NEAR-EDGE color (125 light / 875 dark) + the ◐ ───
 const { projectView: _pvJ } = await import("../../src/ui/model.mjs");
-// the selected palette's near-edge stop hex for the current canvas scheme (one step in from 050/950).
-const edgeHex = (theme) => { const p = _pvJ(app.doc).palettes[app.selectedIndex()]; return p.ramp.find((s) => s.stop === (theme === "dark" ? 900 : 100)).hex; };
+// the selected palette's near-edge stop hex for the current canvas scheme. 125/875 are EXPORT-only
+// half-steps, so they live in fullRamp (the 19-stop display `ramp` does not carry them).
+const edgeHex = (theme) => { const p = _pvJ(app.doc).palettes[app.selectedIndex()]; return p.fullRamp.find((s) => s.stop === (theme === "dark" ? 875 : 125)).hex; };
 const bgAttr = () => (app.querySelector(".canvas-area").getAttribute("style") || "");
 app.canvasTheme = "light"; app.doc.lmax = 100; app.selectPalette(0); app.render(); flushRaf();
-ok(app.canvasBg() === edgeHex("light"), `(j1) light canvas bg = the selected palette's 100 near-edge (got ${app.canvasBg()})`);
-// the point of 100 over 050: even at lmax=100 (where 050 is pure white) the backdrop keeps the palette's tint.
-ok(app.canvasBg() !== "#FFFFFF", `(j1b) at lmax=100 the 100-stop backdrop is NOT pure white (got ${app.canvasBg()})`);
+ok(app.canvasBg() === edgeHex("light"), `(j1) light canvas bg = the selected palette's 125 near-edge (got ${app.canvasBg()})`);
+// the point of a near-edge stop over 050: even at lmax=100 (where 050 is pure white) the backdrop keeps the tint.
+ok(app.canvasBg() !== "#FFFFFF", `(j1b) at lmax=100 the 125-stop backdrop is NOT pure white (got ${app.canvasBg()})`);
 ok(bgAttr().includes(app.canvasBg()), "(j2) rendered .canvas-area carries inline --canvas-bg = the near-edge color");
-// lowering lmax still tracks the palette's 100 stop (stays off pure white).
+// lowering lmax still tracks the palette's 125 stop (stays off pure white).
 app.doc.lmax = 90; app.render(); flushRaf();
-ok(app.canvasBg() === edgeHex("light") && app.canvasBg() !== "#FFFFFF", `(j3) light backdrop follows lmax at the palette's tinted 100 (got ${app.canvasBg()})`);
+ok(app.canvasBg() === edgeHex("light") && app.canvasBg() !== "#FFFFFF", `(j3) light backdrop follows lmax at the palette's tinted 125 (got ${app.canvasBg()})`);
 // the backdrop FOLLOWS palette selection (not just the global range): two differently-hued palettes differ.
 app.selectPalette(2); app.render(); const _bgA = app.canvasBg();
 app.selectPalette(7); app.render(); const _bgB = app.canvasBg();
 ok(_bgA !== _bgB, `(j3b) the backdrop follows palette selection (p2 ${_bgA} vs p7 ${_bgB})`);
-// dark preview = the selected palette's 900 dark near-edge.
+// dark preview = the selected palette's 875 dark near-edge.
 app.canvasTheme = "dark"; app.doc.lmin = 5; app.selectPalette(0); app.render(); flushRaf();
-ok(app.canvasBg() === edgeHex("dark"), `(j4) dark canvas bg = the selected palette's 900 near-edge (got ${app.canvasBg()})`);
-// a LIVE drag of lmin repaints the backdrop via liveRefresh (no full render), still from the palette's 900.
+ok(app.canvasBg() === edgeHex("dark"), `(j4) dark canvas bg = the selected palette's 875 near-edge (got ${app.canvasBg()})`);
+// a LIVE drag of lmin repaints the backdrop via liveRefresh (no full render), still from the palette's 875.
 app.doc.lmin = 20; app.liveRefresh(); flushRaf();
-ok(app.querySelector(".canvas-area").style.getPropertyValue("--canvas-bg") === edgeHex("dark"), `(j5) liveRefresh repaints --canvas-bg from the palette's 900 stop (got ${app.querySelector(".canvas-area").style.getPropertyValue("--canvas-bg")})`);
+ok(app.querySelector(".canvas-area").style.getPropertyValue("--canvas-bg") === edgeHex("dark"), `(j5) liveRefresh repaints --canvas-bg from the palette's 875 stop (got ${app.querySelector(".canvas-area").style.getPropertyValue("--canvas-bg")})`);
 // (j6) a click on EMPTY canvas (not a ramp-row) clears the selection → backdrop reverts to neutral gray.
 app.canvasTheme = "light"; app.doc.lmax = 90; app.canvasView = "palettes"; app.selectPalette(0); app.render(); flushRaf();
 const _selBg = app.canvasBg();
@@ -432,17 +433,18 @@ ok(/^#([0-9A-F]{2})\1\1$/.test(_deBg) && _deBg !== _selBg, `(j6b) deselected →
 // (j7) selecting a palette again restores its near-edge backdrop.
 app.selectPalette(0); app.render(); flushRaf();
 ok(app.canvasBg() === edgeHex("light"), `(j7) re-selecting restores the palette near-edge backdrop (got ${app.canvasBg()})`);
-// (j8) each palette ROW container is tinted with that palette's OWN near-edge stop — 150 in light
-//      canvas preview, 850 in dark (symmetric, so the var(--ink) name text stays readable on it).
+// (j8) each palette ROW container is tinted with that palette's OWN stop — 75 in light canvas
+//      preview, 925 in dark (symmetric, so the var(--ink) name text stays readable on it). 75/925
+//      are EXPORT-only half-steps → read from fullRamp, not the 19-stop display ramp.
 app.canvasTheme = "light"; app.render(); flushRaf();
-const _stopHex = (pi, stop) => _pvJ(app.doc).palettes[pi].ramp.find((s) => s.stop === stop).hex;
+const _stopHex = (pi, stop) => _pvJ(app.doc).palettes[pi].fullRamp.find((s) => s.stop === stop).hex;
 const _row0 = app.querySelectorAll(".ramp-row[data-pi]")[0];
-const _c150 = _stopHex(Number(_row0.dataset.pi), 150);
-ok((_row0.getAttribute("style") || "").includes(_c150), `(j8) light preview: container row painted with the palette's 150 stop (${_c150}; got "${_row0.getAttribute("style")}")`);
+const _c75 = _stopHex(Number(_row0.dataset.pi), 75);
+ok((_row0.getAttribute("style") || "").includes(_c75), `(j8) light preview: container row painted with the palette's 75 stop (${_c75}; got "${_row0.getAttribute("style")}")`);
 app.canvasTheme = "dark"; app.render(); flushRaf();
 const _row0d = app.querySelectorAll(".ramp-row[data-pi]")[0];
-const _c850 = _stopHex(Number(_row0d.dataset.pi), 850);
-ok((_row0d.getAttribute("style") || "").includes(_c850), `(j8b) dark preview: container row painted with the palette's 850 stop, not 150 (${_c850}; got "${_row0d.getAttribute("style")}")`);
+const _c925 = _stopHex(Number(_row0d.dataset.pi), 925);
+ok((_row0d.getAttribute("style") || "").includes(_c925), `(j8b) dark preview: container row painted with the palette's 925 stop, not 75 (${_c925}; got "${_row0d.getAttribute("style")}")`);
 app.canvasTheme = "light"; app.render(); flushRaf();
 
 // ── (k) live example card present on ALL 3 tabs, painted from selected roles ──────────
