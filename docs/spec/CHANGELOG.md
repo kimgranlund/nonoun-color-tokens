@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 1.6 — 2026-06-18 — UI icons → a central SVG registry (Phosphor, inlined offline)
+
+Replaced the ad-hoc emoji/Unicode glyph "icons" (↶ ↷ ⇪ ⊹ ▌ ▐ ◐ 🗑 ↺ ↻ ⇄ ⧉ ⚙ ◳ ⬇ ⬆ ⚑ ✕
++ the ●/○ enable dots, the ✓/⚠ contrast marks, the ✓/✗ in-gamut + save-status marks) with a
+single registry: **`src/ui/icons.js`** holds Phosphor Icons (MIT, regular weight) path data
+**inlined** — NOT a runtime CDN, because the Figma plugin ships `ui.html` as a self-contained
+offline bundle (a CDN would silently fail there). `icon(name, { size, cls })` returns a
+`<span class="ic">` wrapping an inline `<svg fill="currentColor">`, so every icon inherits the
+surrounding text color and aligns on the baseline; the right-pane sidebar toggle reuses the same
+glyph mirrored via `.ic.flip-x`.
+
+Wiring: `icons.js` registered in `scripts/bundle.mjs` (MODS+KEY) so the offline/Figma builds
+include it; app.js imports `{ icon }`. The ◆ brand wordmark and purely typographic glyphs
+(`·` separators, `…`, the `×` in "L\*×C", the `−`/`°` in numeric labels, the `→` in labels) stay
+as text. UI-only — no token/role/export/persistence change. `src/ui/app.js` + `styles.css`
+(`.ic`); headless-boot `(ic)` asserts the toggles/header/canvas controls render registry SVGs.
+
 ## 1.5 — 2026-06-18 — gallery: palette-count + "preset" become overlay tags on the preview
 
 The gallery tile's palette count (`N palettes`) and the presets shelf's `preset` badge now ride

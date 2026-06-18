@@ -880,6 +880,14 @@ const paneTypeInput = new El("input"); paneTypeInput.type = "text";
 doc.dispatch("keydown", { key: "[", target: paneTypeInput });
 ok(app.panesLeft === true, "(ii) '[' while typing in a text field does NOT collapse the pane (yields to typing)");
 
+// ── (ic) icon registry: UI controls render an inline-SVG icon (icons.js), not a glyph char ──
+app.openSet(app.sets[0].id); flushRaf();
+// a .ic span carrying an inline <svg> lives somewhere under `root`?
+const hasSvgIcon = (root) => { const w = (n) => { if (!n) return false; for (const c of n.children || []) { if (c.classList && c.classList.contains("ic") && (c.innerHTML || "").includes("<svg")) return true; if (w(c)) return true; } return false; }; return w(root); };
+ok(hasSvgIcon(findFk("pane-left")), "(ic) the pane toggle renders an inline-SVG icon from the registry");
+ok(hasSvgIcon(app.querySelector(".app-header")), "(ic) the app-header controls (Undo/Redo/Export/theme) carry registry icons");
+ok(hasSvgIcon(app.querySelector(".canvas-header")), "(ic) the canvas-header controls (Fit/zoom/+Palette) carry registry icons");
+
 // ── report ──────────────────────────────────────────────────────────────────────────
 if (fails.length) {
   console.error("HEADLESS BOOT FAIL:");

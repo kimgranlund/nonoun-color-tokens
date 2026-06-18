@@ -22,6 +22,7 @@ import { STORAGE_KEY, serialize, hydrate } from "./persist.js";
 import { FIGMA_PLUGIN } from "./figma-plugin-assets.js";
 import { TRAVEL_PRESETS } from "./travel-presets.js";
 import { zipStore } from "./zip.mjs";
+import { icon } from "./icons.js";
 
 // ── Multi-set storage ─────────────────────────────────────────────────────────
 // persist.js owns ONE document's serialize/hydrate. The gallery needs many sets,
@@ -592,7 +593,7 @@ class HctApp extends HTMLElement {
                 this.deleteSet(rec.id);
               },
             },
-            "🗑",
+            icon("trash", { size: 13 }),
           ),
           h("span", { class: "tile-tag tile-count" }, `${enabled.length} ${enabled.length === 1 ? "palette" : "palettes"}`),
         ),
@@ -609,7 +610,7 @@ class HctApp extends HTMLElement {
     const newTile = h(
       "div",
       { class: "new-tile", onclick: () => this.createSet() },
-      h("div", { class: "plus" }, "+"),
+      h("div", { class: "plus" }, icon("plus", { size: 22 })),
       h("div", {}, "New set"),
     );
 
@@ -708,8 +709,8 @@ class HctApp extends HTMLElement {
         { class: "gallery-header" },
         h("div", { class: "brand" }, h("span", { class: "dia" }, "◆"), "HCT Palette Generator"),
         h("div", { class: "spacer" }),
-        h("button", { class: "ghost", onclick: () => this.loadFromProject(), title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project (Source of Truth)" }, "⬇ Project"),
-        h("button", { class: "ghost", onclick: () => this.importSet(), title: "Import a palette config (.json) exported from Export → Config" }, "⬆ Import"),
+        h("button", { class: "ghost", onclick: () => this.loadFromProject(), title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project (Source of Truth)" }, icon("download"), "Project"),
+        h("button", { class: "ghost", onclick: () => this.importSet(), title: "Import a palette config (.json) exported from Export → Config" }, icon("upload"), "Import"),
         h("button", { class: "ghost", onclick: () => this.createSet() }, "+ New"),
         this.themeBtn(),
       ),
@@ -910,7 +911,7 @@ class HctApp extends HTMLElement {
           disabled: this.canUndo() ? null : true,
           onclick: () => this.undo(),
         },
-        "↶ Undo",
+        icon("arrow-counter-clockwise"), "Undo",
       ),
       h(
         "button",
@@ -920,13 +921,13 @@ class HctApp extends HTMLElement {
           disabled: this.canRedo() ? null : true,
           onclick: () => this.redo(),
         },
-        "↷ Redo",
+        icon("arrow-clockwise"), "Redo",
       ),
-      h("button", { class: "ghost", onclick: () => this.createSet() }, "New"),
+      h("button", { class: "ghost", onclick: () => this.createSet() }, icon("plus"), "New"),
       h(
         "button",
         { class: "primary", title: "Open export drawer", onclick: () => this.toggleDrawer(true) },
-        "⇪ Export",
+        icon("export"), "Export",
       ),
       this.themeBtn(),
     );
@@ -952,7 +953,7 @@ class HctApp extends HTMLElement {
       "aria-label": (shown ? "Collapse" : "Show") + (left ? " left analysis pane" : " right inspector pane"),
       "aria-pressed": shown ? "true" : "false",
       onclick: () => (left ? this.toggleLeftPane() : this.toggleRightPane()),
-    }, left ? "▌" : "▐");
+    }, icon("sidebar", { cls: left ? "" : "flip-x" }));
   }
 
   toGallery() {
@@ -977,7 +978,7 @@ class HctApp extends HTMLElement {
           this.render();
         },
       },
-      "◐ " + this.theme,
+      icon("theme"), this.theme,
     );
   }
 
@@ -1154,7 +1155,7 @@ class HctApp extends HTMLElement {
           h("span", { class: "an-thresh", title: "4.5:1 minimum" }),
           h("span", { class: "an-fill" + (pass ? "" : " bad"), style: `width:${pct.toFixed(0)}%` }),
         ),
-        h("b", { class: pass ? "pass" : "fail" }, `${ratio.toFixed(2)} ${pass ? "✓" : "⚠"}`),
+        h("b", { class: pass ? "pass" : "fail" }, ratio.toFixed(2) + " ", icon(pass ? "check" : "warning", { size: 12 })),
       );
     };
     return h(
@@ -1402,7 +1403,7 @@ class HctApp extends HTMLElement {
           )
         : false,
       // canvas color-scheme — flips ONLY the canvas content's preview (light/dark),
-      // independent of the app-chrome ◐ in the app-header.
+      // independent of the app-chrome theme toggle in the app-header.
       h(
         "button",
         {
@@ -1415,7 +1416,7 @@ class HctApp extends HTMLElement {
             this.render();
           },
         },
-        "◐ canvas " + this.canvasTheme,
+        icon("theme"), "canvas " + this.canvasTheme,
       ),
       h(
         "button",
@@ -1427,13 +1428,13 @@ class HctApp extends HTMLElement {
             this.render();
           },
         },
-        "⊹ Fit",
+        icon("crosshair"), "Fit",
       ),
-      h("button", { class: "ghost", "aria-label": "Zoom out", onclick: () => this.zoomBy(-1) }, "−"),
+      h("button", { class: "ghost", "aria-label": "Zoom out", onclick: () => this.zoomBy(-1) }, icon("minus")),
       h("span", { class: "zoom-readout", role: "status", "aria-live": "polite", "aria-label": "Zoom level" }, Math.round(this.viewport.zoom * 100) + "%"),
-      h("button", { class: "ghost", "aria-label": "Zoom in", onclick: () => this.zoomBy(1) }, "+"),
+      h("button", { class: "ghost", "aria-label": "Zoom in", onclick: () => this.zoomBy(1) }, icon("plus")),
       h("div", { class: "spacer" }),
-      h("button", { class: "ghost add-pal-btn", onclick: () => this.addPalette() }, "+ Palette"),
+      h("button", { class: "ghost add-pal-btn", onclick: () => this.addPalette() }, icon("plus"), "Palette"),
       // when the RIGHT pane is collapsed its toggle pops here, at the canvas's right edge.
       !this.panesRight ? this.paneToggle("right") : false,
     );
@@ -1679,7 +1680,7 @@ class HctApp extends HTMLElement {
                   this.commit((d) => (d.palettes[i].on = !(d.palettes[i].on !== false)));
                 },
               },
-              p.on !== false ? "●" : "○",
+              icon(p.on !== false ? "dot" : "circle", { size: 13 }),
             ),
             h("span", { class: "ramp-name" }, vp.name, h("small", {}, `${stops.length} stops`)),
           ),
@@ -1715,7 +1716,7 @@ class HctApp extends HTMLElement {
                   this.commit((d) => (d.palettes[i].on = true));
                 },
               },
-              "○",
+              icon("circle", { size: 13 }),
             ),
             h("span", { class: "ramp-name off" }, p.name || "(unnamed)", h("small", {}, "disabled")),
           ),
@@ -1813,7 +1814,7 @@ class HctApp extends HTMLElement {
                   this.commit((d) => (d.palettes[i].on = !(d.palettes[i].on !== false)));
                 },
               },
-              p.on !== false ? "●" : "○",
+              icon(p.on !== false ? "dot" : "circle", { size: 13 }),
             ),
             h("span", { class: "ramp-name" }, vp.name, h("small", {}, `500 base · ${stops.length} scrims`)),
           ),
@@ -1841,12 +1842,15 @@ class HctApp extends HTMLElement {
     const tokenName = (ref) => n + "-" + (ref.includes("-") ? ref : ref.padStart(3, "0")); // the displayed raw-token name
     const padRef = (ref) => (ref.includes("-") ? ref : ref.padStart(3, "0"));
     const drift = this.liveVars ? this.driftSummary() : null; // the Figma drift-diff summary, if a live read was done
-    // per-mode drift cell: ✓ matches the file / ✗ drifted / — not in the file / · not read yet.
+    // per-mode drift cell: check = matches the file / ✗ drifted / — not in the file / · not read yet.
     const driftCell = (ref, hex) => {
       const st = this.driftStatus(n + "/" + padRef(ref), hex);
-      const m = { match: ["✓", "Matches the file"], drift: ["✗", "Drifted from the file"], absent: ["—", "Not in the file"] };
-      const [label, title] = st ? m[st] : ["·", "Click ↻ Read live to compare with the file"];
-      return h("td", { class: "map-file" }, h("span", { class: "map-drift map-drift-" + (st || "none"), title }, label));
+      const title = { match: "Matches the file", drift: "Drifted from the file", absent: "Not in the file" }[st]
+        || "Click Read live to compare with the file";
+      const mark = st === "match" ? icon("check", { size: 12 })
+        : st === "drift" ? icon("x", { size: 12 })
+        : st === "absent" ? "—" : "·";
+      return h("td", { class: "map-file" }, h("span", { class: "map-drift map-drift-" + (st || "none"), title }, mark));
     };
 
     const rawEditor = (r, mode, ref, overridden) =>
@@ -1882,7 +1886,7 @@ class HctApp extends HTMLElement {
           "td",
           { class: "map-raw" },
           rawEditor(r, mode, ref, overridden),
-          overridden ? h("button", { class: "map-reset", title: "Reset to canonical", onclick: () => this.clearRoleOverride(r.key, mode) }, "↺") : false,
+          overridden ? h("button", { class: "map-reset", title: "Reset to canonical", onclick: () => this.clearRoleOverride(r.key, mode) }, icon("arrow-counter-clockwise", { size: 13 })) : false,
         ),
         this.inFigma ? driftCell(ref, hex) : false, // drift vs the live Figma variable (#3)
       );
@@ -1903,12 +1907,12 @@ class HctApp extends HTMLElement {
         // drift summary chip (after a live read) — does the file match what I'd generate now?
         drift ? h("span", { class: "map-drift-sum " + (drift.drifted ? "has-drift" : "in-sync") }, drift.drifted ? `${drift.drifted} drifted` : "in sync") : false,
         // read the live raw-colors variables from the file and diff (Figma only).
-        this.inFigma ? h("button", { class: "ghost", title: "Read the live raw-colors variables from this file and compare (drift)", onclick: () => this.readLiveVariables() }, "↻ Read live") : false,
+        this.inFigma ? h("button", { class: "ghost", title: "Read the live raw-colors variables from this file and compare (drift)", onclick: () => this.readLiveVariables() }, icon("arrows-clockwise"), "Read live") : false,
         ovCount ? h("button", { class: "ghost", title: "Revert all re-points to the canonical mapping", onclick: () => this.clearAllOverrides() }, "Reset " + ovCount) : false,
         h(
           "button",
           { class: "ghost", "aria-pressed": this.mapTextMode ? "true" : "false", title: "Switch the raw-token editor between a select menu and a free text input", onclick: () => this.setMapTextMode(!this.mapTextMode) },
-          this.mapTextMode ? "⇄ text" : "⇄ select",
+          icon("arrows-left-right"), this.mapTextMode ? "text" : "select",
         ),
       ),
       h(
@@ -2054,11 +2058,12 @@ class HctApp extends HTMLElement {
         document.createTextNode(`${this.hover.name} · ${this.hover.label} · 750 @ ${this.hover.alpha}% · ${this.hover.hex}`),
       );
     } else if (this.hover) {
-      const g = this.hover.inGamut ? "✓ in-gamut" : "✗ out-of-gamut";
       el.replaceChildren(
         document.createTextNode(`x:${xy.x} y:${xy.y} · ${z}% · `),
         h("span", { class: "sw", style: `background:${this.hover.hex}` }),
-        document.createTextNode(`${this.hover.hex} · tone ${fmt(this.hover.tone)} · ${g}`),
+        document.createTextNode(`${this.hover.hex} · tone ${fmt(this.hover.tone)} · `),
+        icon(this.hover.inGamut ? "check" : "x", { size: 12 }),
+        document.createTextNode(this.hover.inGamut ? " in-gamut" : " out-of-gamut"),
       );
     } else {
       el.textContent = `x:${xy.x} y:${xy.y} · ${z}% · drag pan · wheel zoom · dbl-click reset`;
@@ -2292,8 +2297,8 @@ class HctApp extends HTMLElement {
       h(
         "div",
         { class: "insp-actions" },
-        h("button", { class: "ghost", onclick: () => this.duplicatePalette(i) }, "⧉ Duplicate"),
-        h("button", { class: "ghost danger", onclick: () => this.deletePalette(i) }, "🗑 Delete"),
+        h("button", { class: "ghost", onclick: () => this.duplicatePalette(i) }, icon("copy"), "Duplicate"),
+        h("button", { class: "ghost danger", onclick: () => this.deletePalette(i) }, icon("trash"), "Delete"),
       ),
     );
   }
@@ -2305,7 +2310,7 @@ class HctApp extends HTMLElement {
         "div",
         { class: "cr" },
         h("span", {}, label),
-        h("b", { class: pass ? "pass" : "fail" }, `${ratio.toFixed(2)}:1 ${pass ? "✓" : "⚠"}`),
+        h("b", { class: pass ? "pass" : "fail" }, ratio.toFixed(2) + ":1 ", icon(pass ? "check" : "warning", { size: 12 })),
       );
     };
     return h(
@@ -2338,7 +2343,7 @@ class HctApp extends HTMLElement {
     return h(
       "div",
       {},
-      h("h3", { class: "insp-title" }, "⚙ Global controls"),
+      h("h3", { class: "insp-title" }, icon("gear"), "Global controls"),
       h("div", { class: "insp-sub" }, "Tone curve shared by every palette"),
       h(
         "div",
@@ -2395,7 +2400,7 @@ class HctApp extends HTMLElement {
     return h(
       "div",
       {},
-      h("h3", { class: "insp-title" }, "◳ Roles"),
+      h("h3", { class: "insp-title" }, icon("roles"), "Roles"),
       h("div", { class: "insp-sub" }, `${p ? p.name : ""} — 37 semantic roles · light / dark refs`),
       // (the live component preview is pinned at the bottom of the pane on every
       // tab — see .seg-example / exampleCard — so the Roles panel no longer repeats
@@ -2469,7 +2474,7 @@ class HctApp extends HTMLElement {
     if (save) {
       const dirty = this.isDirty();
       save.className = dirty ? "af-save dirty" : "af-save saved";
-      save.textContent = dirty ? "● unsaved" : "✓ saved";
+      save.replaceChildren(icon(dirty ? "dot" : "check", { size: 12 }), dirty ? " unsaved" : " saved");
     }
 
     const warn = this.querySelector(".app-footer .af-warn");
@@ -2521,9 +2526,9 @@ class HctApp extends HTMLElement {
         h(
           "div",
           { class: "drawer-head" },
-          h("h3", {}, "⇪ Export"),
+          h("h3", {}, icon("export"), "Export"),
           h("div", { class: "spacer" }),
-          h("button", { class: "ghost", onclick: () => this.toggleDrawer(false) }, "✕"),
+          h("button", { class: "ghost", onclick: () => this.toggleDrawer(false) }, icon("x")),
         ),
         h(
           "div",
@@ -2575,7 +2580,7 @@ class HctApp extends HTMLElement {
                     title: "Download the HCT Semantic Binder plugin (manifest.json + code.js). In Figma: Plugins → Development → Import plugin from manifest — it aliases each semantic role to its raw variable so editing a raw color cascades.",
                     onclick: () => this.downloadFigmaPlugin(),
                   },
-                  "⬇ Binder plugin",
+                  icon("download"), "Binder plugin",
                 ),
               ),
             )
@@ -2585,8 +2590,8 @@ class HctApp extends HTMLElement {
           ? h(
               "div",
               { class: "config-bar" },
-              h("button", { class: "ghost", title: this.inFigma ? "Save this config into this Figma file (travels with the file)" : "Save this config to the project (localStorage)", onclick: () => this.saveToProject() }, "⬆ Save to project"),
-              h("button", { class: "ghost", title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project", onclick: () => this.loadFromProject() }, "⬇ Load from project"),
+              h("button", { class: "ghost", title: this.inFigma ? "Save this config into this Figma file (travels with the file)" : "Save this config to the project (localStorage)", onclick: () => this.saveToProject() }, icon("upload"), "Save to project"),
+              h("button", { class: "ghost", title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project", onclick: () => this.loadFromProject() }, icon("download"), "Load from project"),
               h("span", { class: "config-note" }, this.inFigma ? "Source of truth: this Figma file (travels with the file)" : "Source of truth: your browser (localStorage)"),
             )
           : false,
@@ -2595,7 +2600,7 @@ class HctApp extends HTMLElement {
         h(
           "div",
           { class: "drawer-code" },
-          h("button", { class: "copy-float", title: "Copy to clipboard", "aria-label": "Copy", onclick: () => this.copy(code) }, "⧉ Copy"),
+          h("button", { class: "copy-float", title: "Copy to clipboard", "aria-label": "Copy", onclick: () => this.copy(code) }, icon("copy"), "Copy"),
           h("pre", { class: "drawer-pre" }, code),
         ),
         h(
@@ -2617,11 +2622,11 @@ class HctApp extends HTMLElement {
                     title: "Create/update the raw-colors + Light/Dark variable collections directly in this Figma file",
                     onclick: () => this.applyToFigma(),
                   },
-                  "⚑ Apply Variables",
+                  icon("flag"), "Apply Variables",
                 )
               : false,
             // ONE download action — every format in its own folder + the config, as a single .zip.
-            h("button", { class: "primary", title: "Download every format (css-hex, css-oklch, json, dtcg, figma, ui3) in its own folder + the config, as one .zip", onclick: () => this.downloadAllZip(view) }, "⬇ Download All"),
+            h("button", { class: "primary", title: "Download every format (css-hex, css-oklch, json, dtcg, figma, ui3) in its own folder + the config, as one .zip", onclick: () => this.downloadAllZip(view) }, icon("download"), "Download All"),
           ),
         ),
       ),

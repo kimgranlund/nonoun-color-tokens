@@ -99,6 +99,12 @@ button.primary:hover { filter: brightness(1.07); }
 button.ghost { border-color: var(--line); }
 button.ghost:hover { background: var(--line-2); }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* SVG icon registry (icons.js): an inline-flex span carrying a currentColor <svg>; it inherits the
+   surrounding color and centers on the text line, so an icon matches its button/label exactly. The
+   button's own `gap` spaces an icon from adjacent label text. */
+.ic { display: inline-flex; align-items: center; flex: none; vertical-align: middle; }
+.ic svg { display: block; }
+.ic.flip-x svg { transform: scaleX(-1); }   /* mirror (e.g. the right-pane sidebar toggle) */
 /* non-button focusables (the ●/○ enable toggle is a role=button span) */
 [role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--r-sm); }
 button:disabled, button[disabled] {
