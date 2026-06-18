@@ -3881,7 +3881,10 @@ class HctApp extends HTMLElement {
 
   addPalette() {
     this.commit((d) => {
-      d.palettes.push({ name: "Palette " + (d.palettes.length + 1), hue: 200, chroma: 60, skew: -20, lift: 0, on: true });
+      // A new palette starts from clean defaults: every shaping control reset to neutral (skew/lift 0,
+      // edge-hue 0, same-dir off) so it never inherits the previous palette's tweaks — only the
+      // hue/chroma seed defines it. (Global controls are doc-level and shared, so they're untouched.)
+      d.palettes.push({ name: "Palette " + (d.palettes.length + 1), hue: 200, chroma: 60, skew: 0, lift: 0, hueShift: 0, hueSameDir: false, on: true });
     });
     this.selectPalette(this.doc.palettes.length - 1);
   }

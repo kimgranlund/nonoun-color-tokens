@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 1.14 — 2026-06-18 — a new palette ("+ Palette") starts from clean shaping defaults
+
+`addPalette` seeded each new palette with `skew: -20` — a non-default shaping tweak that quietly carried
+into every palette you added. A new palette now resets ALL shaping config to neutral (`skew: 0`, `lift: 0`,
+`hueShift: 0`, `hueSameDir: false`); only the `hue: 200 / chroma: 60` seed defines it. New *sets* already
+reset everything (`createSet` → `defaultDocument` → `DEFAULT_CONTROLS`); global controls stay doc-level and
+shared across a set's palettes (resetting them would alter the existing palettes), so they're untouched.
+`src/ui/app.js`; headless-boot `(add)` now asserts the new palette's neutral defaults.
+
 ## 1.13 — 2026-06-18 — relative-chroma mode: harmonize palette saturation across hue (Option A)
 
 A new global control **`relChroma`** (UI: Global → "Chroma basis" · peak ⇄ gamut; default **off**, so
