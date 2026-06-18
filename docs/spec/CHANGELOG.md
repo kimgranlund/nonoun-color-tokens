@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## 0.9 — 2026-06-17 — OD-004 spike: the aliased-export SHAPE is gated (no behavior change)
+
+The `rawColl` opt-in already emitted the full documented name+collection alias shape
+(`com.figma.aliasData` = `{ targetVariableName: "{n}/{refKey}", targetVariableSetName: rawColl }`),
+but only `targetVariableName` was verified. The export verifier now also asserts
+`targetVariableSetName === "raw-colors"` on **every** aliased semantic leaf, so the shape Figma's
+documented `aliasData` fallback hierarchy resolves on native import (when the raw-colors collection
+pre-exists) can no longer silently regress.
+
+Folded in lockstep: `hpg-export-resolved` (SKILL contract) + `AC-X6` (rubric) +
+`test/engine/exports.mjs` (verifier). **No engine/output change** — the tool already emitted this
+shape; this revision is verification + honest status only.
+
+**OD-004** advanced OPEN→**spike implemented** (the shape is gated). Still OPEN, NOT decided: the
+native-import cascade is unvalidated end-to-end (no Figma in CI) and there is no user-facing
+plugin-free download. ADR-002 default (resolved colors) unchanged; the plugin stays the reliable
+path. Next: validate in real Figma, then decide whether to expose a (clearly-experimental)
+plugin-free download.
+
+Gate: `npm test` green (9 verifiers + headless boot).
+
 ## 0.8 — 2026-06-17 — scrims become a single 500-based translucency ramp (CONTRACT change)
 
 The scrim model changed from "base-{index}" over three bases (250/500/750) at 7 fixed alphas to a

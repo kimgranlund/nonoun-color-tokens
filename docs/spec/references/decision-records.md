@@ -41,6 +41,12 @@ Format: Context → Decision → Rationale → Consequences → Status.
   decision stands: resolved colors remain the always-safe default (import with no preconditions),
   while the aliased path is conditional on the raw-colors collection pre-existing. Pure name-only
   (no `targetVariableSetName`) behavior remains undocumented. Feeds OD-004.
+- **Spike 2026-06-17.** The `rawColl` opt-in already emitted the full name+collection shape
+  (`targetVariableName` + `targetVariableSetName`); the export verifier now **asserts both** on every
+  aliased semantic leaf (`hpg-export-resolved` / AC-X6), so the shape can't silently regress. This is
+  SHAPE conformance only — the native-import cascade is still unvalidated end-to-end (no Figma in CI)
+  and unexposed in the UI. Default stays resolved; the plugin stays the reliable cascade. Advances
+  OD-004 to a **gated spike, not a decision**.
 
 ## ADR-003 — On-colors fixed to `050` in both modes  **(OVERRIDE)**
 - **Context.** `on{N}` sits on the prime fill. A contrast-optimized system picks white or

@@ -183,7 +183,7 @@ designers work in familiar numbers without changing the output color math.
 | OD-001 | On-color contrast vs fixed `050` | DECIDED (override) | accessibility of `on*` on light fills, esp. Warning/dark mode |
 | OD-002 | Surface bases 250/500 as semantic scrims | DEFERRED | scrim role coverage |
 | OD-003 | UI3 Collections schema authenticity | DECIDED (interchange-only) | the `ui3` export's usability |
-| OD-004 | Aliased semantic export without plugin | OPEN — narrowed (2026-06-15) | Figma now documents a name + collection-name `aliasData` fallback (ADR-002 re-verify), so a plugin-free aliased export is **feasible to spike**, conditional on the `raw-colors` collection pre-existing in the target file. Validate end-to-end before removing the plugin; the plugin stays the reliable path. |
+| OD-004 | Aliased semantic export without plugin | OPEN — spike implemented (2026-06-17) | The `rawColl` opt-in now emits the FULL documented alias shape (`targetVariableName` + `targetVariableSetName`), **gated by `hpg-export-resolved`** so it can't regress. Still OPEN, NOT decided: the native-import cascade is unvalidated end-to-end (no Figma in CI) and there is no user-facing plugin-free download yet. Validate in real Figma (import with the `raw-colors` collection pre-existing) before exposing it or removing the plugin; the plugin stays the reliable path. |
 | OD-005 | Palette count beyond the default 8 | DECIDED (2026-06-15) — configurable | Every acceptance criterion is "for every palette", so it generalizes to any count; the validated `capability.system.ui-app` ships a configurable palette set. The 8 defaults are a seed set, NOT a ceiling. |
 
 ## 15. Current Status

@@ -44,8 +44,18 @@ const semLeaves = (d) => [...leaves(d["Light_tokens.json"]), ...leaves(d["Dark_t
 if (semLeaves(dtcg).some((l) => l.$extensions && l.$extensions["com.figma.aliasData"])) FAIL("resolved", "aliasData present with blank rawColl");
 const dtcgA = X.exportDTCG(C(ALL), { rawColl: "raw-colors" });
 const sa = semLeaves(dtcgA);
-if (sa.length === 0 || !sa.every((l) => l.$extensions && l.$extensions["com.figma.aliasData"] && l.$extensions["com.figma.aliasData"].targetVariableName))
-  FAIL("resolved", "rawColl set: not every semantic leaf carries aliasData.targetVariableName");
+const aliasOf = (l) => l.$extensions && l.$extensions["com.figma.aliasData"];
+// rawColl set → every leaf carries the FULL documented name+collection alias shape:
+// targetVariableName "{n}/{refKey}" (e.g. neutral/550, neutral/500-175) AND targetVariableSetName
+// === the raw-colors collection. That is the shape Figma's documented aliasData fallback hierarchy
+// resolves on NATIVE import when the raw-colors collection pre-exists in the file (OD-004 spike;
+// ADR-002 re-verify 2026-06-15). The native-import cascade itself is validated end-to-end in Figma,
+// NOT here — this gate only proves the emitted SHAPE so the spike can't silently regress.
+if (sa.length === 0 || !sa.every((l) => {
+  const a = aliasOf(l);
+  return a && /^[a-z0-9-]+\/[a-z0-9-]+$/.test(a.targetVariableName || "") && a.targetVariableSetName === "raw-colors";
+}))
+  FAIL("resolved", "rawColl set: not every semantic leaf carries aliasData {targetVariableName '{n}/{refKey}', targetVariableSetName 'raw-colors'}");
 
 // ── hpg-export-css-resolves (every --c-* is light-dark(var,var) over existing raw vars) ───
 const css = X.exportCSS(C(ALL));
