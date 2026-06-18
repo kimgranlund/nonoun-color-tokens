@@ -1,6 +1,6 @@
 // app.js — the DOM app for the HCT Palette Generator.
 //
-// One <hct-app> web component. The `document` (a palette SET) is the single
+// One <nonoun-color-tokens> web component. The `document` (a palette SET) is the single
 // source of truth; the whole right side is projectView(document), recomputed on
 // every edit — NEVER stored. Palette SETS persist to localStorage; the gallery
 // lists them. The six validated capability modules do all the color/token work
@@ -32,6 +32,19 @@ const SETS_KEY = STORAGE_KEY + "-sets";
 // The single "source of truth" config slot. In the browser it's a localStorage key; in a Figma
 // plugin the config lives IN the file on the document's root pluginData (round-tripped over the bridge).
 const PROJECT_KEY = STORAGE_KEY + "-project";
+
+// One-time storage-key migration: the key prefix was renamed "hct-palette-state-v1" -> "nonoun-color-tokens"
+// (the product rename, CHANGELOG 1.12). Copy any sets/config saved under the OLD keys into the new ones so a
+// returning user keeps their work. Idempotent (only fills an ABSENT new key) and tolerates a throwing
+// localStorage (a Figma sandboxed iframe) the same way save() does.
+function migrateStorageKeys() {
+  try {
+    for (const [oldK, newK] of [["hct-palette-state-v1-sets", SETS_KEY], ["hct-palette-state-v1-project", PROJECT_KEY]]) {
+      const old = localStorage.getItem(oldK);
+      if (old != null && localStorage.getItem(newK) == null) localStorage.setItem(newK, old);
+    }
+  } catch {}
+}
 
 function loadSets() {
   let raw = null;
@@ -70,10 +83,10 @@ function newSet(name) {
 // ── app-theme injection (dogfooding) ────────────────────────────────────────────
 // The chrome themes itself with the tokens the tool generates. On boot we run the
 // tool's own `exportCSS` over the FIXED 8 default palettes (appThemeCSS) and inject
-// the result once as <style id="hct-app-theme"> into <head>, so every --c-* role and
+// the result once as <style id="nonoun-color-tokens-theme"> into <head>, so every --c-* role and
 // raw var is available globally for styles.css to consume. We use the FIXED default
 // set (not the user's edited doc) so the chrome stays stable while a doc is edited.
-const APP_THEME_STYLE_ID = "hct-app-theme";
+const APP_THEME_STYLE_ID = "nonoun-color-tokens-theme";
 function ensureAppTheme() {
   if (typeof document === "undefined" || !document.head) return;
   if (document.getElementById(APP_THEME_STYLE_ID)) return; // inject exactly once
@@ -134,6 +147,7 @@ const DAMP_PRESETS = [
 class HctApp extends HTMLElement {
   connectedCallback() {
     ensureAppTheme(); // inject the generated --c-* design tokens once, globally
+    migrateStorageKeys(); // copy any pre-rename saved sets/config into the new key namespace
     this.sets = loadSets();
     // session (UI-only, not persisted with the doc)
     this.view = "gallery"; // gallery | editor
@@ -2896,7 +2910,7 @@ class HctApp extends HTMLElement {
   }
 }
 
-customElements.define("hct-app", HctApp);
+customElements.define("nonoun-color-tokens", HctApp);
 
 // expose a couple of pure helpers for any console poking / future tests.
 export { HctApp, contrastRatio };

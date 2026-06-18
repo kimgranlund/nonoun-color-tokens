@@ -51,7 +51,7 @@ const html = `<!doctype html>
 <link rel="icon" type="image/svg+xml" href="${favHref}">
 <title>Color Tokens by NONOUN</title>
 <style>${css}</style></head>
-<body><hct-app></hct-app>
+<body><nonoun-color-tokens></nonoun-color-tokens>
 <script type="module">
 ${out}</script></body></html>`;
 mkdirSync(`${ROOT}/dist`, { recursive: true });

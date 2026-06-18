@@ -25,7 +25,8 @@
 // No dependencies.
 
 // The persistence key — the exact slot the storage chain reads/writes (spec-draft §11).
-export const STORAGE_KEY = "hct-palette-state-v1";
+// Renamed from "hct-palette-state-v1" with the product rename; app.js migrates old saved data forward.
+export const STORAGE_KEY = "nonoun-color-tokens";
 
 // ── DOMAINS ────────────────────────────────────────────────────────────────────
 // One descriptor per State field. Two kinds:

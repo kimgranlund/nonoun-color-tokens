@@ -38,7 +38,7 @@ if (/\bcatch\s*\{/.test(codeNoComments)) FAIL("vmsyntax", "code.js uses optional
 if (!existsSync(`${HERE}/ui.html`)) FAIL("ui", "ui.html not generated — run gen-ui.mjs");
 else {
   const ui = readFileSync(`${HERE}/ui.html`, "utf8");
-  if (!ui.includes("<hct-app>")) FAIL("ui", "ui.html does not embed the generator (<hct-app>)");
+  if (!ui.includes("<nonoun-color-tokens>")) FAIL("ui", "ui.html does not embed the generator (<nonoun-color-tokens>)");
   if (!/figma-init/.test(ui) || !/pluginMessage/.test(ui) || !/figmaBundle/.test(ui))
     FAIL("ui", "ui.html missing the bridge (figma-init listener / pluginMessage / figmaBundle())");
   if (!/config-loaded/.test(ui) || !/applyLoadedConfig/.test(ui))

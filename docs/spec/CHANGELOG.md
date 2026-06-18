@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 1.12 — 2026-06-18 — rename the held-back STORAGE_KEY + `<hct-app>` element (follow-up to 1.11)
+
+Per follow-up, two of 1.11's held-back identifiers are now renamed:
+
+- **`STORAGE_KEY`** `"hct-palette-state-v1"` → `"nonoun-color-tokens"` (so the live keys become
+  `nonoun-color-tokens-sets` / `nonoun-color-tokens-project`). A one-time `migrateStorageKeys()` runs at
+  boot, copying any sets/config saved under the OLD keys into the new ones — idempotent, and tolerant of
+  a throwing localStorage — so a returning user keeps their saved palettes.
+- **Custom element** `<hct-app>` → `<nonoun-color-tokens>` across the `customElements.define`, the
+  markup (`main.ts`, `index.html`, the single-file build), the CSS selectors, the Figma UI bridge's
+  `querySelector`, both tests, and the README. The internal theme-`<style>` id `hct-app-theme` →
+  `nonoun-color-tokens-theme` rode along for consistency.
+
+Left as-is (still HCT, by design): the spec-cell id `spec.system.hct-palette-generator-spec`, the
+`hct-semantic-binder` sub-plugin, the engine symbols (`hctToRgb`…), and the internal `HctApp` class name
+("HCT" = the color model). No engine/token/role/export behavior change.
+
 ## 1.11 — 2026-06-18 — rename product identifiers + git repo → nonoun-color-tokens
 
 Aligns the build/package/repo identifiers with the product name and the renamed folder:
@@ -16,12 +33,13 @@ Aligns the build/package/repo identifiers with the product name and the renamed 
 
 **Deliberately NOT renamed** (each has a real reason — flagged for a follow-up call):
 - `STORAGE_KEY = "hct-palette-state-v1"` (+ its `-sets` / `-project` derivatives) — renaming orphans
-  every saved palette in users' localStorage. Keep, or rename WITH a one-time migration.
+  every saved palette in users' localStorage. Keep, or rename WITH a one-time migration. *(Subsequently
+  renamed with a migration in 1.12.)*
 - The spec-cell id `spec.system.hct-palette-generator-spec` (SKILL `name:`, decomposition, the TDD doc)
   — the engine/methodology identity; "HCT" is the color model the engine is built on.
 - The Figma binder sub-plugin (`hct-semantic-binder` / "HCT Semantic Binder") — a separate tool.
 - The HCT engine symbols (`hctToRgb`, …) and the `<hct-app>` custom element — "HCT" names the color
-  space; renaming the element would churn CSS/DOM/tests for no product benefit.
+  space. *(The `<hct-app>` element was subsequently renamed in 1.12; the engine symbols stay.)*
 
 No engine/token/role/export behavior change.
 

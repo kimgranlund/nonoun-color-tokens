@@ -126,8 +126,8 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => "" });
 
 // ── boot ─────────────────────────────────────────────────────────────────────────
 await import("../../src/ui/app.js");
-const App = customElements.get("hct-app");
-ok(!!App, "custom element hct-app defined");
+const App = customElements.get("nonoun-color-tokens");
+ok(!!App, "custom element nonoun-color-tokens defined");
 
 const app = new App();
 app.classList = new ClassList();
@@ -912,6 +912,14 @@ const hasSvgIcon = (root) => { const w = (n) => { if (!n) return false; for (con
 ok(hasSvgIcon(findFk("pane-left")), "(ic) the pane toggle renders an inline-SVG icon from the registry");
 ok(hasSvgIcon(app.querySelector(".app-header")), "(ic) the app-header controls (Undo/Redo/Export/theme) carry registry icons");
 ok(hasSvgIcon(app.querySelector(".canvas-header")), "(ic) the canvas-header controls (Fit/zoom/+Palette) carry registry icons");
+
+// ── (mig) storage-key migration: pre-rename keys are copied into the new namespace on boot ──
+localStorage.setItem("hct-palette-state-v1-sets", JSON.stringify({ sets: [{ id: "legacy1", name: "Legacy", doc: {}, updated: 1 }] }));
+localStorage.removeItem("nonoun-color-tokens-sets");                 // the new slot starts empty
+const app2 = new (customElements.get("nonoun-color-tokens"))();
+app2.connectedCallback();                                            // runs migrateStorageKeys() before loadSets()
+ok(localStorage.getItem("nonoun-color-tokens-sets") != null, "(mig) a pre-rename '-sets' key is copied into the new namespace on boot");
+ok(Array.isArray(app2.sets) && app2.sets.some((s) => s.id === "legacy1"), "(mig) the migrated set is loaded by the new app (no data loss across the rename)");
 
 // ── report ──────────────────────────────────────────────────────────────────────────
 if (fails.length) {
