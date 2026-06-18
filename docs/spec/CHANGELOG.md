@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 1.16 — 2026-06-18 — OKHSL ⇄ sRGB engine module (Option B foundation; not yet wired)
+
+Adds **`src/engine/okhsl.js`** — Björn Ottosson's OKHSL ⇄ sRGB (perceptual HSL over OKLab), ported
+VERBATIM from the canonical reference (`bottosson.github.io/.../colorconversion.js`). `okhslToRgb(hueDeg,
+s, l)` and `rgbToOkhsl([r,g,b])`, pure/deterministic. OKHSL is gamut-bijective: at a given (hue, lightness)
+`s=1` lands exactly on the sRGB boundary and a fixed (s,l) reads as the same perceived colorfulness across
+hue — the principled version of the relChroma "gamut" basis.
+
+Verified during the port against the reference: forward output matched **0/255 channel error over 1008
+samples**, round-trip rgb→okhsl→rgb is exact, sRGB red sits at the canonical `h≈29.23° s≈1 l≈0.568`. New
+`engine/okhsl.mjs` gate (10th test file): round-trip, gamut bijection (`s=1` on the boundary, every hue),
+monotone saturation, neutrals/extremes, and the red anchor.
+
+**Finding (informs whether to wire it):** re-saturating the default palettes through OKHSL produces output
+**very close to the cheap relChroma "gamut" mode** (e.g. Primary 500: OKHSL `#1364CE` vs relChroma
+`#1962CD`). The module is NOT yet integrated into the generation pipeline — that's the next decision, now
+that we can see the two approaches land in nearly the same place.
+
 ## 1.15 — 2026-06-18 — Download-All export named nonoun-color-tokens-{project}
 
 The "Download All" archive and its inner re-importable config still carried the old `hct-` slug.
