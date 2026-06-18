@@ -2,13 +2,20 @@
 
 ## 1.3 — 2026-06-18 — editor: collapsible side panes (left analysis / right inspector)
 
-The editor's two side panes can now be collapsed to reclaim canvas width. Two `pane-toggle`
-buttons in the app header (`▌` left, `▐` right) and the `[` / `]` keyboard shortcuts flip
-ephemeral `panesLeft` / `panesRight` ui-session state; the `.editor` grid drives the matching
-side track to `0` via `.left-collapsed` / `.right-collapsed` (animated, both panes already clip).
-Toggles carry `aria-pressed` (accented while their pane is shown). UI-only — no State field, no
-persistence, no token/role/collection change. `src/ui/app.js` + `styles.css`; headless-boot `(ii)`
-covers the toggles, the keys, and the type-target guard.
+The editor's two side panes can now be collapsed to reclaim canvas width. A `pane-toggle` per
+side (`▌` left, `▐` right) and the `[` / `]` keyboard shortcuts flip ephemeral `panesLeft` /
+`panesRight` ui-session state; the `.editor` grid drives the matching side track to `0` via
+`.left-collapsed` / `.right-collapsed` (animated, both panes already clip).
+
+Each toggle **moves with state** (`paneToggle(side)` renders the same control in one of two slots,
+so exactly one exists per side): while its pane is OPEN it hugs that pane's own header inner edge
+(left → the Analysis label; right → left of the Inspector tabs); once COLLAPSED it pops to the
+canvas-header (left edge / right edge) so there's always a visible affordance to bring the pane
+back. `aria-pressed` + `.on` track "pane shown".
+
+UI-only — no State field, no persistence, no token/role/collection change. `src/ui/app.js` +
+`styles.css` (`.pane-toggle`, `.pane-head`); headless-boot `(ii)` covers the toggles, their
+header↔canvas-header placement per state, the keys, and the type-target guard.
 
 ## 1.2 — 2026-06-18 — scrim STRENGTH ladder → sequential 5–60% (was full-range 5–95%)
 

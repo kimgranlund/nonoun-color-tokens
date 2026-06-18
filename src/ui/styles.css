@@ -246,12 +246,13 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
   border-radius: var(--r-sm); padding: 4px 9px; max-width: 180px;
 }
 .app-header .spacer { flex: 1; }
-/* pane-collapse toggles — a ghost button per side; accented while its pane is shown (aria-pressed). */
-.app-header .pane-toggle {
-  padding: 4px 9px; color: var(--ink-dim);
+/* pane-collapse toggles — one per side. While its pane is OPEN the toggle sits in that
+   pane's own header (accented via .on); once collapsed it pops to the canvas-header. */
+.pane-toggle {
+  padding: 3px 8px; color: var(--ink-dim); flex: none;
   font-size: 12px; line-height: 1; letter-spacing: -.04em;
 }
-.app-header .pane-toggle.on { color: var(--accent); border-color: var(--accent); }
+.pane-toggle.on { color: var(--accent); border-color: var(--accent); }
 
 /* left pane = ANALYSIS rail (stacked, scrollable graphs for the selected palette) */
 .left-pane {
@@ -271,6 +272,8 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
   text-transform: none; letter-spacing: 0; font-weight: 600;
   color: var(--accent); font-size: 11px;
 }
+/* the left toggle (when the pane is open) sits at the label's inner / canvas-side edge */
+.pane-label .pane-toggle { margin-left: auto; align-self: center; }
 .an-card {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -544,6 +547,9 @@ hct-app.reordering .ramp-row { transition: transform .08s ease; }
   overflow: hidden;
   display: flex; flex-direction: column;
 }
+/* right-pane header row: the right toggle (when open) + the Inspector segmented control */
+.pane-head { display: flex; align-items: center; gap: 8px; margin: 12px 14px 0; }
+.pane-head .segmented { flex: 1; margin: 0; }
 .segmented {
   display: flex; gap: 2px; margin: 12px 14px 0;
   background: var(--panel-2); border: 1px solid var(--line);

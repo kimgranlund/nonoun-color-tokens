@@ -837,22 +837,36 @@ try { app.save(); } catch { lsCrash = true; }   // save() -> saveSets -> localSt
 globalThis.localStorage = realLS;
 ok(!lsCrash, "(w) save() tolerates a throwing localStorage (Figma sandboxed iframe) — degrades to no-persistence, never crashes boot");
 
-// ── (ii) collapsible side panes: header toggles + [ ] keys drive the .editor modifier classes ──
+// ── (ii) collapsible side panes: toggles drive .editor modifiers AND move between headers ──
 app.openSet(app.sets[0].id); flushRaf();             // a clean editor view
 const editorRoot = () => app.querySelector(".editor");
+// fkIn — does `root`'s subtree contain an element with this data-fk? (placement assertions)
+const fkIn = (root, fk) => { const w = (n) => { if (!n) return null; for (const c of n.children || []) { if (c.dataset && c.dataset.fk === fk) return c; const f = w(c); if (f) return f; } return null; }; return w(root); };
 ok(app.panesLeft && app.panesRight, "(ii) both side panes start expanded");
 ok(!editorRoot().classList.contains("left-collapsed") && !editorRoot().classList.contains("right-collapsed"),
   "(ii) the editor carries no collapse modifier initially");
-findFk("pane-left").click();                          // collapse the left pane via the header toggle
+// while OPEN, each toggle lives in its OWN pane's header — not the canvas header
+ok(fkIn(app.querySelector(".left-pane"), "pane-left") && !fkIn(app.querySelector(".canvas-header"), "pane-left"),
+  "(ii) while open, the left toggle lives in the left pane header (not the canvas header)");
+ok(fkIn(app.querySelector(".right-pane"), "pane-right") && !fkIn(app.querySelector(".canvas-header"), "pane-right"),
+  "(ii) while open, the right toggle lives in the right pane header (not the canvas header)");
+ok(findFk("pane-left").attrs["aria-pressed"] === "true", "(ii) the open toggle reflects aria-pressed=true");
+findFk("pane-left").click();                          // collapse the left pane via its header toggle
 ok(app.panesLeft === false && editorRoot().classList.contains("left-collapsed"),
   "(ii) clicking the left toggle collapses the left pane (.left-collapsed)");
 ok(!editorRoot().classList.contains("right-collapsed"), "(ii) the right pane is unaffected by the left toggle");
+// once COLLAPSED, the left toggle has popped to the canvas header (and is gone from the pane)
+ok(fkIn(app.querySelector(".canvas-header"), "pane-left") && !fkIn(app.querySelector(".left-pane"), "pane-left"),
+  "(ii) once collapsed, the left toggle pops to the canvas header");
 ok(findFk("pane-left").attrs["aria-pressed"] === "false", "(ii) the collapsed toggle reflects aria-pressed=false");
-findFk("pane-left").click();                          // and restore it
+findFk("pane-left").click();                          // and restore it (from the canvas-header toggle)
 ok(app.panesLeft === true && !editorRoot().classList.contains("left-collapsed"), "(ii) clicking again restores the left pane");
+ok(fkIn(app.querySelector(".left-pane"), "pane-left"), "(ii) restored — the left toggle is back in the pane header");
 findFk("pane-right").click();                         // the right toggle is independent
 ok(app.panesRight === false && editorRoot().classList.contains("right-collapsed"),
   "(ii) clicking the right toggle collapses the right pane (.right-collapsed)");
+ok(fkIn(app.querySelector(".canvas-header"), "pane-right") && !fkIn(app.querySelector(".right-pane"), "pane-right"),
+  "(ii) once collapsed, the right toggle pops to the canvas header");
 findFk("pane-right").click();
 fireKey("[");                                         // the '[' / ']' shortcuts drive the same state
 ok(app.panesLeft === false && editorRoot().classList.contains("left-collapsed"), "(ii) the '[' key toggles the left pane");
