@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.4 — 2026-06-18 — canvas backdrop uses the 100 / 900 near-edge stop (was 050 / 950)
+
+The editor canvas preview backdrop (`app.js#canvasBg`) now samples the selected palette's **100**
+stop in light preview and **900** in dark, one step in from the 050/950 extremes. At `lmax=100`
+the 050 stop is pure white (and 950 near-black at `lmin=0`), washing the backdrop neutral; the 100/
+900 stop always carries a touch of the palette's hue/tint. UI-only preview — no token/export change.
+`src/ui/app.js`; headless-boot `(j)` updated (now also asserts the lmax=100 backdrop is not pure white).
+
 ## 1.3 — 2026-06-18 — editor: collapsible side panes (left analysis / right inspector)
 
 The editor's two side panes can now be collapsed to reclaim canvas width. A `pane-toggle` per

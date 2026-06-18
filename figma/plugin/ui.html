@@ -3887,16 +3887,15 @@ class HctApp extends HTMLElement {
     this.paintCanvasFooter();
   }
 
-  // canvasBg — the canvas backdrop = the SELECTED palette's EDGE color: its light end (the 050 stop)
-  // in light preview, its dark end (the 950 stop) in dark preview. So the backdrop carries that
-  // palette's own hue at the extreme (vs. the old neutral gray), and follows BOTH palette selection
-  // (selectPalette → render) and lmin/lmax (which set the edge tones). At lmax=100 the 050 stop is
-  // pure white by the white-endpoint guarantee, so the light backdrop reads white until lmax is lowered.
-  // Falls back to a neutral gray at the tonal extreme if no palette/ramp is available yet.
+  // canvasBg — the canvas backdrop = the SELECTED palette's NEAR-EDGE color: its 100 stop in light
+  // preview, its 900 stop in dark preview (one step in from the 050/950 extremes — so the backdrop
+  // carries a touch of the palette's own hue/tint rather than washing to pure white/black at lmax=100/
+  // lmin=0). Follows BOTH palette selection (selectPalette → render) and lmin/lmax (which shape the
+  // tonal range). Falls back to a neutral gray at the tonal extreme if no palette/ramp is available yet.
   canvasBg() {
     const v = this._view || projectView(this.doc);
     const pal = v && v.palettes[this.selectedIndex()];
-    const stop = pal && pal.ramp.find((s) => s.stop === (this.canvasTheme === "dark" ? 950 : 50));
+    const stop = pal && pal.ramp.find((s) => s.stop === (this.canvasTheme === "dark" ? 900 : 100));
     if (stop) return stop.hex;
     const L = this.canvasTheme === "dark" ? (this.doc.lmin ?? 5) : (this.doc.lmax ?? 100);
     const g = hctToRgb(0, 0, L).rgb[0].toString(16).padStart(2, "0").toUpperCase();

@@ -398,27 +398,29 @@ app.setSegment("roles");
 ok(app.segment === "roles" && !!app.querySelector(".roles-table"), "segmented control still switches panels (full render)");
 app.setSegment("palette");
 
-// ── (j) canvas backdrop = the SELECTED palette's EDGE color (050 light / 950 dark) + the ◐ ───────
+// ── (j) canvas backdrop = the SELECTED palette's NEAR-EDGE color (100 light / 900 dark) + the ◐ ───
 const { projectView: _pvJ } = await import("../../src/ui/model.mjs");
-// the selected palette's edge stop hex for the current canvas scheme.
-const edgeHex = (theme) => { const p = _pvJ(app.doc).palettes[app.selectedIndex()]; return p.ramp.find((s) => s.stop === (theme === "dark" ? 950 : 50)).hex; };
+// the selected palette's near-edge stop hex for the current canvas scheme (one step in from 050/950).
+const edgeHex = (theme) => { const p = _pvJ(app.doc).palettes[app.selectedIndex()]; return p.ramp.find((s) => s.stop === (theme === "dark" ? 900 : 100)).hex; };
 const bgAttr = () => (app.querySelector(".canvas-area").getAttribute("style") || "");
 app.canvasTheme = "light"; app.doc.lmax = 100; app.selectPalette(0); app.render(); flushRaf();
-ok(app.canvasBg() === edgeHex("light"), `(j1) light canvas bg = the selected palette's 050 edge (got ${app.canvasBg()})`);
-ok(bgAttr().includes(app.canvasBg()), "(j2) rendered .canvas-area carries inline --canvas-bg = the edge color");
-// lowering lmax pulls the light edge off pure white → the backdrop carries the palette's own tint.
+ok(app.canvasBg() === edgeHex("light"), `(j1) light canvas bg = the selected palette's 100 near-edge (got ${app.canvasBg()})`);
+// the point of 100 over 050: even at lmax=100 (where 050 is pure white) the backdrop keeps the palette's tint.
+ok(app.canvasBg() !== "#FFFFFF", `(j1b) at lmax=100 the 100-stop backdrop is NOT pure white (got ${app.canvasBg()})`);
+ok(bgAttr().includes(app.canvasBg()), "(j2) rendered .canvas-area carries inline --canvas-bg = the near-edge color");
+// lowering lmax still tracks the palette's 100 stop (stays off pure white).
 app.doc.lmax = 90; app.render(); flushRaf();
-ok(app.canvasBg() === edgeHex("light") && app.canvasBg() !== "#FFFFFF", `(j3) light backdrop follows lmax down to the palette's tinted 050 (got ${app.canvasBg()})`);
+ok(app.canvasBg() === edgeHex("light") && app.canvasBg() !== "#FFFFFF", `(j3) light backdrop follows lmax at the palette's tinted 100 (got ${app.canvasBg()})`);
 // the backdrop FOLLOWS palette selection (not just the global range): two differently-hued palettes differ.
 app.selectPalette(2); app.render(); const _bgA = app.canvasBg();
 app.selectPalette(7); app.render(); const _bgB = app.canvasBg();
 ok(_bgA !== _bgB, `(j3b) the backdrop follows palette selection (p2 ${_bgA} vs p7 ${_bgB})`);
-// dark preview = the selected palette's 950 dark edge.
+// dark preview = the selected palette's 900 dark near-edge.
 app.canvasTheme = "dark"; app.doc.lmin = 5; app.selectPalette(0); app.render(); flushRaf();
-ok(app.canvasBg() === edgeHex("dark"), `(j4) dark canvas bg = the selected palette's 950 edge (got ${app.canvasBg()})`);
-// a LIVE drag of lmin repaints the backdrop via liveRefresh (no full render), still from the palette edge.
+ok(app.canvasBg() === edgeHex("dark"), `(j4) dark canvas bg = the selected palette's 900 near-edge (got ${app.canvasBg()})`);
+// a LIVE drag of lmin repaints the backdrop via liveRefresh (no full render), still from the palette's 900.
 app.doc.lmin = 20; app.liveRefresh(); flushRaf();
-ok(app.querySelector(".canvas-area").style.getPropertyValue("--canvas-bg") === edgeHex("dark"), `(j5) liveRefresh repaints --canvas-bg from the palette's dark edge (got ${app.querySelector(".canvas-area").style.getPropertyValue("--canvas-bg")})`);
+ok(app.querySelector(".canvas-area").style.getPropertyValue("--canvas-bg") === edgeHex("dark"), `(j5) liveRefresh repaints --canvas-bg from the palette's 900 stop (got ${app.querySelector(".canvas-area").style.getPropertyValue("--canvas-bg")})`);
 
 // ── (k) live example card present on ALL 3 tabs, painted from selected roles ──────────
 const { projectView: _pv } = await import("../../src/ui/model.mjs");
