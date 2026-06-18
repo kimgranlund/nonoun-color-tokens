@@ -837,6 +837,33 @@ try { app.save(); } catch { lsCrash = true; }   // save() -> saveSets -> localSt
 globalThis.localStorage = realLS;
 ok(!lsCrash, "(w) save() tolerates a throwing localStorage (Figma sandboxed iframe) — degrades to no-persistence, never crashes boot");
 
+// ── (ii) collapsible side panes: header toggles + [ ] keys drive the .editor modifier classes ──
+app.openSet(app.sets[0].id); flushRaf();             // a clean editor view
+const editorRoot = () => app.querySelector(".editor");
+ok(app.panesLeft && app.panesRight, "(ii) both side panes start expanded");
+ok(!editorRoot().classList.contains("left-collapsed") && !editorRoot().classList.contains("right-collapsed"),
+  "(ii) the editor carries no collapse modifier initially");
+findFk("pane-left").click();                          // collapse the left pane via the header toggle
+ok(app.panesLeft === false && editorRoot().classList.contains("left-collapsed"),
+  "(ii) clicking the left toggle collapses the left pane (.left-collapsed)");
+ok(!editorRoot().classList.contains("right-collapsed"), "(ii) the right pane is unaffected by the left toggle");
+ok(findFk("pane-left").attrs["aria-pressed"] === "false", "(ii) the collapsed toggle reflects aria-pressed=false");
+findFk("pane-left").click();                          // and restore it
+ok(app.panesLeft === true && !editorRoot().classList.contains("left-collapsed"), "(ii) clicking again restores the left pane");
+findFk("pane-right").click();                         // the right toggle is independent
+ok(app.panesRight === false && editorRoot().classList.contains("right-collapsed"),
+  "(ii) clicking the right toggle collapses the right pane (.right-collapsed)");
+findFk("pane-right").click();
+fireKey("[");                                         // the '[' / ']' shortcuts drive the same state
+ok(app.panesLeft === false && editorRoot().classList.contains("left-collapsed"), "(ii) the '[' key toggles the left pane");
+fireKey("]");
+ok(app.panesRight === false && editorRoot().classList.contains("right-collapsed"), "(ii) the ']' key toggles the right pane");
+fireKey("["); fireKey("]");                           // restore both
+ok(app.panesLeft && app.panesRight, "(ii) the keys toggle back to fully expanded");
+const paneTypeInput = new El("input"); paneTypeInput.type = "text";
+doc.dispatch("keydown", { key: "[", target: paneTypeInput });
+ok(app.panesLeft === true, "(ii) '[' while typing in a text field does NOT collapse the pane (yields to typing)");
+
 // ── report ──────────────────────────────────────────────────────────────────────────
 if (fails.length) {
   console.error("HEADLESS BOOT FAIL:");

@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 1.3 — 2026-06-18 — editor: collapsible side panes (left analysis / right inspector)
+
+The editor's two side panes can now be collapsed to reclaim canvas width. Two `pane-toggle`
+buttons in the app header (`▌` left, `▐` right) and the `[` / `]` keyboard shortcuts flip
+ephemeral `panesLeft` / `panesRight` ui-session state; the `.editor` grid drives the matching
+side track to `0` via `.left-collapsed` / `.right-collapsed` (animated, both panes already clip).
+Toggles carry `aria-pressed` (accented while their pane is shown). UI-only — no State field, no
+persistence, no token/role/collection change. `src/ui/app.js` + `styles.css`; headless-boot `(ii)`
+covers the toggles, the keys, and the type-target guard.
+
 ## 1.2 — 2026-06-18 — scrim STRENGTH ladder → sequential 5–60% (was full-range 5–95%)
 
 The 7 scrim-strength roles now map weakest→strongest to `50/100/200/300/400/500/600`

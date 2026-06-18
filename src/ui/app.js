@@ -147,6 +147,8 @@ class HctApp extends HTMLElement {
     this.savedSnapshot = null; // JSON string of last-saved doc -> dirty detection
     this.sel = { kind: "palette", id: 0 };
     this.segment = "palette"; // right-pane segmented control: palette | global | roles
+    this.panesLeft = true; // left analysis rail shown (ui-session state, like segment — never persisted)
+    this.panesRight = true; // right inspector shown
     this.canvasTheme = "light"; // canvas preview color-scheme — INDEPENDENT of app chrome ◐
     this.canvasView = "palettes"; // canvas content: palettes (the ramps) | scrims | mapping (the role→raw table)
     this.stopsMode = "core"; // palette ramp density: core (19 display stops) | extended (25 EXPORT_STOPS)
@@ -430,6 +432,14 @@ class HctApp extends HTMLElement {
       case "3":
         e.preventDefault();
         this.setSegment("roles");
+        return;
+      case "[":
+        e.preventDefault();
+        this.toggleLeftPane();
+        return;
+      case "]":
+        e.preventDefault();
+        this.toggleRightPane();
         return;
       case "Escape":
         e.preventDefault();
@@ -834,7 +844,7 @@ class HctApp extends HTMLElement {
 
     return h(
       "div",
-      { class: "editor" },
+      { class: "editor" + (this.panesLeft ? "" : " left-collapsed") + (this.panesRight ? "" : " right-collapsed") },
       this.renderAppHeader(),
       this.renderLeftPane(view),
       this.renderCenter(view),
@@ -862,6 +872,14 @@ class HctApp extends HTMLElement {
         h("span", { class: "dia" }, "◆"),
         "HCT",
       ),
+      h("button", {
+        class: "ghost pane-toggle" + (this.panesLeft ? " on" : ""),
+        "data-fk": "pane-left",
+        title: "Toggle the analysis pane ([)",
+        "aria-label": "Toggle left analysis pane",
+        "aria-pressed": this.panesLeft ? "true" : "false",
+        onclick: () => this.toggleLeftPane(),
+      }, "▌"),
       h("input", {
         class: "docname",
         "data-fk": "docname",
@@ -904,9 +922,22 @@ class HctApp extends HTMLElement {
         { class: "primary", title: "Open export drawer", onclick: () => this.toggleDrawer(true) },
         "⇪ Export",
       ),
+      h("button", {
+        class: "ghost pane-toggle" + (this.panesRight ? " on" : ""),
+        "data-fk": "pane-right",
+        title: "Toggle the inspector pane (])",
+        "aria-label": "Toggle right inspector pane",
+        "aria-pressed": this.panesRight ? "true" : "false",
+        onclick: () => this.toggleRightPane(),
+      }, "▐"),
       this.themeBtn(),
     );
   }
+
+  // toggleLeftPane / toggleRightPane — collapse/expand a side pane (the .editor grid track → 0).
+  // Ephemeral ui-session state (like segment); a full render re-applies the modifier class.
+  toggleLeftPane() { this.panesLeft = !this.panesLeft; this.render(); }
+  toggleRightPane() { this.panesRight = !this.panesRight; this.render(); }
 
   toGallery() {
     this.view = "gallery";
