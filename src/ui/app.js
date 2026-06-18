@@ -2572,7 +2572,11 @@ class HctApp extends HTMLElement {
   // it runs inside Figma and can reveal the "Add Variables → Figma" action in the drawer.
   setInFigma(on) {
     this.inFigma = !!on;
-    if (this.view === "editor") this.render();
+    // Re-render in ANY view, not just the editor: figma-init arrives ASYNC (after the app has
+    // already rendered the startup GALLERY), so the gallery must re-render here to run its one-shot
+    // probeFigmaProject() — otherwise the file's saved config never surfaces as the import row.
+    // (Bug: editor-only re-render → gallery never probed → "saved config doesn't show in gallery".)
+    this.render();
   }
 
   // applyToFigma — post the current DTCG bundle to the plugin sandbox (code.js), which

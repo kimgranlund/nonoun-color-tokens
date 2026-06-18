@@ -743,6 +743,22 @@ globalThis.parent = realParentDD;
 app.inFigma = false; app.liveVars = null; app.liveVarsFound = false; app.fileConfig = null; app._figmaProbed = false; app._loadRequested = false;
 app.toGallery();
 
+// ── (gg) figma-init AFTER the gallery is already on screen must re-render → fire the probe ──
+// Regression: setInFigma() re-rendered ONLY in the editor. But figma-init arrives ASYNC, after the
+// STARTUP gallery has already rendered — so the gallery never re-rendered, never probed, and the
+// file's saved config never surfaced (looked like "save didn't work / nothing in the gallery").
+// setInFigma must re-render in ANY view. Here: on the gallery, inFigma flips true via figma-init.
+const probedGG = [];
+const realParentGG = globalThis.parent;
+globalThis.parent = { postMessage: (m) => { probedGG.push(m && m.pluginMessage && m.pluginMessage.type); } };
+ok(app.view === "gallery" && app.inFigma === false && app._figmaProbed === false, "(gg) preconditions: on the gallery, not yet in Figma, not yet probed");
+app.setInFigma(true); // figma-init arrives while the gallery is already shown
+ok(app._figmaProbed === true, "(gg) figma-init on the already-open gallery re-renders → fires the one-shot file probe");
+ok(probedGG.includes("load-config"), "(gg) the gallery probe posts load-config so the file's saved config can surface");
+globalThis.parent = realParentGG;
+app.inFigma = false; app._figmaProbed = false; app.fileConfig = null;
+app.toGallery();
+
 // ── (ee) "Download all (.zip)": one foldered archive of every format + the re-importable config ──
 const setName0 = app.doc.name;
 let zipCap = null;
