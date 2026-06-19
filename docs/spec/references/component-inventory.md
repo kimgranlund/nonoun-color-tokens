@@ -417,3 +417,33 @@ All six are now implemented (see Refactor status). Ranked as originally prioriti
 | Button, Select, Text input | ✓ `btn()`/`field()` contract | ~ native or focusable | SHIPPABLE-ish *(remaining ghost buttons adopt `btn()` incrementally)* |
 | Data-viz marks (14–18) | ✓ bespoke, fine | ✓ | SHIPPABLE (as one-offs) |
 | Swatch | ✓ primitive; composite cells share the checkerboard | ✓ | SHIPPABLE *(cell migration deferred)* |
+
+## GRADE — the new factories (component-decomposer)
+
+A GRADE-mode pass over the six factories, **scored in-context**. Important framing: the
+component-decomposer rubric assumes a *shadow-DOM, FACE-based custom-element library*. This app is
+deliberately **one light-DOM web component with factory helpers** (the documented helper-factory
+scale). So the REALIZE gates the rubric reserves for standalone elements — **B2** autonomous element,
+**B3** FACE/form-association, **B1** a sizing ramp — are **N/A-by-design** here (one host element, no
+`<form>`s, no declared ramp), not failures. They become real only if a factory is ever extracted into
+a standalone library. Graded on that basis:
+
+| Factory | A·COMPOSE (layer→anatomy→API→compose→cohere) | B·REALIZE (geometry→element→semantics→interaction→fidelity) | Cell |
+|---|---|---|---|
+| **`switchControl()`** | 5 — right layer; named parts; tight `{on,onToggle,label,ariaLabel}` API; no self-margin | 5 — native `<button>`; `role=switch`+`aria-checked`; Space/Enter; `:focus-visible`; forced-colors | **SHIPPABLE** |
+| **`segmented()`** | 5 — composes buttons into a group; `role` opt (tablist/group); `controls`→tabpanel; orthogonal | 5 — roving tabindex + arrows (APG); re-focus after render; forced-colors `.on` | **SHIPPABLE** |
+| **`field()`** | 5 — layout primitive; label↔control contract; no self-name leakage | 5 — `label[for]`/`id` association; fallback `aria-label`; preserves control's own name | **SHIPPABLE** |
+| **`btn()`** | 4 — clean `{ghost,primary,danger,bare}` vocab + `cls` for layout; *−1:* `size` not yet an axis | 5 — native button semantics; `ariaPressed`/`disabled`/icon-only `ariaLabel`; forced-colors | **SHIPPABLE** |
+| **`chip()`** | 4 — `interactive`/`status` modes + tones; *−1:* the `.tile-tag` overlay stays a separate primitive (correct, but the family isn't single) | 5 — button(pressed)/span(status); forced-colors border + Highlight | **SHIPPABLE** |
+| **`swatch()`** | 4 — one chip primitive + shared checkerboard; *−1:* composite cells (ramp/scrim/footer) not folded in (by design) | 4 — decorative `aria-hidden`; `--sw` size; *−1:* size is free, not on a ramp | **SHIPPABLE** |
+
+**One systemic finding (unchanged by the refactor):** geometry is **ad-hoc, off any ramp** — button
+padding `4px 9px`, switch track `34×19`, swatch sizes passed per-call. The component-decomposer's
+`(height − glyph)/2` law + XS–2XL ramp is the one thing none of these adopt. Not a regression (it was
+always so), but it's the highest-leverage *next* systematic move if this ever grows toward a real
+library: a size ramp + derived paddings, machine-checked. Until then the factories are the right
+shape for a single internal app.
+
+**Verdict:** all six land in **SHIPPABLE** in-context; none are *designed-right-built-wrong* or
+*built-right-designed-wrong*. The two 4/5 COMPOSE scores (`btn` size-axis, `chip`/`swatch` family
+completeness) are deferred-by-design scope lines, not defects.
