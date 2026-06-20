@@ -2649,6 +2649,8 @@ class HctApp extends HTMLElement {
       ["dtcg", "DTCG"],
       ["figma", "Figma"],
       ["ui3", "UI3"],
+      ["tailwind", "Tailwind"],
+      ["shadcn", "ShadCN"],
       ["config", "Config"],
     ];
     // The three Figma mode files: [stateKey, label, real filename to import as].
@@ -2786,6 +2788,8 @@ class HctApp extends HTMLElement {
       { name: "figma/Dark_tokens.json", data: ex.figma.dark },
       { name: "figma/palette.tokens.json", data: ex.figma.raw },
       { name: `ui3/${s}.json`, data: ex.ui3 },
+      { name: `tailwind/${s}.css`, data: ex.tailwind },
+      { name: `shadcn/${s}.css`, data: ex.shadcn },
       { name: `nonoun-color-tokens-${s}-config.json`, data: JSON.stringify(serialize(this.doc), null, 2) },
     ];
     const bytes = zipStore(files);

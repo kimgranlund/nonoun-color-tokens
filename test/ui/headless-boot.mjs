@@ -850,9 +850,9 @@ ok(zb[0] === 0x50 && zb[1] === 0x4b && zb[2] === 0x03 && zb[3] === 0x04, "(ee) t
 const eocd = zb.length - 22; // EOCD has no trailing comment → it's the final 22 bytes
 const eocdSig = zb[eocd] === 0x50 && zb[eocd + 1] === 0x4b && zb[eocd + 2] === 0x05 && zb[eocd + 3] === 0x06;
 const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
-ok(eocdSig && entries === 9, `(ee) the EOCD reports 9 entries — one per format folder + the config (got ${entries})`);
+ok(eocdSig && entries === 11, `(ee) the EOCD reports 11 entries — one per format folder (incl. tailwind + shadcn) + the config (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
-const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "nonoun-color-tokens-my-set-config.json"];
+const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "nonoun-color-tokens-my-set-config.json"];
 ok(wantPaths.every((p) => zipText.includes(p)), "(ee) every format folder + the config file is present in the archive");
 
 // ── (ff) the HCT brand doubles as "back to gallery"; the ◀ Gallery button is removed ──
