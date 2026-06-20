@@ -31,6 +31,8 @@ import {
   exportJSON,
   exportDTCG,
   exportUI3,
+  exportTailwind,
+  exportShadcn,
   SCRIM_BASES,
   SCRIM_STEPS,
 } from "../engine/exports.js";
@@ -309,6 +311,8 @@ export function projectView(doc) {
     json: JSON.stringify(exportJSON(state), null, 2),
     dtcg: JSON.stringify(dtcgObj, null, 2),
     ui3: JSON.stringify(exportUI3(state), null, 2),
+    tailwind: exportTailwind(state),
+    shadcn: exportShadcn(state),
     figma: {
       light: JSON.stringify(dtcgObj["Light_tokens.json"], null, 2),
       dark: JSON.stringify(dtcgObj["Dark_tokens.json"], null, 2),

@@ -87,15 +87,39 @@ try {
 
 // ── hpg-export-nonempty (5 formats non-empty; JSON has stops/scrims/semantic) ─────────────
 const all = X.exportAll(C(ALL), {});
-for (const k of ["css", "oklch", "json", "dtcg", "ui3"]) {
+for (const k of ["css", "oklch", "json", "dtcg", "ui3", "tailwind", "shadcn"]) {
   const v = all[k];
   if (v == null || (typeof v === "string" && v.length < 10) || (typeof v === "object" && Object.keys(v).length === 0)) FAIL("nonempty", `${k} empty`);
 }
 const j = X.exportJSON(C(ALL)); const p0 = j[ALL[0].name.toLowerCase()] || Object.values(j)[0];
 if (!p0 || !p0.stops || !p0.scrims || !p0.semantic) FAIL("nonempty", "JSON palette missing stops/scrims/semantic");
 
+// ── hpg-export-tailwind (v4 @theme: oklch ramps + light-dark() semantic roles) ────────────
+const tw = X.exportTailwind(C(ALL));
+if (!/@theme\s*\{/.test(tw)) FAIL("tailwind", "no @theme block");
+if (!/--color-[a-z0-9-]+-500:\s*oklch\(/i.test(tw)) FAIL("tailwind", "no --color-{name}-500: oklch() scale var");
+if (!/--color-[a-z0-9-]+:\s*light-dark\(\s*oklch/i.test(tw)) FAIL("tailwind", "no semantic role as light-dark(oklch…)");
+// a disabled palette must not appear in the Tailwind scale either (use the oneOff state)
+if (X.exportTailwind(oneOff).includes(`--color-${offName}-`)) FAIL("tailwind", `disabled palette '${offName}' still in Tailwind`);
+
+// ── hpg-export-shadcn (oklch :root/.dark token contract + @theme inline + radius) ─────────
+const sc = X.exportShadcn(C(ALL));
+for (const need of [":root {", ".dark {", "@theme inline {", "--radius:", "--background:", "--foreground:", "--primary:", "--destructive:"]) {
+  if (!sc.includes(need)) FAIL("shadcn", `missing '${need}'`);
+}
+if (!/--background:\s*oklch\(/i.test(sc)) FAIL("shadcn", "tokens are not oklch()");
+if (!/--color-background:\s*var\(--background\)/.test(sc)) FAIL("shadcn", "@theme inline does not map --color-* -> var(--token)");
+// same token set in :root (light) and .dark (parity)
+const tokset = (block) => new Set([...block.matchAll(/^\s*(--[a-z0-9-]+):/gim)].map((m) => m[1]).filter((t) => t !== "--radius"));
+const rootBlock = sc.slice(sc.indexOf(":root {"), sc.indexOf(".dark {"));
+const darkBlock = sc.slice(sc.indexOf(".dark {"), sc.indexOf("@theme inline {"));
+const rootToks = tokset(rootBlock), darkToks = tokset(darkBlock);
+if (rootToks.size === 0 || rootToks.size !== darkToks.size || [...rootToks].some((t) => !darkToks.has(t))) {
+  FAIL("shadcn", `:root (${rootToks.size}) and .dark (${darkToks.size}) token sets differ`);
+}
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty"]) {
+for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
