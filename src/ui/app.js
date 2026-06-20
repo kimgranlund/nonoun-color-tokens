@@ -2348,7 +2348,7 @@ class HctApp extends HTMLElement {
 
     return h(
       "div",
-      {},
+      { class: "insp-body" },
       h("h3", { class: "insp-title" }, swatch((vp.ramp.find((s) => s.stop === 550) || vp.ramp[9]).hex, { size: 16 }), "Palette"),
       h("div", { class: "insp-sub" }, isEven ? "Tune hue · chroma · skew · lift — live" : "Tune hue · chroma — live"),
       // In the Scrims view, surface the sub-variant relationship at the top of the inspector.
@@ -2442,7 +2442,7 @@ class HctApp extends HTMLElement {
     const d = this.doc;
     return h(
       "div",
-      {},
+      { class: "insp-body" },
       h("h3", { class: "insp-title" }, icon("gear"), "Global controls"),
       h("div", { class: "insp-sub" }, "Tone curve shared by every palette"),
       field(

@@ -49,6 +49,10 @@
   --r-sm: 5px;
   --r:    8px;
   --r-lg: 12px;
+  /* control geometry — the one shared dimension across controls (switch + range thumb).
+     A full (height−glyph)/2 size-ramp (component-inventory.md GRADE) would CHANGE pixels,
+     so it is intentionally not derived here — it wants a visual pass. */
+  --ctl-thumb: 15px;
   --hh: 48px;   /* header height */
   --ch: 42px;   /* canvas-header height */
   --fh: 30px;   /* footer height */
@@ -538,7 +542,7 @@ button.chip:hover { background: var(--line-2); color: var(--ink); }
 .chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: var(--shadow); }
 .chip.in-sync { background: color-mix(in srgb, #2e9e5b 16%, transparent); color: #2e9e5b; }
 .chip.has-drift { background: color-mix(in srgb, #d9534f 16%, transparent); color: #d9534f; }
-.scrim-context { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; margin-bottom: 12px; background: var(--panel-2); }
+.scrim-context { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; background: var(--panel-2); }
 .scrim-ctx-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .scrim-ctx-head small { color: var(--ink-dim); font-weight: 400; }
 .scrim-ctx-strip { display: flex; border-radius: 5px; overflow: hidden; width: fit-content; box-shadow: var(--shadow); }
@@ -549,12 +553,12 @@ button.chip:hover { background: var(--line-2); color: var(--ink); }
 
 /* shared analysis-graph SVG styles (left-pane graphs) */
 /* differential damping controls + curve (Global tab) */
-.sub-head { font-size: 10px; font-weight: 600; color: var(--ink-dim); margin: 12px 0 2px; text-transform: uppercase; letter-spacing: .05em; }
-.mini-check { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-dim); margin: -2px 0 10px; cursor: pointer; }
+.sub-head { font-size: 10px; font-weight: 600; color: var(--ink-dim); margin: 0; text-transform: uppercase; letter-spacing: .05em; }
+.mini-check { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-dim); margin: 0; cursor: pointer; }
 .mini-check input { width: 13px; height: 13px; accent-color: var(--accent); cursor: pointer; }
-.damp-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 10px; }
+.damp-presets { display: flex; flex-wrap: wrap; gap: 4px; }
 /* the preset buttons are chips (.chip.on) — see the chip primitive above. */
-.damp-graph { margin-top: 6px; padding: 6px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--panel-2); }
+.damp-graph { padding: 6px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--panel-2); }
 .dg-unity { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 2 2; }
 
 .lc-axis { stroke: var(--line); stroke-width: 1; }
@@ -599,7 +603,8 @@ button.chip:hover { background: var(--line-2); color: var(--ink); }
 .pane-head { display: flex; align-items: center; gap: 8px; margin: 12px 14px 0; }
 .pane-head .segmented { flex: 1; margin: 0; }
 .segmented {
-  display: flex; gap: 2px; margin: 12px 14px 0;
+  /* no self-margin — the parent owns spacing (.pane-head provides it; .canvas-seg sits inline) */
+  display: flex; gap: 2px;
   background: var(--panel-2); border: 1px solid var(--line);
   border-radius: var(--r); padding: 2px; flex: none;
 }
@@ -625,9 +630,12 @@ button.chip:hover { background: var(--line-2); color: var(--ink); }
   margin-top: 14px; border: none; border-radius: 10px;
   padding: 9px 18px; font-weight: 650; font-size: 14px; cursor: default;
 }
-.insp-title { font-size: 14px; font-weight: 650; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
-.insp-sub { color: var(--ink-dim); font-size: 11.5px; margin-bottom: 14px; }
-.field { margin-bottom: 14px; }
+/* the palette/global inspector bodies own spacing via a column gap, so no child sets its
+   own outer margin (the "components don't own outer margin" rule). Uniform 14px rhythm. */
+.insp-body { display: flex; flex-direction: column; gap: 14px; }
+.insp-title { font-size: 14px; font-weight: 650; margin: 0; display: flex; align-items: center; gap: 8px; }
+.insp-sub { color: var(--ink-dim); font-size: 11.5px; margin: 0; }
+.field { margin: 0; }
 .field > label {
   display: flex; justify-content: space-between; align-items: baseline;
   font-size: 11.5px; color: var(--ink-dim); margin-bottom: 5px;
@@ -641,12 +649,12 @@ input[type="range"] {
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 15px; height: 15px; border-radius: 50%;
+  width: var(--ctl-thumb); height: var(--ctl-thumb); border-radius: 50%;
   background: var(--accent); border: 2px solid var(--panel);
   box-shadow: var(--shadow); cursor: pointer;
 }
 input[type="range"]::-moz-range-thumb {
-  width: 15px; height: 15px; border-radius: 50%;
+  width: var(--ctl-thumb); height: var(--ctl-thumb); border-radius: 50%;
   background: var(--accent); border: 2px solid var(--panel); cursor: pointer;
 }
 
@@ -665,13 +673,13 @@ input[type="range"]::-moz-range-thumb {
 }
 .toggle .track::after {
   content: ""; position: absolute; top: 2px; left: 2px;
-  width: 15px; height: 15px; border-radius: 50%; background: #fff;
+  width: var(--ctl-thumb); height: var(--ctl-thumb); border-radius: 50%; background: #fff;
   box-shadow: var(--shadow); transition: transform .12s;
 }
 .toggle.on .track { background: var(--accent); }
 .toggle.on .track::after { transform: translateX(15px); }
 
-.insp-actions { display: flex; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.insp-actions { display: flex; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
 .insp-actions .danger:hover { color: var(--danger); }
 
 .roles-table { font-size: 11px; }
@@ -5187,7 +5195,7 @@ class HctApp extends HTMLElement {
 
     return h(
       "div",
-      {},
+      { class: "insp-body" },
       h("h3", { class: "insp-title" }, swatch((vp.ramp.find((s) => s.stop === 550) || vp.ramp[9]).hex, { size: 16 }), "Palette"),
       h("div", { class: "insp-sub" }, isEven ? "Tune hue · chroma · skew · lift — live" : "Tune hue · chroma — live"),
       // In the Scrims view, surface the sub-variant relationship at the top of the inspector.
@@ -5281,7 +5289,7 @@ class HctApp extends HTMLElement {
     const d = this.doc;
     return h(
       "div",
-      {},
+      { class: "insp-body" },
       h("h3", { class: "insp-title" }, icon("gear"), "Global controls"),
       h("div", { class: "insp-sub" }, "Tone curve shared by every palette"),
       field(
