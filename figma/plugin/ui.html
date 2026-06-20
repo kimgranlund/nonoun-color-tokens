@@ -677,7 +677,6 @@ input[type="range"]::-moz-range-thumb {
 .roles-table { font-size: 11px; }
 .roles-table .rrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
 .roles-table .rrow.rhead { color: var(--ink-faint); font-weight: 600; border-bottom: 1px solid var(--line); padding-bottom: 5px; margin-bottom: 3px; }
-.roles-table .rrow .sw { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(128,128,128,.4); flex: none; }
 .roles-table .rrow .k { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .roles-table .rrow .suf { width: 92px; flex: none; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .roles-table .rrow .sw-pair { display: flex; gap: 3px; flex: none; align-items: center; }
@@ -3748,7 +3747,7 @@ class HctApp extends HTMLElement {
           h("span", { class: "fir-sub" }, `${n} ${n === 1 ? "family" : "families"} — approximate read (each family's 500 hue + chroma). For an exact round-trip, re-apply from the editor to embed the full config.`),
         ),
         h("div", { class: "spacer" }),
-        h("button", { class: "ghost", onclick: () => this.readFromFigmaVariables() }, "Read approx →"),
+        btn("Read approx →", { onclick: () => this.readFromFigmaVariables() }),
       );
     }
     return false;
@@ -3860,32 +3859,10 @@ class HctApp extends HTMLElement {
         },
       }),
       h("div", { class: "spacer" }),
-      h(
-        "button",
-        {
-          class: "ghost undo-btn",
-          title: "Undo (⌘Z)",
-          disabled: this.canUndo() ? null : true,
-          onclick: () => this.undo(),
-        },
-        icon("arrow-counter-clockwise"), "Undo",
-      ),
-      h(
-        "button",
-        {
-          class: "ghost redo-btn",
-          title: "Redo (⇧⌘Z)",
-          disabled: this.canRedo() ? null : true,
-          onclick: () => this.redo(),
-        },
-        icon("arrow-clockwise"), "Redo",
-      ),
-      h("button", { class: "ghost", onclick: () => this.createSet() }, icon("plus"), "New"),
-      h(
-        "button",
-        { class: "primary", title: "Open export drawer", onclick: () => this.toggleDrawer(true) },
-        icon("export"), "Export",
-      ),
+      btn([icon("arrow-counter-clockwise"), "Undo"], { cls: "undo-btn", title: "Undo (⌘Z)", disabled: !this.canUndo(), onclick: () => this.undo() }),
+      btn([icon("arrow-clockwise"), "Redo"], { cls: "redo-btn", title: "Redo (⇧⌘Z)", disabled: !this.canRedo(), onclick: () => this.redo() }),
+      btn([icon("plus"), "New"], { onclick: () => this.createSet() }),
+      btn([icon("export"), "Export"], { variant: "primary", cls: "export-open-btn", title: "Open export drawer", onclick: () => this.toggleDrawer(true) }),
       this.themeBtn(),
     );
   }
@@ -4391,37 +4368,27 @@ class HctApp extends HTMLElement {
         : false,
       // canvas color-scheme — flips ONLY the canvas content's preview (light/dark),
       // independent of the app-chrome theme toggle in the app-header.
-      h(
-        "button",
-        {
-          class: "ghost",
-          title: "Canvas color-scheme (preview only — independent of app chrome)",
-          "aria-label": "Canvas preview scheme: " + this.canvasTheme + " — toggle light / dark",
-          "aria-pressed": this.canvasTheme === "dark" ? "true" : "false",
-          onclick: () => {
-            this.canvasTheme = this.canvasTheme === "light" ? "dark" : "light";
-            this.render();
-          },
+      btn([icon("theme"), "canvas " + this.canvasTheme], {
+        title: "Canvas color-scheme (preview only — independent of app chrome)",
+        ariaLabel: "Canvas preview scheme: " + this.canvasTheme + " — toggle light / dark",
+        ariaPressed: this.canvasTheme === "dark" ? "true" : "false",
+        onclick: () => {
+          this.canvasTheme = this.canvasTheme === "light" ? "dark" : "light";
+          this.render();
         },
-        icon("theme"), "canvas " + this.canvasTheme,
-      ),
-      h(
-        "button",
-        {
-          class: "ghost",
-          "aria-label": "Fit — reset the canvas view to centre at 100%",
-          onclick: () => {
-            this.fit();
-            this.render();
-          },
+      }),
+      btn([icon("crosshair"), "Fit"], {
+        ariaLabel: "Fit — reset the canvas view to centre at 100%",
+        onclick: () => {
+          this.fit();
+          this.render();
         },
-        icon("crosshair"), "Fit",
-      ),
-      h("button", { class: "ghost", "aria-label": "Zoom out", onclick: () => this.zoomBy(-1) }, icon("minus")),
+      }),
+      btn(icon("minus"), { ariaLabel: "Zoom out", onclick: () => this.zoomBy(-1) }),
       h("span", { class: "zoom-readout", role: "status", "aria-live": "polite", "aria-label": "Zoom level" }, Math.round(this.viewport.zoom * 100) + "%"),
-      h("button", { class: "ghost", "aria-label": "Zoom in", onclick: () => this.zoomBy(1) }, icon("plus")),
+      btn(icon("plus"), { ariaLabel: "Zoom in", onclick: () => this.zoomBy(1) }),
       h("div", { class: "spacer" }),
-      h("button", { class: "ghost add-pal-btn", onclick: () => this.addPalette() }, icon("plus"), "Palette"),
+      btn([icon("plus"), "Palette"], { cls: "add-pal-btn", onclick: () => this.addPalette() }),
       // when the RIGHT pane is collapsed its toggle pops here, at the canvas's right edge.
       !this.panesRight ? this.paneToggle("right") : false,
     );
@@ -4901,7 +4868,7 @@ class HctApp extends HTMLElement {
           "td",
           { class: "map-raw" },
           rawEditor(r, mode, ref, overridden),
-          overridden ? h("button", { class: "map-reset", title: "Reset to canonical", onclick: () => this.clearRoleOverride(r.key, mode) }, icon("arrow-counter-clockwise", { size: 13 })) : false,
+          overridden ? btn(icon("arrow-counter-clockwise", { size: 13 }), { variant: "bare", cls: "map-reset", title: "Reset to canonical", ariaLabel: "Reset to canonical", onclick: () => this.clearRoleOverride(r.key, mode) }) : false,
         ),
         this.inFigma ? driftCell(ref, hex) : false, // drift vs the live Figma variable (#3)
       );
@@ -4922,13 +4889,13 @@ class HctApp extends HTMLElement {
         // drift summary chip (after a live read) — does the file match what I'd generate now?
         drift ? chip(drift.drifted ? `${drift.drifted} drifted` : "in sync", { tone: drift.drifted ? "has-drift" : "in-sync" }) : false,
         // read the live raw-colors variables from the file and diff (Figma only).
-        this.inFigma ? h("button", { class: "ghost", title: "Read the live raw-colors variables from this file and compare (drift)", onclick: () => this.readLiveVariables() }, icon("arrows-clockwise"), "Read live") : false,
-        ovCount ? h("button", { class: "ghost", title: "Revert all re-points to the canonical mapping", onclick: () => this.clearAllOverrides() }, "Reset " + ovCount) : false,
-        h(
-          "button",
-          { class: "ghost", "aria-pressed": this.mapTextMode ? "true" : "false", title: "Switch the raw-token editor between a select menu and a free text input", onclick: () => this.setMapTextMode(!this.mapTextMode) },
-          icon("arrows-left-right"), this.mapTextMode ? "text" : "select",
-        ),
+        this.inFigma ? btn([icon("arrows-clockwise"), "Read live"], { title: "Read the live raw-colors variables from this file and compare (drift)", onclick: () => this.readLiveVariables() }) : false,
+        ovCount ? btn("Reset " + ovCount, { title: "Revert all re-points to the canonical mapping", onclick: () => this.clearAllOverrides() }) : false,
+        btn([icon("arrows-left-right"), this.mapTextMode ? "text" : "select"], {
+          ariaPressed: this.mapTextMode ? "true" : "false",
+          title: "Switch the raw-token editor between a select menu and a free text input",
+          onclick: () => this.setMapTextMode(!this.mapTextMode),
+        }),
       ),
       h(
         "table",
@@ -5484,6 +5451,33 @@ class HctApp extends HTMLElement {
   toggleDrawer(open) {
     this.exportOpen = open;
     this.render();
+    // modal focus management: move focus INTO the drawer on open (so keyboard users land in
+    // the dialog, not the page behind it) and return it to the opener on close. Guards keep
+    // this a no-op in the headless DOM (tag selectors return null there).
+    if (open) {
+      const d = this.querySelector(".drawer");
+      const first = d && d.querySelector && d.querySelector("button");
+      if (first && first.focus) first.focus();
+    } else {
+      const opener = this.querySelector(".export-open-btn");
+      if (opener && opener.focus) opener.focus();
+    }
+  }
+
+  // _trapDrawerTab — keep Tab focus inside the open export dialog (the focus-trap half of a
+  // modal; Esc + scrim-click already close it). Browser-only: the headless shim's
+  // querySelectorAll matches classes, so the focusable sweep returns [] there and this no-ops.
+  _trapDrawerTab(e) {
+    if (e.key !== "Tab" || !this.exportOpen) return;
+    const d = this.querySelector(".drawer");
+    if (!d || !d.querySelectorAll) return;
+    const f = [...d.querySelectorAll("button, input, select, textarea, [tabindex]")]
+      .filter((el) => !el.disabled && el.getAttribute && el.getAttribute("tabindex") !== "-1");
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && active === first) { e.preventDefault(); last.focus && last.focus(); }
+    else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus && first.focus(); }
   }
 
   renderDrawer(view) {
@@ -5525,13 +5519,14 @@ class HctApp extends HTMLElement {
           role: "dialog",
           "aria-modal": "true",
           "aria-label": "Export",
+          onkeydown: (e) => this._trapDrawerTab(e),
         },
         h(
           "div",
           { class: "drawer-head" },
           h("h3", {}, icon("export"), "Export"),
           h("div", { class: "spacer" }),
-          h("button", { class: "ghost", onclick: () => this.toggleDrawer(false) }, icon("x")),
+          btn(icon("x"), { ariaLabel: "Close export drawer", onclick: () => this.toggleDrawer(false) }),
         ),
         this.segmented(
           tabs.map(([id, label]) => ({ id, label })),
@@ -5573,8 +5568,8 @@ class HctApp extends HTMLElement {
           ? h(
               "div",
               { class: "config-bar" },
-              h("button", { class: "ghost", title: this.inFigma ? "Save this config into this Figma file (travels with the file)" : "Save this config to the project (localStorage)", onclick: () => this.saveToProject() }, icon("upload"), "Save to project"),
-              h("button", { class: "ghost", title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project", onclick: () => this.loadFromProject() }, icon("download"), "Load from project"),
+              btn([icon("upload"), "Save to project"], { title: this.inFigma ? "Save this config into this Figma file (travels with the file)" : "Save this config to the project (localStorage)", onclick: () => this.saveToProject() }),
+              btn([icon("download"), "Load from project"], { title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project", onclick: () => this.loadFromProject() }),
               h("span", { class: "config-note" }, this.inFigma ? "Source of truth: this Figma file (travels with the file)" : "Source of truth: your browser (localStorage)"),
             )
           : false,
@@ -5584,6 +5579,7 @@ class HctApp extends HTMLElement {
           "div",
           // tabpanel for the .drawer-tabs export-format tablist above (aria-labelledby the active tab).
           { class: "drawer-code", id: "export-panel", role: "tabpanel", "aria-labelledby": "xtab-" + this.exportTab },
+          btn([icon("copy"), "Copy"], { variant: "bare", cls: "copy-float", title: "Copy to clipboard", ariaLabel: "Copy", onclick: () => this.copy(code) }),
           h("button", { class: "copy-float", title: "Copy to clipboard", "aria-label": "Copy", onclick: () => this.copy(code) }, icon("copy"), "Copy"),
           h("pre", { class: "drawer-pre" }, code),
         ),

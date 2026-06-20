@@ -673,7 +673,6 @@ input[type="range"]::-moz-range-thumb {
 .roles-table { font-size: 11px; }
 .roles-table .rrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
 .roles-table .rrow.rhead { color: var(--ink-faint); font-weight: 600; border-bottom: 1px solid var(--line); padding-bottom: 5px; margin-bottom: 3px; }
-.roles-table .rrow .sw { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(128,128,128,.4); flex: none; }
 .roles-table .rrow .k { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .roles-table .rrow .suf { width: 92px; flex: none; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .roles-table .rrow .sw-pair { display: flex; gap: 3px; flex: none; align-items: center; }
