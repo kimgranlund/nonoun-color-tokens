@@ -335,7 +335,13 @@ export function projectView(doc) {
     const keyColors = placeKeyColors(p.keyColors, fullStops);
 
     // ramp = 19 core display stops; fullRamp = all 25 EXPORT_STOPS (the extended view).
-    palettes.push({ name: p.name, on: p.on !== false, key: keyHex, ramp, fullRamp: fullStops, roles, keyColors });
+    palettes.push({
+      name: p.name, on: p.on !== false, key: keyHex, ramp, fullRamp: fullStops, roles, keyColors,
+      // curated story (present for preset palettes): the color's evocative name, role, description.
+      ...(p.colorName ? { colorName: p.colorName } : {}),
+      ...(p.colorRole ? { colorRole: p.colorRole } : {}),
+      ...(p.description ? { description: p.description } : {}),
+    });
 
     plot.push({
       palette: p.name,
@@ -383,7 +389,7 @@ export function projectView(doc) {
     },
   };
 
-  return { palettes, plot, exports, contrast };
+  return { palettes, plot, exports, contrast, story: doc.story || null };
 }
 
 function round2(x) {

@@ -1012,6 +1012,27 @@ const { serialize: serKC, hydrate: hydKC } = await import("../../src/ui/persist.
 const rtKC = hydKC(serKC(app.doc)).palettes[0].keyColors;
 ok(rtKC && rtKC.length === 1 && rtKC[0].role === "dominant" && Array.isArray(rtKC[0].oklch) && rtKC[0].oklch.length === 3, "(kc5) key colors round-trip through persist (oklch by role)");
 
+// ── (st) story + volumes: capture, round-trip, the Story tab, and the gallery volume groups ──
+const { TRAVEL_PRESETS: TPs, TRAVEL_VOLUMES: TVs } = await import("../../src/ui/travel-presets.js");
+ok(TPs.every((p) => typeof p.vol === "string" && p.vol), "(st1) every preset carries a volume (vol)");
+const withStory = TPs.filter((p) => p.story);
+ok(withStory.length >= 1 && Object.keys(TVs).length >= 1, `(st2) some presets carry a story (${withStory.length}) + volume headers (${Object.keys(TVs).length})`);
+const storyPreset = withStory[0];
+ok(storyPreset.story.title && storyPreset.story.narrative && Array.isArray(storyPreset.story.groups), "(st3) a story has title + narrative + groups");
+ok(storyPreset.palettes.some((q) => q.colorName && q.colorRole && q.description), "(st4) the curated colors carry name + role + description");
+// open a story preset → its story round-trips through hydrate, and the Story tab renders
+app.openConfigAsSet(storyPreset, "story"); flushRaf();
+ok(app.doc.story && app.doc.story.title === storyPreset.story.title, "(st5) opening a story preset keeps doc.story (round-trips through hydrate)");
+app.setSegment("story"); flushRaf();
+ok(!!app.querySelector(".story-pane"), "(st6) the Story tab renders for a set with a story");
+ok(app.querySelectorAll(".story-color").length >= 1, "(st7) the Story tab lists the curated colors");
+// the Palette tab shows the per-color story line
+app.setSegment("palette"); flushRaf();
+ok(!!app.querySelector(".color-story"), "(st8) the Palette tab shows the curated color's story line");
+// gallery groups presets by volume
+app.toGallery(); app.search = ""; app.refreshTiles(); flushRaf();
+ok(app.querySelectorAll(".preset-vol").length >= 1, `(st9) the gallery groups presets into volume sub-groups (got ${app.querySelectorAll(".preset-vol").length})`);
+
 // ── report ──────────────────────────────────────────────────────────────────────────
 if (fails.length) {
   console.error("HEADLESS BOOT FAIL:");

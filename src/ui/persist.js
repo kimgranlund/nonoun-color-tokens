@@ -134,7 +134,28 @@ function clampPalette(p) {
   // (a palette without key colors must round-trip unchanged, not gain an empty array).
   const kc = clampKeyColors(src.keyColors);
   if (kc.length) out.keyColors = kc;
+  // STORY (optional, from a curated preset): the source color's evocative name, a one-line
+  // description, and its role in the set. Kept as-is iff present (free strings / known role).
+  if (typeof src.colorName === "string" && src.colorName) out.colorName = src.colorName;
+  if (typeof src.description === "string" && src.description) out.description = src.description;
+  if (src.colorRole === "dominant" || src.colorRole === "supporting" || src.colorRole === "accent") out.colorRole = src.colorRole;
   return out;
+}
+
+// clampStory — the set-level concept narrative from a curated preset (optional). Free strings +
+// a groups array of {hier,pct,note}; shape-clamped only. Returns null when nothing valid is present.
+function clampStory(s) {
+  if (!s || typeof s !== "object") return null;
+  const str = (x) => (typeof x === "string" && x.trim() ? x : undefined);
+  const out = {};
+  for (const k of ["title", "kicker", "narrative", "refuses"]) { const v = str(s[k]); if (v) out[k] = v; }
+  if (Array.isArray(s.groups)) {
+    const g = s.groups
+      .filter((x) => x && (x.hier === "d" || x.hier === "s" || x.hier === "a"))
+      .map((x) => ({ hier: x.hier, pct: typeof x.pct === "number" ? x.pct : 0, ...(str(x.note) ? { note: x.note } : {}) }));
+    if (g.length) out.groups = g;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 // Per-doc semantic-mapping overrides: { [roleKey]: { light?, dark? } } — a role re-pointed to a
@@ -187,6 +208,10 @@ export function hydrate(snapshot) {
   else if (selected > maxIndex) selected = maxIndex;
   // (no rounding of an in-range integer: an in-domain integer stays byte-for-byte)
 
+  // optional curated metadata — the set's concept story + its travel volume (both opt-in, so a
+  // hand-built doc round-trips unchanged).
+  const story = clampStory(s.story);
+
   return {
     curve: clampEnum(s.curve, DOMAINS.curve.values, DOMAINS.curve.default),
     tension: clampNumber(s.tension, DOMAINS.tension.min, DOMAINS.tension.max),
@@ -205,5 +230,7 @@ export function hydrate(snapshot) {
     selected,
     roleOverrides: clampOverrides(s.roleOverrides),
     palettes,
+    ...(typeof s.vol === "string" && s.vol ? { vol: s.vol } : {}),
+    ...(story ? { story } : {}),
   };
 }

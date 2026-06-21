@@ -1,24 +1,21 @@
-// gen-travel-presets.mjs — GENERATE src/ui/travel-presets.js from docs/spec/colors/travel-palettes.md.
+// gen-travel-presets.mjs — GENERATE src/ui/travel-presets.js from docs/spec/colors/travel-palettes.md
+// (+ the hand-authored travel-palettes.html for the STORY).
 //
 // Parses the 48 curated "Travel Palettes" (12 volumes × 4) and emits each as a read-only gallery
 // preset: a parametric config the generator opens as an editable copy. Run via `npm run gen:travel-presets`.
 //
-// NAMING — per docs/spec/colors/color-model-funciton.md (the source of truth):
+// NAMING — per docs/spec/colors/color-model-funciton.md:
 //   sampled 6 colors → {tier}-{rank}: primary-base/muted, secondary-base/muted, accent-base/muted
-//   status 3 colors  → danger/warning/success (the doc's functional-error/warning/success, mapped to
-//                       the tool's existing semantic families per the owner's call)
+//   status 3 colors  → danger/warning/success
 //
-// 1/3/2 → 2-2-2 MAPPING (the doc §5 "judgment call", made deterministic from its own rules of thumb;
-// validated to reproduce the §6 worked example exactly):
-//   • dominant                         → primary-base   (the ground)
-//   • supporting nearest the ground in lightness → primary-muted (the ground's quiet partner, §4)
-//   • the other two supporting, by chroma        → secondary-base (higher C) / secondary-muted (lower C)
-//   • the two accents, in listed order           → accent-base / accent-muted
+// 1/3/2 → 2-2-2 MAPPING: dominant → primary-base; supporting nearest the ground → primary-muted;
+//   the other two supporting (by chroma) → secondary-base/muted; the two accents → accent-base/muted.
 //
-// Each color's hue+chroma is recovered from its HEX via CAM16 (the same approximate seed
-// configFromVariables uses) — the curated color is a SEED; the tool re-derives an even ramp from it,
-// so a ramp's 500 ≈ but ≠ the source hex. Skew/lift default to 0.
+// STORY — the .html bundle carries the narrative the .md lacks (title, per-color descriptions, the
+// 60/30/10 groups, refuses) + the per-VOLUME intro. Only Volumes I–III are present in the bundle as
+// plain data (IV–XII are assembled by runtime code); the rest get colors + `vol` but no story yet.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { cam16FromRgb, lstarFromRgb } from "../src/engine/hct.js";
@@ -26,21 +23,84 @@ import { toneAt, DEFAULT_CONTROLS } from "../src/engine/tonal.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(here, "../docs/spec/colors/travel-palettes.md");
+const HTMLSRC = resolve(here, "../docs/spec/colors/travel-palettes.html");
 const OUT = resolve(here, "../src/ui/travel-presets.js");
+const HIER_ROLE = { d: "dominant", s: "supporting", a: "accent" };
 
 // "#RRGGBB" → [r,g,b] ints.
 const hexToRgb = (hex) => {
   const s = hex.replace("#", "");
   return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
 };
-// The prime role is stop 550; with default skew/lift its tone is ~46 L*, which would flatten EVERY
-// palette's prime to mid-dark — a light fog-cream and a dark kelp would BOTH render as L*46 grey. So
-// anchor each palette's prime to its SOURCE lightness via `lift` (the centred tone bump), clamped to
-// lift's ±40 domain, so the prime token (--c-{name}) ≈ the curated color. Hue+chroma come from CAM16;
-// lightness comes from lift. (Stops away from 550 still span the full ramp — lift tapers to 0 at the ends.)
+// strip the HTML the authored strings carry (<em>…</em>, &nbsp;, &amp;, numeric entities).
+const clean = (s) =>
+  String(s || "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n))
+    .replace(/\s+/g, " ").trim();
+
+// extractObj — JSON.parse the brace-balanced `<marker> { … }` (string-aware), retrying the next
+// occurrence if a match fails (the marker may appear in a comment/code first).
+function extractObj(src, marker) {
+  for (let from = 0; ; ) {
+    const at = src.indexOf(marker, from);
+    if (at < 0) return null;
+    const i = src.indexOf("{", at);
+    let depth = 0, inStr = false, esc = false, end = -1;
+    for (let j = i; j < src.length; j++) {
+      const ch = src[j];
+      if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; }
+      else if (ch === '"') inStr = true;
+      else if (ch === "{") depth++;
+      else if (ch === "}" && --depth === 0) { end = j; break; }
+    }
+    if (end > 0) { try { return JSON.parse(src.slice(i, end + 1)); } catch { /* wrong { — retry */ } }
+    from = at + marker.length;
+  }
+}
+
+// loadStory — decompress the .html bundle and read the EARLY volumes (I–III) it carries as plain
+// data. Returns { volumes:{vol:{title,intro}}, sets:[{vol, title, kicker, narrative, refuses,
+// groups, byHex}] } in volume order; byHex maps a source HEX → {name,note,hier} for per-color story.
+function loadStory() {
+  let html;
+  try { html = readFileSync(HTMLSRC, "utf8"); }
+  catch { console.warn("⚠ travel-palettes.html not found — presets get colors + vol but no story"); return { volumes: {}, sets: [] }; }
+  const man = JSON.parse(html.match(/<script type="__bundler\/manifest">([\s\S]*?)<\/script>/)[1]);
+  let all = "";
+  for (const r of Object.values(man)) {
+    if (!r.data) continue;
+    let b = Buffer.from(r.data, "base64");
+    if (r.compressed) { try { b = gunzipSync(b); } catch { /* not gzip */ } }
+    all += b.toString("utf8") + "\n";
+  }
+  const early = extractObj(all, "PALETTE_DATA_EARLY = {");
+  const volumes = {}, sets = [];
+  if (early) {
+    for (const [vol, v] of Object.entries(early)) {
+      volumes[vol] = { title: clean(v.h1 || v.title), intro: clean((v.preface || []).join(" ")) };
+      for (const p of v.palettes || []) {
+        const hy = p.hierarchy || {};
+        sets.push({
+          vol,
+          title: clean(p.title),
+          kicker: clean(p.kicker),
+          narrative: clean(p.source),
+          refuses: clean(p.refuses),
+          groups: ["d", "s", "a"].filter((k) => hy[k]).map((k) => ({ hier: k, pct: hy[k].pct, note: clean(hy[k].text) })),
+          byHex: Object.fromEntries((p.swatches || []).map((s) => [String(s.hex).toUpperCase(), { name: clean(s.name), note: clean(s.note), hier: s.hier }])),
+        });
+      }
+    }
+  }
+  return { volumes, sets };
+}
+
+// The prime role is stop 550; with default skew/lift its tone is ~46 L*, which would flatten every
+// palette's prime. Anchor each prime to its SOURCE lightness via `lift` (centred tone bump), clamped.
 const PRIME_TONE = toneAt(550, 0, 0, DEFAULT_CONTROLS);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const palette = (name, hex, oklch) => {
+const palette = (name, hex, oklch, sw) => {
   const rgb = hexToRgb(hex);
   const { hue, chroma } = cam16FromRgb(rgb);
   return {
@@ -51,84 +111,91 @@ const palette = (name, hex, oklch) => {
     lift: Math.round(clamp(lstarFromRgb(rgb) - PRIME_TONE, -40, 40)),
     hueShift: 0,
     hueSameDir: false,
-    // Retain the EXACT source color as the `dominant` key color, in OKLCH (less lossy than the
-    // 8-bit hex). The ramp re-derives an even scale from the seed; the key color keeps the
-    // original verbatim, so the curated palette is represented accurately, not just approximated.
+    // retain the EXACT source color as the `dominant` key color, in OKLCH (less lossy than hex).
     keyColors: [{ role: "dominant", oklch: oklch.map((v) => Number(v)) }],
+    // the curated color's STORY (from the HTML): evocative name, one-line description, source role.
+    ...(sw ? { colorName: sw.name, description: sw.note, colorRole: HIER_ROLE[sw.hier] || sw.hier } : {}),
     on: true,
   };
 };
 
-// ── parse one "### " entry: title + the core-6 table + the system-3 table ──────────────────────
+// ── parse one "### " entry: volume + title + the core-6 table + the system-3 table ──────────────
 function parseEntry(block) {
-  const heading = block.split("\n", 1)[0].trim(); // e.g. "I·04 — 37° N · November · 05:40 · MV passing Kea, …"
+  const heading = block.split("\n", 1)[0].trim(); // "I·04 — 37° N · November · 05:40 · MV passing Kea, …"
   const dash = heading.indexOf(" — ");
   const idx = dash >= 0 ? heading.slice(0, dash).trim() : heading; // "I·04"
+  const vol = idx.split(/[·.]/)[0].trim(); // "I"
   const rest = dash >= 0 ? heading.slice(dash + 3).trim() : "";
   const parts = rest.split(" · ");
-  const place = parts.length > 3 ? parts.slice(3).join(" · ") : rest; // the place, after lat·month·time
-  const name = place || idx; // the place itself is the set name (no "IV·01 ·" prefix); array order keeps vol order
-
+  const place = parts.length > 3 ? parts.slice(3).join(" · ") : rest;
+  const name = place || idx;
   const core = [...block.matchAll(/^\|\s*(Dominant|Supporting|Accent)\s*\|\s*([^|]+?)\s*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|/gm)]
     .map((m) => ({ role: m[1], desc: m[2].trim(), oklch: m[3].trim().split(/\s+/).map(Number), hex: m[4].trim().toUpperCase() }));
   const system = Object.fromEntries(
     [...block.matchAll(/^\|\s*system-(red|yellow|green)\s*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|/gm)]
       .map((m) => [m[1], { oklch: m[2].trim().split(/\s+/).map(Number), hex: m[3].trim().toUpperCase() }]),
   );
-  return { idx, name, core, system };
+  return { idx, vol, name, core, system };
 }
 
-// ── the deterministic 1/3/2 → 2-2-2 mapping (color-model-funciton.md §2–§5) ─────────────────────
-function mapColors({ core, system }) {
+// ── the deterministic 1/3/2 → 2-2-2 mapping ──────────────────────────────────────────────────────
+function mapColors({ core, system }, story) {
+  const bh = (story && story.byHex) || {};
   const dom = core.find((r) => r.role === "Dominant");
   const sup = core.filter((r) => r.role === "Supporting");
   const acc = core.filter((r) => r.role === "Accent");
   const C = (r) => r.oklch[1];
-  // OKLab (L,a,b) from OKLCH, and a perceptual distance — the doc's "muted = similar lightness, lower
-  // chroma / small hue step" is exactly small ΔE to the ground, so primary-muted = the closest supporting.
   const oklab = (r) => { const [L, c, H] = r.oklch; const h = (H * Math.PI) / 180; return [L, c * Math.cos(h), c * Math.sin(h)]; };
   const dE = (a, b) => { const A = oklab(a), B = oklab(b); return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]); };
   const byNearGround = [...sup].sort((a, b) => dE(a, dom) - dE(b, dom));
   const primaryMuted = byNearGround[0];
-  const secondary = byNearGround.slice(1).sort((a, b) => C(b) - C(a)); // base = higher chroma, muted = lower
+  const secondary = byNearGround.slice(1).sort((a, b) => C(b) - C(a));
   return [
-    palette("primary-base", dom.hex, dom.oklch),
-    palette("primary-muted", primaryMuted.hex, primaryMuted.oklch),
-    palette("secondary-base", secondary[0].hex, secondary[0].oklch),
-    palette("secondary-muted", secondary[1].hex, secondary[1].oklch),
-    palette("accent-base", acc[0].hex, acc[0].oklch),
-    palette("accent-muted", acc[1].hex, acc[1].oklch),
-    palette("danger", system.red.hex, system.red.oklch),
+    palette("primary-base", dom.hex, dom.oklch, bh[dom.hex]),
+    palette("primary-muted", primaryMuted.hex, primaryMuted.oklch, bh[primaryMuted.hex]),
+    palette("secondary-base", secondary[0].hex, secondary[0].oklch, bh[secondary[0].hex]),
+    palette("secondary-muted", secondary[1].hex, secondary[1].oklch, bh[secondary[1].hex]),
+    palette("accent-base", acc[0].hex, acc[0].oklch, bh[acc[0].hex]),
+    palette("accent-muted", acc[1].hex, acc[1].oklch, bh[acc[1].hex]),
+    palette("danger", system.red.hex, system.red.oklch),   // system colors aren't in the HTML story
     palette("warning", system.yellow.hex, system.yellow.oklch),
     palette("success", system.green.hex, system.green.oklch),
   ];
 }
 
-// ── build ───────────────────────────────────────────────────────────────────────────────────────
+// ── build ─────────────────────────────────────────────────────────────────────────────────────
 const md = readFileSync(SRC, "utf8");
 const entries = md.split(/^### /m).slice(1).map(parseEntry);
-// Spread the full DEFAULT_CONTROLS into every preset. A config that OMITS them hydrates to the
-// domain MINIMUMS (lmin 0, lmax 60, damp 0) — not the sensible defaults (5/100/80) — which caps the
-// whole ramp dark and was a big part of why every preset rendered muddy. Carry them explicitly.
-// Travel presets default to the "Vivid mids" damping (boosts mid-tone chroma toward the gamut) — more
-// vibrant than the flat "Default" damping. Mirrors the DAMP_PRESETS "Vivid mids" entry in app.js.
-const VIVID_MIDS = { damp: 70, dampCurve: 1.5, dampAmp: 55, dampBias: 0 };
-const presets = entries.map((e) => ({ name: e.name, ...DEFAULT_CONTROLS, ...VIVID_MIDS, palettes: mapColors(e) }));
+const { volumes, sets } = loadStory(); // story zips with `entries` by index (Volumes I–III only)
+entries.forEach((e, i) => {
+  const dom = e.core.find((r) => r.role === "Dominant");
+  if (sets[i] && dom && !sets[i].byHex[dom.hex]) console.warn(`⚠ entry ${i} (${e.name}): story/md order mismatch`);
+});
 
-// One preset per line (compact JSON) — keeps the bundle small AND keeps git diffs readable
-// (a change to one palette shows as a single changed line).
+const VIVID_MIDS = { damp: 70, dampCurve: 1.5, dampAmp: 55, dampBias: 0 };
+const presets = entries.map((e, i) => {
+  const st = sets[i];
+  return {
+    name: e.name,
+    vol: e.vol, // volume the set belongs to — drives the gallery sub-groups
+    ...(st ? { story: { title: st.title, kicker: st.kicker, narrative: st.narrative, refuses: st.refuses, groups: st.groups } } : {}),
+    ...DEFAULT_CONTROLS, ...VIVID_MIDS,
+    palettes: mapColors(e, st),
+  };
+});
+
 const lines = presets.map((p) => "  " + JSON.stringify(p)).join(",\n");
 const body =
   "// travel-presets.js — GENERATED by scripts/gen-travel-presets.mjs from\n" +
-  "// docs/spec/colors/travel-palettes.md. DO NOT EDIT — run `npm run gen:travel-presets`.\n" +
-  "//\n" +
-  "// 48 curated Travel Palettes as READ-ONLY gallery presets. Each is a parametric config (palette\n" +
-  "// hue/chroma seeded from the source hex via CAM16; the tool re-derives even ramps). Naming per\n" +
-  "// docs/spec/colors/color-model-funciton.md: {tier}-{rank} + danger/warning/success.\n" +
+  "// docs/spec/colors/travel-palettes.md (+ travel-palettes.html for the story). DO NOT EDIT — run\n" +
+  "// `npm run gen:travel-presets`. 48 curated Travel Palettes (12 volumes × 4) as read-only presets;\n" +
+  "// each carries `vol` (its volume) and, for Volumes I–III, the captured `story` + per-color name/role.\n" +
+  "export const TRAVEL_VOLUMES = " + JSON.stringify(volumes) + ";\n" +
   "export const TRAVEL_PRESETS = [\n" +
   lines +
   "\n];\n";
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, body);
-console.log(`wrote ${OUT}  (${presets.length} presets × ${presets[0].palettes.length} palettes)`);
+const withStory = presets.filter((p) => p.story).length;
+console.log(`wrote ${OUT}  (${presets.length} presets × ${presets[0].palettes.length} palettes · ${withStory} with story · ${Object.keys(volumes).length} volume headers)`);

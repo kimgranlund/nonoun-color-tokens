@@ -23,7 +23,7 @@ import {
 } from "./model.mjs";
 import { STORAGE_KEY, serialize, hydrate } from "./persist.js";
 import { FIGMA_PLUGIN } from "./figma-plugin-assets.js";
-import { TRAVEL_PRESETS } from "./travel-presets.js";
+import { TRAVEL_PRESETS, TRAVEL_VOLUMES } from "./travel-presets.js";
 import { zipStore } from "./zip.mjs";
 import { icon, brandMark } from "./icons.js";
 
@@ -749,39 +749,48 @@ class HctApp extends HTMLElement {
   buildPresetTiles() {
     const q = this.search.trim().toLowerCase();
     const visible = TRAVEL_PRESETS.filter((p) => !q || p.name.toLowerCase().includes(q));
-    return visible.map((preset) => {
-      const v = projectView(hydrate(preset));
-      const enabled = v.palettes.filter((p) => p.on);
-      // Preview the 6 CURATED colors only (the trailing danger/warning/success are near-identical
-      // across presets and made every tile look the same). Widths emphasize the primary tier
-      // (~55/35/10, primary-base biggest), so a tile reads as "this palette's main color". Each
-      // swatch is the palette's KEY (most-chromatic) color so the strip shows distinct hues, not a
-      // row of mid-lightness 550s.
-      const SAMPLED_W = [36, 19, 19, 16, 6, 4];
-      const strip = h(
-        "div",
-        { class: "strip" },
-        ...enabled.slice(0, 6).map((p, i) => h("i", { style: `background:${p.key};flex:${SAMPLED_W[i] || 1}` })),
-      );
+    // group by VOLUME (the curated sets ship as 12 volumes of 4 territories), in order.
+    const byVol = new Map();
+    for (const p of visible) { const v = p.vol || "—"; if (!byVol.has(v)) byVol.set(v, []); byVol.get(v).push(p); }
+    return [...byVol.entries()].map(([vol, ps]) => {
+      const vi = TRAVEL_VOLUMES[vol];
       return h(
-        "button",
-        { class: "set-tile preset", title: `Open a copy of “${preset.name}”`, onclick: () => this.openConfigAsSet(preset, `Opened “${preset.name}”`) },
-        // both the "preset" tag (bottom-right) and the palette-count (bottom-left) ride the preview;
-        // the meta row below carries just the name.
+        "div",
+        { class: "preset-vol" },
         h(
           "div",
-          { class: "set-thumb" },
-          strip,
-          h("span", { class: "tile-tag tile-preset" }, "preset"),
-          h("span", { class: "tile-tag tile-count" }, `${enabled.length} palettes`),
+          { class: "preset-vol-head" },
+          h("span", { class: "preset-vol-num" }, "Vol " + vol),
+          vi && vi.title ? h("span", { class: "preset-vol-title" }, vi.title) : false,
+          vi && vi.intro ? h("p", { class: "preset-vol-intro" }, vi.intro) : false,
         ),
-        h(
-          "div",
-          { class: "set-meta" },
-          h("div", { class: "nm" }, preset.name),
-        ),
+        h("div", { class: "set-grid preset-grid" }, ...ps.map((p) => this.presetTile(p))),
       );
     });
+  }
+
+  // presetTile — one read-only preset card. Clicking opens an editable copy into the user's sets.
+  presetTile(preset) {
+    const v = projectView(hydrate(preset));
+    const enabled = v.palettes.filter((p) => p.on);
+    const SAMPLED_W = [36, 19, 19, 16, 6, 4];
+    const strip = h(
+      "div",
+      { class: "strip" },
+      ...enabled.slice(0, 6).map((p, i) => h("i", { style: `background:${p.key};flex:${SAMPLED_W[i] || 1}` })),
+    );
+    return h(
+      "button",
+      { class: "set-tile preset", title: `Open a copy of “${preset.name}”`, onclick: () => this.openConfigAsSet(preset, `Opened “${preset.name}”`) },
+      h(
+        "div",
+        { class: "set-thumb" },
+        strip,
+        h("span", { class: "tile-tag tile-preset" }, preset.story ? "story" : "preset"),
+        h("span", { class: "tile-tag tile-count" }, `${enabled.length} palettes`),
+      ),
+      h("div", { class: "set-meta" }, h("div", { class: "nm" }, preset.name)),
+    );
   }
 
   // refreshTiles — re-render ONLY the grid hosts' children. Used on search input
@@ -818,7 +827,7 @@ class HctApp extends HTMLElement {
 
     this._gridHost = h("div", { class: "set-grid" }, ...this.buildTiles());
     // Read-only curated "Presets" — ship in code (TRAVEL_PRESETS), open as an editable copy.
-    this._presetGridHost = h("div", { class: "set-grid preset-grid" }, ...this.buildPresetTiles());
+    this._presetGridHost = h("div", { class: "preset-shelf" }, ...this.buildPresetTiles());
 
     return h(
       "div",
@@ -2243,10 +2252,15 @@ class HctApp extends HTMLElement {
   // [ Palette | Global | Roles ] — three panels over the SELECTED palette. The
   // selection lives in ui-session state (this.segment); default is Palette.
   renderRightPane(view) {
+    const hasStory = !!view.story;
+    const seg = this.segment === "story" && !hasStory ? "palette" : this.segment; // story tab only when there is one
     let body;
-    if (this.segment === "global") body = this.renderGlobalInspector();
-    else if (this.segment === "roles") body = this.renderRolesInspector(view);
+    if (seg === "story") body = this.renderStoryInspector(view);
+    else if (seg === "global") body = this.renderGlobalInspector();
+    else if (seg === "roles") body = this.renderRolesInspector(view);
     else body = this.renderPaletteInspector(view);
+    const tabs = [{ id: "palette", label: "Palette" }, { id: "global", label: "Global" }, { id: "roles", label: "Roles" }];
+    if (hasStory) tabs.push({ id: "story", label: "Story" });
     return h(
       "aside",
       { class: "right-pane" },
@@ -2254,16 +2268,62 @@ class HctApp extends HTMLElement {
       // the Inspector tabs; once collapsed it is rendered in the canvas-header instead.
       h("div", { class: "pane-head" },
         this.panesRight ? this.paneToggle("right") : false,
-        this.segmented(
-          [{ id: "palette", label: "Palette" }, { id: "global", label: "Global" }, { id: "roles", label: "Roles" }],
-          this.segment,
-          (id) => this.setSegment(id),
-          { ariaLabel: "Inspector", idPrefix: "tab", controls: "seg-panel" },
-        )),
-      h("div", { class: "seg-body", "data-scroll": "seg-body", role: "tabpanel", id: "seg-panel", "aria-labelledby": "tab-" + this.segment }, body),
+        this.segmented(tabs, seg, (id) => this.setSegment(id), { ariaLabel: "Inspector", idPrefix: "tab", controls: "seg-panel" })),
+      h("div", { class: "seg-body", "data-scroll": "seg-body", role: "tabpanel", id: "seg-panel", "aria-labelledby": "tab-" + seg }, body),
       // Pinned below the panel on EVERY tab: a live component preview wired to the
       // selected palette's roles (surface / onSurface / onSurfaceVariant + primary).
       h("div", { class: "seg-example" }, this.exampleCard(view)),
+    );
+  }
+
+  // renderStoryInspector — the holistic "Story" tab: the set's concept narrative + the curated
+  // colors (name · role · description) + the 60/30/10 groups + what the palette refuses. Mirrors the
+  // source's cover layout. Present only for sets that carry a story (the curated travel volumes).
+  renderStoryInspector(view) {
+    const s = view.story;
+    if (!s) return h("div", { class: "empty-note" }, "No story for this palette set.");
+    const HIER = { d: "Dominant", s: "Supporting", a: "Accent" };
+    const cols = view.palettes.filter((p) => p.colorName); // the curated colors carry the story
+    return h(
+      "div",
+      { class: "story-pane" },
+      s.kicker ? h("div", { class: "story-kicker" }, s.kicker) : false,
+      s.title ? h("h3", { class: "story-title" }, s.title) : false,
+      s.narrative ? h("p", { class: "story-narrative" }, s.narrative) : false,
+      cols.length
+        ? h(
+            "div",
+            { class: "story-colors" },
+            ...cols.map((p) =>
+              h(
+                "div",
+                { class: "story-color" },
+                h("span", { class: "story-swatch", style: `background:${p.key}` }),
+                h(
+                  "div",
+                  { class: "story-color-meta" },
+                  h("div", { class: "story-color-name" }, p.colorRole ? h("span", { class: "color-role" }, p.colorRole) : false, p.colorName),
+                  p.description ? h("p", { class: "story-color-note" }, p.description) : false,
+                ),
+              ),
+            ),
+          )
+        : false,
+      s.groups && s.groups.length
+        ? h(
+            "div",
+            { class: "story-groups" },
+            ...s.groups.map((g) =>
+              h(
+                "div",
+                { class: "story-group" },
+                h("div", { class: "story-group-head" }, h("b", {}, HIER[g.hier] || g.hier), h("span", { class: "story-group-pct" }, g.pct + "%")),
+                g.note ? h("p", {}, g.note) : false,
+              ),
+            ),
+          )
+        : false,
+      s.refuses ? h("div", { class: "story-refuses" }, h("b", {}, "Refuses"), h("p", {}, s.refuses)) : false,
     );
   }
 
@@ -2377,6 +2437,15 @@ class HctApp extends HTMLElement {
       { class: "insp-body" },
       h("h3", { class: "insp-title" }, swatch((vp.ramp.find((s) => s.stop === 550) || vp.ramp[9]).hex, { size: 16 }), "Palette"),
       h("div", { class: "insp-sub" }, isEven ? "Tune hue · chroma · skew · lift — live" : "Tune hue · chroma — live"),
+      // curated story for this color (preset palettes): its evocative name, role, and description.
+      vp.colorName
+        ? h(
+            "div",
+            { class: "color-story" },
+            h("div", { class: "color-story-name" }, vp.colorRole ? h("span", { class: "color-role" }, vp.colorRole) : false, vp.colorName),
+            vp.description ? h("p", { class: "color-story-note" }, vp.description) : false,
+          )
+        : false,
       // In the Scrims view, surface the sub-variant relationship at the top of the inspector.
       this.canvasView === "scrims" ? this.scrimContext(view) : false,
       field(
