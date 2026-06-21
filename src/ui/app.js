@@ -2536,6 +2536,12 @@ class HctApp extends HTMLElement {
         ),
         { labelTitle: "perceptual: even OKHSL-lightness steps + gamut chroma (no near-white dead zone). even: the classic CIELAB curve (tone-aligned across hues; Curve/Tension/Chroma-basis apply). peak: cusp anchored at stop 500." },
       ),
+      // Vibrancy (perceptual only): pulls the ramp's center toward the hue's chroma cusp, so the mid
+      // stops read vibrant — the fix for hues whose vivid expression is off-center (e.g. yellow). At
+      // 100 it equals "peak" mode. Hidden in even (CIELAB) + peak (already pinned at the cusp).
+      d.toneMode === "perceptual"
+        ? this.slider("Vibrancy", d.vibrancy, 0, 100, 1, (v) => fmt(v), (v) => this.editDrag((doc) => (doc.vibrancy = v)))
+        : false,
       // Curve · Tension · Chroma-basis shape the CIELAB "even" path ONLY — hide them in the OKHSL modes.
       d.toneMode === "even"
         ? field(

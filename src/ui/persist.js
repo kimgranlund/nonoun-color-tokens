@@ -51,8 +51,10 @@ export const DOMAINS = {
   dampAmp: { kind: "number", min: 0, max: 100, default: 0 },
   dampBias: { kind: "number", min: -100, max: 100, default: 0 },
   hueSpace: { kind: "enum", values: ["cam16", "oklch"], default: "cam16" },
-  // ramp distribution mode (see tonal.js DEFAULT_CONTROLS.toneMode). Default "even".
-  toneMode: { kind: "enum", values: ["even", "perceptual", "peak"], default: "even" },
+  // ramp distribution mode (see tonal.js DEFAULT_CONTROLS.toneMode). Default "perceptual".
+  toneMode: { kind: "enum", values: ["even", "perceptual", "peak"], default: "perceptual" },
+  // perceptual-path vibrancy: 0 = even lightness, 100 = cusp-anchored center (see tonal.js). Default 0.
+  vibrancy: { kind: "number", min: 0, max: 100, default: 0 },
   // even-mode light/dark chroma floor, % of gamut (see tonal.js). Default on, so absent → 40 not 0.
   chromaFloor: { kind: "number", min: 0, max: 100, default: 40 },
   theme: { kind: "enum", values: ["auto", "light", "dark"], default: "auto" },
@@ -198,6 +200,7 @@ export function hydrate(snapshot) {
     relChroma: s.relChroma === true, // boolean chroma-basis flag; absent/non-true -> false (legacy default)
     chromaFloor: clampNumber(s.chromaFloor ?? DOMAINS.chromaFloor.default, DOMAINS.chromaFloor.min, DOMAINS.chromaFloor.max),
     toneMode: clampEnum(s.toneMode, DOMAINS.toneMode.values, DOMAINS.toneMode.default),
+    vibrancy: clampNumber(s.vibrancy ?? DOMAINS.vibrancy.default, DOMAINS.vibrancy.min, DOMAINS.vibrancy.max),
     theme: clampEnum(s.theme, DOMAINS.theme.values, DOMAINS.theme.default),
     selected,
     roleOverrides: clampOverrides(s.roleOverrides),

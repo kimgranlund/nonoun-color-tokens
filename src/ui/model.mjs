@@ -108,6 +108,7 @@ export function defaultDocument() {
     relChroma: DEFAULT_CONTROLS.relChroma,
     chromaFloor: DEFAULT_CONTROLS.chromaFloor,
     toneMode: DEFAULT_CONTROLS.toneMode,
+    vibrancy: DEFAULT_CONTROLS.vibrancy,
     theme: "auto",
     selected: 0,
     roleOverrides: {}, // per-doc semantic-mapping re-points (empty = canonical role table)
@@ -129,6 +130,7 @@ function controlsOf(doc) {
     relChroma: doc.relChroma ?? DEFAULT_CONTROLS.relChroma,
     chromaFloor: doc.chromaFloor ?? DEFAULT_CONTROLS.chromaFloor,
     toneMode: doc.toneMode ?? DEFAULT_CONTROLS.toneMode,
+    vibrancy: doc.vibrancy ?? DEFAULT_CONTROLS.vibrancy,
   };
 }
 
@@ -152,6 +154,7 @@ function stateOf(doc) {
     relChroma: c.relChroma,
     chromaFloor: c.chromaFloor,
     toneMode: c.toneMode,
+    vibrancy: c.vibrancy,
   };
 }
 

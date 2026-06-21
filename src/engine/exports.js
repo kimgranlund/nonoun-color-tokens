@@ -118,6 +118,12 @@ function controlsOf(state) {
     dampAmp: state.dampAmp ?? DEFAULT_CONTROLS.dampAmp,
     dampBias: state.dampBias ?? DEFAULT_CONTROLS.dampBias,
     hueSpace: state.hueSpace ?? DEFAULT_CONTROLS.hueSpace,
+    // distribution mode + its shapers — previously dropped here, so exports always used the
+    // default mode regardless of the doc. Threaded now so exports match what the UI renders.
+    toneMode: state.toneMode ?? DEFAULT_CONTROLS.toneMode,
+    vibrancy: state.vibrancy ?? DEFAULT_CONTROLS.vibrancy,
+    relChroma: state.relChroma ?? DEFAULT_CONTROLS.relChroma,
+    chromaFloor: state.chromaFloor ?? DEFAULT_CONTROLS.chromaFloor,
   };
 }
 
@@ -142,6 +148,10 @@ function derivePalette(palette, controls, overrides) {
     dampAmp: controls.dampAmp,
     dampBias: controls.dampBias,
     hueSpace: controls.hueSpace,
+    toneMode: controls.toneMode,
+    vibrancy: controls.vibrancy,
+    relChroma: controls.relChroma,
+    chromaFloor: controls.chromaFloor,
   };
   const stopList = paletteStops(
     { hue: palette.hue, chroma: palette.chroma, skew: palette.skew, lift: palette.lift, hueShift: palette.hueShift, hueSameDir: palette.hueSameDir },
