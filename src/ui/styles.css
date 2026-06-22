@@ -72,8 +72,9 @@ body {
 }
 
 nonoun-color-tokens { display: block; height: 100vh; }
-nonoun-color-tokens[data-theme="light"] { color-scheme: light; }
-nonoun-color-tokens[data-theme="dark"]  { color-scheme: dark; }
+nonoun-color-tokens[data-theme="system"] { color-scheme: light dark; } /* follow the OS preference */
+nonoun-color-tokens[data-theme="light"]  { color-scheme: light; }
+nonoun-color-tokens[data-theme="dark"]   { color-scheme: dark; }
 
 /* Hidden scrollbars — content still scrolls; the bar is just not painted. Keeps the
    chrome clean and avoids the bright native scrollbar in a Figma plugin iframe. */
@@ -137,7 +138,31 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 }
 .gallery-header .brand { font-weight: 650; letter-spacing: -.01em; display: inline-flex; align-items: center; gap: 7px; }
 .gallery-header .spacer { flex: 1; }
-.gallery-body { flex: 1; overflow: auto; padding: 22px 24px; }
+/* the scroll container: the masthead sticks to its top, the content scrolls beneath. */
+.gallery-body { flex: 1; overflow: auto; }
+/* sticky page masthead — title/eyebrow + search, then a description. Pins below the utility bar
+   while the content scrolls under it; a solid bg + bottom seam hide the content passing behind. */
+.gallery-masthead {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--bg);
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.masthead-row { display: flex; align-items: center; gap: 12px; }
+.masthead-row .spacer { flex: 1; }
+.masthead-row input[type="search"] { width: 240px; flex: none; }
+.masthead-title { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
+.masthead-title.masthead-serif { font-family: Georgia, "Times New Roman", serif; font-weight: 600; font-size: 24px; margin-top: 8px; }
+.masthead-desc { margin: 7px 0 0; max-width: 78ch; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
+/* the survey eyebrow doubles as the back affordance (‹ + category eyebrow → hub). */
+.survey-back-eyebrow {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 0; border: none; background: none; cursor: pointer;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--ink-faint);
+}
+.survey-back-eyebrow:hover { color: var(--accent); background: none; }
+.gallery-content { padding: 18px 24px 24px; }
 /* the "read a project that has no config yet" row — shown above the sets when the Figma file
    already carries a compatible raw-colors structure (renderFigmaImportRow). */
 .figma-import-row {
@@ -266,15 +291,6 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
   color: var(--ink-faint); font-variant-numeric: tabular-nums;
 }
 
-/* ─────────────────── PALETTE SURVEYS — one category page ─────────────────── */
-.survey-back { margin-bottom: 16px; }
-.survey-masthead { margin-bottom: 24px; }
-.survey-eyebrow {
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
-  color: var(--ink-faint); margin-bottom: 7px;
-}
-.survey-h1 { font-family: Georgia, "Times New Roman", serif; margin: 0; font-size: 25px; font-weight: 600; letter-spacing: -.005em; }
-.survey-tagline { margin: 9px 0 0; max-width: 70ch; font-size: 14px; line-height: 1.55; color: var(--ink-dim); }
 
 /* ───────────────────────── EDITOR SHELL ───────────────────────── */
 .editor {
@@ -327,15 +343,19 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
   grid-area: left;
   border-right: 1px solid var(--line);
   background: var(--panel);
-  overflow-y: auto; overflow-x: hidden;
+  overflow: hidden; /* the header is a fixed band; .an-body scrolls */
   display: flex; flex-direction: column;
-  padding: 8px;
 }
+/* the pane header matches the canvas-header: same height (--ch) + padding + bottom seam,
+   so the three column headers line up as one band. */
 .pane-label {
   font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
   text-transform: uppercase; color: var(--ink-faint);
-  padding: 6px 8px 8px; display: flex; align-items: baseline; gap: 8px;
+  height: var(--ch); flex: none; padding: 0 12px; gap: 8px;
+  display: flex; align-items: center;
+  border-bottom: 1px solid var(--line);
 }
+.an-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
 .pane-label .an-sel {
   text-transform: none; letter-spacing: 0; font-weight: 600;
   color: var(--accent); font-size: 11px;
@@ -444,12 +464,6 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
   transform-origin: 0 0;
   will-change: transform;
 }
-.origin-dot {
-  position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px;
-  border-radius: 50%; background: var(--ink-faint); opacity: .5;
-  pointer-events: none; z-index: 1;
-}
-
 /* canvas = the ramps as the 2D space; each row IS the palette navigator */
 .ramp-stack { display: flex; flex-direction: column; gap: 12px; padding: 4px; }
 .ramp-row {
@@ -638,7 +652,11 @@ button.chip:hover { background: var(--line-2); color: var(--ink); }
   display: flex; flex-direction: column;
 }
 /* right-pane header row: the right toggle (when open) + the Inspector segmented control */
-.pane-head { display: flex; align-items: center; gap: 8px; margin: 12px 14px 0; }
+.pane-head {
+  display: flex; align-items: center; gap: 8px;
+  height: var(--ch); flex: none; padding: 0 12px;
+  border-bottom: 1px solid var(--line); /* match the canvas-header band */
+}
 .pane-head .segmented { flex: 1; margin: 0; }
 .segmented {
   /* no self-margin — the parent owns spacing (.pane-head provides it; .canvas-seg sits inline) */
@@ -788,24 +806,28 @@ input[type="range"]::-moz-range-thumb {
 .roles-table .rrow.rhead .sw-pair span { width: 16px; text-align: center; }
 
 /* ───────────────────────── EXPORT DRAWER ───────────────────────── */
-.drawer-scrim {
-  position: fixed; inset: 0; background: rgba(10,14,22,.34);
-  z-index: 40; opacity: 0; pointer-events: none; transition: opacity .14s;
+/* A native <dialog> opened with showModal(): the browser renders it in the TOP LAYER — above
+   every stacking context with no z-index race against the panes/canvas — and gives a real
+   ::backdrop, focus trapping, background inert, and Esc. open/close is driven by exportOpen
+   (see app.js _syncDrawer). A closed dialog is display:none by default. */
+dialog.drawer {
+  position: fixed; inset: 0 0 0 auto; /* pinned to the right edge, full height */
+  margin: 0; padding: 0; width: 480px; max-width: 92vw; max-height: 100%;
+  border: none; border-left: 1px solid var(--line);
+  background: var(--panel); color: var(--ink);
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.drawer-scrim.open { opacity: 1; pointer-events: auto; }
-.drawer {
-  position: fixed; top: 0; right: 0; height: 100%; width: 480px; max-width: 92vw;
-  background: var(--panel); border-left: 1px solid var(--line);
-  box-shadow: var(--shadow-lg); z-index: 41;
-  transform: translateX(100%); transition: transform .18s ease;
-  display: flex; flex-direction: column;
-}
-.drawer.open { transform: none; }
+dialog.drawer:not([open]) { display: none; }
+dialog.drawer::backdrop { background: rgba(10,14,22,.34); }
+/* the drawer header reuses the shared header band — same height (--ch), inset, and bottom seam
+   as .canvas-header / .pane-head — so it lines up with the rest of the chrome. */
 .drawer-head {
   display: flex; align-items: center; gap: 10px;
-  padding: 12px 16px; border-bottom: 1px solid var(--line);
+  height: var(--ch); flex: none; padding: 0 12px;
+  border-bottom: 1px solid var(--line); background: var(--panel);
 }
-.drawer-head h3 { margin: 0; font-size: 14px; }
+.drawer-head h3 { margin: 0; font-size: 14px; display: flex; align-items: center; gap: 8px; }
 .drawer-head .spacer { flex: 1; }
 /* export-format picker — a grouped <select> (the flat tab row outgrew the drawer at 9 formats). */
 .drawer-format { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }

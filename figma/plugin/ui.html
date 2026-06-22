@@ -76,8 +76,9 @@ body {
 }
 
 nonoun-color-tokens { display: block; height: 100vh; }
-nonoun-color-tokens[data-theme="light"] { color-scheme: light; }
-nonoun-color-tokens[data-theme="dark"]  { color-scheme: dark; }
+nonoun-color-tokens[data-theme="system"] { color-scheme: light dark; } /* follow the OS preference */
+nonoun-color-tokens[data-theme="light"]  { color-scheme: light; }
+nonoun-color-tokens[data-theme="dark"]   { color-scheme: dark; }
 
 /* Hidden scrollbars — content still scrolls; the bar is just not painted. Keeps the
    chrome clean and avoids the bright native scrollbar in a Figma plugin iframe. */
@@ -141,7 +142,31 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 }
 .gallery-header .brand { font-weight: 650; letter-spacing: -.01em; display: inline-flex; align-items: center; gap: 7px; }
 .gallery-header .spacer { flex: 1; }
-.gallery-body { flex: 1; overflow: auto; padding: 22px 24px; }
+/* the scroll container: the masthead sticks to its top, the content scrolls beneath. */
+.gallery-body { flex: 1; overflow: auto; }
+/* sticky page masthead — title/eyebrow + search, then a description. Pins below the utility bar
+   while the content scrolls under it; a solid bg + bottom seam hide the content passing behind. */
+.gallery-masthead {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--bg);
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.masthead-row { display: flex; align-items: center; gap: 12px; }
+.masthead-row .spacer { flex: 1; }
+.masthead-row input[type="search"] { width: 240px; flex: none; }
+.masthead-title { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
+.masthead-title.masthead-serif { font-family: Georgia, "Times New Roman", serif; font-weight: 600; font-size: 24px; margin-top: 8px; }
+.masthead-desc { margin: 7px 0 0; max-width: 78ch; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
+/* the survey eyebrow doubles as the back affordance (‹ + category eyebrow → hub). */
+.survey-back-eyebrow {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 0; border: none; background: none; cursor: pointer;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--ink-faint);
+}
+.survey-back-eyebrow:hover { color: var(--accent); background: none; }
+.gallery-content { padding: 18px 24px 24px; }
 /* the "read a project that has no config yet" row — shown above the sets when the Figma file
    already carries a compatible raw-colors structure (renderFigmaImportRow). */
 .figma-import-row {
@@ -270,15 +295,6 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
   color: var(--ink-faint); font-variant-numeric: tabular-nums;
 }
 
-/* ─────────────────── PALETTE SURVEYS — one category page ─────────────────── */
-.survey-back { margin-bottom: 16px; }
-.survey-masthead { margin-bottom: 24px; }
-.survey-eyebrow {
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
-  color: var(--ink-faint); margin-bottom: 7px;
-}
-.survey-h1 { font-family: Georgia, "Times New Roman", serif; margin: 0; font-size: 25px; font-weight: 600; letter-spacing: -.005em; }
-.survey-tagline { margin: 9px 0 0; max-width: 70ch; font-size: 14px; line-height: 1.55; color: var(--ink-dim); }
 
 /* ───────────────────────── EDITOR SHELL ───────────────────────── */
 .editor {
@@ -331,15 +347,19 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
   grid-area: left;
   border-right: 1px solid var(--line);
   background: var(--panel);
-  overflow-y: auto; overflow-x: hidden;
+  overflow: hidden; /* the header is a fixed band; .an-body scrolls */
   display: flex; flex-direction: column;
-  padding: 8px;
 }
+/* the pane header matches the canvas-header: same height (--ch) + padding + bottom seam,
+   so the three column headers line up as one band. */
 .pane-label {
   font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
   text-transform: uppercase; color: var(--ink-faint);
-  padding: 6px 8px 8px; display: flex; align-items: baseline; gap: 8px;
+  height: var(--ch); flex: none; padding: 0 12px; gap: 8px;
+  display: flex; align-items: center;
+  border-bottom: 1px solid var(--line);
 }
+.an-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
 .pane-label .an-sel {
   text-transform: none; letter-spacing: 0; font-weight: 600;
   color: var(--accent); font-size: 11px;
@@ -448,12 +468,6 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
   transform-origin: 0 0;
   will-change: transform;
 }
-.origin-dot {
-  position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px;
-  border-radius: 50%; background: var(--ink-faint); opacity: .5;
-  pointer-events: none; z-index: 1;
-}
-
 /* canvas = the ramps as the 2D space; each row IS the palette navigator */
 .ramp-stack { display: flex; flex-direction: column; gap: 12px; padding: 4px; }
 .ramp-row {
@@ -642,7 +656,11 @@ button.chip:hover { background: var(--line-2); color: var(--ink); }
   display: flex; flex-direction: column;
 }
 /* right-pane header row: the right toggle (when open) + the Inspector segmented control */
-.pane-head { display: flex; align-items: center; gap: 8px; margin: 12px 14px 0; }
+.pane-head {
+  display: flex; align-items: center; gap: 8px;
+  height: var(--ch); flex: none; padding: 0 12px;
+  border-bottom: 1px solid var(--line); /* match the canvas-header band */
+}
 .pane-head .segmented { flex: 1; margin: 0; }
 .segmented {
   /* no self-margin — the parent owns spacing (.pane-head provides it; .canvas-seg sits inline) */
@@ -792,24 +810,28 @@ input[type="range"]::-moz-range-thumb {
 .roles-table .rrow.rhead .sw-pair span { width: 16px; text-align: center; }
 
 /* ───────────────────────── EXPORT DRAWER ───────────────────────── */
-.drawer-scrim {
-  position: fixed; inset: 0; background: rgba(10,14,22,.34);
-  z-index: 40; opacity: 0; pointer-events: none; transition: opacity .14s;
+/* A native <dialog> opened with showModal(): the browser renders it in the TOP LAYER — above
+   every stacking context with no z-index race against the panes/canvas — and gives a real
+   ::backdrop, focus trapping, background inert, and Esc. open/close is driven by exportOpen
+   (see app.js _syncDrawer). A closed dialog is display:none by default. */
+dialog.drawer {
+  position: fixed; inset: 0 0 0 auto; /* pinned to the right edge, full height */
+  margin: 0; padding: 0; width: 480px; max-width: 92vw; max-height: 100%;
+  border: none; border-left: 1px solid var(--line);
+  background: var(--panel); color: var(--ink);
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.drawer-scrim.open { opacity: 1; pointer-events: auto; }
-.drawer {
-  position: fixed; top: 0; right: 0; height: 100%; width: 480px; max-width: 92vw;
-  background: var(--panel); border-left: 1px solid var(--line);
-  box-shadow: var(--shadow-lg); z-index: 41;
-  transform: translateX(100%); transition: transform .18s ease;
-  display: flex; flex-direction: column;
-}
-.drawer.open { transform: none; }
+dialog.drawer:not([open]) { display: none; }
+dialog.drawer::backdrop { background: rgba(10,14,22,.34); }
+/* the drawer header reuses the shared header band — same height (--ch), inset, and bottom seam
+   as .canvas-header / .pane-head — so it lines up with the rest of the chrome. */
 .drawer-head {
   display: flex; align-items: center; gap: 10px;
-  padding: 12px 16px; border-bottom: 1px solid var(--line);
+  height: var(--ch); flex: none; padding: 0 12px;
+  border-bottom: 1px solid var(--line); background: var(--panel);
 }
-.drawer-head h3 { margin: 0; font-size: 14px; }
+.drawer-head h3 { margin: 0; font-size: 14px; display: flex; align-items: center; gap: 8px; }
 .drawer-head .spacer { flex: 1; }
 /* export-format picker — a grouped <select> (the flat tab row outgrew the drawer at 9 formats). */
 .drawer-format { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
@@ -3179,6 +3201,9 @@ const ICONS = {
   "flag": "<path d=\"M42.76,50A8,8,0,0,0,40,56V224a8,8,0,0,0,16,0V179.77c26.79-21.16,49.87-9.75,76.45,3.41,16.4,8.11,34.06,16.85,53,16.85,13.93,0,28.54-4.75,43.82-18a8,8,0,0,0,2.76-6V56A8,8,0,0,0,218.76,50c-28,24.23-51.72,12.49-79.21-1.12C111.07,34.76,78.78,18.79,42.76,50ZM216,172.25c-26.79,21.16-49.87,9.74-76.45-3.41-25-12.35-52.81-26.13-83.55-8.4V59.79c26.79-21.16,49.87-9.75,76.45,3.4,25,12.35,52.82,26.13,83.55,8.4Z\"/>",
   "roles": "<path d=\"M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z\"/>",
   "dot": "<circle cx=\"128\" cy=\"128\" r=\"60\"/>",
+  "sun": "<path d=\"M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z\"/>",
+  "moon": "<path d=\"M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z\"/>",
+  "caret-left": "<path d=\"M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z\"/>",
 };
 
 function icon(name, opts = {}) {
@@ -3714,11 +3739,12 @@ function ensureAppTheme() {
 }
 
 // setColorScheme — flip the document's color-scheme so EVERY light-dark() token —
-// the generated --c-* chrome tokens included — resolves to the chosen mode.
+// the generated --c-* chrome tokens included — resolves to the chosen mode. "system" maps to
+// "light dark" so the browser follows the OS prefers-color-scheme.
 function setColorScheme(theme) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  if (root) root.style.colorScheme = theme; // "light" | "dark"
+  if (root) root.style.colorScheme = theme === "system" ? "light dark" : theme; // "light" | "dark" | "light dark"
 }
 
 // ── tiny helpers ───────────────────────────────────────────────────────────────
@@ -3827,6 +3853,11 @@ const btn = (children, { variant = "ghost", cls = "", title, ariaLabel, ariaPres
     ...(Array.isArray(children) ? children : [children]),
   );
 
+// color-scheme toggles (app chrome + canvas preview): a 3-state cycle rendered icon-only.
+// sun = light, moon = dark, the split-circle "theme" glyph = system (follow the OS).
+const SCHEME_ICON = { system: "theme", light: "sun", dark: "moon" };
+const SCHEME_NEXT = { system: "light", light: "dark", dark: "system" };
+
 // chip — a small pill. mode "interactive" (a <button>, `on` = active/pressed) or "status"
 // (a non-interactive <span> badge, optional `tone`). Folds the in-flow pill stylings
 // (damp-presets, map-drift-sum) onto one .chip primitive. The absolutely-positioned
@@ -3875,12 +3906,12 @@ class HctApp extends HTMLElement {
     this.segment = "palette"; // right-pane segmented control: palette | global | roles
     this.panesLeft = true; // left analysis rail shown (ui-session state, like segment — never persisted)
     this.panesRight = true; // right inspector shown
-    this.canvasTheme = "light"; // canvas preview color-scheme — INDEPENDENT of app chrome ◐
+    this.canvasTheme = "system"; // canvas preview color-scheme: system (follow OS) | light | dark — INDEPENDENT of app chrome ◐
     this.canvasView = "palettes"; // canvas content: palettes (the ramps) | scrims | mapping (the role→raw table)
     this.stopsMode = "core"; // palette ramp density: core (19 display stops) | extended (25 EXPORT_STOPS)
     this.mapTextMode = false; // Mapping table raw-token editor: false = select menu, true = free text input
     this.viewport = { panX: 0, panY: 0, zoom: 1 };
-    this.theme = "light";
+    this.theme = "system"; // app chrome color scheme: system (follows OS) | light | dark
     this.exportOpen = false;
     this.exportTab = "css";
     this.figmaFile = "light"; // which Figma mode file the Figma tab previews/downloads
@@ -3898,11 +3929,19 @@ class HctApp extends HTMLElement {
     this.HISTORY_MAX = 100;
     setColorScheme(this.theme); // flip the chrome's light-dark() tokens to the initial theme
     this._installKeyboard(); // editor-scoped keyboard shortcuts (guarded vs text inputs)
+    // when the OS scheme flips while we follow it ("system"), re-render so the canvas preview's
+    // computed light/dark hex tracks it live (the chrome's light-dark() tokens update on their own).
+    if (typeof matchMedia !== "undefined") {
+      this._mqlScheme = matchMedia("(prefers-color-scheme: dark)");
+      this._onSchemeChange = () => { if (this.theme === "system" || this.canvasTheme === "system") this.render(); };
+      this._mqlScheme.addEventListener("change", this._onSchemeChange);
+    }
     this.render();
   }
 
   disconnectedCallback() {
     if (this._onKeyDown) document.removeEventListener("keydown", this._onKeyDown);
+    if (this._mqlScheme && this._onSchemeChange) this._mqlScheme.removeEventListener("change", this._onSchemeChange);
   }
 
   // ── doc lifecycle ──────────────────────────────────────────────────────────
@@ -4228,6 +4267,18 @@ class HctApp extends HTMLElement {
     // readouts now (the same path liveRefresh uses during a drag).
     if (this.view === "editor") this.paintAppFooter(this._view);
     this._restoreFocus(focus);
+    this._syncDrawer(); // (re)open/close the native <dialog> to match exportOpen (top layer)
+  }
+
+  // _syncDrawer — reconcile the native export <dialog> with this.exportOpen AFTER each render.
+  // render() rebuilds the whole subtree (a fresh, closed <dialog> each time), so an open drawer
+  // must be re-promoted to the top layer via showModal(). Guarded so the headless DOM shim (no
+  // showModal) and any unsupported host fall back to plain state (exportOpen) with no error.
+  _syncDrawer() {
+    const d = this.querySelector(".drawer");
+    if (!d || typeof d.showModal !== "function") return;
+    if (this.exportOpen && !d.open) { try { d.showModal(); } catch { /* not attached yet */ } }
+    else if (!this.exportOpen && d.open) { try { d.close(); } catch { /* already closed */ } }
   }
 
   // _walkFind — first element in this subtree matching pred (works in the browser
@@ -4499,37 +4550,49 @@ class HctApp extends HTMLElement {
     );
   }
 
-  // renderHubBody — the gallery home: Your Palettes (your saved sets) above a grid of survey category
-  // cards. Opening a card descends into that category's palette page (renderSurveyBody).
+  // renderHubBody — the gallery home: a STICKY masthead (title + search · description) over the
+  // scrolling content — Your Palettes (your saved sets) and the Surveys category grid.
   renderHubBody() {
     this._presetGridHost = null;
     this._gridHost = h("div", { class: "set-grid" }, ...this.buildTiles());
     return h(
       "div",
       { class: "gallery-body" },
-      this.renderFigmaImportRow(), // a separate row ABOVE the sets when this Figma file already has palette variables
+      // sticky masthead — title + search (row 1), description (row 2).
       h(
         "div",
-        { class: "gallery-title" },
-        h("h2", {}, "Your Palettes"),
-        h("div", { class: "spacer" }),
-        this.ensureSearchInput("Search your palette sets"),
+        { class: "gallery-masthead" },
+        h(
+          "div",
+          { class: "masthead-row" },
+          h("h1", { class: "masthead-title" }, "Color Tokens"),
+          h("div", { class: "spacer" }),
+          this.ensureSearchInput("Search your palette sets"),
+        ),
+        h("p", { class: "masthead-desc" }, "Generate perceptual color palettes and semantic design tokens. Build your own set, or open a curated survey as a starting point."),
       ),
-      this._gridHost,
-      // Palette Surveys — read-only curated categories. Opening a palette copies it into Your Palettes.
       h(
         "div",
-        { class: "gallery-title surveys-head" },
-        h("h2", {}, "Surveys"),
-        h("span", { class: "title-count" }, String(SURVEY_INDEX.length)),
+        { class: "gallery-content" },
+        this.renderFigmaImportRow(), // a separate row ABOVE the sets when this Figma file already has palette variables
+        h("div", { class: "gallery-title" }, h("h2", {}, "Your Palettes")),
+        this._gridHost,
+        // Palette Surveys — read-only curated categories. Opening a palette copies it into Your Palettes.
+        h(
+          "div",
+          { class: "gallery-title surveys-head" },
+          h("h2", {}, "Surveys"),
+          h("span", { class: "title-count" }, String(SURVEY_INDEX.length)),
+        ),
+        h("p", { class: "surveys-lede" }, "Palettes sourced from real places, dishes, films, books, scenes, biomes — read for their colour, not their cliché. Open any palette as an editable copy."),
+        h("div", { class: "survey-grid" }, ...SURVEY_INDEX.map((c) => this.surveyCard(c))),
       ),
-      h("p", { class: "surveys-lede" }, "Palettes sourced from real places, dishes, films, books, scenes, biomes — read for their colour, not their cliché. Open any palette as an editable copy."),
-      h("div", { class: "survey-grid" }, ...SURVEY_INDEX.map((c) => this.surveyCard(c))),
     );
   }
 
-  // renderSurveyBody — one survey category page: a back affordance + masthead (eyebrow / name / tagline)
-  // and the category's 12 volumes × 4 palettes (lazily loaded), each opening as an editable copy.
+  // renderSurveyBody — one survey category page: a STICKY masthead (back-eyebrow + search · title ·
+  // description) over the category's 12 volumes × 4 palettes (lazily loaded). The eyebrow row doubles
+  // as the back affordance to the hub.
   renderSurveyBody() {
     this._gridHost = null;
     const card = SURVEY_INDEX.find((c) => c.slug === this.survey) || { category: this.survey, count: 0 };
@@ -4540,23 +4603,36 @@ class HctApp extends HTMLElement {
     return h(
       "div",
       { class: "gallery-body" },
-      btn("← All surveys", { cls: "survey-back", onclick: () => this.closeSurvey() }),
       h(
         "div",
-        { class: "survey-masthead" },
-        card.eyebrow ? h("div", { class: "survey-eyebrow" }, card.eyebrow) : false,
-        h("h2", { class: "survey-h1" }, card.category),
-        card.tagline ? h("p", { class: "survey-tagline" }, card.tagline) : false,
+        { class: "gallery-masthead survey" },
+        h(
+          "div",
+          { class: "masthead-row" },
+          // the eyebrow IS the back affordance: ‹ + the category eyebrow → return to the hub.
+          h(
+            "button",
+            { class: "survey-back-eyebrow", title: "Back to all surveys", "aria-label": "Back to all surveys", onclick: () => this.closeSurvey() },
+            icon("caret-left", { size: 13 }),
+            h("span", {}, card.eyebrow || "All surveys"),
+          ),
+          h("div", { class: "spacer" }),
+          this.ensureSearchInput(`Search ${card.category} palettes`),
+        ),
+        h("h1", { class: "masthead-title masthead-serif" }, card.category),
+        card.tagline ? h("p", { class: "masthead-desc" }, card.tagline) : false,
       ),
       h(
         "div",
-        { class: "gallery-title" },
-        h("h2", {}, "Palettes"),
-        h("span", { class: "title-count" }, String(card.count)),
-        h("div", { class: "spacer" }),
-        this.ensureSearchInput(`Search ${card.category} palettes`),
+        { class: "gallery-content" },
+        h(
+          "div",
+          { class: "gallery-title" },
+          h("h2", {}, "Palettes"),
+          h("span", { class: "title-count" }, String(card.count)),
+        ),
+        this._presetGridHost,
       ),
-      this._presetGridHost,
     );
   }
 
@@ -4725,11 +4801,12 @@ class HctApp extends HTMLElement {
         },
       }),
       h("div", { class: "spacer" }),
-      btn([icon("arrow-counter-clockwise"), "Undo"], { cls: "undo-btn", title: "Undo (⌘Z)", disabled: !this.canUndo(), onclick: () => this.undo() }),
-      btn([icon("arrow-clockwise"), "Redo"], { cls: "redo-btn", title: "Redo (⇧⌘Z)", disabled: !this.canRedo(), onclick: () => this.redo() }),
+      // trailing strip: undo · redo · scheme · new · export.
+      btn(icon("arrow-counter-clockwise"), { cls: "undo-btn", title: "Undo (⌘Z)", ariaLabel: "Undo", disabled: !this.canUndo(), onclick: () => this.undo() }),
+      btn(icon("arrow-clockwise"), { cls: "redo-btn", title: "Redo (⇧⌘Z)", ariaLabel: "Redo", disabled: !this.canRedo(), onclick: () => this.redo() }),
+      this.themeBtn(),
       btn([icon("plus"), "New"], { onclick: () => this.createSet() }),
       btn([icon("export"), "Export"], { variant: "primary", cls: "export-open-btn", title: "Open export drawer", onclick: () => this.toggleDrawer(true) }),
-      this.themeBtn(),
     );
   }
 
@@ -4761,25 +4838,44 @@ class HctApp extends HTMLElement {
     this.render();
   }
 
+  // app-chrome color scheme — icon-only (sun/moon/auto), cycles system → light → dark.
   themeBtn() {
-    return h(
-      "button",
-      {
-        class: "ghost",
-        title: "Toggle light / dark (UI only — never exported)",
-        "aria-label": "App theme: " + this.theme + " — toggle light / dark",
-        "aria-pressed": this.theme === "dark" ? "true" : "false",
-        onclick: () => {
-          this.theme = this.theme === "light" ? "dark" : "light";
-          this.dataset.theme = this.theme;
-          // Flip the CHROME too: set color-scheme on :root so every generated
-          // light-dark() --c-* token (now driving the chrome) resolves to the new mode.
-          setColorScheme(this.theme);
-          this.render();
-        },
+    return btn(icon(SCHEME_ICON[this.theme] || "theme"), {
+      cls: "scheme-btn",
+      title: "App theme: " + this.theme + " (UI only) — click to cycle system / light / dark",
+      ariaLabel: "App theme: " + this.theme + " — cycle system / light / dark",
+      onclick: () => {
+        this.theme = SCHEME_NEXT[this.theme] || "system";
+        this.dataset.theme = this.theme;
+        // Flip the CHROME too: color-scheme on :root so every generated light-dark() --c-*
+        // token resolves to the new mode ("system" → "light dark" → follows the OS).
+        setColorScheme(this.theme);
+        this.render();
       },
-      icon("theme"), this.theme,
-    );
+    });
+  }
+
+  // canvas-preview color scheme — icon-only (sun/moon/auto), cycles system → light → dark.
+  // "system" follows the OS; INDEPENDENT of the app-chrome theme.
+  canvasThemeBtn() {
+    return btn(icon(SCHEME_ICON[this.canvasTheme] || "theme"), {
+      cls: "scheme-btn",
+      title: "Canvas preview scheme: " + this.canvasTheme + " — click to cycle system / light / dark",
+      ariaLabel: "Canvas preview scheme: " + this.canvasTheme + " — cycle system / light / dark",
+      onclick: () => {
+        this.canvasTheme = SCHEME_NEXT[this.canvasTheme] || "system";
+        this.render();
+      },
+    });
+  }
+
+  // resolvedCanvasScheme — the concrete light/dark the canvas paints in: "system" maps to the OS
+  // preference (prefers-color-scheme), everything else is itself.
+  resolvedCanvasScheme() {
+    if (this.canvasTheme === "system") {
+      return typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    return this.canvasTheme;
   }
 
   // ── left pane (ANALYSIS rail) ─────────────────────────────────────────────────
@@ -5232,28 +5328,22 @@ class HctApp extends HTMLElement {
             { cls: "canvas-seg", ariaLabel: "Ramp stops", role: "group", idPrefix: "stops" },
           )
         : false,
-      // canvas color-scheme — flips ONLY the canvas content's preview (light/dark),
-      // independent of the app-chrome theme toggle in the app-header.
-      btn([icon("theme"), "canvas " + this.canvasTheme], {
-        title: "Canvas color-scheme (preview only — independent of app chrome)",
-        ariaLabel: "Canvas preview scheme: " + this.canvasTheme + " — toggle light / dark",
-        ariaPressed: this.canvasTheme === "dark" ? "true" : "false",
-        onclick: () => {
-          this.canvasTheme = this.canvasTheme === "light" ? "dark" : "light";
-          this.render();
-        },
-      }),
-      btn([icon("crosshair"), "Fit"], {
+      // trailing tool group, right-aligned: fit · scheme · zoom · + Palette.
+      h("div", { class: "spacer" }),
+      // fit/orient — reset the canvas view to centre at 100% (icon-only).
+      btn(icon("crosshair"), {
+        title: "Fit — reset the canvas view to centre at 100%",
         ariaLabel: "Fit — reset the canvas view to centre at 100%",
         onclick: () => {
           this.fit();
           this.render();
         },
       }),
+      // canvas preview color-scheme (sun/moon/auto) — independent of the app chrome.
+      this.canvasThemeBtn(),
       btn(icon("minus"), { ariaLabel: "Zoom out", onclick: () => this.zoomBy(-1) }),
       h("span", { class: "zoom-readout", role: "status", "aria-live": "polite", "aria-label": "Zoom level" }, Math.round(this.viewport.zoom * 100) + "%"),
       btn(icon("plus"), { ariaLabel: "Zoom in", onclick: () => this.zoomBy(1) }),
-      h("div", { class: "spacer" }),
       btn([icon("plus"), "Palette"], { cls: "add-pal-btn", onclick: () => this.addPalette() }),
       // when the RIGHT pane is collapsed its toggle pops here, at the canvas's right edge.
       !this.panesRight ? this.paneToggle("right") : false,
@@ -5310,9 +5400,9 @@ class HctApp extends HTMLElement {
     const v = this._view || projectView(this.doc);
     const pal = this.sel.kind === "palette" && v && v.palettes[this.selectedIndex()];
     const ramp = pal && (pal.fullRamp || pal.ramp);
-    const stop = ramp && ramp.find((s) => s.stop === (this.canvasTheme === "dark" ? 875 : 125));
+    const stop = ramp && ramp.find((s) => s.stop === (this.resolvedCanvasScheme() === "dark" ? 875 : 125));
     if (stop) return stop.hex;
-    const L = this.canvasTheme === "dark" ? (this.doc.lmin ?? 5) : (this.doc.lmax ?? 100);
+    const L = this.resolvedCanvasScheme() === "dark" ? (this.doc.lmin ?? 5) : (this.doc.lmax ?? 100);
     const g = hctToRgb(0, 0, L).rgb[0].toString(16).padStart(2, "0").toUpperCase();
     return "#" + g + g + g;
   }
@@ -5326,7 +5416,7 @@ class HctApp extends HTMLElement {
   containerBg(vp) {
     const ramp = vp && (vp.fullRamp || vp.ramp);
     if (!ramp) return "";
-    const s = ramp.find((x) => x.stop === (this.canvasTheme === "dark" ? 925 : 75));
+    const s = ramp.find((x) => x.stop === (this.resolvedCanvasScheme() === "dark" ? 925 : 75));
     return s ? s.hex : "";
   }
 
@@ -5338,12 +5428,11 @@ class HctApp extends HTMLElement {
     const area = h(
       "div",
       {
-        class: "canvas-area canvas-scheme-" + this.canvasTheme + (isTable ? " is-table" : ""),
+        class: "canvas-area canvas-scheme-" + this.resolvedCanvasScheme() + (isTable ? " is-table" : ""),
         style: "--canvas-bg:" + this.canvasBg(),
         role: "group",
         "aria-label": isTable ? "Semantic mapping table" : "Palette canvas — drag to pan, wheel to zoom, double-click to reset",
       },
-      isTable ? false : h("div", { class: "origin-dot" }),
       h("div", { class: "canvas-scene" }, scene),
     );
     if (!isTable) {
@@ -6027,7 +6116,7 @@ class HctApp extends HTMLElement {
   exampleCard(view) {
     const p = view.palettes[this.selectedIndex()];
     const roles = p?.roles || [];
-    const dark = this.canvasTheme === "dark";
+    const dark = this.resolvedCanvasScheme() === "dark";
     const sl = slug(p?.name || "");
     const byKey = {};
     for (const r of roles) byKey[r.key] = r;
@@ -6465,34 +6554,13 @@ class HctApp extends HTMLElement {
   // ── export drawer ────────────────────────────────────────────────────────────
   toggleDrawer(open) {
     this.exportOpen = open;
-    this.render();
-    // modal focus management: move focus INTO the drawer on open (so keyboard users land in
-    // the dialog, not the page behind it) and return it to the opener on close. Guards keep
-    // this a no-op in the headless DOM (tag selectors return null there).
-    if (open) {
-      const d = this.querySelector(".drawer");
-      const first = d && d.querySelector && d.querySelector("button");
-      if (first && first.focus) first.focus();
-    } else {
+    this.render(); // render() → _syncDrawer() promotes/dismisses the native <dialog> in the top layer
+    // showModal() moves focus INTO the dialog on open and the browser traps Tab there; on close
+    // we return focus to the opener. Guarded to a no-op in the headless DOM (no real focus).
+    if (!open) {
       const opener = this.querySelector(".export-open-btn");
       if (opener && opener.focus) opener.focus();
     }
-  }
-
-  // _trapDrawerTab — keep Tab focus inside the open export dialog (the focus-trap half of a
-  // modal; Esc + scrim-click already close it). Browser-only: the headless shim's
-  // querySelectorAll matches classes, so the focusable sweep returns [] there and this no-ops.
-  _trapDrawerTab(e) {
-    if (e.key !== "Tab" || !this.exportOpen) return;
-    const d = this.querySelector(".drawer");
-    if (!d || !d.querySelectorAll) return;
-    const f = [...d.querySelectorAll("button, input, select, textarea, [tabindex]")]
-      .filter((el) => !el.disabled && el.getAttribute && el.getAttribute("tabindex") !== "-1");
-    if (!f.length) return;
-    const first = f[0], last = f[f.length - 1];
-    const active = document.activeElement;
-    if (e.shiftKey && active === first) { e.preventDefault(); last.focus && last.focus(); }
-    else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus && first.focus(); }
   }
 
   renderDrawer(view) {
@@ -6521,28 +6589,28 @@ class HctApp extends HTMLElement {
         : view.exports[this.exportTab];
     const bytes = new Blob([code]).size;
 
+    // A native <dialog>: showModal() (see _syncDrawer) promotes it to the browser TOP LAYER —
+    // above every stacking context with no z-index race — and gives ::backdrop, focus trapping,
+    // background inert, and Esc for free. open/close is driven by exportOpen via _syncDrawer.
     return h(
-      "div",
-      {},
-      h("div", { class: "drawer-scrim" + (this.exportOpen ? " open" : ""), onclick: () => this.toggleDrawer(false) }),
+      "dialog",
+      {
+        class: "drawer",
+        "aria-label": "Export",
+        // a click that lands on the dialog box itself (i.e. the ::backdrop) closes it; clicks on
+        // the content hit child nodes, so they don't.
+        onclick: (e) => { if (e.target === e.currentTarget) this.toggleDrawer(false); },
+        // Esc → native 'cancel'. Keep exportOpen the single source of truth: cancel the default
+        // close and route through toggleDrawer so the state + the dialog stay in lockstep.
+        oncancel: (e) => { e.preventDefault(); this.toggleDrawer(false); },
+      },
       h(
         "div",
-        // a modal dialog: role + aria-modal name it to assistive tech; Esc already closes it
-        // (see the keydown handler) and the scrim click closes it too.
-        {
-          class: "drawer" + (this.exportOpen ? " open" : ""),
-          role: "dialog",
-          "aria-modal": "true",
-          "aria-label": "Export",
-          onkeydown: (e) => this._trapDrawerTab(e),
-        },
-        h(
-          "div",
-          { class: "drawer-head" },
-          h("h3", {}, icon("export"), "Export"),
-          h("div", { class: "spacer" }),
-          btn(icon("x"), { ariaLabel: "Close export drawer", onclick: () => this.toggleDrawer(false) }),
-        ),
+        { class: "drawer-head" },
+        h("h3", {}, icon("export"), "Export"),
+        h("div", { class: "spacer" }),
+        btn(icon("x"), { ariaLabel: "Close export drawer", onclick: () => this.toggleDrawer(false) }),
+      ),
         h(
           "div",
           { class: "drawer-format" },
@@ -6637,7 +6705,6 @@ class HctApp extends HTMLElement {
             btn([icon("download"), "Download All"], { variant: "primary", title: "Download every format (css-hex, css-oklch, json, dtcg, figma, ui3) in its own folder + the config, as one .zip", onclick: () => this.downloadAllZip(view) }),
           ),
         ),
-      ),
     );
   }
 
