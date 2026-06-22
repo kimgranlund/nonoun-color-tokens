@@ -47,6 +47,22 @@ const clean = (s) =>
     .replace(/\s+/g, " ").trim();
 const oklchOf = (s) => String(s || "").trim().split(/\s+/).map(Number);
 
+// tidyVolumeTitle — the source h1s lead with the redundant "Four palettes from …" count (the tile
+// strip already shows the count). Strip that lead-in, capitalize, and drop the trailing period so a
+// heading reads as the evocative phrase: "Four palettes from the great Russian novels, …" → "The
+// great Russian novels, …". The first matching prefix wins (rules are ordered most- → least-specific).
+const VOL_LEADINS = [
+  [/^Four palettes from\s+/i, ""],
+  [/^Four palettes,\s*/i, ""],
+  [/^Four more\s+/i, "More "],
+  [/^Four\s+/i, ""],
+];
+function tidyVolumeTitle(s) {
+  let t = clean(s).replace(/\.$/, "");
+  for (const [re, rep] of VOL_LEADINS) { if (re.test(t)) { t = t.replace(re, rep); break; } }
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 // The prime role is stop 550; anchor each prime to its SOURCE lightness via `lift` (centred tone bump).
 const PRIME_TONE = toneAt(550, 0, 0, DEFAULT_CONTROLS);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -102,7 +118,7 @@ function buildCategory(doc) {
   const volumes = {}, presets = [], strip = [];
   for (const v of doc.volumes || []) {
     const vol = v.roman;
-    volumes[vol] = { title: clean(v.h1 || v.title), intro: clean((v.preface || []).join(" ")) };
+    volumes[vol] = { title: tidyVolumeTitle(v.h1 || v.title), intro: clean((v.preface || []).join(" ")) };
     (v.palettes || []).forEach((p, pi) => {
       const hy = p.hierarchy || {};
       const dom = (p.swatches || []).find((s) => s.hier === "d");
