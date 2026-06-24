@@ -163,48 +163,6 @@
       "dark": "500-300"
     },
     {
-      "key": "scrimWeakest",
-      "suffix": "-scrim-weakest",
-      "light": "500-50",
-      "dark": "500-50"
-    },
-    {
-      "key": "scrimWeaker",
-      "suffix": "-scrim-weaker",
-      "light": "500-100",
-      "dark": "500-100"
-    },
-    {
-      "key": "scrimWeak",
-      "suffix": "-scrim-weak",
-      "light": "500-200",
-      "dark": "500-200"
-    },
-    {
-      "key": "scrim",
-      "suffix": "-scrim",
-      "light": "500-300",
-      "dark": "500-300"
-    },
-    {
-      "key": "scrimStrong",
-      "suffix": "-scrim-strong",
-      "light": "500-400",
-      "dark": "500-400"
-    },
-    {
-      "key": "scrimStronger",
-      "suffix": "-scrim-stronger",
-      "light": "500-500",
-      "dark": "500-500"
-    },
-    {
-      "key": "scrimStrongest",
-      "suffix": "-scrim-strongest",
-      "light": "500-600",
-      "dark": "500-600"
-    },
-    {
       "key": "inverseSurface",
       "suffix": "-inverse-surface",
       "light": "900",
@@ -299,6 +257,48 @@
       "suffix": "-surface-highest",
       "light": "200",
       "dark": "800"
+    },
+    {
+      "key": "scrimWeakest",
+      "suffix": "-scrim-weakest",
+      "light": "500-50",
+      "dark": "500-50"
+    },
+    {
+      "key": "scrimWeaker",
+      "suffix": "-scrim-weaker",
+      "light": "500-100",
+      "dark": "500-100"
+    },
+    {
+      "key": "scrimWeak",
+      "suffix": "-scrim-weak",
+      "light": "500-200",
+      "dark": "500-200"
+    },
+    {
+      "key": "scrim",
+      "suffix": "-scrim",
+      "light": "500-300",
+      "dark": "500-300"
+    },
+    {
+      "key": "scrimStrong",
+      "suffix": "-scrim-strong",
+      "light": "500-400",
+      "dark": "500-400"
+    },
+    {
+      "key": "scrimStronger",
+      "suffix": "-scrim-stronger",
+      "light": "500-500",
+      "dark": "500-500"
+    },
+    {
+      "key": "scrimStrongest",
+      "suffix": "-scrim-strongest",
+      "light": "500-600",
+      "dark": "500-600"
     }
   ],
   "defaults": [

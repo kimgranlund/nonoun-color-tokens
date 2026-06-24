@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 1.24 — 2026-06-24 — role-table order regrouped (scrims last) for a cleaner token list
+
+The 37 semantic roles are reordered so the emitted token list — Figma variables in the `Color Modes`
+collection, the `--c-*` CSS custom properties, and every export — groups logically:
+
+1. **regular** — accents (`primary`, `primaryDim/Bright/Low/High`), on-accents, on-surface, outline
+2. **containers** — `container`, `containerLow`, `containerHigh`
+3. **surfaces** — `inverse*`, `background`, `surface`, the dim/bright + low/high surfaces
+4. **scrims** — the 7 strengths, moved from the middle to the **end**
+
+Pure reordering: no key/suffix/ref/value changed, so every token resolves to the same color — only the
+sequence (and thus the Figma variable + CSS declaration order) changed. Updated `semantic.js`
+(`semanticRoles`), the `roleTable` answer key in `data/role-table.json` (kept in lock-step; the
+`refs-canonical` gate checks the ordered key set), and the standalone Semantic Binder's hardcoded
+mirror (`figma-semantic-binder/code.js`; `bind-plan.mjs` imports `semanticRoles`, so it followed
+automatically). Regenerated `figma-plugin-assets.js` + `figma/plugin/ui.html`.
+
 ## 1.23 — 2026-06-23 — Figma collections renamed `Color Primitives` / `Color Modes`
 
 The two generated Figma variable collections are renamed for clarity:
