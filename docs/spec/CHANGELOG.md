@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.26 — 2026-06-24 — `outlineVariant` → `500-300` (was `500-400`)
+
+`outlineVariant` now references the `500-300` scrim (30% alpha) instead of `500-400` (40%) in both
+modes — a subtler variant outline. Role-table ref change only (key/suffix/order unchanged); updated
+`semantic.js`, the `roleTable` answer key, and the Semantic Binder mirror. (It now shares the `500-300`
+raw stop with `containerHigh` — distinct roles, same primitive, which is fine.)
+
 ## 1.24 — 2026-06-24 — role-table order regrouped (scrims last) for a cleaner token list
 
 The 37 semantic roles are reordered so the emitted token list — Figma variables in the `Color Modes`

@@ -65,7 +65,7 @@ function roleTable(n) {
 
     // 4. OUTLINE — shared; on the 500 scrim ramp (light === dark).
     { key: "outline", suffix: "-outline", light: "500-600", dark: "500-600" },
-    { key: "outlineVariant", suffix: "-outline-variant", light: "500-400", dark: "500-400" },
+    { key: "outlineVariant", suffix: "-outline-variant", light: "500-300", dark: "500-300" },
 
     // 5. CONTAINER — shared; on the 500 scrim ramp (light === dark).
     { key: "container", suffix: "-container", light: "500-200", dark: "500-200" },
