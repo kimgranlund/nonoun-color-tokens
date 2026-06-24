@@ -100,7 +100,7 @@ export function semanticRoles(paletteName) {
 
   // 4. OUTLINE — shared; on the 500 scrim ramp (light === dark).
   role('outline', '-outline', '500-600', '500-600');
-  role('outlineVariant', '-outline-variant', '500-400', '500-400');
+  role('outlineVariant', '-outline-variant', '500-300', '500-300');
 
   // 5. CONTAINER — shared; on the 500 scrim ramp (light === dark).
   role('container', '-container', '500-200', '500-200');

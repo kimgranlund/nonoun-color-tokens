@@ -141,8 +141,8 @@
     {
       "key": "outlineVariant",
       "suffix": "-outline-variant",
-      "light": "500-400",
-      "dark": "500-400"
+      "light": "500-300",
+      "dark": "500-300"
     },
     {
       "key": "container",
