@@ -107,22 +107,15 @@ export function semanticRoles(paletteName) {
   role('containerLow', '-container-low', '500-100', '500-100');
   role('containerHigh', '-container-high', '500-300', '500-300');
 
-  // 6. SCRIM — shared; 7 strengths, all on the 500 ramp at alpha% = step/10.
-  //    Mode-independent: light === dark === `500-${step}`. Generated via loop.
-  for (let i = 0; i < SCRIM_STRENGTH_STEPS.length; i++) {
-    const ref = `500-${SCRIM_STRENGTH_STEPS[i]}`;
-    role(SCRIM_KEYS[i], SCRIM_SUFFIXES[i], ref, ref);
-  }
-
-  // 7. INVERSE — shared.
+  // 6. INVERSE — shared.
   role('inverseSurface', '-inverse-surface', '900', '100');
   role('inverseOnSurface', '-inverse-on-surface', '50', '950');
 
-  // 8. SURFACE — shared base surfaces.
+  // 7. SURFACE — shared base surfaces.
   role('background', '-background', '100', '900');
   role('surface', '-surface', '125', '875');
 
-  // 9. SURFACE DIM/BRIGHT — shared; non-mirror (light+dark do NOT sum to 1000).
+  // 8. SURFACE DIM/BRIGHT — shared; non-mirror (light+dark do NOT sum to 1000).
   //    Same direction in both modes: a "dim" surface is a darker stop in both.
   role('surfaceDimmest', '-surface-dimmest', '200', '950');
   role('surfaceDimmer', '-surface-dimmer', '175', '925');
@@ -131,7 +124,7 @@ export function semanticRoles(paletteName) {
   role('surfaceBrighter', '-surface-brighter', '75', '825');
   role('surfaceBrightest', '-surface-brightest', '50', '800');
 
-  // 10. SURFACE LOW/HIGH — shared; mirror (light+dark sum toward 1000) so
+  // 9. SURFACE LOW/HIGH — shared; mirror (light+dark sum toward 1000) so
   //     "lower" reads recessed and "higher" raised regardless of mode.
   role('surfaceLowest', '-surface-lowest', '50', '950');
   role('surfaceLower', '-surface-lower', '75', '925');
@@ -139,6 +132,14 @@ export function semanticRoles(paletteName) {
   role('surfaceHigh', '-surface-high', '150', '850');
   role('surfaceHigher', '-surface-higher', '175', '825');
   role('surfaceHighest', '-surface-highest', '200', '800');
+
+  // 10. SCRIM — shared; 7 strengths, all on the 500 ramp at alpha% = step/10. Mode-independent
+  //     (light === dark === `500-${step}`). Listed LAST so the emitted token order groups as
+  //     regular colors → containers → surfaces → scrims — a cleaner Figma variable / CSS list.
+  for (let i = 0; i < SCRIM_STRENGTH_STEPS.length; i++) {
+    const ref = `500-${SCRIM_STRENGTH_STEPS[i]}`;
+    role(SCRIM_KEYS[i], SCRIM_SUFFIXES[i], ref, ref);
+  }
 
   return roles;
 }

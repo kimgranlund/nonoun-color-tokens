@@ -72,25 +72,15 @@ function roleTable(n) {
     { key: "containerLow", suffix: "-container-low", light: "500-100", dark: "500-100" },
     { key: "containerHigh", suffix: "-container-high", light: "500-300", dark: "500-300" },
 
-    // 6. SCRIM — shared; 7 strengths on the 500 ramp (alpha% = step/10), mode-independent.
-    //    Sequential 5–60%: weakest..strongest = 50/100/200/300/400/500/600.
-    { key: "scrimWeakest", suffix: "-scrim-weakest", light: "500-50", dark: "500-50" },
-    { key: "scrimWeaker", suffix: "-scrim-weaker", light: "500-100", dark: "500-100" },
-    { key: "scrimWeak", suffix: "-scrim-weak", light: "500-200", dark: "500-200" },
-    { key: "scrim", suffix: "-scrim", light: "500-300", dark: "500-300" },
-    { key: "scrimStrong", suffix: "-scrim-strong", light: "500-400", dark: "500-400" },
-    { key: "scrimStronger", suffix: "-scrim-stronger", light: "500-500", dark: "500-500" },
-    { key: "scrimStrongest", suffix: "-scrim-strongest", light: "500-600", dark: "500-600" },
-
-    // 7. INVERSE — shared.
+    // 6. INVERSE — shared.
     { key: "inverseSurface", suffix: "-inverse-surface", light: "900", dark: "100" },
     { key: "inverseOnSurface", suffix: "-inverse-on-surface", light: "50", dark: "950" },
 
-    // 8. SURFACE — shared base surfaces.
+    // 7. SURFACE — shared base surfaces.
     { key: "background", suffix: "-background", light: "100", dark: "900" },
     { key: "surface", suffix: "-surface", light: "125", dark: "875" },
 
-    // 9. SURFACE DIM/BRIGHT — shared; non-mirror.
+    // 8. SURFACE DIM/BRIGHT — shared; non-mirror.
     { key: "surfaceDimmest", suffix: "-surface-dimmest", light: "200", dark: "950" },
     { key: "surfaceDimmer", suffix: "-surface-dimmer", light: "175", dark: "925" },
     { key: "surfaceDim", suffix: "-surface-dim", light: "150", dark: "900" },
@@ -98,13 +88,24 @@ function roleTable(n) {
     { key: "surfaceBrighter", suffix: "-surface-brighter", light: "75", dark: "825" },
     { key: "surfaceBrightest", suffix: "-surface-brightest", light: "50", dark: "800" },
 
-    // 10. SURFACE LOW/HIGH — shared; mirror (sum 1000).
+    // 9. SURFACE LOW/HIGH — shared; mirror (sum 1000).
     { key: "surfaceLowest", suffix: "-surface-lowest", light: "50", dark: "950" },
     { key: "surfaceLower", suffix: "-surface-lower", light: "75", dark: "925" },
     { key: "surfaceLow", suffix: "-surface-low", light: "100", dark: "900" },
     { key: "surfaceHigh", suffix: "-surface-high", light: "150", dark: "850" },
     { key: "surfaceHigher", suffix: "-surface-higher", light: "175", dark: "825" },
     { key: "surfaceHighest", suffix: "-surface-highest", light: "200", dark: "800" },
+
+    // 10. SCRIM — shared; 7 strengths on the 500 ramp (alpha% = step/10), mode-independent.
+    //     Listed LAST (mirrors semantic.js) so the bound variables group regular → containers →
+    //     surfaces → scrims. Sequential 5–60%: weakest..strongest = 50/100/200/300/400/500/600.
+    { key: "scrimWeakest", suffix: "-scrim-weakest", light: "500-50", dark: "500-50" },
+    { key: "scrimWeaker", suffix: "-scrim-weaker", light: "500-100", dark: "500-100" },
+    { key: "scrimWeak", suffix: "-scrim-weak", light: "500-200", dark: "500-200" },
+    { key: "scrim", suffix: "-scrim", light: "500-300", dark: "500-300" },
+    { key: "scrimStrong", suffix: "-scrim-strong", light: "500-400", dark: "500-400" },
+    { key: "scrimStronger", suffix: "-scrim-stronger", light: "500-500", dark: "500-500" },
+    { key: "scrimStrongest", suffix: "-scrim-strongest", light: "500-600", dark: "500-600" },
   ];
 }
 
