@@ -73,6 +73,15 @@ for (const m of css.matchAll(/--c-[a-z0-9-]+?-(\d+)(?:-\d+)?\s*:/gi)) {
   if (/^\d+$/.test(stop) && stop.length < 3) FAIL("padding", `unpadded stop in --c-…-${stop}`);
 }
 
+// ── on-color policy threads to exports (OD-001): "fixed" = on{N} pinned 050 both modes;
+//    "contrast" re-points at least one to the better-contrasting end (proves onColorMode is wired). ──
+const onRefs = (cssStr) => [...cssStr.matchAll(/--c-([a-z]+)-on-\1:\s*light-dark\(var\(--c-[a-z]+-([0-9-]+)\),\s*var\(--c-[a-z]+-([0-9-]+)\)/gi)].map((m) => `${m[1]}:${m[2]}/${m[3]}`);
+const fixedOn = onRefs(X.exportCSS(C(ALL)));
+const contrastOn = onRefs(X.exportCSS({ ...C(ALL), onColorMode: "contrast" }));
+if (fixedOn.length === 0) FAIL("oncolors", "no on-{n} CSS vars found");
+if (!fixedOn.every((r) => /:050\/050$/.test(r))) FAIL("oncolors", `fixed mode: on-colors not all 050/050 (${fixedOn.find((r) => !/:050\/050$/.test(r))})`);
+if (JSON.stringify(fixedOn) === JSON.stringify(contrastOn)) FAIL("oncolors", "contrast mode changed no on-color — onColorMode not threaded to exports");
+
 // ── hpg-export-disabled-palette (on:false absent; all-disabled = valid empty, no throw) ───
 const oneOff = C(ALL.map((p, i) => (i === 1 ? { ...p, on: false } : p)));
 const cssOff = X.exportCSS(oneOff);

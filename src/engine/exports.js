@@ -18,7 +18,13 @@
 // theme light/dark/auto.
 
 import { paletteStops, EXPORT_STOPS, DEFAULT_CONTROLS } from "./tonal.js";
-import { semanticRoles, refKey, applyRoleOverrides } from "./semantic.js";
+import { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast } from "./semantic.js";
+
+// WCAG relative luminance of an [r,g,b] (0..255) triple — for the opt-in contrast on-color pick.
+const relLumExp = (rgb) => {
+  const c = rgb.map((v) => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+};
 
 // ── Constants (from data/role-table.json) ─────────────────────────────────────
 // Scrims are a 500-based translucency ramp: a scrim primitive "{n}/500-{step}" is the
@@ -122,6 +128,7 @@ function controlsOf(state) {
     // default mode regardless of the doc. Threaded now so exports match what the UI renders.
     toneMode: state.toneMode ?? DEFAULT_CONTROLS.toneMode,
     vibrancy: state.vibrancy ?? DEFAULT_CONTROLS.vibrancy,
+    onColorMode: state.onColorMode ?? DEFAULT_CONTROLS.onColorMode,
     relChroma: state.relChroma ?? DEFAULT_CONTROLS.relChroma,
     chromaFloor: state.chromaFloor ?? DEFAULT_CONTROLS.chromaFloor,
   };
@@ -194,7 +201,11 @@ function derivePalette(palette, controls, overrides) {
 
   // The 37 semantic roles, with each ref pre-resolved to a concrete color for
   // BOTH modes. semanticRoles is keyed on the slug (so keys are name-prefixed).
-  const roles = applyRoleOverrides(semanticRoles(n), overrides).map((r) => {
+  // on-color policy: "contrast" mode flips the accent on-colors to the better-contrasting end
+  // BEFORE per-doc overrides (so an explicit override still wins). No-op in the default "fixed" mode.
+  const lumOf = (ref) => { const rgb = byStop.get(Number(ref)); return rgb ? relLumExp(rgb) : 0; };
+  const onAdjusted = applyOnColorContrast(semanticRoles(n), n, lumOf, controls.onColorMode);
+  const roles = applyRoleOverrides(onAdjusted, overrides).map((r) => {
     const L = resolveRef(r.light);
     const D = resolveRef(r.dark);
     return {

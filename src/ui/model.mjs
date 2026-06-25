@@ -25,7 +25,7 @@ import {
   EXPORT_STOPS,
   DEFAULT_CONTROLS,
 } from "../engine/tonal.js";
-import { semanticRoles, refKey, applyRoleOverrides } from "../engine/semantic.js";
+import { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast } from "../engine/semantic.js";
 import {
   exportCSS,
   exportOKLCH,
@@ -113,6 +113,7 @@ export function defaultDocument() {
     chromaFloor: DEFAULT_CONTROLS.chromaFloor,
     toneMode: DEFAULT_CONTROLS.toneMode,
     vibrancy: DEFAULT_CONTROLS.vibrancy,
+    onColorMode: DEFAULT_CONTROLS.onColorMode,
     theme: "auto",
     selected: 0,
     roleOverrides: {}, // per-doc semantic-mapping re-points (empty = canonical role table)
@@ -135,6 +136,7 @@ function controlsOf(doc) {
     chromaFloor: doc.chromaFloor ?? DEFAULT_CONTROLS.chromaFloor,
     toneMode: doc.toneMode ?? DEFAULT_CONTROLS.toneMode,
     vibrancy: doc.vibrancy ?? DEFAULT_CONTROLS.vibrancy,
+    onColorMode: doc.onColorMode ?? DEFAULT_CONTROLS.onColorMode,
   };
 }
 
@@ -159,6 +161,7 @@ function stateOf(doc) {
     chromaFloor: c.chromaFloor,
     toneMode: c.toneMode,
     vibrancy: c.vibrancy,
+    onColorMode: c.onColorMode,
   };
 }
 
@@ -315,7 +318,11 @@ export function projectView(doc) {
     const byStop = rampByStop(fullStops);                          // 25 stops — every role ref resolves
     const ramp = fullStops.filter((s) => STOPS.includes(s.stop));  // 19 display stops for the canvas
     const n = slug(p.name);
-    const roles = applyRoleOverrides(semanticRoles(n), doc.roleOverrides).map((r) => ({
+    // on-color policy: in "contrast" mode flip the accent on-colors to the better-contrasting end
+    // (vs the resolved accent fill) BEFORE per-doc overrides, so an explicit override still wins.
+    const lumOf = (ref) => { const hit = byStop.get(Number(ref)); return hit ? relLum(hit.rgb) : 0; };
+    const baseRoles = applyOnColorContrast(semanticRoles(n), n, lumOf, controls.onColorMode);
+    const roles = applyRoleOverrides(baseRoles, doc.roleOverrides).map((r) => ({
       key: r.key,
       suffix: r.suffix,
       name: n + r.suffix, // the semantic token name (e.g. "neutral", "neutral-dim")

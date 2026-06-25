@@ -161,3 +161,34 @@ export function applyRoleOverrides(roles, overrides) {
     return { ...r, light: o.light ?? r.light, dark: o.dark ?? r.dark };
   });
 }
+
+/**
+ * Opt-in WCAG-safe on-colors (OD-001). By default `on{N}` is pinned to `050` in both modes
+ * (ADR-003) — uniform but failing contrast on light accents (e.g. white-on-Warning ≈ 1.8:1). In
+ * "contrast" mode this re-points the accent on-colors to the END (light vs dark extreme) that
+ * maximizes WCAG contrast against the accent fill they sit on (`550` light / `450` dark), per mode:
+ * `on{N}` → 050|950, `on{N}Variant` → 200|800 (a softer tint of the same end). All other roles are
+ * untouched, and the canonical `semanticRoles` table is unchanged — this is a resolution-layer
+ * adjustment, gated by the explicit `onColorMode` opt-in (ADR-003 forbids changing the default).
+ *
+ * `lumOf(ref)` must return the WCAG relative luminance (0..1) of a solid-stop ref's resolved color;
+ * the caller supplies it (it has the resolved ramp). A no-op unless onColorMode === "contrast".
+ * @param {{key,suffix,light,dark}[]} roles
+ * @param {string} n palette slug (for the `-on-${n}` suffixes)
+ * @param {(ref:string)=>number} lumOf relative luminance of a solid stop ref
+ * @param {string} [onColorMode] "fixed" (default) | "contrast"
+ */
+export function applyOnColorContrast(roles, n, lumOf, onColorMode) {
+  if (onColorMode !== 'contrast') return roles;
+  const onMain = `-on-${n}`, onVar = `-on-${n}-variant`;
+  const wcag = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  const pick = (fillRef, ends) => {
+    const f = lumOf(fillRef);
+    return wcag(lumOf(ends[0]), f) >= wcag(lumOf(ends[1]), f) ? ends[0] : ends[1];
+  };
+  return roles.map((r) => {
+    const ends = r.suffix === onMain ? ['050', '950'] : r.suffix === onVar ? ['200', '800'] : null;
+    if (!ends) return r;
+    return { ...r, light: pick('550', ends), dark: pick('450', ends) };
+  });
+}

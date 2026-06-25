@@ -55,6 +55,8 @@ export const DOMAINS = {
   toneMode: { kind: "enum", values: ["even", "perceptual", "peak"], default: "perceptual" },
   // perceptual-path vibrancy: 0 = even lightness, 100 = cusp-anchored center (see tonal.js). Default 0.
   vibrancy: { kind: "number", min: 0, max: 100, default: 0 },
+  // on-color policy: "fixed" (050 both modes, ADR-003) | "contrast" (WCAG-aware flip, OD-001). Default fixed.
+  onColorMode: { kind: "enum", values: ["fixed", "contrast"], default: "fixed" },
   // even-mode light/dark chroma floor, % of gamut (see tonal.js). Default on, so absent → 40 not 0.
   chromaFloor: { kind: "number", min: 0, max: 100, default: 40 },
   theme: { kind: "enum", values: ["auto", "light", "dark"], default: "auto" },
@@ -229,6 +231,7 @@ export function hydrate(snapshot) {
     chromaFloor: clampNumber(s.chromaFloor ?? DOMAINS.chromaFloor.default, DOMAINS.chromaFloor.min, DOMAINS.chromaFloor.max),
     toneMode: clampEnum(s.toneMode, DOMAINS.toneMode.values, DOMAINS.toneMode.default),
     vibrancy: clampNumber(s.vibrancy ?? DOMAINS.vibrancy.default, DOMAINS.vibrancy.min, DOMAINS.vibrancy.max),
+    onColorMode: clampEnum(s.onColorMode, DOMAINS.onColorMode.values, DOMAINS.onColorMode.default),
     theme: clampEnum(s.theme, DOMAINS.theme.values, DOMAINS.theme.default),
     selected,
     roleOverrides: clampOverrides(s.roleOverrides),

@@ -63,6 +63,11 @@ export const DEFAULT_CONTROLS = {
   // chromatic. The fix for hues whose vivid expression lives off-center (e.g. yellow, cusp at high L*):
   // crank it and the mid stops read vibrant for ANY hue. ("peak" mode = vibrancy 100.)
   vibrancy: 0,
+  // On-color policy (resolution layer, not the ramp). "fixed" (default, ADR-003): on{N} pinned to
+  // the light tint (050/200) in both modes — uniform but can fail contrast on light accents.
+  // "contrast" (OD-001 opt-in): on{N}/on{N}Variant flip to the end with the better WCAG contrast vs
+  // the accent fill (550/450) per mode. Applied in projectView + derivePalette via applyOnColorContrast.
+  onColorMode: "fixed",
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

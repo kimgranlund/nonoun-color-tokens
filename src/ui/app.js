@@ -2834,6 +2834,18 @@ class HctApp extends HTMLElement {
           onToggle: () => this.commit((doc) => (doc.hueSpace = doc.hueSpace === "oklch" ? "cam16" : "oklch")),
         }),
       ),
+      // On-color policy — opt-in WCAG-safe on-colors. Default "fixed" (light tint both modes, ADR-003);
+      // "contrast" flips on{N}/on{N}Variant to the better-contrasting end vs the accent fill, per mode.
+      field(
+        "On-colors",
+        switchControl({
+          on: d.onColorMode === "contrast",
+          ariaLabel: "On-color policy — WCAG contrast when on, fixed light tint when off",
+          label: d.onColorMode === "contrast" ? "contrast" : "fixed",
+          onToggle: () => this.commit((doc) => (doc.onColorMode = d.onColorMode === "contrast" ? "fixed" : "contrast")),
+        }),
+        { labelTitle: "fixed: on-colors are the light tint in both modes (ADR-003). contrast: on{N}/on{N}Variant flip to the end with the best WCAG contrast vs the accent fill, per mode — accessible, but no longer uniform." },
+      ),
       d.toneMode === "even"
         ? field(
             "Chroma basis",
