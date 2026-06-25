@@ -59,8 +59,14 @@ Format: Context → Decision → Rationale → Consequences → Status.
 - **Consequences.** White-on-`Warning` (yellow) ≈ 1.8:1, below WCAG 4.5:1; in dark mode
   several palettes lose contrast as fills lighten. This is **accepted by design**. Tracked
   as OD-001.
-- **Status.** DECIDED — **do not reintroduce contrast-aware on-colors without explicit
+- **Status.** DECIDED — **do not reintroduce contrast-aware on-colors as the DEFAULT without explicit
   instruction.**
+- **Opt-in added (2026-06-25, explicit instruction).** The default stays `fixed` (050/200 both modes,
+  as above). A new `onColorMode` control adds an opt-in `"contrast"` mode that re-points `on{N}`
+  (050↔950) and `on{N}Variant` (200↔800) to the end with the better WCAG contrast vs the accent fill
+  (550 light / 450 dark), per mode. It's a resolution-layer adjustment (`applyOnColorContrast`,
+  applied in `projectView` + `derivePalette`) — `semanticRoles` and the canonical role table are
+  UNCHANGED, so the default contract holds. This satisfies OD-001 without overriding ADR-003's default.
 
 ## ADR-004 — Semantic scrim roles use base 750 only  **(SUPERSEDED — see the 500-ramp revision)**
 > **SUPERSEDED (2026-06-17).** Scrims are now a single **500-based** ramp: a scrim is `500-{step}`

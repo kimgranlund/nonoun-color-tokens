@@ -62,6 +62,30 @@ const succ = S.semanticRoles("success");
 if (!succ.some((r) => r.key === "onSuccess") || !succ.some((r) => r.key === "successDim") || !succ.some((r) => r.key === "surfaceDim"))
   FAIL("roles", "palette-name substitution wrong for 'success' (expect onSuccess, successDim, shared surfaceDim)");
 
+// ── on-color contrast (OD-001 opt-in): applyOnColorContrast flips on{N}/on{N}Variant to the
+//    better-WCAG-contrast end vs the accent fill (550/450) per mode; a no-op unless "contrast". ──
+{
+  const P = S.semanticRoles("primary");
+  const onMain0 = P.find((r) => r.suffix === "-on-primary");
+  // fixed (default) → unchanged
+  const fixed = S.applyOnColorContrast(P, "primary", () => 0.5, "fixed");
+  const fm = fixed.find((r) => r.suffix === "-on-primary");
+  if (fm.light !== onMain0.light || fm.dark !== onMain0.dark) FAIL("oncolors", "fixed mode must not alter on-colors");
+  // contrast + LIGHT accent fill → dark on-colors (on{N}→950, on{N}Variant→800)
+  const lumLight = (ref) => ({ "550": 0.8, "450": 0.75, "050": 0.95, "950": 0.03, "200": 0.7, "800": 0.12 }[ref] ?? 0.5);
+  const cl = S.applyOnColorContrast(P, "primary", lumLight, "contrast");
+  const cm = cl.find((r) => r.suffix === "-on-primary"), cv = cl.find((r) => r.suffix === "-on-primary-variant");
+  if (cm.light !== "950" || cm.dark !== "950") FAIL("oncolors", `contrast/light fill: on-primary ${cm.light}/${cm.dark}, want 950/950`);
+  if (cv.light !== "800" || cv.dark !== "800") FAIL("oncolors", `contrast/light fill: on-primary-variant ${cv.light}/${cv.dark}, want 800/800`);
+  // contrast + DARK accent fill → light on-colors (on{N}→050)
+  const lumDark = (ref) => ({ "550": 0.12, "450": 0.08, "050": 0.95, "950": 0.03, "200": 0.7, "800": 0.12 }[ref] ?? 0.5);
+  const dm = S.applyOnColorContrast(P, "primary", lumDark, "contrast").find((r) => r.suffix === "-on-primary");
+  if (dm.light !== "050" || dm.dark !== "050") FAIL("oncolors", `contrast/dark fill: on-primary ${dm.light}/${dm.dark}, want 050/050`);
+  // non-on roles untouched in contrast mode
+  const surf = cl.find((r) => r.key === "surface"), surf0 = P.find((r) => r.key === "surface");
+  if (surf.light !== surf0.light || surf.dark !== surf0.dark) FAIL("oncolors", "contrast mode must not touch non-on roles");
+}
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
 for (const g of ["roles", "oncolors", "refs-canonical", "surface-mode"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));

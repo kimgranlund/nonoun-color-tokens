@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 1.28 — 2026-06-25 — opt-in WCAG-safe on-colors (`onColorMode: "contrast"`) — OD-001
+
+A new `onColorMode` control adds an opt-in **`"contrast"`** mode (default stays **`"fixed"`**, ADR-003):
+it re-points the accent on-colors to the end with the better WCAG contrast vs the accent fill
+(`550` light / `450` dark), per mode — `on{N}` flips 050↔950, `on{N}Variant` 200↔800. It's a
+**resolution-layer** adjustment (`applyOnColorContrast`, applied in `projectView` + `derivePalette`):
+`semanticRoles` and the canonical `roleTable` are unchanged, so the default contract holds and the
+`refs-canonical` gate still passes. Threaded through DEFAULT_CONTROLS / controlsOf / stateOf / persist;
+a Global-inspector toggle. Covered by a semantic unit test (light fill → dark on-color, dark fill →
+light, fixed unchanged, non-on roles untouched) + an export integration test (the mode flips ≥1
+on-color) + the persist roundtrip. Addresses OD-001 without overriding ADR-003's default.
+
 ## 1.27 — 2026-06-24 — plugin: opt-in "Regroup Color Modes" (rebuild in canonical order)
 
 Figma keeps an existing variable's position on a normal apply (find-or-create), so a file whose
