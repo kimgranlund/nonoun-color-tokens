@@ -648,6 +648,15 @@ ok(
     posted.pluginMessage.dtcg && typeof posted.pluginMessage.dtcg === "object",
   "(x) applyToFigma posts {pluginMessage:{type:'apply', dtcg}} — the UI→sandbox bridge contract",
 );
+ok(!posted.pluginMessage.rebuildSemantic, "(x) a normal apply does NOT set rebuildSemantic (existing variable positions kept)");
+// the opt-in Regroup path posts rebuildSemantic:true so code.js re-creates Color Modes in grouped order
+posted = null;
+const realConfirm = globalThis.confirm;
+globalThis.confirm = () => true; // accept the destructive-rebuild warning
+app.applyToFigma(true);
+globalThis.confirm = realConfirm;
+ok(posted && posted.pluginMessage && posted.pluginMessage.type === "apply" && posted.pluginMessage.rebuildSemantic === true,
+  "(x) applyToFigma(true) (Regroup) posts rebuildSemantic:true");
 globalThis.parent = realParent;
 app.setInFigma(false);
 

@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 1.27 — 2026-06-24 — plugin: opt-in "Regroup Color Modes" (rebuild in canonical order)
+
+Figma keeps an existing variable's position on a normal apply (find-or-create), so a file whose
+`Color Modes` collection predates the role-order regroup (1.24) keeps its old order. A new **opt-in
+"Regroup" action** in the Export drawer (Figma only) sends `apply` with `rebuildSemantic:true`;
+`applyBundle` then **deletes the `Color Modes` collection and re-creates it fresh**, so it adopts
+the bundle's canonical order (regular · containers · surfaces · scrims). `Color Primitives` are
+untouched. It's destructive by design — re-created variables get new IDs, so layers bound to them
+detach — hence opt-in + a confirm. The default apply stays idempotent and position-preserving.
+Covered by the plugin verifier (delete + re-create, single collection, canonical order, scrims last)
+and a headless assertion (the UI posts the flag).
+
 ## 1.26 — 2026-06-24 — `outlineVariant` → `500-300` (was `500-400`)
 
 `outlineVariant` now references the `500-300` scrim (30% alpha) instead of `500-400` (40%) in both

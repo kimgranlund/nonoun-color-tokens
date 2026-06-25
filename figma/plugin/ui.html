@@ -6737,8 +6737,17 @@ class HctApp extends HTMLElement {
               ? btn([icon("flag"), "Apply Variables"], {
                   variant: "primary",
                   cls: "figma-apply",
-                  title: "Create/update the raw-colors + Light/Dark variable collections directly in this Figma file",
+                  title: "Create/update the Color Primitives + Color Modes (Light/Dark) variable collections directly in this Figma file",
                   onclick: () => this.applyToFigma(),
+                })
+              : false,
+            // Opt-in: re-create Color Modes so it adopts the grouped order (Figma won't reorder
+            // existing variables on a normal apply). Re-creates them — bound layers need reconnecting.
+            this.inFigma
+              ? btn([icon("arrows-clockwise"), "Regroup"], {
+                  cls: "figma-regroup",
+                  title: "Rebuild the Color Modes variables in grouped order (regular · containers · surfaces · scrims). Re-creates them, so layers bound to them will need reconnecting. Color Primitives are untouched.",
+                  onclick: () => this.applyToFigma(true),
                 })
               : false,
             // ONE download action — every format in its own folder + the config, as a single .zip.
@@ -6839,12 +6848,17 @@ class HctApp extends HTMLElement {
   // applyToFigma — post the current DTCG bundle to the plugin sandbox (code.js), which
   // creates/updates the raw-colors + Light/Dark variable collections. A safe no-op outside
   // a Figma plugin: parent === window and nothing listens for the pluginMessage envelope.
-  applyToFigma() {
+  applyToFigma(rebuild = false) {
+    // rebuild = the opt-in "Regroup" path: re-create the Color Modes collection so it adopts the
+    // canonical grouped order (Figma keeps existing variables' positions on a normal update). It
+    // re-creates the semantic variables, so confirm first — bound layers will detach.
+    if (rebuild && typeof confirm === "function" &&
+        !confirm("Rebuild the Color Modes variables in grouped order?\n\nThis deletes and re-creates the semantic variables, so any layers or styles bound to them will need reconnecting. (Color Primitives are untouched.)")) return;
     try {
       // Send the variables AND the exact params together — code.js embeds the config in the file
       // (root pluginData) so a later read reproduces this state losslessly, not approximately.
-      parent.postMessage({ pluginMessage: { type: "apply", dtcg: this.figmaBundle(), config: serialize(this.doc) } }, "*");
-      this.toast("Sent to Figma — check the Variables panel");
+      parent.postMessage({ pluginMessage: { type: "apply", dtcg: this.figmaBundle(), config: serialize(this.doc), rebuildSemantic: !!rebuild } }, "*");
+      this.toast(rebuild ? "Regrouping Color Modes…" : "Sent to Figma — check the Variables panel");
     } catch {
       /* not in a frame / blocked — nothing to apply to */
     }

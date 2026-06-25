@@ -48,11 +48,11 @@ figma.ui.onmessage = async (msg) => {
   if (!msg) return;
   try {
     if (msg.type === "apply") {
-      const r = await applyBundle(msg.dtcg);
+      const r = await applyBundle(msg.dtcg, { rebuildSemantic: !!msg.rebuildSemantic });
       // Embed the exact params in the file ALONGSIDE the variables, so a later read round-trips
       // losslessly (the variables alone can only seed an approximate hue/chroma).
       if (msg.config) writeConfig(msg.config);
-      figma.notify(`HCT: ${r.raw} raw + ${r.semantic} semantic vars (Light/Dark)` + (r.pruned ? `, ${r.pruned} stale pruned` : ""));
+      figma.notify(`HCT: ${r.raw} raw + ${r.semantic} semantic vars (Light/Dark)` + (r.rebuilt ? ", regrouped" : "") + (r.pruned ? `, ${r.pruned} stale pruned` : ""));
     } else if (msg.type === "save-config") {
       writeConfig(msg.config);
       figma.notify("HCT: config saved into this file");
@@ -128,7 +128,12 @@ async function varsByName(collectionId) {
 }
 
 // ── the apply ───────────────────────────────────────────────────────────────────
-async function applyBundle(dtcg) {
+// opts.rebuildSemantic — the opt-in "Regroup": delete the existing Color Modes collection so it is
+// re-created fresh and adopts the bundle's (canonical, grouped) variable order. Figma keeps an
+// existing variable's position on update, so a normal apply never reorders; only a fresh collection
+// does. Color Primitives are untouched; bindings to the dropped Color Modes variables detach.
+async function applyBundle(dtcg, opts) {
+  opts = opts || {};
   const rawTree = dtcg && dtcg["palette.tokens.json"];
   const semLight = dtcg && dtcg["Light_tokens.json"];
   const semDark = dtcg && dtcg["Dark_tokens.json"];
@@ -153,6 +158,14 @@ async function applyBundle(dtcg) {
   }
 
   // 2) SEMANTIC collection — "Light" + "Dark" modes, each role ALIASED to its raw var.
+  // Regroup: drop the existing Color Modes collection first so the rebuild creates every variable
+  // fresh, in the bundle's canonical order (regular · containers · surfaces · scrims).
+  let rebuilt = false;
+  if (opts.rebuildSemantic) {
+    const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
+    const old = cols0.find((c) => c.name === SEMANTIC_COLLECTION);
+    if (old) { old.remove(); rebuilt = true; }
+  }
   const sem = await ensureCollection(SEMANTIC_COLLECTION);
   const lightMode = sem.modes[0].modeId;
   sem.renameMode(lightMode, "Light");
@@ -192,7 +205,7 @@ async function applyBundle(dtcg) {
     if (!currentRaw.has(name)) { rawByName[name].remove(); pruned++; }
   }
 
-  return { raw: rawCount, semantic: semCount, pruned: pruned };
+  return { raw: rawCount, semantic: semCount, pruned: pruned, rebuilt: rebuilt };
 }
 
 // Exposed for the headless verifier (a no-op inside Figma's VM).

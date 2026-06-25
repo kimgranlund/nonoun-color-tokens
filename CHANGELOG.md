@@ -3,11 +3,48 @@
 All notable changes to **Color Tokens by NONOUN** are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims
-to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). No versioned release has been
-cut yet, so everything to date lives under **Unreleased**, grouped by the day it landed on `main`.
-Entries reference the squash-merged PR that introduced them.
+to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Entries are grouped by the day
+they landed on `main` and reference the squash-merged PR that introduced them.
 
-## [Unreleased]
+## [1.0.0] — 2026-06-24
+
+The first tagged release. Beyond the foundations (HCT/OKHSL engine, 37-role semantic layer, the
+export formats, and the Figma generator + binder), 1.0.0 adds the **Palette Surveys** gallery, the
+per-palette **Cusp pull**, durable Figma persistence, and a pass of naming/ordering/export polish.
+
+### 2026-06-24
+
+#### Added
+- Opt-in **"Regroup Color Modes"** action (Figma, in the Export drawer): re-creates the `Color Modes`
+  collection so it adopts the canonical grouped order (regular · containers · surfaces · scrims) —
+  Figma keeps existing variables' positions on a normal apply. Destructive (re-created variables get
+  new IDs, so bound layers detach), so it's opt-in + confirmed; the default apply stays idempotent.
+
+#### Changed
+- **Semantic token order regrouped** — the 37 roles emit as regular colors → containers → surfaces →
+  scrims (scrims moved from the middle to the end), consistently across the Figma `Color Modes`
+  variables, the `--c-*` CSS, and every export. Pure reorder; no color changes. (#57)
+- **CSS raw vars drop the underscore** — `--c_{family}-{stop}` → `--c-{family}-{stop}`; raw and
+  semantic now share the `--c-` prefix (raw names end in digits, semantic in a word, so no collision). (#58)
+- `outlineVariant` references the `500-300` scrim (was `500-400`) — a subtler variant outline. (#59)
+
+### 2026-06-23
+
+#### Added
+- **Per-palette "Cusp pull"** (perceptual mode) — a per-palette override of the global Vibrancy that
+  nudges a palette's richest (max-chroma) stop toward stop 500, independent of the others (e.g. pulls
+  yellow's vivid expression to the mid). Optional persisted field; perceptual-only inspector slider. (#55)
+
+#### Changed
+- **Figma collections renamed** — the generated variable collections are now **`Color Primitives`**
+  (was `raw-colors`) and **`Color Modes`** (was `semantic-colors`). (#54)
+
+#### Fixed
+- **Figma gallery sets persist** via `figma.clientStorage` — the plugin iframe's opaque origin blocks
+  `localStorage`, so "Your Palettes" silently vanished on reopen; now durable per-user. (#56)
+- Export drawer spans full height; downloads save reliably (File System Access API + `<a download>`
+  fallback) instead of navigating to the blob in embedded webviews; Mapping-tab scrim refs corrected
+  (`scrim-weakest → 500-50`, etc.). (#55)
 
 ### 2026-06-22
 

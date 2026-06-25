@@ -66,6 +66,10 @@ function mockFigma() {
           id: "c" + id++, name, modes: [{ modeId: "m" + id++, name: "Mode 1" }],
           renameMode(mid, nm) { const m = this.modes.find((x) => x.modeId === mid); if (m) m.name = nm; },
           addMode(nm) { const m = { modeId: "m" + id++, name: nm }; this.modes.push(m); return m.modeId; },
+          remove() { // real Figma drops the collection AND its variables
+            const i = collections.indexOf(this); if (i >= 0) collections.splice(i, 1);
+            for (let j = variables.length - 1; j >= 0; j--) if (variables[j].variableCollectionId === this.id) variables.splice(j, 1);
+          },
         };
         collections.push(c); return c;
       },
@@ -153,6 +157,25 @@ if (applyBundle) {
     if (rawNames3.length !== rawExpect) FAIL("prune", `Color Primitives has ${rawNames3.length} vars after prune, want ${rawExpect}`);
     if (semNames3.length !== semExpect) FAIL("prune", `Color Modes has ${semNames3.length} vars after prune, want ${semExpect}`);
     if (res3.pruned !== 4) FAIL("prune", `apply reported pruned=${res3.pruned}, expected 4`);
+
+    // ── REGROUP: apply with {rebuildSemantic} DELETES + re-creates the Color Modes collection (so it
+    //    adopts the bundle's canonical order), leaving Color Primitives + the var counts intact and
+    //    NOT duplicating the collection. The fresh semantic vars created in the bundle's role order. ──
+    const semColl0 = F.collections.find((c) => c.name === "Color Modes");
+    const res4 = await applyBundle(bundle, { rebuildSemantic: true });
+    if (!res4.rebuilt) FAIL("regroup", "applyBundle({rebuildSemantic:true}) did not report rebuilt");
+    const semColls4 = F.collections.filter((c) => c.name === "Color Modes");
+    if (semColls4.length !== 1) FAIL("regroup", `after regroup there are ${semColls4.length} Color Modes collections, want 1`);
+    if (semColls4[0] === semColl0) FAIL("regroup", "regroup reused the old Color Modes collection (should be a fresh one)");
+    if (res4.semantic !== semExpect) FAIL("regroup", `regroup created ${res4.semantic} semantic vars, want ${semExpect}`);
+    const semNames4 = inColl(semColls4[0].id);
+    if (semNames4.length !== semExpect) FAIL("regroup", `Color Modes has ${semNames4.length} vars after regroup, want ${semExpect}`);
+    // order check: the fresh collection's variable order matches the bundle's (regular → … → scrims)
+    const wantOrder = Object.keys(bundle["Light_tokens.json"]).filter((n) => n[0] !== "$")
+      .flatMap((n) => Object.keys(bundle["Light_tokens.json"][n]).filter((k) => k[0] !== "$").map((k) => n + "/" + k));
+    if (semNames4.join(",") !== wantOrder.join(",")) FAIL("regroup", "regrouped Color Modes order != bundle (canonical) order");
+    const lastSeven = semNames4.slice(-7);
+    if (!lastSeven.every((nm) => /\/scrim/.test(nm))) FAIL("regroup", `last 7 regrouped vars are not scrims: ${lastSeven}`);
   } catch (e) { FAIL("apply", "applyBundle threw: " + e.message); }
 
   // ── CONFIG round-trip via the file's root pluginData (the project source of truth, travels with the
