@@ -51,13 +51,23 @@ const evalJS = async (expression, awaitPromise = false) => {
 };
 
 try {
-  // wait for the CDP endpoint, then open the page target.
-  let wsUrl = null;
-  for (let i = 0; i < 60 && !wsUrl; i++) {
-    try { wsUrl = (await (await fetch(`http://127.0.0.1:${PORT}/json/new?${encodeURIComponent(url)}`, { method: "PUT" })).json()).webSocketDebuggerUrl; }
-    catch { await sleep(250); }
+  // Wait for the CDP endpoint, then open the page target. Cold CI runners can take well over 15s to
+  // start Chrome's debugger, so this is generous + two-phase: (1) poll /json/version until the debugger
+  // is LISTENING, then (2) create the tab (/json/new can briefly lag the version endpoint). Both report
+  // how long they waited + the last error, so a real failure is diagnosable instead of a bare timeout.
+  const cdp = async (path, init) => { const r = await fetch(`http://127.0.0.1:${PORT}${path}`, init); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); };
+  const DEADLINE_MS = 45000, INTERVAL_MS = 400;
+  let lastErr = "no response", up = false;
+  for (let waited = 0; waited < DEADLINE_MS && !up; waited += INTERVAL_MS) {
+    try { await cdp("/json/version"); up = true; } catch (e) { lastErr = e.message; await sleep(INTERVAL_MS); }
   }
-  if (!wsUrl) throw new Error("Chrome CDP did not come up");
+  if (!up) throw new Error(`Chrome CDP did not come up within ${DEADLINE_MS / 1000}s (last: ${lastErr})`);
+  let wsUrl = null;
+  for (let i = 0; i < 25 && !wsUrl; i++) {
+    try { wsUrl = (await cdp(`/json/new?${encodeURIComponent(url)}`, { method: "PUT" })).webSocketDebuggerUrl; }
+    catch (e) { lastErr = e.message; await sleep(INTERVAL_MS); }
+  }
+  if (!wsUrl) throw new Error(`Chrome CDP target did not open after the debugger came up (last: ${lastErr})`);
   ws = new WebSocket(wsUrl);
   ws.addEventListener("message", (e) => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m.result); pending.delete(m.id); } });
   await new Promise((r) => ws.addEventListener("open", r));

@@ -17,6 +17,9 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   `SURVEY_INDEX`/`loadSurvey` → `CATEGORY_INDEX`/`loadCategory`, the `openSurvey`/`closeSurvey`/
   `renderSurveyBody` methods, and the `.survey-*` CSS classes. The curated per-category editorial
   eyebrows still read "… Palette Survey" (left as authored copy). No behavior change.
+- **Tooling:** the CI smoke harness waits for Chrome's CDP endpoint more robustly — a two-phase poll
+  (debugger-listening, then open-tab) with a 45 s budget and a diagnostic error, instead of a 15 s
+  blind wait that intermittently failed cold runners with "Chrome CDP did not come up".
 
 ## [1.1.0] — 2026-06-25
 
