@@ -1088,6 +1088,65 @@ app.toGallery(); app.search = ""; await app.openSurvey("travel"); flushRaf();
 ok(app.querySelectorAll(".preset-vol").length >= 1, `(st9) a category page groups presets into volume sub-groups (got ${app.querySelectorAll(".preset-vol").length})`);
 app.closeSurvey();
 
+// ── (np) New-Palette modal: derive (relative / environmental) + custom, with the context strip ──
+const { RELATIONSHIPS: NP_RELS } = await import("../../src/engine/derive.mjs");
+app.openSet(app.sets[0].id); flushRaf();
+const npCount0 = app.doc.palettes.length;
+
+app.openNewPalette(); flushRaf();
+ok(app.newPalOpen === true, "(np1) openNewPalette flips newPalOpen");
+ok(!!app.querySelector(".newpal"), "(np1b) the New-Palette <dialog> is in the tree");
+ok(app.newPalCtx instanceof Set && app.newPalCtx.size >= 1, `(np1c) the 'Derive from' strip is pre-seeded with palettes (got ${app.newPalCtx.size})`);
+// status palettes (warning/error/success/…) are excluded from the context by default.
+const npSysIdx = app.doc.palettes.findIndex((p) => /warning|error|success|danger|critical/i.test(p.name));
+if (npSysIdx >= 0) ok(!app.newPalCtx.has(npSysIdx), `(np1d) the system palette "${app.doc.palettes[npSysIdx].name}" starts excluded`);
+
+const npView = app._view;
+const npSamples = app.newPalSamples(npView);
+ok(npSamples.length === app.newPalCtx.size && npSamples.every((s) => Array.isArray(s) && s.length === 3), "(np2) samples = one OKLCH [L,C,H] per included palette");
+
+// A. Relative — extend (analogous): yields a target OKLCH; creating appends + retains it as the dominant key.
+app.newPalTab = "relative"; app.newPalRel = "extend"; app.render(); flushRaf();
+ok(app.querySelectorAll(".newpal-rel").length === NP_RELS.length, `(np3) the Relative tab lists all ${NP_RELS.length} relationships (got ${app.querySelectorAll(".newpal-rel").length})`);
+const npTarget = app.newPalTarget(npView);
+ok(npTarget && Array.isArray(npTarget.oklch) && npTarget.oklch.length === 3, "(np3b) Relative→extend yields a target OKLCH");
+app.createNewPalette(npView); flushRaf();
+ok(app.doc.palettes.length === npCount0 + 1, "(np4) creating a relative palette appends exactly one");
+const npA = app.doc.palettes[app.doc.palettes.length - 1];
+ok(npA.keyColors && npA.keyColors[0].role === "dominant" && npA.keyColors[0].oklch.length === 3, "(np4b) the derived palette retains the target as its dominant key color");
+ok(typeof npA.hue === "number" && typeof npA.chroma === "number", "(np4c) hue/chroma seeded from the target");
+ok(app.newPalOpen === false, "(np4d) creating closes the modal");
+ok(app.selectedIndex() === app.doc.palettes.length - 1, "(np4e) the freshly-derived palette is selected");
+
+// B. Environmental — a neutral: low, clamped chroma (≤ 0.018 OKLCH) → a muted seed.
+app.openNewPalette(); app.newPalTab = "environmental"; app.render(); flushRaf();
+const npEnv = app.newPalTarget(app._view);
+ok(npEnv && npEnv.oklch && npEnv.oklch[1] <= 0.018 + 1e-9, `(np5) Environmental yields a low-chroma neutral (C=${npEnv.oklch[1].toFixed(4)} ≤ 0.018)`);
+const npBeforeEnv = app.doc.palettes.length;
+app.createNewPalette(app._view); flushRaf();
+ok(app.doc.palettes.length === npBeforeEnv + 1, "(np5b) Environmental appends a palette");
+ok(app.doc.palettes[app.doc.palettes.length - 1].chroma < 30, `(np5c) the neutral seed is muted, not vivid (chroma ${app.doc.palettes[app.doc.palettes.length - 1].chroma})`);
+
+// C. Custom — parametric hue/chroma, needs NO context.
+app.openNewPalette(); app.newPalTab = "custom"; app.newPalCustom = { hue: 300, chroma: 70 }; app.render(); flushRaf();
+ok(!!app.querySelector(".newpal-custom"), "(np6) the Custom tab shows the hue/chroma sliders");
+app.newPalCtx = new Set(); // empty the strip — Custom must not care
+const npBeforeC = app.doc.palettes.length;
+app.createNewPalette(app._view); flushRaf();
+ok(app.doc.palettes.length === npBeforeC + 1, "(np6b) Custom creates a palette with no context selected");
+const npC = app.doc.palettes[app.doc.palettes.length - 1];
+ok(npC.hue === 300 && npC.chroma === 70, `(np6c) Custom uses the picked hue/chroma (got ${npC.hue}/${npC.chroma})`);
+ok(!npC.keyColors, "(np6d) Custom is parametric — no retained key color");
+
+// relative/environmental REQUIRE context: empty → blocked, Create is a no-op.
+app.openNewPalette(); app.newPalTab = "relative"; app.newPalCtx = new Set(); app.render(); flushRaf();
+ok(app.newPalTarget(app._view) === null, "(np7) no context → no target (Relative blocked)");
+const npBeforeBlocked = app.doc.palettes.length;
+app.createNewPalette(app._view); flushRaf();
+ok(app.doc.palettes.length === npBeforeBlocked, "(np7b) Create is a no-op when Relative has no context");
+app.closeNewPalette(); flushRaf();
+ok(app.newPalOpen === false, "(np7c) closeNewPalette dismisses the modal");
+
 // ── report ──────────────────────────────────────────────────────────────────────────
 if (fails.length) {
   console.error("HEADLESS BOOT FAIL:");

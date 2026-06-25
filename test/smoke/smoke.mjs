@@ -79,11 +79,21 @@ try {
 
   await evalJS(`${el}.toggleDrawer(true)`); await sleep(400);
   ok(await evalJS(`(()=>{const d=${el}.querySelector("dialog.drawer");return !!d && d.open && Math.round(d.getBoundingClientRect().height) === innerHeight})()`), "export drawer opens as a full-height <dialog>");
+  await evalJS(`${el}.toggleDrawer(false)`); await sleep(200);
 
   mkdirSync(OUT, { recursive: true });
   const shot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(resolve(OUT, "editor.png"), Buffer.from(shot.data, "base64"));
   console.log("  · screenshot → smoke-out/editor.png");
+
+  // New-Palette modal: a CENTERED top-layer <dialog> with the "Derive from" strip + the 3 tabs.
+  await evalJS(`${el}.openNewPalette()`); await sleep(400);
+  ok(await evalJS(`(()=>{const d=${el}.querySelector("dialog.newpal");if(!d||!d.open)return false;const r=d.getBoundingClientRect();return Math.abs((r.left+r.right)/2 - innerWidth/2) < 2 && Math.abs((r.top+r.bottom)/2 - innerHeight/2) < 2})()`), "New-Palette modal opens centered in the top layer");
+  ok(await evalJS(`${el}.querySelectorAll(".newpal-chip").length >= 1 && ${el}.querySelectorAll(".newpal-rel").length === 6`), "modal shows the context strip + all 6 Relative relationships");
+  const npShot = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(resolve(OUT, "new-palette.png"), Buffer.from(npShot.data, "base64"));
+  console.log("  · screenshot → smoke-out/new-palette.png");
+  await evalJS(`${el}.closeNewPalette()`); await sleep(150);
 } catch (e) {
   fails.push("smoke threw: " + e.message);
 } finally {

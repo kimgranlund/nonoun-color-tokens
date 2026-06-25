@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Entries are grouped by the day
 they landed on `main` and reference the squash-merged PR that introduced them.
 
+## [Unreleased]
+
+### 2026-06-25
+
+#### Added
+- **"New palette" derivation modal** — "+ Palette" now opens a centered dialog that *derives* a
+  palette instead of adding a default. Three modes: **Relative** (a color-theory relationship —
+  extend / complete / contrast / bridge / anchor / recontextualize — computed from the palettes you
+  include via a "Derive from" strip), **Environmental** (a neutral/environment tone: chroma-weighted
+  mean hue + a clamped low chroma), and **Custom** (pick hue + chroma directly). Status palettes
+  (success/warning/error/…) are excluded from the derivation context by default.
+
 ## [1.0.0] — 2026-06-24
 
 The first tagged release. Beyond the foundations (HCT/OKHSL engine, 37-role semantic layer, the

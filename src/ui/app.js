@@ -26,6 +26,7 @@ import {
 import { STORAGE_KEY, serialize, hydrate } from "./persist.js";
 import { FIGMA_PLUGIN } from "./figma-plugin-assets.js";
 import { SURVEY_INDEX, loadSurvey } from "./surveys/index.js";
+import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.mjs";
 import { zipStore } from "./zip.mjs";
 import { icon, brandMark } from "./icons.js";
 
@@ -297,6 +298,13 @@ class HctApp extends HTMLElement {
     this.theme = "system"; // app chrome color scheme: system (follows OS) | light | dark
     this.exportOpen = false;
     this.exportTab = "css";
+    // New-Palette modal (a native <dialog>, like the export drawer). newPalCtx = Set of context
+    // palette indices to derive from (initialized on open: all non-system palettes on).
+    this.newPalOpen = false;
+    this.newPalTab = "relative"; // relative | environmental | custom
+    this.newPalRel = "extend"; // selected Relative relationship
+    this.newPalCtx = null; // Set<number> of included palette indices
+    this.newPalCustom = null; // { hue, chroma } for the Custom tab (seeded on open)
     this.figmaFile = "light"; // which Figma mode file the Figma tab previews/downloads
     this.hover = null; // hovered swatch info for footers
     this.search = "";
@@ -651,6 +659,7 @@ class HctApp extends HTMLElement {
     if (this.view === "editor") this.paintAppFooter(this._view);
     this._restoreFocus(focus);
     this._syncDrawer(); // (re)open/close the native <dialog> to match exportOpen (top layer)
+    this._syncNewPal(); // same, for the New-Palette modal
   }
 
   // _syncDrawer — reconcile the native export <dialog> with this.exportOpen AFTER each render.
@@ -1167,6 +1176,7 @@ class HctApp extends HTMLElement {
       this.renderRightPane(view),
       this.renderAppFooter(),
       this.renderDrawer(view),
+      this.renderNewPalette(view),
       this.toastEl || (this.toastEl = h("div", { class: "toast", role: "status", "aria-live": "polite" })),
     );
   }
@@ -1691,6 +1701,243 @@ class HctApp extends HTMLElement {
     this.selectPalette(this.doc.palettes.length - 1);
   }
 
+  // ── New-Palette modal ──────────────────────────────────────────────────────────
+  // "+ Palette" opens a native <dialog> (top layer, like the export drawer) that DERIVES a
+  // new palette instead of dropping a default. Three modes (segmented tabs):
+  //   • Relative — a color-theory relationship (extend/complete/contrast/bridge/anchor/
+  //     recontextualize) computed from the included palettes' identity colors.
+  //   • Environmental — a neutral/environment tone (chroma-weighted-mean hue + a clamped low
+  //     chroma) per docs/spec/color-neutral-derivation.md.
+  //   • Custom — pick Hue + Chroma directly (parametric, the classic seed).
+  // A/B derive a TARGET OKLCH (engine/derive.mjs), seed hue+chroma from it (seedFromKeyColor),
+  // and retain it as the dominant key color; C sets hue+chroma straight. The "Derive from"
+  // strip toggles which existing palettes feed A/B — system/status palettes start excluded.
+
+  // status palettes (success/warning/error/…) carry meaning, not character — off by default.
+  _isSystemPalette(name) {
+    return /\b(success|positive|warning|error|danger|critical|negative|info)\b/.test(String(name || "").toLowerCase());
+  }
+
+  openNewPalette() {
+    const ps = this.doc.palettes || [];
+    this.newPalCtx = new Set(ps.map((_, i) => i).filter((i) => ps[i].on !== false && !this._isSystemPalette(ps[i].name)));
+    if (!this.newPalCustom) this.newPalCustom = { hue: 210, chroma: 55 };
+    this.newPalOpen = true;
+    this.render();
+  }
+  closeNewPalette() { this.newPalOpen = false; this.render(); }
+
+  _toggleCtx(i) {
+    const ctx = this.newPalCtx || (this.newPalCtx = new Set());
+    if (ctx.has(i)) ctx.delete(i); else ctx.add(i);
+    this.render();
+  }
+
+  // _syncNewPal — mirror _syncDrawer for the New-Palette <dialog>: re-promote to the top layer
+  // after each render (render rebuilds a fresh, closed dialog). Guarded for the headless shim.
+  _syncNewPal() {
+    const d = this.querySelector(".newpal");
+    if (!d || typeof d.showModal !== "function") return;
+    if (this.newPalOpen && !d.open) { try { d.showModal(); } catch { /* not attached yet */ } }
+    else if (!this.newPalOpen && d.open) { try { d.close(); } catch { /* already closed */ } }
+  }
+
+  // samples for A/B = each included palette's vivid identity color, as OKLCH [L,C,H].
+  newPalSamples(view) {
+    const ctx = this.newPalCtx || new Set();
+    const out = [];
+    for (const i of ctx) { const vp = view.palettes[i]; if (vp && vp.key) out.push(hexToOklch(vp.key)); }
+    return out;
+  }
+
+  // the current tab's target: { oklch } for relative/environmental (null if no context), or
+  // { custom:true } for the parametric tab.
+  newPalTarget(view) {
+    if (this.newPalTab === "custom") return { custom: true };
+    const samples = this.newPalSamples(view);
+    if (!samples.length) return null;
+    return { oklch: this.newPalTab === "environmental" ? deriveNeutral(samples) : deriveRelative(this.newPalRel, samples) };
+  }
+
+  // the preview color for the current settings, as a CSS color string (or null). Custom projects a
+  // throwaway 1-palette doc so the swatch matches the engine's vivid identity exactly; A/B use the
+  // derived OKLCH straight (keyCss → an oklch() string the browser renders).
+  _newPalPreviewCss(view) {
+    if (this.newPalTab === "custom") {
+      const c = this.newPalCustom || { hue: 210, chroma: 55 };
+      try {
+        return projectView({ ...this.doc, palettes: [{ name: "_probe", hue: Math.round(c.hue), chroma: Math.round(c.chroma), on: true }] }).palettes[0].key;
+      } catch { return null; }
+    }
+    const t = this.newPalTarget(view);
+    return t && t.oklch ? keyCss(t.oklch) : null;
+  }
+
+  // refresh ONLY the preview swatch in place (no full render) — keeps the Custom sliders smooth
+  // during a drag (a full render would recreate the range input mid-drag).
+  _refreshNewPalPreview() {
+    const sw = this.querySelector(".newpal-sw");
+    if (!sw) return;
+    const css = this._newPalPreviewCss(this._view || projectView(this.doc));
+    sw.style.background = css || "transparent";
+  }
+
+  createNewPalette(view) {
+    const tab = this.newPalTab;
+    const name = "Palette " + (this.doc.palettes.length + 1);
+    let pal;
+    if (tab === "custom") {
+      const c = this.newPalCustom || { hue: 210, chroma: 55 };
+      pal = { name, hue: Math.round(c.hue), chroma: Math.round(c.chroma), skew: 0, lift: 0, hueShift: 0, hueSameDir: false, on: true };
+    } else {
+      const samples = this.newPalSamples(view);
+      if (!samples.length) { this.toast("Pick at least one palette to derive from"); return; }
+      const oklch = tab === "environmental" ? deriveNeutral(samples) : deriveRelative(this.newPalRel, samples);
+      const s = seedFromKeyColor(oklch) || { hue: 200, chroma: 60 };
+      // retain the derived target as the dominant key color so it shows as the palette's anchor.
+      pal = { name, hue: s.hue, chroma: s.chroma, skew: 0, lift: 0, hueShift: 0, hueSameDir: false, keyColors: [{ role: "dominant", oklch: oklch.map(Number) }], on: true };
+    }
+    this.newPalOpen = false; // close on the commit's render (newPalOpen drives _syncNewPal)
+    this.commit((d) => d.palettes.push(pal));
+    this.selectPalette(this.doc.palettes.length - 1);
+    this.toast(tab === "environmental" ? "Neutral palette derived" : tab === "custom" ? "Palette created" : "Palette derived");
+  }
+
+  renderNewPalette(view) {
+    const ps = this.doc.palettes || [];
+    const ctx = this.newPalCtx || new Set();
+    const samples = this.newPalSamples(view);
+    const needsCtx = this.newPalTab !== "custom";
+    const blocked = needsCtx && samples.length === 0;
+    const previewCss = blocked ? null : this._newPalPreviewCss(view);
+    const TABS = [
+      { id: "relative", label: "Relative" },
+      { id: "environmental", label: "Environmental" },
+      { id: "custom", label: "Custom" },
+    ];
+    return h(
+      "dialog",
+      {
+        class: "newpal",
+        "aria-label": "New palette",
+        onclick: (e) => { if (e.target === e.currentTarget) this.closeNewPalette(); },
+        oncancel: (e) => { e.preventDefault(); this.closeNewPalette(); },
+      },
+      h(
+        "div",
+        { class: "drawer-head" },
+        h("h3", {}, icon("plus"), "New palette"),
+        h("div", { class: "spacer" }),
+        btn(icon("x"), { ariaLabel: "Close", onclick: () => this.closeNewPalette() }),
+      ),
+      // "Derive from" strip — tap a chip to include/exclude that palette as context (A/B only).
+      h(
+        "div",
+        { class: "newpal-ctx" + (needsCtx ? "" : " muted") },
+        h("div", { class: "newpal-ctx-head" }, h("b", {}, "Derive from"), h("small", {}, needsCtx ? (samples.length ? samples.length + " selected" : "select at least one") : "not used in Custom")),
+        h(
+          "div",
+          { class: "newpal-chips" },
+          ...ps.map((p, i) => {
+            const vp = view.palettes[i];
+            const on = ctx.has(i);
+            return h(
+              "button",
+              {
+                type: "button",
+                class: "newpal-chip" + (on ? " on" : ""),
+                "aria-pressed": on ? "true" : "false",
+                disabled: needsCtx ? undefined : true,
+                title: p.name + (on ? " — included" : " — excluded"),
+                onclick: () => this._toggleCtx(i),
+              },
+              h("span", { class: "newpal-chip-sw", style: `background:${vp ? vp.key : "#888"}` }),
+              h("span", { class: "newpal-chip-name" }, p.name),
+            );
+          }),
+        ),
+      ),
+      this.segmented(TABS, this.newPalTab, (id) => { this.newPalTab = id; this.render(); }, { ariaLabel: "Derivation mode", cls: "newpal-seg", role: "group", idPrefix: "npt" }),
+      h("div", { class: "newpal-body" }, this._newPalBody(view, samples, blocked)),
+      h(
+        "div",
+        { class: "newpal-foot" },
+        h(
+          "div",
+          { class: "newpal-preview" },
+          h("span", { class: "newpal-sw", style: `background:${previewCss || "transparent"}` }),
+          h("small", {}, blocked ? "Select a palette to derive from" : "Preview"),
+        ),
+        h("div", { class: "spacer" }),
+        btn("Cancel", { onclick: () => this.closeNewPalette() }),
+        btn("Create palette", { variant: "primary", cls: "newpal-create", disabled: blocked, onclick: () => this.createNewPalette(view) }),
+      ),
+    );
+  }
+
+  _newPalBody(view, samples, blocked) {
+    if (this.newPalTab === "relative") {
+      return h(
+        "div",
+        { class: "newpal-rels", role: "radiogroup", "aria-label": "Relationship" },
+        ...RELATIONSHIPS.map((r) => {
+          const on = this.newPalRel === r.id;
+          return h(
+            "button",
+            {
+              type: "button",
+              class: "newpal-rel" + (on ? " on" : ""),
+              role: "radio",
+              "aria-checked": on ? "true" : "false",
+              onclick: () => { this.newPalRel = r.id; this.render(); },
+            },
+            h("b", { class: "newpal-rel-label" }, r.label),
+            h("small", { class: "newpal-rel-hint" }, r.hint),
+          );
+        }),
+      );
+    }
+    if (this.newPalTab === "environmental") {
+      return h(
+        "div",
+        { class: "newpal-env" },
+        h("p", { class: "newpal-note" }, "A neutral environment tone for backgrounds, surfaces, dividers, and system text. Its hue is the chroma-weighted average of the selected palettes — the saturated members set the temperature — at a chroma low enough to still read as grey."),
+        blocked ? false : h("p", { class: "newpal-readout" }, ...this._envReadout(samples)),
+      );
+    }
+    // custom — parametric Hue + Chroma. Dedicated sliders (not this.slider) so they touch
+    // newPalCustom, not the doc/undo stack, and refresh the preview in place (no full render).
+    const c = this.newPalCustom || (this.newPalCustom = { hue: 210, chroma: 55 });
+    const customSlider = (label, key, min, max, fmtFn) => {
+      const readout = h("b", {}, fmtFn(c[key]));
+      return h(
+        "div",
+        { class: "field" },
+        h("label", {}, label, readout),
+        h("input", {
+          type: "range",
+          "data-fk": "npc:" + key,
+          "aria-label": label,
+          min, max, step: 1, value: c[key],
+          oninput: (e) => { const v = parseFloat(e.target.value); c[key] = v; readout.textContent = fmtFn(v); this._refreshNewPalPreview(); },
+        }),
+      );
+    };
+    return h(
+      "div",
+      { class: "newpal-custom" },
+      h("p", { class: "newpal-note" }, "Set the palette's hue and chroma directly. The ramp builds from these the same way every palette does."),
+      customSlider("Hue", "hue", 0, 360, (v) => fmt(v) + "°"),
+      customSlider("Chroma", "chroma", 0, 100, (v) => fmt(v) + "%"),
+    );
+  }
+
+  // _envReadout — the derived neutral's hue + chroma, as a short human line under the description.
+  _envReadout(samples) {
+    const [, C, H] = deriveNeutral(samples);
+    return ["Derived neutral: ", h("b", {}, fmt(H) + "° hue"), ", ", h("b", {}, "chroma " + C.toFixed(3)), " — a tinted grey."];
+  }
+
   // ── center column ────────────────────────────────────────────────────────────
   renderCenter(view) {
     return h(
@@ -1747,7 +1994,7 @@ class HctApp extends HTMLElement {
       btn(icon("minus"), { ariaLabel: "Zoom out", onclick: () => this.zoomBy(-1) }),
       h("span", { class: "zoom-readout", role: "status", "aria-live": "polite", "aria-label": "Zoom level" }, Math.round(this.viewport.zoom * 100) + "%"),
       btn(icon("plus"), { ariaLabel: "Zoom in", onclick: () => this.zoomBy(1) }),
-      btn([icon("plus"), "Palette"], { cls: "add-pal-btn", onclick: () => this.addPalette() }),
+      btn([icon("plus"), "Palette"], { cls: "add-pal-btn", title: "Create a new palette — derive it from your palette set, or pick one custom", onclick: () => this.openNewPalette() }),
       // when the RIGHT pane is collapsed its toggle pops here, at the canvas's right edge.
       !this.panesRight ? this.paneToggle("right") : false,
     );

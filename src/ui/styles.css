@@ -871,6 +871,60 @@ dialog.drawer::backdrop { background: rgba(10,14,22,.34); }
    The group wraps as a UNIT under the meta on a narrow plugin window; its own buttons stay side by side. */
 .drawer-foot .foot-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex-shrink: 0; }
 
+/* ── New-Palette modal — a CENTERED native <dialog> (top layer, like the export drawer) that
+   DERIVES a new palette: a "Derive from" context strip, the relative/environmental/custom tabs,
+   and a live preview. Unlike the drawer it's centered, not edge-pinned. ── */
+dialog.newpal {
+  position: fixed; inset: 0; margin: auto;
+  width: 540px; max-width: 92vw; max-height: 88vh;
+  padding: 0; border: none; border-radius: var(--r-lg);
+  background: var(--panel); color: var(--ink);
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+dialog.newpal:not([open]) { display: none; }
+dialog.newpal::backdrop { background: rgba(10,14,22,.34); }
+.newpal-ctx { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.newpal-ctx.muted { opacity: .5; }
+.newpal-ctx-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.newpal-ctx-head b { font-size: 12px; }
+.newpal-ctx-head small { color: var(--ink-dim); font-size: 11px; }
+.newpal-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.newpal-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 9px 4px 5px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel-2);
+  color: var(--ink-dim); font-size: 11.5px; font-weight: 550;
+}
+.newpal-chip:hover:not(:disabled) { border-color: var(--line-2); color: var(--ink); }
+.newpal-chip.on { border-color: var(--accent); color: var(--ink); background: var(--panel); }
+.newpal-chip:disabled { cursor: default; }
+.newpal-chip-sw { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); flex: none; }
+.newpal-chip.on .newpal-chip-sw { box-shadow: 0 0 0 2px var(--accent); }
+.newpal-seg { margin: 10px 14px 0; }
+.newpal-body { padding: 12px 14px; overflow: auto; flex: 1; min-height: 0; }
+.newpal-rels { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.newpal-rel {
+  display: flex; flex-direction: column; gap: 3px; text-align: left;
+  padding: 9px 11px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+}
+.newpal-rel:hover { border-color: var(--line-2); }
+.newpal-rel.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--panel); }
+.newpal-rel-label { font-size: 12.5px; }
+.newpal-rel-hint { color: var(--ink-dim); font-size: 11px; line-height: 1.4; }
+.newpal-note { color: var(--ink-dim); font-size: 12px; line-height: 1.55; margin: 0 0 10px; }
+.newpal-readout { font-size: 12px; color: var(--ink); margin: 0; }
+.newpal-readout b { font-variant-numeric: tabular-nums; }
+.newpal-custom .field { margin-bottom: 12px; }
+.newpal-foot {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-top: 1px solid var(--line);
+}
+.newpal-preview { display: flex; align-items: center; gap: 8px; }
+.newpal-preview small { color: var(--ink-dim); font-size: 11px; }
+.newpal-sw { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line); background-clip: padding-box; flex: none; }
+
 /* ── responsive toolbars — the plugin window can be narrow; toolbars must never overflow ── */
 /* never break a button's own label across lines (no 3-line "⚑ Add Variables → Figma"). */
 .app-header button, .canvas-header button, .drawer-foot button, .drawer-head button { white-space: nowrap; }

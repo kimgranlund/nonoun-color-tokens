@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 1.30 — 2026-06-25 — "New palette" derivation modal (relative / environmental / custom)
+
+"+ Palette" now opens a centered top-layer **`<dialog class="newpal">`** that **derives** a palette
+instead of dropping a default. A **"Derive from"** strip toggles which existing palettes feed the
+derivation (status palettes — success/warning/error/danger/critical/info — start **excluded**, since
+they carry meaning, not character); each included palette contributes its vivid identity color as an
+OKLCH sample. Three modes (segmented tabs):
+
+- **Relative** — a color-theory relationship over the samples: `extend` (analogous, +30° off the
+  chroma-weighted-mean hue), `complete` (fill the largest open gap), `contrast` (complement, vivid),
+  `bridge` (mediate the two most-separated hues), `anchor` (reinforce the dominant), `recontextualize`
+  (the dominant's muted complement — Albers).
+- **Environmental** — a neutral/environment tone per `color-neutral-derivation.md`: chroma-weighted
+  circular-mean hue + `clamp(0.30·meanC, 0.004, 0.018)` chroma.
+- **Custom** — pick Hue + Chroma directly (the classic parametric seed); needs no context.
+
+Relative/Environmental compute a **target OKLCH** (`engine/derive.mjs`, validated by
+`test/engine/derive.mjs`), seed the palette's hue+chroma from it (`seedFromKeyColor`), and retain the
+target as the palette's **dominant key color**; Custom sets hue+chroma straight. The new palette is
+appended + selected. Pure-additive: no engine/contract/persist-schema change (it composes existing
+machinery). Covered by `(np)` headless assertions (context pre-seed + system exclusion, the three
+modes, the no-context block) and two real-browser smoke checks (centered top-layer dialog, the strip
++ all six relationships).
+
 ## 1.29 — 2026-06-25 — Download-All ships `figma-aliased/` (OD-004 cascade test artifact)
 
 The Download-All `.zip` now includes a **`figma-aliased/`** folder alongside the default `figma/`:
