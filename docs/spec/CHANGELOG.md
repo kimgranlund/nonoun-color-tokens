@@ -38,10 +38,23 @@ palette contributes its vivid identity color as an OKLCH sample. Three modes (se
 Relative/Environmental compute a **target OKLCH** (`engine/derive.mjs`, validated by
 `test/engine/derive.mjs`), seed the palette's hue+chroma from it (`seedFromKeyColor`), and retain the
 target as the palette's **dominant key color**; Custom sets hue+chroma straight. The new palette is
-appended + selected. Pure-additive: no engine/contract/persist-schema change (it composes existing
-machinery). Covered by `(np)` headless assertions (context pre-seed + system exclusion, the three
-modes, the no-context block, header-drag offset + swatch-only chips) and real-browser smoke checks
-(centered top-layer dialog, the strip + all six relationships, swatch-only chips, header-draggable).
+appended + selected.
+
+The body is **two columns**: LEFT = diagrams (a **hue × chroma circle** — every context color and the
+proposed one plotted at angle = hue, radius ∝ chroma normalized to the busiest sample, proposed wears
+an accent ring; 0° top, clockwise — plus the reused **chroma-curve** graph); RIGHT = the segment's
+selection/picker, then a **proposed-palette preview** (a Dominant swatch — plus the Supporting context
+color on Relative — and the full generated ramp). The previews are driven by a single
+**`_newPalProposed`** that PROJECTS the would-be palette (a throwaway `projectView`) — the same object
+`createNewPalette` commits, so the preview is the source of truth. Custom slider drags refresh the
+diagrams + preview **in place** (no full render → the dragged input survives).
+
+Pure-additive: no engine/contract/persist-schema change (it composes existing machinery). Covered by
+`(np)` headless assertions (context pre-seed + system exclusion, the three modes, the no-context
+block, header-drag offset + swatch-only chips, the two-column diagrams + ramp preview, the in-place
+Custom-drag refresh) and real-browser smoke checks (centered top-layer dialog, the strip + all six
+relationships, swatch-only chips, hue circle + chroma curve + ramp on Relative, the Custom picker +
+live preview, header-draggable).
 
 ## 1.29 — 2026-06-25 — Download-All ships `figma-aliased/` (OD-004 cascade test artifact)
 

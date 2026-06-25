@@ -92,9 +92,18 @@ try {
   ok(await evalJS(`${el}.querySelectorAll(".newpal-chip").length >= 1 && ${el}.querySelectorAll(".newpal-rel").length === 6`), "modal shows the context strip + all 6 Relative relationships");
   // swatch-only chips: no inline text, the palette name lives in the title (hover tooltip).
   ok(await evalJS(`(()=>{const c=${el}.querySelector(".newpal-chip");return !!c.getAttribute("title") && c.textContent.trim()===""})()`), "context chips are swatch-only (name in title)");
+  // two-column previews: left = hue circle + chroma curve; right = the proposed-palette ramp.
+  ok(await evalJS(`!!${el}.querySelector(".newpal-hc svg") && ${el}.querySelectorAll(".newpal-diagram").length === 2 && ${el}.querySelector(".newpal-ramp").children.length >= 19`), "Relative tab renders hue circle + chroma curve + ramp preview");
   const npShot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(resolve(OUT, "new-palette.png"), Buffer.from(npShot.data, "base64"));
   console.log("  · screenshot → smoke-out/new-palette.png");
+  // Custom tab: the picker + a live, in-place preview refresh on slider input.
+  await evalJS(`(()=>{${el}.newPalTab="custom";${el}.newPalCustom={hue:300,chroma:70};${el}.render();})()`); await sleep(250);
+  ok(await evalJS(`!!${el}.querySelector(".newpal-custom") && ${el}.querySelector(".newpal-ramp").children.length >= 19`), "Custom tab shows the picker + live palette preview");
+  const npCustomShot = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(resolve(OUT, "new-palette-custom.png"), Buffer.from(npCustomShot.data, "base64"));
+  console.log("  · screenshot → smoke-out/new-palette-custom.png");
+  await evalJS(`(()=>{${el}.newPalTab="relative";${el}.render();})()`); await sleep(200);
   // the modal is draggable by its header — synthesize a header-drag and confirm it offsets.
   await evalJS(`(()=>{const a=${el};a._beginNewPalDrag({clientX:200,clientY:200,target:{},preventDefault(){}});document.dispatchEvent(new PointerEvent('pointermove',{clientX:260,clientY:240}));document.dispatchEvent(new PointerEvent('pointerup',{}));})()`);
   await sleep(120);

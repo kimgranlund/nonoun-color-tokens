@@ -18,7 +18,6 @@ import {
   figmaBundle,
   configFromVariables,
   seedFromKeyColor,
-  keyCss,
   hexToOklch,
   SCRIM_BASES,
   SCRIM_STEPS,
@@ -1781,44 +1780,14 @@ class HctApp extends HTMLElement {
     return { oklch: this.newPalTab === "environmental" ? deriveNeutral(samples) : deriveRelative(this.newPalRel, samples) };
   }
 
-  // the preview color for the current settings, as a CSS color string (or null). Custom projects a
-  // throwaway 1-palette doc so the swatch matches the engine's vivid identity exactly; A/B use the
-  // derived OKLCH straight (keyCss → an oklch() string the browser renders).
-  _newPalPreviewCss(view) {
-    if (this.newPalTab === "custom") {
-      const c = this.newPalCustom || { hue: 210, chroma: 55 };
-      try {
-        return projectView({ ...this.doc, palettes: [{ name: "_probe", hue: Math.round(c.hue), chroma: Math.round(c.chroma), on: true }] }).palettes[0].key;
-      } catch { return null; }
-    }
-    const t = this.newPalTarget(view);
-    return t && t.oklch ? keyCss(t.oklch) : null;
-  }
-
-  // refresh ONLY the preview swatch in place (no full render) — keeps the Custom sliders smooth
-  // during a drag (a full render would recreate the range input mid-drag).
-  _refreshNewPalPreview() {
-    const sw = this.querySelector(".newpal-sw");
-    if (!sw) return;
-    const css = this._newPalPreviewCss(this._view || projectView(this.doc));
-    sw.style.background = css || "transparent";
-  }
-
   createNewPalette(view) {
+    // the preview IS the source of truth — commit the same palette _newPalProposed projected.
+    const proposed = this._newPalProposed(view);
+    if (!proposed) { this.toast("Pick at least one palette to derive from"); return; }
     const tab = this.newPalTab;
     const name = "Palette " + (this.doc.palettes.length + 1);
-    let pal;
-    if (tab === "custom") {
-      const c = this.newPalCustom || { hue: 210, chroma: 55 };
-      pal = { name, hue: Math.round(c.hue), chroma: Math.round(c.chroma), skew: 0, lift: 0, hueShift: 0, hueSameDir: false, on: true };
-    } else {
-      const samples = this.newPalSamples(view);
-      if (!samples.length) { this.toast("Pick at least one palette to derive from"); return; }
-      const oklch = tab === "environmental" ? deriveNeutral(samples) : deriveRelative(this.newPalRel, samples);
-      const s = seedFromKeyColor(oklch) || { hue: 200, chroma: 60 };
-      // retain the derived target as the dominant key color so it shows as the palette's anchor.
-      pal = { name, hue: s.hue, chroma: s.chroma, skew: 0, lift: 0, hueShift: 0, hueSameDir: false, keyColors: [{ role: "dominant", oklch: oklch.map(Number) }], on: true };
-    }
+    const pal = { name, hue: proposed.pal.hue, chroma: proposed.pal.chroma, skew: 0, lift: 0, hueShift: 0, hueSameDir: false, on: true };
+    if (proposed.pal.keyColors) pal.keyColors = proposed.pal.keyColors; // A/B retain the derived dominant
     this.newPalOpen = false; // close on the commit's render (newPalOpen drives _syncNewPal)
     this.commit((d) => d.palettes.push(pal));
     this.selectPalette(this.doc.palettes.length - 1);
@@ -1831,7 +1800,8 @@ class HctApp extends HTMLElement {
     const samples = this.newPalSamples(view);
     const needsCtx = this.newPalTab !== "custom";
     const blocked = needsCtx && samples.length === 0;
-    const previewCss = blocked ? null : this._newPalPreviewCss(view);
+    const proposed = blocked ? null : this._newPalProposed(view); // the would-be palette (projected, uncommitted)
+    const previewCss = proposed ? proposed.hex : null;
     const TABS = [
       { id: "relative", label: "Relative" },
       { id: "environmental", label: "Environmental" },
@@ -1880,7 +1850,18 @@ class HctApp extends HTMLElement {
         ),
       ),
       this.segmented(TABS, this.newPalTab, (id) => { this.newPalTab = id; this.render(); }, { ariaLabel: "Derivation mode", cls: "newpal-seg", role: "group", idPrefix: "npt" }),
-      h("div", { class: "newpal-body" }, this._newPalBody(view, samples, blocked)),
+      // body = two columns: LEFT = diagrams (hue×chroma circle + chroma curve), RIGHT = the
+      // segment's selection/picker + the proposed-palette preview (swatches + ramp).
+      h(
+        "div",
+        { class: "newpal-body" },
+        h(
+          "div",
+          { class: "newpal-cols" },
+          h("div", { class: "newpal-col newpal-col-left" }, ...this._newPalDiagrams(view, proposed)),
+          h("div", { class: "newpal-col newpal-col-right" }, ...this._newPalRight(view, samples, blocked, proposed)),
+        ),
+      ),
       h(
         "div",
         { class: "newpal-foot" },
@@ -1888,7 +1869,7 @@ class HctApp extends HTMLElement {
           "div",
           { class: "newpal-preview" },
           h("span", { class: "newpal-sw", style: `background:${previewCss || "transparent"}` }),
-          h("small", {}, blocked ? "Select a palette to derive from" : "Preview"),
+          h("small", {}, blocked ? "Select a palette to derive from" : "Proposed"),
         ),
         h("div", { class: "spacer" }),
         btn("Cancel", { onclick: () => this.closeNewPalette() }),
@@ -1897,40 +1878,130 @@ class HctApp extends HTMLElement {
     );
   }
 
-  _newPalBody(view, samples, blocked) {
-    if (this.newPalTab === "relative") {
-      return h(
-        "div",
-        { class: "newpal-rels", role: "radiogroup", "aria-label": "Relationship" },
-        ...RELATIONSHIPS.map((r) => {
-          const on = this.newPalRel === r.id;
-          return h(
-            "button",
-            {
-              type: "button",
-              class: "newpal-rel" + (on ? " on" : ""),
-              role: "radio",
-              "aria-checked": on ? "true" : "false",
-              onclick: () => { this.newPalRel = r.id; this.render(); },
-            },
-            h("b", { class: "newpal-rel-label" }, r.label),
-            h("small", { class: "newpal-rel-hint" }, r.hint),
-          );
-        }),
-      );
+  // _newPalProposed — the would-be palette for the current settings, PROJECTED (not committed):
+  // returns { pal, view, vp, hex, target, pos } or null when A/B has no context. `pal` is the
+  // minimal palette object (hue/chroma + keyColors for A/B); `view` is its throwaway projectView
+  // (palettes[0] = vp, carrying .key + .ramp) so the diagrams + ramp render from real engine output.
+  _newPalProposed(view) {
+    const tab = this.newPalTab;
+    let pal, target = null;
+    if (tab === "custom") {
+      const c = this.newPalCustom || { hue: 210, chroma: 55 };
+      pal = { name: "_probe", hue: Math.round(c.hue), chroma: Math.round(c.chroma), on: true };
+    } else {
+      const samples = this.newPalSamples(view);
+      if (!samples.length) return null;
+      target = tab === "environmental" ? deriveNeutral(samples) : deriveRelative(this.newPalRel, samples);
+      const s = seedFromKeyColor(target) || { hue: 200, chroma: 60 };
+      pal = { name: "_probe", hue: s.hue, chroma: s.chroma, on: true, keyColors: [{ role: "dominant", oklch: target.map(Number) }] };
     }
-    if (this.newPalTab === "environmental") {
-      return h(
+    let pv;
+    try { pv = projectView({ ...this.doc, palettes: [pal] }); } catch { return null; }
+    const vp = pv.palettes[0];
+    // the proposed dot's polar position: target hue/chroma for A/B; the rendered identity for Custom.
+    const oklch = target || hexToOklch(vp.key);
+    return { pal, view: pv, vp, hex: vp.key, target, pos: { H: oklch[2], C: oklch[1] } };
+  }
+
+  // LEFT column — the diagrams. The hue×chroma circle places every context color (and the proposed
+  // one) at angle = hue, radius ∝ chroma; the chroma curve reuses the analysis-rail graph.
+  _newPalDiagrams(view, proposed) {
+    return [
+      h(
         "div",
-        { class: "newpal-env" },
+        { class: "newpal-diagram" },
+        h("div", { class: "newpal-diagram-title" }, "Hue × chroma — context + proposed"),
+        this._hueCircle(view, proposed),
+      ),
+      h(
+        "div",
+        { class: "newpal-diagram" },
+        h("div", { class: "newpal-diagram-title" }, "Chroma curve — applied vs ceiling"),
+        proposed ? this.graphChroma(proposed.view, 0) : h("div", { class: "an-empty" }, "—"),
+      ),
+    ];
+  }
+
+  // _hueCircle — a polar plot: 0° at top, clockwise (90° right · 180° bottom · 270° left). Each dot
+  // sits at its hue angle; its distance from centre is its chroma normalized to the busiest sample
+  // (greys fall to the middle, vivids to the rim). The proposed color wears an accent ring.
+  _hueCircle(view, proposed) {
+    const ctx = this.newPalCtx || new Set();
+    const dots = [];
+    for (const i of ctx) {
+      const vp = view.palettes[i];
+      if (!vp || !vp.key) continue;
+      const [, C, H] = hexToOklch(vp.key);
+      dots.push({ H, C, fill: vp.key, on: false });
+    }
+    if (proposed) dots.push({ H: proposed.pos.H, C: proposed.pos.C, fill: proposed.hex, on: true });
+    const SZ = 280, cx = SZ / 2, cy = SZ / 2, R = SZ / 2 - 30;
+    const maxC = Math.max(0.08, ...dots.map((d) => d.C)); // floor so a near-grey-only set still spreads
+    const at = (H, C) => {
+      const rr = R * Math.min(1, C / maxC), a = (H * Math.PI) / 180;
+      return [cx + rr * Math.sin(a), cy - rr * Math.cos(a)];
+    };
+    const dotSvg = dots.map((d) => {
+      const [x, y] = at(d.H, d.C);
+      return d.on
+        ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" class="hc-ring"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" class="hc-dot" fill="${d.fill}"/>`
+        : `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" class="hc-dot" fill="${d.fill}"/>`;
+    }).join("");
+    const svg = `
+      <svg width="${SZ}" height="${SZ}" viewBox="0 0 ${SZ} ${SZ}" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="${cx}" cy="${cy}" r="${R}" class="hc-rim"/>
+        <text x="${cx}" y="13" class="hc-axis" text-anchor="middle">0°</text>
+        <text x="${SZ - 4}" y="${cy + 4}" class="hc-axis" text-anchor="end">90°</text>
+        <text x="${cx}" y="${SZ - 3}" class="hc-axis" text-anchor="middle">180°</text>
+        <text x="4" y="${cy + 4}" class="hc-axis" text-anchor="start">270°</text>
+        ${dotSvg}
+      </svg>`;
+    return h("div", { class: "an-svg newpal-hc", html: svg });
+  }
+
+  // RIGHT column — segment-specific: the selection/picker, then the proposed-palette preview.
+  _newPalRight(view, samples, blocked, proposed) {
+    const pane = h("div", { class: "newpal-pp-host" }, this._newPalPreviewPane(view, proposed));
+    if (this.newPalTab === "relative") return [this._relSelect(), pane];
+    if (this.newPalTab === "environmental") {
+      return [
         h("p", { class: "newpal-note" }, "A neutral environment tone for backgrounds, surfaces, dividers, and system text. Its hue is the chroma-weighted average of the selected palettes — the saturated members set the temperature — at a chroma low enough to still read as grey."),
         blocked ? false : h("p", { class: "newpal-readout" }, ...this._envReadout(samples)),
-      );
+        pane,
+      ];
     }
-    // custom — parametric Hue + Chroma. Dedicated sliders (not this.slider) so they touch
-    // newPalCustom, not the doc/undo stack, and refresh the preview in place (no full render).
+    return [this._customPicker(), pane];
+  }
+
+  // the relationship radio group (a single column inside the right pane).
+  _relSelect() {
+    return h(
+      "div",
+      { class: "newpal-rels", role: "radiogroup", "aria-label": "Relationship" },
+      ...RELATIONSHIPS.map((r) => {
+        const on = this.newPalRel === r.id;
+        return h(
+          "button",
+          {
+            type: "button",
+            class: "newpal-rel" + (on ? " on" : ""),
+            role: "radio",
+            "aria-checked": on ? "true" : "false",
+            onclick: () => { this.newPalRel = r.id; this.render(); },
+          },
+          h("b", { class: "newpal-rel-label" }, r.label),
+          h("small", { class: "newpal-rel-hint" }, r.hint),
+        );
+      }),
+    );
+  }
+
+  // the Custom picker — parametric Hue + Chroma. Dedicated sliders (not this.slider) so they touch
+  // newPalCustom, not the doc/undo stack, and refresh the preview + diagrams in place (no full
+  // render — a full render would recreate the range input mid-drag and kill the native drag).
+  _customPicker() {
     const c = this.newPalCustom || (this.newPalCustom = { hue: 210, chroma: 55 });
-    const customSlider = (label, key, min, max, fmtFn) => {
+    const slider = (label, key, min, max, fmtFn) => {
       const readout = h("b", {}, fmtFn(c[key]));
       return h(
         "div",
@@ -1949,15 +2020,62 @@ class HctApp extends HTMLElement {
       "div",
       { class: "newpal-custom" },
       h("p", { class: "newpal-note" }, "Set the palette's hue and chroma directly. The ramp builds from these the same way every palette does."),
-      customSlider("Hue", "hue", 0, 360, (v) => fmt(v) + "°"),
-      customSlider("Chroma", "chroma", 0, 100, (v) => fmt(v) + "%"),
+      slider("Hue", "hue", 0, 360, (v) => fmt(v) + "°"),
+      slider("Chroma", "chroma", 0, 100, (v) => fmt(v) + "%"),
     );
+  }
+
+  // the proposed-palette preview: a dominant swatch (+ the supporting context color on Relative)
+  // and the full generated ramp — so the user sees the actual colors before committing.
+  _newPalPreviewPane(view, proposed) {
+    if (!proposed) return h("div", { class: "newpal-preview-pane empty" }, h("small", {}, "Select a palette to derive from"));
+    const supp = this.newPalTab === "relative" ? this._dominantContextHex(view) : null;
+    return h(
+      "div",
+      { class: "newpal-preview-pane" },
+      h("div", { class: "newpal-pp-label" }, "Proposed palette"),
+      h(
+        "div",
+        { class: "newpal-pp-swatches" },
+        this._ppSwatch("Dominant", proposed.hex),
+        supp ? this._ppSwatch("Supporting", supp) : false,
+      ),
+      h(
+        "div",
+        { class: "newpal-ramp" },
+        ...proposed.vp.ramp.map((s) => h("i", { class: s.inGamut ? "" : "oog", style: `background:${s.hex}`, title: `${s.stop} · ${s.hex}` })),
+      ),
+    );
+  }
+  _ppSwatch(label, css) {
+    return h("div", { class: "newpal-pp-sw-item" }, h("span", { class: "newpal-pp-sw", style: `background:${css}` }), h("small", {}, label));
+  }
+  // the most-chromatic included palette's key color — the one the relationship is computed against.
+  _dominantContextHex(view) {
+    const ctx = this.newPalCtx || new Set();
+    let best = null, bestC = -1;
+    for (const i of ctx) { const vp = view.palettes[i]; if (!vp || !vp.key) continue; const c = hexToOklch(vp.key)[1]; if (c > bestC) { bestC = c; best = vp.key; } }
+    return best;
   }
 
   // _envReadout — the derived neutral's hue + chroma, as a short human line under the description.
   _envReadout(samples) {
     const [, C, H] = deriveNeutral(samples);
     return ["Derived neutral: ", h("b", {}, fmt(H) + "° hue"), ", ", h("b", {}, "chroma " + C.toFixed(3)), " — a tinted grey."];
+  }
+
+  // _refreshNewPalPreview — recompute the diagrams + preview pane IN PLACE (no full render), so the
+  // Custom sliders stay smooth mid-drag (their input nodes, in the right column, are never touched).
+  _refreshNewPalPreview() {
+    const view = this._view || projectView(this.doc);
+    const blocked = this.newPalTab !== "custom" && this.newPalSamples(view).length === 0;
+    const proposed = blocked ? null : this._newPalProposed(view);
+    const left = this.querySelector(".newpal-col-left");
+    if (left) left.replaceChildren(...this._newPalDiagrams(view, proposed));
+    const host = this.querySelector(".newpal-pp-host");
+    if (host) host.replaceChildren(this._newPalPreviewPane(view, proposed));
+    const sw = this.querySelector(".newpal-sw");
+    if (sw) sw.style.background = proposed ? proposed.hex : "transparent";
   }
 
   // ── center column ────────────────────────────────────────────────────────────

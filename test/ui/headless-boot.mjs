@@ -1113,6 +1113,12 @@ ok(npSamples.length === app.newPalCtx.size && npSamples.every((s) => Array.isArr
 // A. Relative — extend (analogous): yields a target OKLCH; creating appends + retains it as the dominant key.
 app.newPalTab = "relative"; app.newPalRel = "extend"; app.render(); flushRaf();
 ok(app.querySelectorAll(".newpal-rel").length === NP_RELS.length, `(np3) the Relative tab lists all ${NP_RELS.length} relationships (got ${app.querySelectorAll(".newpal-rel").length})`);
+// the two-column previews: hue circle (left) + chroma curve + the proposed ramp & dominant swatch (right).
+ok(!!app.querySelector(".newpal-hc") && app.querySelectorAll(".newpal-diagram").length === 2, "(np3c) left column shows the hue circle + chroma-curve diagrams");
+ok(!!app.querySelector(".newpal-ramp") && app.querySelector(".newpal-ramp").children.length >= 19, "(np3d) right column shows the proposed-palette ramp preview");
+ok(app.querySelectorAll(".newpal-pp-sw").length === 2, "(np3e) Relative preview shows BOTH a dominant + supporting swatch");
+const npProp = app._newPalProposed(npView);
+ok(npProp && npProp.vp && Array.isArray(npProp.vp.ramp) && /^#|^oklch/.test(npProp.hex), "(np3f) _newPalProposed projects a real palette (vp.ramp + identity hex)");
 const npTarget = app.newPalTarget(npView);
 ok(npTarget && Array.isArray(npTarget.oklch) && npTarget.oklch.length === 3, "(np3b) Relative→extend yields a target OKLCH");
 app.createNewPalette(npView); flushRaf();
@@ -1135,6 +1141,16 @@ ok(app.doc.palettes[app.doc.palettes.length - 1].chroma < 30, `(np5c) the neutra
 // C. Custom — parametric hue/chroma, needs NO context.
 app.openNewPalette(); app.newPalTab = "custom"; app.newPalCustom = { hue: 300, chroma: 70 }; app.render(); flushRaf();
 ok(!!app.querySelector(".newpal-custom"), "(np6) the Custom tab shows the hue/chroma sliders");
+ok(!!app.querySelector(".newpal-ramp") && app.querySelectorAll(".newpal-pp-sw").length === 1, "(np6a1) Custom preview shows the ramp + a single (dominant) swatch");
+// a Custom slider drag refreshes the preview IN PLACE without rebuilding the dragged input.
+const npHueInput = findIn(app.querySelector(".newpal-custom"), isRange);
+const npRampBefore = app.querySelector(".newpal-ramp");
+ok(!!npHueInput, "(np6a2) found the Custom hue range input");
+npHueInput.value = "120"; npHueInput.dispatch("input", {});
+ok(app.newPalCustom.hue === 120, "(np6a3) dragging the Custom hue slider updates newPalCustom");
+ok(findIn(app.querySelector(".newpal-custom"), isRange) === npHueInput, "(np6a4) the dragged slider node is NOT rebuilt (smooth drag)");
+ok(app.querySelector(".newpal-ramp") !== npRampBefore, "(np6a5) the preview ramp refreshed in place (new node)");
+app.newPalCustom = { hue: 300, chroma: 70 }; app.render(); flushRaf();
 app.newPalCtx = new Set(); // empty the strip — Custom must not care
 const npBeforeC = app.doc.palettes.length;
 app.createNewPalette(app._view); flushRaf();
