@@ -12,7 +12,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22   # the browser smoke uses node's global WebSocket (stable in 22)
       - run: npm install
       - run: npm run build
       - run: npm test
+      # real-browser smoke: boot the built single-file in the runner's headless Chrome (CDP, no extra
+      # deps) and drive gallery → survey → editor → export dialog. Catches UI regressions the DOM shim can't.
+      - run: npm run smoke
+      - name: Upload smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots
+          path: smoke-out/
+          if-no-files-found: ignore

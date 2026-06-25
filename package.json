@@ -13,7 +13,8 @@
     "gen:surveys": "node scripts/gen-surveys.mjs",
     "build": "npm run gen:figma-assets && npm run gen:surveys && tsc && vite build && npm run bundle && npm run gen:figma-ui",
     "preview": "vite preview",
-    "test": "npm run gen:figma-assets && npm run gen:surveys && npm run bundle && npm run gen:figma-ui && node test/run.mjs"
+    "test": "npm run gen:figma-assets && npm run gen:surveys && npm run bundle && npm run gen:figma-ui && node test/run.mjs",
+    "smoke": "node test/smoke/smoke.mjs"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

@@ -1,6 +1,7 @@
 node_modules/
 dist/
 _site/
+smoke-out/
 .DS_Store
 *.local
 
