@@ -840,9 +840,13 @@ ok(SI.every((c) => c.slug && c.category && c.count === 48 && Array.isArray(c.str
 const TPm = await LS("travel"); // one category lazily loaded
 const TP = TPm.PRESETS;
 ok(Array.isArray(TP) && TP.length === 48, `(hh) travel survey lazily loads 48 presets (got ${TP && TP.length})`);
-ok(TP.every((p) => p.palettes.length === 9), "(hh) each preset has 9 palettes (6 sampled + danger/warning/success)");
-const SLOTS = ["primary-base","primary-muted","secondary-base","secondary-muted","accent-base","accent-muted","danger","warning","success"];
-ok(TP.every((p) => JSON.stringify(p.palettes.map((x) => x.name)) === JSON.stringify(SLOTS)), "(hh) every preset uses the {tier}-{rank} + status naming model, identically");
+ok(TP.every((p) => p.palettes.length === 10), "(hh) each preset has 10 palettes (a derived neutral + 6 sampled + danger/warning/success)");
+const SLOTS = ["neutral","primary-base","primary-muted","secondary-base","secondary-muted","accent-base","accent-muted","danger","warning","success"];
+ok(TP.every((p) => JSON.stringify(p.palettes.map((x) => x.name)) === JSON.stringify(SLOTS)), "(hh) every preset leads with the derived neutral, then the {tier}-{rank} + status model, identically");
+// the leading neutral is DERIVED from the character palettes' key colors (environment tone): a
+// low-chroma tinted grey retaining the derived target as its dominant key color.
+ok(TP.every((p) => { const n = p.palettes[0]; return n.name === "neutral" && n.chroma < 30 && n.keyColors && n.keyColors[0].role === "dominant" && n.keyColors[0].oklch.length === 3; }),
+  "(hh) the derived neutral leads each preset (low chroma + a dominant key color)");
 // names are the PLACE only (no "IV·01 ·" vol-index prefix)
 ok(!TP.some((p) => /^[IVXLC]+·\d/.test(p.name)), "(hh) preset names drop the vol·index prefix (just the place)");
 // presets carry the full controls (a config that OMITS them hydrates to the DARK domain-min, lmax 60,
@@ -850,20 +854,20 @@ ok(!TP.some((p) => /^[IVXLC]+·\d/.test(p.name)), "(hh) preset names drop the vo
 ok(TP.every((p) => p.lmax === 100 && p.lmin === 5 && p.damp === 70 && p.dampAmp === 55 && p.chromaFloor === 40), "(hh) presets carry controls + 'Vivid mids' damping (damp 70, amp 55) + the chroma floor (40)");
 // re-import captures each curated source color as a `dominant` key color (OKLCH), so the preset
 // retains the original palette exactly while the ramp re-derives an even scale from it.
-ok(TP.every((p) => p.palettes.slice(0, 6).every((q) => q.keyColors && q.keyColors.length === 1 && q.keyColors[0].role === "dominant" && Array.isArray(q.keyColors[0].oklch) && q.keyColors[0].oklch.length === 3)),
+ok(TP.every((p) => p.palettes.slice(1, 7).every((q) => q.keyColors && q.keyColors.length === 1 && q.keyColors[0].role === "dominant" && Array.isArray(q.keyColors[0].oklch) && q.keyColors[0].oklch.length === 3)),
   "(hh) every sampled preset palette retains its source color as a dominant key color (OKLCH)");
-// every category lazily loads + holds 48 fully-formed presets (9 palettes each)
+// every category lazily loads + holds 48 fully-formed presets (10 palettes each)
 for (const c of SI) {
   const m = await LS(c.slug);
-  ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === 48 && m.PRESETS.every((p) => p.palettes.length === 9),
-    `(hh) survey "${c.slug}" loads 48 presets × 9 palettes`);
+  ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === 48 && m.PRESETS.every((p) => p.palettes.length === 10),
+    `(hh) survey "${c.slug}" loads 48 presets × 10 palettes`);
 }
 // lift-anchoring (EVEN mode): a LIGHT dominant must open LIGHT, not the old mid-dark L*≈46 grey.
 // This is the "colors look really wrong" fix. Keyed on any preset whose primary-base source is light.
 const { projectView: _pvHH } = await import("../../src/ui/model.mjs");
 const { hydrate: _hydHH } = await import("../../src/ui/persist.js");
-const _light = TP.find((p) => p.palettes[0].keyColors[0].oklch[0] > 0.85);
-const _lightPrime = _pvHH(_hydHH({ ..._light, toneMode: "even" })).palettes[0].ramp.find((s) => s.stop === 550);
+const _light = TP.find((p) => p.palettes[1].keyColors[0].oklch[0] > 0.85); // primary-base (after the neutral at [0])
+const _lightPrime = _pvHH(_hydHH({ ..._light, toneMode: "even" })).palettes[1].ramp.find((s) => s.stop === 550);
 ok(_lightPrime.tone > 72, `(hh) [even] lift anchors the prime to source lightness — a light dominant opens LIGHT (550 L*=${_lightPrime.tone.toFixed(0)})`);
 app.toGallery(); flushRaf();
 // the HUB shows a category card per survey (not the presets directly)
@@ -878,7 +882,7 @@ const setsBeforeHH = app.sets.length;
 const openPreset = TP[0];
 app.openConfigAsSet(openPreset, "Opened");
 ok(app.view === "editor" && app.sets.length === setsBeforeHH + 1, "(hh) opening a preset adds an EDITABLE copy to your sets + enters the editor");
-ok(app.doc.palettes.length === 9 && app.doc.palettes[0].name === "primary-base", "(hh) the opened copy carries the 9 named palettes (primary-base first)");
+ok(app.doc.palettes.length === 10 && app.doc.palettes[0].name === "neutral" && app.doc.palettes[1].name === "primary-base", "(hh) the opened copy carries the 10 named palettes (neutral first, then primary-base)");
 ok(app.doc.palettes.some((p) => p.name === "danger") && app.doc.palettes.some((p) => p.name === "success"), "(hh) the status palettes (danger/warning/success) are present in the copy");
 app.toGallery(); flushRaf();
 ok(app.survey === "travel", "(hh) returning from the editor lands back on the open category page");
@@ -1080,8 +1084,9 @@ ok(app.doc.story && app.doc.story.title === storyPreset.story.title, "(st5) open
 app.setSegment("story"); flushRaf();
 ok(!!app.querySelector(".story-pane"), "(st6) the Story tab renders for a set with a story");
 ok(app.querySelectorAll(".story-color").length >= 1, "(st7) the Story tab lists the curated colors");
-// the Palette tab shows the per-color story line
-app.setSegment("palette"); flushRaf();
+// the Palette tab shows the per-color story line — select a CURATED palette (primary-base, now at
+// index 1 after the derived neutral; the neutral carries no curated story line of its own).
+app.setSegment("palette"); app.selectPalette(1); flushRaf();
 ok(!!app.querySelector(".color-story"), "(st8) the Palette tab shows the curated color's story line");
 // a category page groups its presets by volume
 app.toGallery(); app.search = ""; await app.openSurvey("travel"); flushRaf();
