@@ -87,6 +87,7 @@ try {
   ok(await evalJS(`${el}.view === "editor" && !!${el}.querySelector(".canvas-header")`), "opening a set enters the editor");
   ok(await evalJS(`${el}.querySelectorAll(".ramp-row").length >= 1`), "editor renders palette ramps");
 
+  mkdirSync(OUT, { recursive: true }); // ensure the screenshot dir exists before the first capture
   // drag-to-reorder: a real handle-drag lifts a floating clone (.drag-ghost) and opens a dashed drop
   // placeholder (.drop-ghost) at the landing slot; the source row collapses.
   const dragPt = await evalJS(`(()=>{const h=${el}.querySelector(".drag-handle");if(!h)return null;const r=h.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`);
@@ -105,7 +106,6 @@ try {
   ok(await evalJS(`(()=>{const d=${el}.querySelector("dialog.drawer");return !!d && d.open && Math.round(d.getBoundingClientRect().height) === innerHeight})()`), "export drawer opens as a full-height <dialog>");
   await evalJS(`${el}.toggleDrawer(false)`); await sleep(200);
 
-  mkdirSync(OUT, { recursive: true });
   const shot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(resolve(OUT, "editor.png"), Buffer.from(shot.data, "base64"));
   console.log("  · screenshot → smoke-out/editor.png");
