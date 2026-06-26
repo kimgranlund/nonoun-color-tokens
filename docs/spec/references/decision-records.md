@@ -39,7 +39,7 @@ Format: Context → Decision → Rationale → Consequences → Status.
   library-key UUID) IS a documented path **when the target collection already exists in the file**.
   The original "needs library UUIDs / name-only errors" framing is therefore **softened** — but the
   decision stands: resolved colors remain the always-safe default (import with no preconditions),
-  while the aliased path is conditional on the raw-colors collection pre-existing. Pure name-only
+  while the aliased path is conditional on the Color Primitives collection pre-existing. Pure name-only
   (no `targetVariableSetName`) behavior remains undocumented. Feeds OD-004.
 - **Spike 2026-06-17.** The `rawColl` opt-in already emitted the full name+collection shape
   (`targetVariableName` + `targetVariableSetName`); the export verifier now **asserts both** on every
@@ -106,7 +106,7 @@ Format: Context → Decision → Rationale → Consequences → Status.
   they never collide despite the shared prefix. (Originally raw used `--c_` with an underscore to
   flag raw-vs-semantic; revised to drop the `_` for a cleaner, all-hyphen CSS namespace — the
   digit-vs-word suffix already disambiguates.) Semantic vars reference raw vars via `var(--c-…)`.
-- **Rationale.** Stable lexical sort, exact name matching against the user's `raw-colors`
+- **Rationale.** Stable lexical sort, exact name matching against the user's `Color Primitives`
   collection (which is padded), no ambiguity; the raw/semantic prefix split is self-documenting.
 - **Status.** DECIDED.
 

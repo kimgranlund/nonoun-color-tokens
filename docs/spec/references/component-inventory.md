@@ -304,9 +304,14 @@ a `<div role=button>` (Enter/Space) so `.del` is a real, focusable `<button>`. (
 ### 13 · Ramp-row (composition)
 
 `.ramp-row` `[ .enable · .drag-handle (⋮⋮ via ::before) · .ramp-name · .ramp-strip ]`
-(`styles.css:408-441`; `renderRampsScene` `app.js:1653`). Selectable (`.sel`), reorder-draggable
-(`.drop-before`/`.drop-after`), toggle-able (`.off`). **Flag:** `.enable` and `.drag-handle` are
-`<div>`s with pointer handlers — rich interaction, no keyboard/role.
+(`renderRampsScene` in `app.js`). Selectable (`.sel`) and toggle-able (`.off`). **Reorder is
+ghost-based:** dragging the `.drag-handle` lifts a viewport-fixed clone (`.drag-ghost`) that tracks
+the cursor while the source row collapses and a dashed `.drop-ghost` placeholder opens at the landing
+slot; the drop slot is decided relative to that placeholder with a **10px deadzone** so it doesn't
+jitter from the reflow (`_beginReorder` / `_buildDragGhost` / `_onReorderMove` / `_syncDropFromPlaceholder`).
+`.enable` is now a real `role=button` (Enter/Space-operable); the `.drag-handle` claims the pointer
+(`touch-action:none`). The clone is re-parented to the host, so its `light-dark()` tokens are pinned to
+the canvas preview's `color-scheme`, not the chrome's.
 
 ### 14 · Contrast bar
 
@@ -339,10 +344,16 @@ curve (`styles.css:537-538`; `graphDamping()` `app.js:2419`).
 
 Noted for completeness (the "everything interactive" scope) but they are *patterns*, not primitives:
 
-- **Drawer** `.drawer` + `.drawer-scrim` (`styles.css:662-674`; `renderDrawer` `app.js:2552`) — the
-  Export panel. **Flag:** no documented focus-trap, no `Esc`-to-close wired in CSS/markup, scrim
-  click closes only; not a `role=dialog`.
-- **Toast** `.toast` (`styles.css:733-740`) — transient confirmation; no `aria-live` region.
+- **Export drawer** `dialog.drawer` (`renderDrawer` in `app.js`) — a native `<dialog>` promoted to the
+  browser **top layer** via `showModal()`, so `role=dialog`, focus-trap, `::backdrop`, background-inert,
+  and `Esc`-to-close come for free; open/close is reconciled after each render by `_syncDrawer` (the
+  single source of truth is `exportOpen`). A backdrop click closes it.
+- **New-Palette modal** `dialog.newpal` (`renderNewPalette` in `app.js`) — a centered, **header-draggable**
+  native `<dialog>` (top layer, like the drawer; `_syncNewPal`). Two columns: a hue × chroma circle
+  (`.newpal-hc`) + the reused chroma curve on the left; the derivation selection/picker + a **live
+  proposed-palette preview** (`.newpal-pp-*` swatches + `.newpal-ramp`) on the right. The "Derive from"
+  strip is swatch-only chips. See `knowledge-06-palette-derivation.md`.
+- **Toast** `.toast` — transient confirmation (`role=status`, `aria-live=polite`).
 
 ## Notable absence — Radio
 

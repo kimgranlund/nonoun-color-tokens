@@ -55,7 +55,7 @@ logic was removed; see ADR-003).
 ## 4. Role-table parity
 
 The plugin's `semanticRoles(n)` must equal the artifact's and `gen.js`'s exactly. Validate
-every `{n}/{refKey}` target resolves against the real `raw-colors` variable names (which use
+every `{n}/{refKey}` target resolves against the real `Color Primitives` variable names (which use
 3-digit padding and `500-{step}` scrim suffixes). See `rubrics/parity-checklist.md`.
 
 ## 5. Run instructions and failure modes
