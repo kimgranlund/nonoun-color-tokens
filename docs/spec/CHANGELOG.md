@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 1.37 — 2026-06-26 — spec/reference docs brought current (naming + new features)
+
+A pass over the internal `docs/spec/**` corpus. **Naming:** the Figma collections `raw-colors` /
+`semantic-colors` → **`Color Primitives`** / **`Color Modes`** across SKILL.md, spec-draft, knowledge-05,
+decision-records, and acceptance-criteria (the code already used the new names; the prose lagged).
+**New features:** added **`knowledge-06-palette-derivation.md`** for the "New Palette" engine
+(`derive.mjs`: the six Relative relationships pivoting on the primary, the Environmental neutral, the
+Custom picker, and the modal); indexed it in SKILL.md + spec-draft §16. Updated `component-inventory.md`
+(the Ramp-row reorder is ghost-based; the export drawer is a native top-layer `<dialog>`; added the
+New-Palette modal) and `spec-draft.md` (§4 derive.mjs, §7 data model gains `toneMode`/`vibrancy`/
+`chromaFloor`/`relChroma`/`onColorMode`/`keyColors`/`cuspPull`, §10 Color Modes, §11 the gallery +
+New-Palette + ghost reorder). Docs only; no engine/contract change; all 11 verifiers still pass.
+
 ## 1.36 — 2026-06-25 — reorder drop hit area = the placeholder, with a 10px deadzone
 
 The drop slot is now decided relative to the **placeholder** (the proposed placement), not a fresh

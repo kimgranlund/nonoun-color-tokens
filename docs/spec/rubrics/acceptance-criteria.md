@@ -52,7 +52,7 @@
 ## AC-P · Plugin
 - **AC-P1** Plugin `semanticRoles(n)` is byte-identical in structure to the generator's
   (same 37 keys, same refs).
-- **AC-P2** Every `{n}/{refKey}` binding target exists among real `raw-colors` variable
+- **AC-P2** Every `{n}/{refKey}` binding target exists among real `Color Primitives` variable
   names (including `{n}/500-{step}` scrims).
 - **AC-P3** `code.js` and `manifest.json` parse; `networkAccess` is `none`.
 
@@ -65,4 +65,4 @@
 ## How to run (reference)
 Extract the artifact `<script>` to a file and `node --check` it; replicate the engine via the
 `gen.js` reference generator against `hct.js`; validate JSON leaf shape and cross-check ref
-targets against the role table and `raw-colors` names; `unzip -t` zips. Node v22.
+targets against the role table and `Color Primitives` names; `unzip -t` zips. Node v22.

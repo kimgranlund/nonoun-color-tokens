@@ -86,7 +86,8 @@ keep mode-switching in a dedicated semantic layer.
 | Semantic mapping | the 37-role table | per-stop colors | role→ref mappings + resolved leaves | role table diverges across impls |
 | Export | format serializers | semantic + raw | CSS / JSON / DTCG zip / UI3 | a ref doesn't resolve to a primitive |
 
-Full detail per layer: `references/knowledge-01..05`.
+Full detail per layer: `references/knowledge-01..05`. An auxiliary engine module, `derive.mjs`
+(`knowledge-06`), derives a NEW palette from the existing set (the "New Palette" modal) — pure, no DOM.
 
 ## 5. Color Engine 📐
 See `references/knowledge-01-color-engine.md` and `data/verification-anchors.json`.
@@ -110,7 +111,12 @@ Canonical machine-readable form: `data/role-table.json` (`constants`, `roleTable
 
 ```ts
 interface State {
-  curve: 'linear'|'sine'|'cubic'|'logistic'|'exp';
+  toneMode: 'perceptual'|'even'|'peak';  // ramp distribution (default 'perceptual', knowledge-02)
+  vibrancy: number;         // 0..100   pulls the ramp toward the hue's cusp-anchored center (perceptual)
+  chromaFloor: number;      // 0..100   min chroma (% of ceiling) to kill the near-white dead zone
+  relChroma: boolean;       // harmonize saturation across hues (relative-chroma)
+  onColorMode: 'fixed'|'contrast';  // opt-in WCAG-safe on-colors (default 'fixed', ADR-003 / OD-001)
+  curve: 'linear'|'sine'|'cubic'|'logistic'|'exp';  // 'even' path only
   tension: number;          // 0..100
   lmin: number;             // 0..40
   lmax: number;             // 60..100
@@ -119,11 +125,19 @@ interface State {
   dampAmp: number;          // 0..100   mid-tone chroma amplify (default 0)
   dampBias: number;         // -100..100  light↔dark asymmetry (default 0)
   hueSpace: 'cam16'|'oklch';
-  theme: 'auto'|'light'|'dark';
+  theme: 'system'|'light'|'dark';
   palettes: Palette[];
   selected: number;
+  roleOverrides?: object;   // per-doc semantic ref re-points (canvas Mapping tab)
+  story?: object;           // curated narrative (category presets)
 }
-interface Palette { name: string; hue: number; chroma: number; skew: number; lift: number; hueShift: number /* -60..60 edge hue rotation */; hueSameDir: boolean /* both ends same direction (|s|) vs opposite (s) */; on: boolean; }
+interface Palette {
+  name: string; hue: number; chroma: number; skew: number; lift: number;
+  hueShift: number /* -60..60 edge hue rotation */; hueSameDir: boolean /* both ends same dir (|s|) vs opposite (s) */; on: boolean;
+  cuspPull?: number;        // per-palette override of global vibrancy (perceptual)
+  keyColors?: { role: 'dominant'|'supportive'; oklch: [number, number, number]; name?: string }[]; // retained brand colors, lossless OKLCH; the New-Palette derivation pins its target here
+  colorName?: string; colorRole?: string; description?: string;  // curated story (category presets)
+}
 interface Role { key: string; suffix: string; light: Ref; dark: Ref; }  // Ref = "550" | "500-200"
 interface TokenLeaf { $type:'color'; $value:{colorSpace:'srgb'; components:[number,number,number]; alpha:number; hex:string}; $extensions:object; }
 ```
@@ -141,15 +155,21 @@ Figma DTCG 3-file zip (resolved colors, ADR-002), UI3 Collections (interchange-o
 ADR-007/OD-003). Padding via `pad3`/`refKey` (ADR-006).
 
 ## 10. Figma Plugin 📐
-See `references/knowledge-05-figma-plugin.md`. Binds a `Semantic` collection to `raw-colors`
+See `references/knowledge-05-figma-plugin.md`. Binds the `Color Modes` collection to `Color Primitives`
 by `createVariableAlias` for a true cascade JSON import cannot provide (ADR-002). Same role
-table as the generator (parity).
+table as the generator (parity). (Collections renamed from `semantic-colors` / `raw-colors`.)
 
 ## 11. UI / Interaction 📐
-Live grid (editable name, enable toggle, per-palette hue/chroma/skew/lift sliders); L\*×C
-analysis plot (applied chroma vs gamut ceiling, tone line); contrast readout (vs white/black);
-export dialog with 5 tabs; theme switch (UI only); persistence chain
-`window.storage → localStorage → in-memory` (`hct-palette-state-v1`); `prefers-reduced-motion`.
+A **gallery** hub (Your Palettes + **Color Categories** — 7 curated categories × 48 = 336 presets,
+lazy-loaded) opens a set into the **editor**: a live canvas of palette rows + a right-pane inspector
+(per-palette hue/chroma/cusp-pull/edge-hue/skew/lift, global tonal controls, the 37-role mapping) and a
+left analysis rail (L\*×C plot, tone + chroma curves, contrast readout, hue wheel). **Compose a new
+palette** via the New-Palette modal (`knowledge-06`: Relative / Environmental / Custom + live preview).
+**Reorder** palette rows by dragging the ⋮⋮ handle — a lifted clone + a dashed drop placeholder (10px
+deadzone). Native-`<dialog>` export drawer (top layer; grouped format `<select>`); app-chrome **and**
+canvas-preview color-scheme each follow `system / light / dark`. Persistence chain
+`window.storage → localStorage → in-memory` (`hct-palette-state-v1`), or `figma.clientStorage` in the
+plugin; `prefers-reduced-motion`.
 
 ## 12. What Differentiates This System
 
@@ -173,7 +193,7 @@ designers work in familiar numbers without changing the output color math.
 | Making raw tokens `light-dark()` pairs | re-creates the mirror-coupling that ADR-005 removed; breaks non-mirror roles |
 | Emitting name-only `aliasData` by default | native Figma import errors rather than resolving (ADR-002) |
 | Importing the UI3 schema into the Variables modal | not a verified native format (ADR-007) |
-| Mixing `"50"` and `"050"` refs | sort/lookup bugs; breaks name matching against `raw-colors` (ADR-006) |
+| Mixing `"50"` and `"050"` refs | sort/lookup bugs; breaks name matching against `Color Primitives` (ADR-006) |
 | Editing one implementation only | breaks parity; the artifact already lost `surfaceHighest` once |
 
 ## 14. Open Decisions ⚠️
@@ -183,7 +203,7 @@ designers work in familiar numbers without changing the output color math.
 | OD-001 | On-color contrast vs fixed `050` | DECIDED (override) | accessibility of `on*` on light fills, esp. Warning/dark mode |
 | OD-002 | Surface bases 250/500 as semantic scrims | DEFERRED | scrim role coverage |
 | OD-003 | UI3 Collections schema authenticity | DECIDED (interchange-only) | the `ui3` export's usability |
-| OD-004 | Aliased semantic export without plugin | OPEN — spike implemented (2026-06-17) | The `rawColl` opt-in now emits the FULL documented alias shape (`targetVariableName` + `targetVariableSetName`), **gated by `hpg-export-resolved`** so it can't regress. Still OPEN, NOT decided: the native-import cascade is unvalidated end-to-end (no Figma in CI) and there is no user-facing plugin-free download yet. Validate in real Figma (import with the `raw-colors` collection pre-existing) before exposing it or removing the plugin; the plugin stays the reliable path. |
+| OD-004 | Aliased semantic export without plugin | OPEN — spike implemented (2026-06-17) | The `rawColl` opt-in now emits the FULL documented alias shape (`targetVariableName` + `targetVariableSetName`), **gated by `hpg-export-resolved`** so it can't regress. Still OPEN, NOT decided: the native-import cascade is unvalidated end-to-end (no Figma in CI) and there is no user-facing plugin-free download yet. Validate in real Figma (import with the `Color Primitives` collection pre-existing) before exposing it or removing the plugin; the plugin stays the reliable path. |
 | OD-005 | Palette count beyond the default 8 | DECIDED (2026-06-15) — configurable | Every acceptance criterion is "for every palette", so it generalizes to any count; the validated `capability.system.ui-app` ships a configurable palette set. The 8 defaults are a seed set, NOT a ceiling. |
 
 ## 15. Current Status
@@ -204,6 +224,8 @@ designers work in familiar numbers without changing the output color math.
 | `references/knowledge-03-semantic-system.md` | two layers, 37 roles, on-colors, scrims, surfaces |
 | `references/knowledge-04-export-formats.md` | 5 formats, shapes, Figma import constraints |
 | `references/knowledge-05-figma-plugin.md` | cascade binder, parity, run/failure modes |
+| `references/knowledge-06-palette-derivation.md` | the "New Palette" engine (`derive.mjs`): Relative / Environmental / Custom |
+| `color-neutral-derivation.md` | the neutral/environment rule (hue + max chroma) |
 | `references/decision-records.md` | ADR-001…010 (fenced choices) |
 | `references/glossary.md` | project vocabulary |
 | `data/role-table.json` | canonical 37-role table + defaults + constants |

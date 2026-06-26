@@ -15,6 +15,10 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   perceptual distribution** (`gen-preview.mjs`), so the "perceptually-even" caption holds regardless of
   the default; added a **Compose new palettes** feature bullet (the derivation modal + drag-reorder);
   framed the hero as the perceptual export.
+- **Spec/reference docs brought current** — the Figma collections renamed to `Color Primitives` /
+  `Color Modes` across the `docs/spec/**` prose; a new `knowledge-06-palette-derivation.md` for the
+  "New Palette" engine; `component-inventory.md` + `spec-draft.md` updated for the ghost reorder, the
+  native-`<dialog>` overlays, the gallery, and the evolved data model. (Internal spec; see spec CHANGELOG 1.37.)
 
 ### 2026-06-25
 
