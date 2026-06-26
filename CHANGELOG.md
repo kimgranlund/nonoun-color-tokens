@@ -18,6 +18,13 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   deadzone**, so it only reslots when the cursor moves clearly past the placeholder's edge — no jitter
   from the reflow. The reorder logic (one undo step, selection follows the moved palette) is unchanged.
 
+#### Fixed
+- The drag-reorder **floating clone now resolves its colors in the canvas preview's `color-scheme`**,
+  not the app chrome's. The clone is re-parented to the host for viewport-fixed positioning, so a row
+  dragged while the canvas ◐ preview is the **opposite** mode from the chrome (e.g. light canvas, dark
+  app) previously rendered the clone's `light-dark()` text/surfaces in the wrong mode (light text on
+  the light row). The ghost is now pinned to `resolvedCanvasScheme()`.
+
 ## [1.2.0] — 2026-06-25
 
 Renames **Surveys → Color Categories** (the gallery label *and* the internal code), adds a **color

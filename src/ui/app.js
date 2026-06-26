@@ -2804,6 +2804,12 @@ class HctApp extends HTMLElement {
     const ghost = srcRow.cloneNode(true);
     ghost.classList.add("drag-ghost");
     ghost.classList.remove("sel"); // the lifted clone isn't the selection ring
+    // The ghost is re-parented to the HOST (for viewport-fixed positioning), but the row it clones
+    // lives in the CANVAS — whose color-scheme (the ◐ preview toggle) is independent of the app chrome.
+    // Pin the canvas's resolved scheme on the ghost so its light-dark() tokens (--ink, --panel, …)
+    // resolve in the mode it visually belongs to, not the host's (else a light-canvas row dragged while
+    // the chrome is dark renders dark-mode text on the light row).
+    ghost.style.colorScheme = this.resolvedCanvasScheme();
     ghost.style.width = rect.width + "px";
     ghost.style.height = rect.height + "px";
     ghost.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
