@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 1.41 — 2026-06-26 — Geometry / dimensional generator (the spatial analog of the color & type engines)
+
+The third token system: `src/engine/geometry.mjs` derives a **systematic size ramp** (XS–2XL) and the
+**derived control geometry** from a few params, encoding ONE law and TWO families distilled from the
+agent-ui dimensional spec. The **centering law** — `edge padding = (height − glyph) / 2`, every glyph
+centered in a square cell of side = the control height — generates the slot padding, the slotless `h/2`
+edge, the icon-only square (`min-width = height`), and the pill radius (`height/2`). The **two families**:
+*frame* ∝ height (icon, slot, pad, radius) and *rhythm* ∝ font (`gap = font/2`, `caret = font`); density
+multiplies the rhythm **only** (scaling the frame would un-center the glyph). The six-size ramp is one
+sublinear **power law** sampled six times — `icon = 2.49·h^0.58`, `font ≈ √h` — reproducing the hand-tuned
+reference table (`20·24·28·36·48·64`) to ±1px, so it generalizes to any scaled `baseHeight`. Five
+**treatments** (Comfortable/Compact/Spacious/Touch/Pill) seed density + a radius ladder + the `--space-*`
+layout scale. `geomScale(config)` resolves it; `geomTokensCSS` (custom props + `.control-*` utility
+classes that embody the law — block-size lever, `padding-block: 0`) / `geomTokensDTCG` (W3C `dimension`
+tokens) emit. A 📐 **Geometry modal** picks treatment + base height, shows a **live size ramp** of mock
+controls, and downloads `geometry.css` + `geometry.tokens.json`. The config (`doc.geometry = { treatment,
+baseHeight }`) is persisted (enum + clamped int, roundtrip-safe) and folded into **`brandKit(doc)`** so the
+**Brand-Kit MCP serves geometry too**. Covered by `test/engine/geometry.mjs` (the ramp vs the reference
+table, the centering law per size, the two families, treatments, CSS + DTCG emit), `(geo)` headless (modal
++ ramp + persist + brandKit + `.zip`), and a smoke leg (the rendered mock control on the ramp). This is
+the same law the `design-skills:component-decomposer` skill mechanizes (`bin/geometry-check.py`).
+Next composition step: share the type scale's per-size `font` with the geometry `font` (one number, two
+engines).
+
 ## 1.40 — 2026-06-26 — Typography generator (the type analog of the color engine)
 
 A second token system: `src/engine/type.mjs` derives a **systematic type scale** from a few params,

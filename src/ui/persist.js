@@ -239,6 +239,7 @@ export function hydrate(snapshot) {
     selected,
     roleOverrides: clampOverrides(s.roleOverrides),
     type: clampType(s.type),
+    geometry: clampGeometry(s.geometry),
     palettes,
     ...(typeof s.vol === "string" && s.vol ? { vol: s.vol } : {}),
     ...(story ? { story } : {}),
@@ -255,4 +256,16 @@ function clampType(t) {
   if (!Number.isFinite(bodyBase)) bodyBase = 16;
   bodyBase = Math.max(10, Math.min(32, Math.round(bodyBase)));
   return { treatment, bodyBase };
+}
+
+// clampGeometry — the dimensional config (treatment + base control height). Treatment to a known id, base
+// height to a sane integer range. Identity-preserving for an in-domain value (so the roundtrip gate holds).
+const GEOMETRY_TREATMENTS = ["comfortable", "compact", "spacious", "touch", "pill"];
+function clampGeometry(g) {
+  g = (g && typeof g === "object") ? g : {};
+  const treatment = GEOMETRY_TREATMENTS.includes(g.treatment) ? g.treatment : "comfortable";
+  let baseHeight = Number(g.baseHeight);
+  if (!Number.isFinite(baseHeight)) baseHeight = 28;
+  baseHeight = Math.max(20, Math.min(48, Math.round(baseHeight)));
+  return { treatment, baseHeight };
 }

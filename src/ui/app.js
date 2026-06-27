@@ -29,6 +29,7 @@ import { MCP_BRAND_KIT } from "./mcp-assets.js";
 import { CATEGORY_INDEX, loadCategory } from "./categories/index.js";
 import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.mjs";
 import { typeScale, typeTokensCSS, typeTokensDTCG, TYPE_TREATMENTS, DEFAULT_TYPE } from "../engine/type.mjs";
+import { geomScale, geomTokensCSS, geomTokensDTCG, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
 import { icon, brandMark } from "./icons.js";
 
@@ -315,6 +316,7 @@ class HctApp extends HTMLElement {
     this.applyGateDontShow = false; // the "don't show again" checkbox (transient, reset on open)
     this.settingsOpen = false; // the Settings modal (token-mapping + app prefs)
     this.typeOpen = false; // the Typography modal (type-scale treatment + specimen + export)
+    this.geomOpen = false; // the Geometry modal (dimensional treatment + size ramp + export)
     this.figmaFile = "light"; // which Figma mode file the Figma tab previews/downloads
     this.hover = null; // hovered swatch info for footers
     this.search = "";
@@ -673,6 +675,7 @@ class HctApp extends HTMLElement {
     this._syncApplyGate(); // same, for the Apply-to-Figma consent gate
     this._syncSettings(); // same, for the Settings modal
     this._syncTypography(); // same, for the Typography modal
+    this._syncGeometry(); // same, for the Geometry modal
   }
 
   // _syncDrawer — reconcile the native export <dialog> with this.exportOpen AFTER each render.
@@ -1193,6 +1196,7 @@ class HctApp extends HTMLElement {
       this.renderApplyGate(),
       this.renderSettings(),
       this.renderTypography(),
+      this.renderGeometry(),
       this.toastEl || (this.toastEl = h("div", { class: "toast", role: "status", "aria-live": "polite" })),
     );
   }
@@ -1235,6 +1239,7 @@ class HctApp extends HTMLElement {
       btn(icon("arrow-clockwise"), { cls: "redo-btn", title: "Redo (⇧⌘Z)", ariaLabel: "Redo", disabled: !this.canRedo(), onclick: () => this.redo() }),
       this.themeBtn(),
       btn(icon("type"), { cls: "type-btn", title: "Typography — type scale + treatments", ariaLabel: "Typography", onclick: () => this.openTypography() }),
+      btn(icon("ruler"), { cls: "geom-btn", title: "Geometry — size ramp + dimensional tokens", ariaLabel: "Geometry", onclick: () => this.openGeometry() }),
       btn(icon("gear"), { cls: "settings-btn", title: "Settings — token mapping & preferences", ariaLabel: "Settings", onclick: () => this.openSettings() }),
       btn([icon("plus"), "New"], { onclick: () => this.createSet() }),
       btn([icon("export"), "Export"], { variant: "primary", cls: "export-open-btn", title: "Open export drawer", onclick: () => this.toggleDrawer(true) }),
@@ -4069,6 +4074,118 @@ class HctApp extends HTMLElement {
         btn([icon("download"), "Download type tokens"], { title: "CSS utility classes + DTCG typography tokens, as a .zip", onclick: () => this.downloadTypeTokens() }),
         h("div", { class: "spacer" }),
         btn("Done", { variant: "primary", onclick: () => this.closeTypography() }),
+      ),
+    );
+  }
+
+  // ── Geometry modal (dimensional treatment + live size ramp + export) ──────────────────
+  openGeometry() { this.geomOpen = true; this.render(); }
+  closeGeometry() { this.geomOpen = false; this.render(); }
+  _syncGeometry() {
+    const d = this.querySelector(".geom");
+    if (!d || typeof d.showModal !== "function") return;
+    if (this.geomOpen && !d.open) { try { d.showModal(); } catch { /* not attached */ } }
+    else if (!this.geomOpen && d.open) { try { d.close(); } catch { /* already closed */ } }
+  }
+  // download the resolved geometry tokens (CSS custom props + utility classes + DTCG dimension tokens).
+  downloadGeomTokens() {
+    const scale = geomScale(this.doc.geometry || DEFAULT_GEOMETRY);
+    const files = [
+      { name: "geometry.css", data: geomTokensCSS(scale) },
+      { name: "geometry.tokens.json", data: JSON.stringify(geomTokensDTCG(scale), null, 2) },
+    ];
+    this.downloadBytes(zipStore(files), "geometry-tokens.zip", "application/zip");
+    this.toast("Geometry tokens downloaded");
+  }
+  // a live mock control at one size — a real box on the ramp: leading icon, label, trailing caret, every
+  // dimension (height, the icon square, the gap, the centering-law padding, the pill radius) the real px.
+  _geomSample(scale, name) {
+    const s = scale.sizes[name];
+    if (!s) return false;
+    const box = h(
+      "div",
+      {
+        class: "geom-ctl",
+        style: `height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline-start:${s.padding}px;padding-inline-end:${s.padding}px;border-radius:${s.radiusPill}px`,
+        title: `height ${s.height} · icon ${s.icon} · font ${s.font} · pad ${s.padding} · gap ${s.gap} · radius ${s.radiusPill}`,
+      },
+      h("span", { class: "geom-glyph", style: `width:${s.icon}px;height:${s.icon}px` }),
+      h("span", { class: "geom-ctl-label" }, "Button"),
+      h("span", { class: "geom-caret", style: `width:${s.caret}px;height:${s.caret}px` }, icon("caret-left")),
+    );
+    return h(
+      "div",
+      { class: "geom-line" },
+      h("span", { class: "geom-step" }, `${name} · ${s.height}h`),
+      box,
+      h("span", { class: "geom-readout" }, `icon ${s.icon} · font ${s.font} · pad ${s.padding}`),
+    );
+  }
+  renderGeometry() {
+    const cfg = this.doc.geometry || DEFAULT_GEOMETRY;
+    const scale = geomScale(cfg);
+    const t = GEOMETRY_TREATMENTS.find((x) => x.id === cfg.treatment) || GEOMETRY_TREATMENTS[0];
+    const baseReadout = h("b", {}, scale.baseHeight + "px");
+    return h(
+      "dialog",
+      {
+        class: "geom",
+        "aria-label": "Geometry",
+        onclick: (e) => { if (e.target === e.currentTarget) this.closeGeometry(); },
+        oncancel: (e) => { e.preventDefault(); this.closeGeometry(); },
+      },
+      h(
+        "div",
+        { class: "drawer-head" },
+        h("h3", {}, icon("ruler"), "Geometry"),
+        h("div", { class: "spacer" }),
+        btn(icon("x"), { ariaLabel: "Close geometry", onclick: () => this.closeGeometry() }),
+      ),
+      h(
+        "div",
+        { class: "typo-controls" },
+        h(
+          "div",
+          { class: "field" },
+          h("label", { for: "geom-treatment" }, "Treatment"),
+          h(
+            "select",
+            { id: "geom-treatment", "aria-label": "Treatment", onchange: (e) => this.commit((d) => { d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), treatment: e.target.value, baseHeight: (GEOMETRY_TREATMENTS.find((x) => x.id === e.target.value) || GEOMETRY_TREATMENTS[0]).baseHeight }; }) },
+            ...GEOMETRY_TREATMENTS.map((x) => h("option", { value: x.id, selected: cfg.treatment === x.id ? true : undefined }, x.label)),
+          ),
+        ),
+        h(
+          "div",
+          { class: "field" },
+          h("label", {}, "Base height", baseReadout),
+          h("input", {
+            type: "range", "data-fk": "geom:base", "aria-label": "Base control height",
+            min: 20, max: 48, step: 2, value: scale.baseHeight,
+            oninput: (e) => { baseReadout.textContent = e.target.value + "px"; },
+            onchange: (e) => this.commit((d) => { d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), baseHeight: parseInt(e.target.value, 10) }; }),
+          }),
+        ),
+      ),
+      h("p", { class: "typo-note" }, t.note + " — every glyph centers in a square cell of side = the control height, so edge padding = (height − glyph) / 2. The ramp + paddings are computed, not authored."),
+      h(
+        "div",
+        { class: "geom-specimen" },
+        ...["XS", "SM", "MD", "LG", "XL", "2XL"].map((name) => this._geomSample(scale, name)),
+      ),
+      h(
+        "div",
+        { class: "geom-scales" },
+        h("div", { class: "geom-scale" }, h("b", {}, "Radius"), ...Object.entries(scale.radii).map(([k, v]) =>
+          h("span", { class: "geom-chip" }, h("span", { class: "geom-radius-swatch", style: `border-radius:${Math.min(v, 24)}px` }), `${k} ${v === 9999 ? "pill" : v}`))),
+        h("div", { class: "geom-scale" }, h("b", {}, "Space"), ...Object.entries(scale.space).map(([k, v]) =>
+          h("span", { class: "geom-chip", title: `--space-${k}: ${v}px` }, h("span", { class: "geom-space-bar", style: `width:${Math.max(1, v)}px` }), `${v}`))),
+      ),
+      h(
+        "div",
+        { class: "typo-foot" },
+        btn([icon("download"), "Download geometry tokens"], { title: "CSS custom props + utility classes + DTCG dimension tokens, as a .zip", onclick: () => this.downloadGeomTokens() }),
+        h("div", { class: "spacer" }),
+        btn("Done", { variant: "primary", onclick: () => this.closeGeometry() }),
       ),
     );
   }
