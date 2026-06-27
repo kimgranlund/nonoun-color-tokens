@@ -352,7 +352,8 @@ class HctApp extends HTMLElement {
     this.applyGateOpen = false;
     this.applyGateRebuild = false; // the pending action: false = apply, true = regroup
     this.applyGateDontShow = false; // the "don't show again" checkbox (transient, reset on open)
-    this.settingsOpen = false; // the Settings modal (token-mapping + app prefs)
+    this.settingsOpen = false; // the Settings page (token-mapping + app prefs)
+    this.settingsSection = "mapping"; // which Settings nav item is active (left-nav page layout)
     this.typeOpen = false; // the Typography modal (type-scale treatment + specimen + export)
     this.geomOpen = false; // the Geometry modal (dimensional treatment + size ramp + export)
     this.figmaFile = "light"; // which Figma mode file the Figma tab previews/downloads
@@ -4035,11 +4036,76 @@ class HctApp extends HTMLElement {
       this.segmented(items, value, onSelect, { ariaLabel: title, role: "group", cls: "settings-seg", idPrefix }),
     );
   }
+  // a titled group of setting rows (a sub-section of a Settings page).
+  _settingsGroup(title, rows) {
+    return h("div", { class: "settings-group" }, title ? h("div", { class: "settings-group-title" }, title) : false, ...rows.filter(Boolean));
+  }
 
-  renderSettings() {
+  // The Settings nav model: grouped, labeled sections (the left rail). Each item id → a panel.
+  _settingsNav() {
+    return [
+      { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }] },
+      { group: "App", items: [{ id: "appearance", label: "Appearance" }] },
+      { group: "About", items: [{ id: "about", label: "About" }] },
+    ];
+  }
+
+  // _settingsPanel — the right-content for a nav section: { title, desc, body[] }.
+  _settingsPanel(sec) {
     const d = this.doc;
+    if (sec === "appearance") {
+      const schemes = [{ id: "system", label: "System" }, { id: "light", label: "Light" }, { id: "dark", label: "Dark" }];
+      return {
+        title: "Appearance", desc: "How the editor chrome and the canvas preview render.",
+        body: [this._settingsGroup(null, [
+          this._settingRow("App theme", "The editor chrome. System follows your OS.", schemes, this.theme,
+            (id) => { this.theme = id; this.dataset.theme = id; setColorScheme(id); this.render(); }, "setapptheme"),
+          this._settingRow("Canvas preview", "The scheme the canvas previews in — independent of the chrome.", schemes, this.canvasTheme,
+            (id) => { this.canvasTheme = id; this.render(); }, "setcanvastheme"),
+        ])],
+      };
+    }
+    if (sec === "about") {
+      return {
+        title: "About", desc: "Color Tokens by NONOUN.",
+        body: [h("div", { class: "settings-about" },
+          h("p", {}, "Generate perceptual color palettes, a systematic type scale, and a dimensional geometry system — exported as CSS, DTCG, Tailwind, shadcn, Figma variables, and a downloadable Brand-Kit MCP."),
+          this._settingsGroup(null, [
+            h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("b", {}, "Support"), h("small", {}, "Questions, bugs, or feedback.")), h("span", { class: "settings-meta" }, "support@nonoun.io")),
+            h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("b", {}, "Documentation"), h("small", {}, "Guides and the token-mapping reference.")), h("span", { class: "settings-meta" }, "nonoun.io/docs")),
+          ]),
+        )],
+      };
+    }
+    // mapping (default)
     const accentRef = d.accentRef === "single" ? "single" : "mode";
     const onColorMode = d.onColorMode === "contrast" ? "contrast" : "fixed";
+    return {
+      title: "Token mapping", desc: "How semantic roles resolve and export. These choices travel with the set.",
+      body: [
+        this._settingsGroup("Accent", [
+          this._settingRow(
+            "Primary accent",
+            "How the prime accent role exports. Mode-specific picks the better-contrast stop per scheme; Single uses one mode-agnostic token.",
+            [{ id: "mode", label: "Mode · 550 / 450" }, { id: "single", label: "Single · 500" }],
+            accentRef, (id) => this.commit((doc) => { doc.accentRef = id; }), "setaccent",
+          ),
+          this._settingRow(
+            "On-colors",
+            "Text/icon colors on accent fills. Fixed pins the light tint (050 / 200); Contrast flips to the WCAG-safer end per mode.",
+            [{ id: "fixed", label: "Fixed · 050 / 200" }, { id: "contrast", label: "WCAG contrast" }],
+            onColorMode, (id) => this.commit((doc) => { doc.onColorMode = id; }), "setoncolor",
+          ),
+        ]),
+        h("p", { class: "settings-note" }, "These are resolution-layer mapping choices — they re-point how roles resolve, not the ramps, and apply to every export."),
+      ],
+    };
+  }
+
+  renderSettings() {
+    const sec = this.settingsSection || "mapping";
+    const nav = this._settingsNav();
+    const panel = this._settingsPanel(sec);
     return h(
       "dialog",
       {
@@ -4048,40 +4114,34 @@ class HctApp extends HTMLElement {
         onclick: (e) => { if (e.target === e.currentTarget) this.closeSettings(); },
         oncancel: (e) => { e.preventDefault(); this.closeSettings(); },
       },
+      // left rail: grouped, labeled section nav
       h(
-        "div",
-        { class: "drawer-head" },
-        h("h3", {}, icon("gear"), "Settings"),
-        h("div", { class: "spacer" }),
-        btn(icon("x"), { ariaLabel: "Close settings", onclick: () => this.closeSettings() }),
-      ),
-      h(
-        "div",
-        { class: "settings-body" },
-        h("div", { class: "settings-section-title" }, "Token mapping"),
-        this._settingRow(
-          "Primary accent",
-          "How the prime accent role exports. Mode-specific picks the better-contrast stop per scheme; Single uses one mode-agnostic token.",
-          [{ id: "mode", label: "Mode-specific · 550 / 450" }, { id: "single", label: "Single · 500 / 500" }],
-          accentRef,
-          (id) => this.commit((doc) => { doc.accentRef = id; }),
-          "setaccent",
+        "nav",
+        { class: "settings-nav", "aria-label": "Settings sections" },
+        h("div", { class: "settings-nav-head" }, icon("gear"), h("b", {}, "Settings")),
+        ...nav.map((g) =>
+          h(
+            "div",
+            { class: "settings-nav-group" },
+            h("div", { class: "settings-nav-grouplabel" }, g.group),
+            ...g.items.map((it) =>
+              h("button", {
+                type: "button",
+                class: "settings-nav-item" + (sec === it.id ? " on" : ""),
+                "aria-current": sec === it.id ? "page" : undefined,
+                onclick: () => { this.settingsSection = it.id; this.render(); },
+              }, it.label),
+            ),
+          ),
         ),
-        this._settingRow(
-          "On-colors",
-          "Text/icon colors on accent fills. Fixed pins the light tint (050 / 200); Contrast flips to the WCAG-safer end per mode.",
-          [{ id: "fixed", label: "Fixed · 050 / 200" }, { id: "contrast", label: "WCAG contrast" }],
-          onColorMode,
-          (id) => this.commit((doc) => { doc.onColorMode = id; }),
-          "setoncolor",
-        ),
-        h("p", { class: "settings-note" }, "These are resolution-layer mapping choices — they re-point how roles resolve, not the ramps. They travel with the set and apply to every export."),
       ),
+      // right content: page header + sections
       h(
         "div",
-        { class: "settings-foot" },
-        h("div", { class: "spacer" }),
-        btn("Done", { variant: "primary", onclick: () => this.closeSettings() }),
+        { class: "settings-content" },
+        btn(icon("x"), { cls: "settings-close", ariaLabel: "Close settings", onclick: () => this.closeSettings() }),
+        h("div", { class: "settings-pagehead" }, h("h3", {}, panel.title), h("p", {}, panel.desc)),
+        h("div", { class: "settings-sections", role: "region", "aria-label": panel.title }, ...panel.body),
       ),
     );
   }

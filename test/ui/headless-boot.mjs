@@ -1286,6 +1286,13 @@ app.openSet(app.sets[0].id); flushRaf();
 app.openSettings(); flushRaf();
 ok(app.settingsOpen === true && !!app.querySelector(".settings"), "(set) openSettings shows the Settings <dialog>");
 ok(app.querySelectorAll(".settings-row").length >= 2, "(set) Settings has the token-mapping rows (accent + on-colors)");
+// left-nav page layout: grouped section nav + a page header reflecting the active section
+const txtOfSet = (n) => (n._text || "") + (n.children || []).map(txtOfSet).join("");
+ok(app.querySelectorAll(".settings-nav-item").length >= 3, `(set) Settings has the left section-nav (Mapping/Appearance/About) (got ${app.querySelectorAll(".settings-nav-item").length})`);
+ok((txtOfSet(app.querySelector(".settings-pagehead")) || "").includes("Token mapping"), "(set) the page header reflects the active section (Token mapping)");
+app.settingsSection = "appearance"; app.render(); flushRaf();
+ok((txtOfSet(app.querySelector(".settings-pagehead")) || "").includes("Appearance") && app.querySelectorAll(".settings-row").length >= 2, "(set) switching nav to Appearance swaps the panel (theme + canvas rows)");
+app.settingsSection = "mapping"; app.render(); flushRaf(); // restore for the assertions below
 const { projectView: pvSet } = await import("../../src/ui/model.mjs");
 const primeRefs = (doc) => { const vp = pvSet(doc).palettes[0]; const prime = vp.roles.find((r) => r.suffix === ""); const at = (st) => vp.ramp.find((s) => s.stop === st).hex; return { prime, h550: at(550), h450: at(450), h500: at(500) }; };
 app.commit((d) => { d.accentRef = "mode"; }); flushRaf();
