@@ -8,6 +8,17 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 
 ## [Unreleased]
 
+### 2026-06-27
+
+#### Changed
+- **Settings is now a page, not a toast.** Rebuilt as a left **section-nav** (grouped, labeled — Tokens ·
+  App · About) + a right content area with a page header and label-left / control-right rows, sized like a
+  page (`min(960px, 94vw) × min(85vh, 720px)`). **Tokens › Mapping** holds the accent + on-color mapping;
+  **App › Appearance** surfaces the app-theme and canvas-preview scheme as explicit segmented controls;
+  **About** carries the support contact + docs. First step of the three-system workbench IA — the nav has
+  room to grow (Export defaults, Set identity, Modes & breakpoints) as those land. `(set)` headless covers
+  the nav + panel switching.
+
 ### 2026-06-26
 
 #### Added
