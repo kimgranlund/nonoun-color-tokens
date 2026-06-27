@@ -67,6 +67,10 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const css = T.typeTokensCSS(T.typeScale({ treatment: "product" }));
   ok(css.includes("--font-display:") && css.includes("--type-body-md-size:"), "CSS has font + size custom props");
   ok(/\.type-display-xl\s*\{[^}]*font-size: var\(--type-display-xl-size\)/.test(css), "CSS emits a .type-display-xl utility class");
+  // font family names MUST be QUOTED — a name with a digit ("Source Serif 4") is invalid unquoted in
+  // strict parsers (Safari drops the whole declaration → fallback). luxury uses Source Serif 4.
+  const lux = T.typeTokensCSS(T.typeScale({ treatment: "luxury" }));
+  ok(lux.includes("--font-display: 'Source Serif 4'"), "CSS quotes font family names (digit names like 'Source Serif 4' are invalid unquoted in Safari)");
 }
 
 // ── DTCG emit: fontFamily group + composite typography tokens ──
