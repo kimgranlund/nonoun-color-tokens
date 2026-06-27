@@ -1556,7 +1556,7 @@ class HctApp extends HTMLElement {
       ...ROLES.map(([role, label]) => {
         const fam = scale.fonts[role] || "—";
         const generic = role === "mono" || /mono/i.test(fam) ? "monospace" : /serif/i.test(fam) ? "serif" : "sans-serif";
-        return h("div", { class: "ty-role" }, h("span", { class: "ty-role-k" }, label), h("span", { class: "ty-role-fam", style: `font-family:${fam}, ${generic}` }, fam));
+        return h("div", { class: "ty-role" }, h("span", { class: "ty-role-k" }, label), h("span", { class: "ty-role-fam", style: `font-family:'${fam}', ${generic}` }, fam));
       }),
     );
   }
@@ -2849,7 +2849,7 @@ class HctApp extends HTMLElement {
       const token = `type-${kebab(cat)}-${kebab(step)}`;
       const tt = s.textTransform && s.textTransform !== "none" ? `text-transform:${s.textTransform};` : "";
       const faceStyle =
-        `font-family:${fam}, ${generic};font-size:${s.size}px;line-height:${s.lineHeight}px;` +
+        `font-family:'${fam}', ${generic};font-size:${s.size}px;line-height:${s.lineHeight}px;` +
         `letter-spacing:${s.letterSpacing}px;font-weight:${s.weight};${tt}`;
       const isPara = cat === "Body" && step === "XL";
       return h(
@@ -3477,7 +3477,7 @@ class HctApp extends HTMLElement {
             "div",
             { class: "tyi-font-row" },
             h("span", { class: "tyi-font-role" }, ROLE_LABEL[role] || role),
-            h("span", { class: "tyi-font-name", style: `font-family:${family}, ${generic}` }, family),
+            h("span", { class: "tyi-font-name", style: `font-family:'${family}', ${generic}` }, family),
           );
         }),
       ),
@@ -3530,7 +3530,7 @@ class HctApp extends HTMLElement {
     const main = roles.find((r) => r.suffix === "");
     const onMain = roles.find((r) => r.suffix === "-on-" + sl);
     const hStep = scale.categories["Heading Editorial"].MD, bStep = scale.categories.Body.MD;
-    const fam = (cat) => { const fm = scale.fonts[scale.roleOf[cat]] || "Inter"; const g = /mono/i.test(fm) ? "monospace" : /serif/i.test(fm) ? "serif" : "sans-serif"; return `${fm}, ${g}`; };
+    const fam = (cat) => { const fm = scale.fonts[scale.roleOf[cat]] || "Inter"; const g = /mono/i.test(fm) ? "monospace" : /serif/i.test(fm) ? "serif" : "sans-serif"; return `'${fm}', ${g}`; };
     return h(
       "div",
       { class: "example-card tyi-example", style: "background:" + pick(byKey.surface) },
@@ -4652,7 +4652,7 @@ class HctApp extends HTMLElement {
       "div",
       { class: "typo-line" },
       h("span", { class: "typo-step" }, `${step} · ${s.size}/${s.lineHeight}`),
-      h("div", { class: "typo-sample", style: `font-family:${fam}, ${generic};font-size:${s.size}px;line-height:${s.lineHeight}px;letter-spacing:${s.letterSpacing}px;font-weight:${s.weight};${tt}` }, text),
+      h("div", { class: "typo-sample", style: `font-family:'${fam}', ${generic};font-size:${s.size}px;line-height:${s.lineHeight}px;letter-spacing:${s.letterSpacing}px;font-weight:${s.weight};${tt}` }, text),
     );
   }
   // ── Geometry modal (dimensional treatment + live size ramp + export) ──────────────────

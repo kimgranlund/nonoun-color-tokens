@@ -11,6 +11,14 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-06-27
 
 #### Fixed
+- **Typography fonts now render in Safari (the real "fonts not loading" root cause).** The specimen built
+  inline `font-family` declarations with **unquoted** family names, e.g. `font-family: Source Serif 4, serif`.
+  Per the CSS spec an unquoted family name can't contain a token starting with a digit, so **`Source Serif 4`
+  (the "4") is invalid in Safari** and the declaration drops to the fallback — while **Chrome tolerates it**
+  (which is why the headless-Chrome smoke passed and Safari failed). Every inline-style font-family (the
+  specimen, the inspector, the live example, the analysis card) and the exported CSS custom prop
+  (`--font-*`) now **quote** the family name. A side-by-side isolation page (`scripts/gen-font-test.mjs`)
+  pinned it down: all loading methods work; only the unquoted real-name usage failed in Safari.
 - **Typography fonts now load everywhere — including offline and in the Figma plugin.** The four faces
   (Inter · Inter Tight · Source Serif 4 · JetBrains Mono) are **self-hosted**: their Latin subset is
   inlined as base64 `@font-face` (`src/ui/type-fonts.js`, ~230 KB), injected as a `<style>` when the

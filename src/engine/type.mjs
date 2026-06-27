@@ -106,7 +106,7 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 // utility class per step. Drop-in: `class="type-display-xl"`.
 export function typeTokensCSS(scale) {
   const lines = [":root {"];
-  for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: ${family};`);
+  for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
   for (const [cName, steps] of Object.entries(scale.categories)) {
     for (const [sName, s] of Object.entries(steps)) {
       const p = `--type-${kebab(cName)}-${kebab(sName)}`;
