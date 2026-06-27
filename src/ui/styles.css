@@ -844,6 +844,10 @@ dialog.drawer::backdrop { background: rgba(10,14,22,.34); }
 }
 .drawer-head h3 { margin: 0; font-size: 14px; display: flex; align-items: center; gap: 8px; }
 .drawer-head .spacer { flex: 1; }
+/* systems opt-in: which token systems the Download-All .zip + the Brand-Kit MCP bundle (toggle chips). */
+.drawer-systems { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.drawer-systems-label { font-size: 11.5px; color: var(--ink-dim); font-weight: 600; flex: none; }
+.drawer-systems-note { font-size: 10.5px; color: var(--ink-faint); flex: none; margin-left: auto; }
 /* export-format picker — a grouped <select> (the flat tab row outgrew the drawer at 9 formats). */
 .drawer-format { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .drawer-format label { font-size: 11.5px; color: var(--ink-dim); font-weight: 600; flex: none; }

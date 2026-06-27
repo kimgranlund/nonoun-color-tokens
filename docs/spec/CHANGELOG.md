@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 1.42 — 2026-06-26 — Per-system export opt-in (Color · Typography · Geometry)
+
+The three token systems are now **independently selectable at export**. The export drawer grows an
+**Include** toggle row (Color · Typography · Geometry) that governs the **Download-All `.zip`** and the
+**Brand-Kit MCP** bundle; the format picker also previews **Typography** and **Geometry** (CSS + DTCG)
+directly, so each system is a first-class export, not just a modal-local download. `brandKit(doc, systems)`
+takes an opt-in map and emits only the chosen sections (no arg → all three, the back-compat default);
+`downloadAllZip` gates the colour folders on `color`, adds `typography/` + `geometry/` folders on their
+toggles, and drops the type + dimension DTCG files into `figma/` as importable variables/styles. The
+**MCP server's surface is now presence-driven**: colour tools/resources appear only with palettes,
+`get_type` / `brand://type` only when typography is included, `get_geometry` / `brand://geometry` only
+when geometry is — and the usage guide + startup banner report which systems the kit carries. Covered by
+`test/mcp/brand-kit.mjs` (the opt-in gating on `brandKit`, the new tools/resources end-to-end) and `(mc4–mc10)`
+headless (the toggles, the bundle-size deltas per system, the last-one guard, the Type/Geometry preview tabs).
+
 ## 1.41 — 2026-06-26 — Geometry / dimensional generator (the spatial analog of the color & type engines)
 
 The third token system: `src/engine/geometry.mjs` derives a **systematic size ramp** (XS–2XL) and the

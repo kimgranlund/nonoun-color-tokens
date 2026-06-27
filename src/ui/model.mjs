@@ -181,23 +181,32 @@ export function figmaBundle(doc) {
 }
 
 // brandKit — the resolved brand-kit data the downloadable MCP server (`mcp/brand-kit-server.mjs`) reads:
-// every enabled palette's identity colour + tonal ramp, and its 37 semantic roles resolved for BOTH
-// light & dark. A pure projection (projectView) — the server itself is engine-free and just serves this.
-export function brandKit(doc) {
-  const view = projectView(doc);
-  const on = view.palettes.filter((p) => p.on);
-  const stops = on[0] ? on[0].ramp.map((s) => s.stop) : [];
-  const palettes = on.map((p) => ({
-    name: p.name, slug: slug(p.name), key: p.key,
-    ramp: p.ramp.map((s) => ({ stop: s.stop, hex: s.hex })),
-  }));
-  const roles = {};
-  for (const p of on) {
-    const r = {};
-    for (const role of p.roles) r[role.key] = { light: role.lightHex, dark: role.darkHex };
-    roles[slug(p.name)] = r;
+// every enabled palette's identity colour + tonal ramp, its 37 semantic roles resolved for BOTH light &
+// dark, the typography scale, and the geometry scale. A pure projection (projectView) — the server itself
+// is engine-free and just serves this. `systems` opts each token SYSTEM in/out (Color · Typography ·
+// Geometry); omitted/undefined → all three (the back-compatible default). An omitted system's section is
+// absent from the kit entirely, so the MCP serves only what the user chose to include.
+export function brandKit(doc, systems) {
+  const sys = systems || { color: true, type: true, geometry: true };
+  const kit = { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Color Tokens by NONOUN" };
+  if (sys.color) {
+    const view = projectView(doc);
+    const on = view.palettes.filter((p) => p.on);
+    kit.stops = on[0] ? on[0].ramp.map((s) => s.stop) : [];
+    kit.palettes = on.map((p) => ({
+      name: p.name, slug: slug(p.name), key: p.key,
+      ramp: p.ramp.map((s) => ({ stop: s.stop, hex: s.hex })),
+    }));
+    kit.roles = {};
+    for (const p of on) {
+      const r = {};
+      for (const role of p.roles) r[role.key] = { light: role.lightHex, dark: role.darkHex };
+      kit.roles[slug(p.name)] = r;
+    }
   }
-  return { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Color Tokens by NONOUN", stops, palettes, roles, type: typeScale(doc.type || DEFAULT_TYPE), geometry: geomScale(doc.geometry || DEFAULT_GEOMETRY) };
+  if (sys.type) kit.type = typeScale(doc.type || DEFAULT_TYPE);
+  if (sys.geometry) kit.geometry = geomScale(doc.geometry || DEFAULT_GEOMETRY);
+  return kit;
 }
 
 // WCAG relative-luminance contrast ratio between two [r,g,b] int triples.

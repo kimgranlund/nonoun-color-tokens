@@ -14,10 +14,19 @@ const ROOT = resolve(HERE, "../..");
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
 
-// 1. generate a real brand kit from the default doc
+// 1. generate a real brand kit from the default doc (no systems arg → all three, the back-compat default)
 const kit = brandKit(defaultDocument());
 ok(kit.$schema === "nonoun-brand-kit/1" && kit.palettes.length === 8, `brandKit shape: ${kit.palettes.length} palettes (want 8)`);
 ok(kit.roles.primary && typeof kit.roles.primary.primary.light === "string" && typeof kit.roles.primary.primary.dark === "string", "brandKit resolves the prime accent for light + dark");
+ok(kit.type && kit.geometry, "brandKit() (no arg) includes all three systems (color + type + geometry)");
+
+// opt-in gating: brandKit(doc, systems) includes ONLY the selected systems (the export opt-in contract)
+const colorOnly = brandKit(defaultDocument(), { color: true });
+ok(colorOnly.palettes && !colorOnly.type && !colorOnly.geometry, "brandKit({color}) omits type + geometry");
+const typeOnly = brandKit(defaultDocument(), { type: true });
+ok(!typeOnly.palettes && !typeOnly.roles && typeOnly.type && !typeOnly.geometry, "brandKit({type}) omits colour + geometry");
+const geomOnly = brandKit(defaultDocument(), { geometry: true });
+ok(!geomOnly.palettes && !geomOnly.type && geomOnly.geometry, "brandKit({geometry}) omits colour + type");
 const dir = mkdtempSync(join(tmpdir(), "nonoun-mcp-"));
 const kitPath = join(dir, "brand-kit.json");
 writeFileSync(kitPath, JSON.stringify(kit));
@@ -47,7 +56,16 @@ try {
   notify("notifications/initialized");
 
   const tools = (await rpc("tools/list")).result.tools.map((t) => t.name);
-  ok(["list_palettes", "get_ramp", "resolve_token", "get_semantic", "nearest_token"].every((n) => tools.includes(n)), `tools/list has all 5 (${tools})`);
+  ok(["list_palettes", "get_ramp", "resolve_token", "get_semantic", "nearest_token"].every((n) => tools.includes(n)), `tools/list has all 5 colour tools (${tools})`);
+  ok(tools.includes("get_type") && tools.includes("get_geometry"), `tools/list has get_type + get_geometry (the opted-in systems) (${tools})`);
+
+  const ty = await callTool("get_type", {});
+  ok(ty && ty.categories && ty.categories.Body, "get_type → the typography scale (Body voice present)");
+  const geo = await callTool("get_geometry", {});
+  ok(geo && geo.sizes && geo.sizes.MD && geo.sizes.MD.padding === (geo.sizes.MD.height - geo.sizes.MD.icon) / 2, "get_geometry → the dimensional scale (the centering law holds on the served MD size)");
+
+  const resUris = (await rpc("resources/list")).result.resources.map((r) => r.uri);
+  ok(resUris.includes("brand://type") && resUris.includes("brand://geometry"), `resources/list has brand://type + brand://geometry (${resUris})`);
 
   const pal = await callTool("list_palettes", {});
   ok(Array.isArray(pal) && pal.length === 8 && /^#|^oklch/.test(pal[0].key || ""), "list_palettes → 8 palettes with identity colours");

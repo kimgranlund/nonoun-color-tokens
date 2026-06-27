@@ -11,6 +11,14 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-06-26
 
 #### Added
+- **Per-system export opt-in (Color · Typography · Geometry).** The export drawer gains an **Include**
+  toggle row — choose which token systems go into the **Download-All `.zip`** and the **Brand-Kit MCP**.
+  Color gates every colour format + the palettes/roles; Typography adds `typography/type.{css,tokens.json}`;
+  Geometry adds `geometry/geometry.{css,tokens.json}` (both also dropped into `figma/` as importable
+  variables/styles). The format picker now previews **Typography (CSS/DTCG)** and **Geometry (CSS/DTCG)**
+  directly too. `brandKit(doc, systems)` builds only the opted-in sections, and the **MCP server's surface
+  follows suit** — `get_type` / `brand://type` and `get_geometry` / `brand://geometry` appear only when
+  those systems are included (the colour tools only with palettes).
 - **Geometry / dimensional generator.** The spatial analog of the color & type engines: a few params →
   a systematic size ramp → derived control geometry. A 📐 Geometry modal (header) picks a **treatment**
   (Comfortable, Compact/Dense, Spacious/Airy, Touch/Mobile, Pill/Rounded) + base control height, previews

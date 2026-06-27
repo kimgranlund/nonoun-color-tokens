@@ -579,7 +579,7 @@ ok(app.doc.dampAmp === 55 && app.doc.damp === 70 && app.doc.dampBias === 0, `(r3
 ok(app.history.length - presetHist === 1, "(r4) a preset is ONE undo step");
 // the now-matching chip is marked active
 app.setSegment("global"); flushRaf();
-const onChip = app.querySelectorAll(".chip").filter((b) => b.classList.contains("on"));
+const onChip = app.querySelectorAll(".chip").filter((b) => b.classList.contains("on") && !b.classList.contains("sys-chip"));
 ok(onChip.length === 1 && (onChip[0].getAttribute("title") || "").includes("amplify 55"), `(r5) exactly the matching preset chip is highlighted (got ${onChip.length})`);
 
 // ── (s) Figma Light/Dark export — separate per-mode files + drawer tab ────────────────
@@ -617,6 +617,43 @@ let mcpZip = null; const realDBmcp = app.downloadBytes.bind(app);
 app.downloadBytes = (bytes, name) => { mcpZip = { bytes, name }; };
 app.downloadBrandKitMcp();
 ok(mcpZip && /-mcp\.zip$/.test(mcpZip.name) && mcpZip.bytes && mcpZip.bytes.length > 1000, `(mc3) downloadBrandKitMcp emits a .zip (${mcpZip && mcpZip.name})`);
+
+// systems opt-in: the drawer offers Color/Typography/Geometry toggles governing Download-All + MCP
+app.exportOpen = true; app.exportTab = "css"; app.render(); flushRaf();
+const sysChips = walk(app, (e) => e.tagName === "BUTTON" && e.classList && e.classList.contains("chip") && ["Color", "Typography", "Geometry"].includes(txtOf(e)));
+ok(sysChips.length === 3, `(mc4) the export drawer has the 3 system toggle chips (got ${sysChips.length})`);
+
+const mcView = _pv(app.doc);
+let allZip = null; app.downloadBytes = (b) => { allZip = b; };
+app.exportSystems = { color: true, type: true, geometry: true };
+app.downloadAllZip(mcView); const sizeAll = allZip.length;
+app.exportSystems = { color: true, type: false, geometry: false };
+app.downloadAllZip(mcView); const sizeColor = allZip.length;
+ok(sizeColor < sizeAll, `(mc5) deselecting type+geometry shrinks the Download-All .zip (${sizeColor} < ${sizeAll})`);
+app.exportSystems = { color: false, type: true, geometry: false };
+app.downloadAllZip(mcView); const sizeType = allZip.length;
+ok(sizeType > 0 && sizeType !== sizeColor, `(mc6) a type-only bundle differs from a colour-only bundle (${sizeType} vs ${sizeColor})`);
+
+// the guard: the LAST selected system cannot be turned off
+app.exportSystems = { color: false, type: true, geometry: false };
+app.toggleExportSystem("type");
+ok(app.exportSystems.type === true, "(mc7) toggleExportSystem keeps at least one system selected");
+
+// the Typography / Geometry format tabs preview their OWN tokens (not the colour formats)
+app.exportSystems = { color: true, type: true, geometry: true };
+app.exportTab = "type-css"; app.render(); flushRaf();
+ok((txtOf(app.querySelector(".drawer-pre")) || "").includes(".type-"), "(mc8) the Type·CSS format tab previews the type tokens");
+app.exportTab = "geom-css"; app.render(); flushRaf();
+ok((txtOf(app.querySelector(".drawer-pre")) || "").includes(".control-"), "(mc9) the Geometry·CSS format tab previews the geometry tokens");
+
+// the MCP .zip reflects the opt-in: a colour-only kit has no type/geometry in brand-kit.json
+app.exportSystems = { color: true, type: false, geometry: false };
+let mcpColorOnly = null; app.downloadBytes = (b, n) => { mcpColorOnly = { b, n }; };
+app.exportTab = "config"; app.render(); flushRaf();
+app.downloadBrandKitMcp();
+ok(mcpColorOnly && /-mcp\.zip$/.test(mcpColorOnly.n), "(mc10) the Brand-Kit MCP download honours the systems opt-in");
+app.exportSystems = { color: true, type: true, geometry: true }; // restore default
+
 app.downloadBytes = realDBmcp;
 app.exportOpen = false; app.render(); flushRaf();
 
@@ -954,11 +991,14 @@ ok(zb[0] === 0x50 && zb[1] === 0x4b && zb[2] === 0x03 && zb[3] === 0x04, "(ee) t
 const eocd = zb.length - 22; // EOCD has no trailing comment → it's the final 22 bytes
 const eocdSig = zb[eocd] === 0x50 && zb[eocd + 1] === 0x4b && zb[eocd + 2] === 0x05 && zb[eocd + 3] === 0x06;
 const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
-ok(eocdSig && entries === 15, `(ee) the EOCD reports 15 entries — one per format folder + config + the figma-aliased/ cascade variant (3 files + README) (got ${entries})`);
+// default opt-in = all three systems on: 10 colour files + 4 figma-aliased + 3 typography (incl. figma/) +
+// 3 geometry (incl. figma/) + the config = 21 entries.
+ok(eocdSig && entries === 21, `(ee) the EOCD reports 21 entries — colour (10) + figma-aliased (4) + typography (3) + geometry (3) + config (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
 const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "nonoun-color-tokens-my-set-config.json",
-  "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt"];
-ok(wantPaths.every((p) => zipText.includes(p)), "(ee) every format folder + the config + the figma-aliased/ cascade variant is present in the archive");
+  "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt",
+  "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.tokens.json"];
+ok(wantPaths.every((p) => zipText.includes(p)), "(ee) every colour format + typography/ + geometry/ + the config + the figma-aliased/ cascade variant is present in the archive");
 // the aliased variant carries com.figma.aliasData (the cascade); the default figma/ does not (ADR-002 resolved).
 ok(zipText.includes("com.figma.aliasData") && zipText.includes("Color Primitives"), "(ee) figma-aliased/ carries com.figma.aliasData targeting Color Primitives (the OD-004 cascade variant)");
 

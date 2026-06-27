@@ -1,18 +1,24 @@
 # Brand-Kit MCP
 
 A **zero-dependency** [MCP](https://modelcontextprotocol.io/) server that serves a **Color Tokens by
-NONOUN** brand kit (your generated color tokens) to AI agents — **Claude Code / Claude Design, Cursor,
+NONOUN** brand kit (your generated design tokens) to AI agents — **Claude Code / Claude Design, Cursor,
 VS Code, ChatGPT**, anything that speaks MCP. The agent then builds with your brand's *exact* tokens
-instead of guessing a colour.
+instead of guessing.
 
-> Status: **spike / proof-of-concept.** The server + data shape are real and tested; the in-app
-> "Download Brand-Kit MCP" packaging (the per-brand `.zip`) is the next step.
+The kit can carry up to **three token systems** — **Color**, **Typography**, and **Geometry** — and you
+choose which to include when you download it (the export drawer's *Include* toggles). The server's
+surface reflects what's present: the colour tools/resources appear only with palettes, `get_type` /
+`brand://type` only when typography is included, `get_geometry` / `brand://geometry` only when geometry is.
+
+> Status: **shipped.** The in-app export drawer's **Download Brand-Kit MCP** packages this server +
+> your opted-in tokens as a ready-to-run `.zip`. Tested end-to-end (`test/mcp/brand-kit.mjs`).
 
 ## Files
 
 - `brand-kit-server.mjs` — the server. Pure Node, **no `npm install`**.
-- `brand-kit.json` — your resolved tokens (produced by `brandKit(doc)` — palettes, ramps, and the 37
-  semantic roles resolved for light + dark). The server reads this sibling file.
+- `brand-kit.json` — your resolved tokens (produced by `brandKit(doc, systems)` — the opted-in palettes +
+  37 semantic roles (light + dark), the typography scale, and/or the geometry scale). The server reads
+  this sibling file.
 
 ## Run it
 
@@ -37,10 +43,12 @@ claude mcp add brand-kit -- node /abs/path/to/brand-kit-server.mjs
 
 ## What it exposes
 
-**Resources** — `brand://kit` (full), `brand://palettes`, `brand://semantic/light`,
-`brand://semantic/dark`, `brand://guide`.
+**Resources** — `brand://kit` (full), `brand://guide`, plus (per included system) `brand://palettes` ·
+`brand://semantic/light` · `brand://semantic/dark` (Color), `brand://type` (Typography),
+`brand://geometry` (Geometry).
 
-**Tools**
+**Tools** (the colour tools listed only when palettes are present; `get_type` / `get_geometry` only when
+those systems are included)
 | tool | does |
 |---|---|
 | `list_palettes` | the palettes + their identity colour |
@@ -48,9 +56,11 @@ claude mcp add brand-kit -- node /abs/path/to/brand-kit-server.mjs
 | `resolve_token(palette, role, scheme)` | the hex for a semantic role in `light`/`dark` (role can be `"palette/role"`) |
 | `get_semantic(scheme)` | all 37 roles per palette resolved for a scheme |
 | `nearest_token(hex)` | the brand token closest to a hex (reuse the system, don't invent a colour) |
+| `get_type` | the typography scale — treatment, fonts, and the per-voice size ramp |
+| `get_geometry` | the geometry scale — the size ramp, the centering law, radius + spacing |
 
 **Prompt** — `apply_brand`: how to apply the kit (surfaces from `*/surface*`, accents from the prime
-roles, text from `*/on*`, never raw hex).
+roles, text from `*/on*`; the type voices; the geometry size ramp + centering law; never raw values).
 
 ## Protocol
 

@@ -125,6 +125,40 @@ function ensureAppTheme() {
   document.head.appendChild(style);
 }
 
+// ── typography web fonts (lazy) ─────────────────────────────────────────────────
+// The Typography treatments name four highly-rated, free Google Fonts — Inter, Inter
+// Tight (geometric sans), Source Serif 4 (high-contrast serif), and JetBrains Mono.
+// Loaded LAZILY (only when the Typography modal first opens, not on every boot) as a
+// single css2 stylesheet so the specimen renders in the REAL faces instead of falling
+// back to the system stack. The weight range 400..900 covers every weight the engine
+// emits (400 / 450 / 500 / 600 / 700 / 800 / 900 across the treatments); `display=swap`
+// keeps the specimen visible (fallback) while the fonts stream in. Offline (the Figma
+// single-file bundle has no network) the link simply fails and the generic fallbacks in
+// _typeSample hold — so this never blocks, it only upgrades fidelity where there's a net.
+const TYPE_FONTS_LINK_ID = "nonoun-type-fonts";
+const TYPE_FONTS_HREF =
+  "https://fonts.googleapis.com/css2?family=Inter:wght@400..900" +
+  "&family=Inter+Tight:wght@400..900" +
+  "&family=Source+Serif+4:wght@400..900" +
+  "&family=JetBrains+Mono:wght@400..800&display=swap";
+function ensureTypeFonts() {
+  if (typeof document === "undefined" || !document.head) return;
+  if (document.getElementById(TYPE_FONTS_LINK_ID)) return; // inject exactly once
+  // preconnect to the Google Fonts hosts so the stylesheet + the font binaries start sooner.
+  for (const [href, crossorigin] of [["https://fonts.googleapis.com", false], ["https://fonts.gstatic.com", true]]) {
+    const pre = document.createElement("link");
+    pre.rel = "preconnect";
+    pre.href = href;
+    if (crossorigin) pre.crossOrigin = "anonymous";
+    document.head.appendChild(pre);
+  }
+  const link = document.createElement("link");
+  link.id = TYPE_FONTS_LINK_ID;
+  link.rel = "stylesheet";
+  link.href = TYPE_FONTS_HREF;
+  document.head.appendChild(link);
+}
+
 // setColorScheme — flip the document's color-scheme so EVERY light-dark() token —
 // the generated --c-* chrome tokens included — resolves to the chosen mode. "system" maps to
 // "light dark" so the browser follows the OS prefers-color-scheme.
@@ -301,6 +335,9 @@ class HctApp extends HTMLElement {
     this.theme = "system"; // app chrome color scheme: system (follows OS) | light | dark
     this.exportOpen = false;
     this.exportTab = "css";
+    // which token SYSTEMS the Download-All .zip + the Brand-Kit MCP bundle (export-time opt-in, all on
+    // by default). Color = the palettes/roles + every colour format; Type/Geometry = their CSS + DTCG.
+    this.exportSystems = { color: true, type: true, geometry: true };
     // New-Palette modal (a native <dialog>, like the export drawer). newPalCtx = Set of context
     // palette indices to derive from (initialized on open: all non-system palettes on).
     this.newPalOpen = false;
@@ -3548,8 +3585,24 @@ class HctApp extends HTMLElement {
       ["CSS", [["css", "Hex"], ["oklch", "OKLCH"]]],
       ["Frameworks", [["tailwind", "Tailwind v4"], ["shadcn", "shadcn/ui"]]],
       ["Design tools", [["figma", "Figma"], ["ui3", "Figma UI3"], ["dtcg", "DTCG"], ["json", "JSON"]]],
+      ["Typography", [["type-css", "Type · CSS"], ["type-dtcg", "Type · DTCG"]]],
+      ["Geometry", [["geom-css", "Geometry · CSS"], ["geom-dtcg", "Geometry · DTCG"]]],
       ["Project", [["config", "Config"]]],
     ];
+    // the per-system token output for the Typography / Geometry format tabs (the colour formats live on
+    // view.exports). Computed from the same engines the modals + the Brand-Kit MCP use.
+    const typeSc = typeScale(this.doc.type || DEFAULT_TYPE);
+    const geomSc = geomScale(this.doc.geometry || DEFAULT_GEOMETRY);
+    const SYSTEM_CODE = {
+      "type-css": () => typeTokensCSS(typeSc),
+      "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc), null, 2),
+      "geom-css": () => geomTokensCSS(geomSc),
+      "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc), null, 2),
+    };
+    const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG" };
+    // the systems currently opted into the Download-All + MCP bundle (for the footer summary).
+    const SYS_LABEL = { color: "Color", type: "Typography", geometry: "Geometry" };
+    const included = ["color", "type", "geometry"].filter((k) => this.exportSystems[k] !== false).map((k) => SYS_LABEL[k]).join(" · ");
     // The three Figma mode files: [stateKey, label, real filename to import as].
     const FIGMA = [
       ["light", "Light", "Light_tokens.json"],
@@ -3563,7 +3616,9 @@ class HctApp extends HTMLElement {
       ? JSON.stringify(serialize(this.doc), null, 2) // the parametric doc — re-importable via the gallery's ⬆ Import
       : isFigma
         ? view.exports.figma[this.figmaFile]
-        : view.exports[this.exportTab];
+        : SYSTEM_CODE[this.exportTab]
+          ? SYSTEM_CODE[this.exportTab]()
+          : view.exports[this.exportTab];
     const bytes = new Blob([code]).size;
 
     // A native <dialog>: showModal() (see _syncDrawer) promotes it to the browser TOP LAYER —
@@ -3588,6 +3643,24 @@ class HctApp extends HTMLElement {
         h("div", { class: "spacer" }),
         btn(icon("x"), { ariaLabel: "Close export drawer", onclick: () => this.toggleDrawer(false) }),
       ),
+        // Systems opt-in: which token systems the Download-All .zip + the Brand-Kit MCP bundle. Color
+        // gates every colour format + the palettes/roles; Type/Geometry add their CSS + DTCG. The
+        // single-format preview below is unaffected (pick any format to inspect/copy it directly).
+        h(
+          "div",
+          { class: "drawer-systems" },
+          h("span", { class: "drawer-systems-label" }, "Include"),
+          ...[["color", "Color"], ["type", "Typography"], ["geometry", "Geometry"]].map(([k, label]) =>
+            chip(label, {
+              mode: "interactive",
+              on: this.exportSystems[k] !== false,
+              cls: "sys-chip",
+              title: `Include the ${label} system in Download-All & the Brand-Kit MCP`,
+              onclick: () => this.toggleExportSystem(k),
+            }),
+          ),
+          h("span", { class: "drawer-systems-note" }, "in Download-All & MCP"),
+        ),
         h(
           "div",
           { class: "drawer-format" },
@@ -3673,7 +3746,7 @@ class HctApp extends HTMLElement {
         h(
           "div",
           { class: "drawer-foot" },
-          h("span", { class: "meta" }, `${(bytes / 1024).toFixed(1)} KB · ${isFigma ? figCur[2] : isConfig ? "re-importable config" : tokenCount(this.doc) + " tokens"}`),
+          h("span", { class: "meta" }, `${(bytes / 1024).toFixed(1)} KB · ${isFigma ? figCur[2] : isConfig ? "re-importable config" : SYSTEM_LABEL[this.exportTab] || tokenCount(this.doc) + " tokens"} · Download-All: ${included}`),
           // Footer actions kept in ONE group so they never split across rows: the foot is
           // flex-wrap and .meta has flex:1, so as separate children Download all wrapped below
           // Apply. As a single .foot-actions child they stay together (Apply left, Download right).
@@ -3691,42 +3764,79 @@ class HctApp extends HTMLElement {
               : false,
             // (Regroup moved to the Figma tab's sub-bar, beside the Binder plugin button.)
             // ONE download action — every format in its own folder + the config, as a single .zip.
-            btn([icon("download"), "Download All"], { variant: "primary", title: "Download every format (css-hex, css-oklch, json, dtcg, figma, ui3) in its own folder + the config, as one .zip", onclick: () => this.downloadAllZip(view) }),
+            btn([icon("download"), "Download All"], { variant: "primary", title: `Download the selected systems (${included}) — each format in its own folder + the re-importable config, as one .zip`, onclick: () => this.downloadAllZip(view) }),
           ),
         ),
     );
   }
 
-  // downloadAllZip — ONE archive with every format in its own folder + the re-importable config at the
-  // root. Built with the dependency-free store-only ZIP writer (zip.mjs) so it works offline / in the
-  // Figma sandbox. Folders mirror the formats: css-hex / css-oklch / json / dtcg / figma / ui3.
+  // toggleExportSystem — flip one token system (color/type/geometry) in the Download-All + MCP opt-in.
+  // Keeps at least one system selected (an all-off bundle is degenerate).
+  toggleExportSystem(k) {
+    const on = this.exportSystems[k] !== false;
+    if (on && ["color", "type", "geometry"].filter((s) => this.exportSystems[s] !== false).length <= 1) {
+      this.toast("Keep at least one system selected");
+      return;
+    }
+    this.exportSystems = { ...this.exportSystems, [k]: !on };
+    this.render();
+  }
+
+  // downloadAllZip — ONE archive with every SELECTED system's formats in its own folder + the
+  // re-importable config at the root. Built with the dependency-free store-only ZIP writer (zip.mjs) so
+  // it works offline / in the Figma sandbox. Colour folders (css-hex / css-oklch / json / dtcg / figma /
+  // ui3 / tailwind / shadcn) ride `systems.color`; `typography/` + `geometry/` ride their toggles; the
+  // figma/ folder also gets the type + dimension token files (importable as Figma variables/styles).
   downloadAllZip(view) {
     const s = slug(this.doc.name || "palette");
+    const sys = this.exportSystems;
     const ex = view.exports;
-    const files = [
-      { name: `css-hex/${s}.css`, data: ex.css },
-      { name: `css-oklch/${s}.css`, data: ex.oklch },
-      { name: `json/${s}.json`, data: ex.json },
-      { name: `dtcg/${s}.tokens.json`, data: ex.dtcg },
-      { name: "figma/Light_tokens.json", data: ex.figma.light },
-      { name: "figma/Dark_tokens.json", data: ex.figma.dark },
-      { name: "figma/palette.tokens.json", data: ex.figma.raw },
-      { name: `ui3/${s}.json`, data: ex.ui3 },
-      { name: `tailwind/${s}.css`, data: ex.tailwind },
-      { name: `shadcn/${s}.css`, data: ex.shadcn },
-      { name: `nonoun-color-tokens-${s}-config.json`, data: JSON.stringify(serialize(this.doc), null, 2) },
-    ];
-    // figma-aliased/ — the SAME tokens, but the Light/Dark leaves carry com.figma.aliasData targeting
-    // the "Color Primitives" collection (figmaBundle). For TESTING plugin-free import / the live cascade
-    // (OD-004, unverified end-to-end). The default figma/ files (resolved) always import; the plugin is
-    // the reliable cascade. See figma-aliased/README.txt.
-    const aliased = this.figmaBundle();
-    files.push(
-      { name: "figma-aliased/palette.tokens.json", data: JSON.stringify(aliased["palette.tokens.json"], null, 2) },
-      { name: "figma-aliased/Light_tokens.json", data: JSON.stringify(aliased["Light_tokens.json"], null, 2) },
-      { name: "figma-aliased/Dark_tokens.json", data: JSON.stringify(aliased["Dark_tokens.json"], null, 2) },
-      { name: "figma-aliased/README.txt", data: ALIASED_README },
-    );
+    const files = [];
+    if (sys.color) {
+      files.push(
+        { name: `css-hex/${s}.css`, data: ex.css },
+        { name: `css-oklch/${s}.css`, data: ex.oklch },
+        { name: `json/${s}.json`, data: ex.json },
+        { name: `dtcg/${s}.tokens.json`, data: ex.dtcg },
+        { name: "figma/Light_tokens.json", data: ex.figma.light },
+        { name: "figma/Dark_tokens.json", data: ex.figma.dark },
+        { name: "figma/palette.tokens.json", data: ex.figma.raw },
+        { name: `ui3/${s}.json`, data: ex.ui3 },
+        { name: `tailwind/${s}.css`, data: ex.tailwind },
+        { name: `shadcn/${s}.css`, data: ex.shadcn },
+      );
+      // figma-aliased/ — the SAME tokens, but the Light/Dark leaves carry com.figma.aliasData targeting
+      // the "Color Primitives" collection (figmaBundle). For TESTING plugin-free import / the live cascade
+      // (OD-004, unverified end-to-end). The default figma/ files (resolved) always import; the plugin is
+      // the reliable cascade. See figma-aliased/README.txt.
+      const aliased = this.figmaBundle();
+      files.push(
+        { name: "figma-aliased/palette.tokens.json", data: JSON.stringify(aliased["palette.tokens.json"], null, 2) },
+        { name: "figma-aliased/Light_tokens.json", data: JSON.stringify(aliased["Light_tokens.json"], null, 2) },
+        { name: "figma-aliased/Dark_tokens.json", data: JSON.stringify(aliased["Dark_tokens.json"], null, 2) },
+        { name: "figma-aliased/README.txt", data: ALIASED_README },
+      );
+    }
+    if (sys.type) {
+      const tsc = typeScale(this.doc.type || DEFAULT_TYPE);
+      const tDtcg = JSON.stringify(typeTokensDTCG(tsc), null, 2);
+      files.push(
+        { name: "typography/type.css", data: typeTokensCSS(tsc) },
+        { name: "typography/type.tokens.json", data: tDtcg },
+        { name: "figma/type.tokens.json", data: tDtcg }, // importable as Figma text styles (via a tokens plugin)
+      );
+    }
+    if (sys.geometry) {
+      const gsc = geomScale(this.doc.geometry || DEFAULT_GEOMETRY);
+      const gDtcg = JSON.stringify(geomTokensDTCG(gsc), null, 2);
+      files.push(
+        { name: "geometry/geometry.css", data: geomTokensCSS(gsc) },
+        { name: "geometry/geometry.tokens.json", data: gDtcg },
+        { name: "figma/dimension.tokens.json", data: gDtcg }, // importable as Figma number/dimension variables
+      );
+    }
+    // the re-importable parametric config — ALWAYS (it carries the colour + type + geometry params).
+    files.push({ name: `nonoun-color-tokens-${s}-config.json`, data: JSON.stringify(serialize(this.doc), null, 2) });
     const bytes = zipStore(files);
     this.downloadBytes(bytes, `nonoun-color-tokens-${s}.zip`, "application/zip");
   }
@@ -3976,7 +4086,7 @@ class HctApp extends HTMLElement {
   }
 
   // ── Typography modal (type-scale treatment + live specimen + export) ──────────────────
-  openTypography() { this.typeOpen = true; this.render(); }
+  openTypography() { ensureTypeFonts(); this.typeOpen = true; this.render(); }
   closeTypography() { this.typeOpen = false; this.render(); }
   _syncTypography() {
     const d = this.querySelector(".typo");
@@ -4308,7 +4418,7 @@ class HctApp extends HTMLElement {
   // server (inlined from mcp/), THEIR resolved tokens (brandKit), a setup README, and a package.json.
   // `node brand-kit-server.mjs` (or `claude mcp add`) and an agent can query the brand's exact tokens.
   downloadBrandKitMcp() {
-    const kit = brandKit(this.doc);
+    const kit = brandKit(this.doc, this.exportSystems);
     const base = slug(kit.name) || "brand-kit";
     const pkg = JSON.stringify(
       { name: "nonoun-brand-kit", version: "0.1.0", type: "module", description: `MCP server for the "${kit.name}" brand kit (Color Tokens by NONOUN)`, bin: { "brand-kit-mcp": "brand-kit-server.mjs" }, private: true },

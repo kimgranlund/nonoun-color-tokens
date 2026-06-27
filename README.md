@@ -48,7 +48,8 @@ collections.
   lazy-loaded.
 - **Exports.** CSS (Hex or **OKLCH**), **Tailwind v4**, **shadcn/ui**, **Figma** variables,
   **Figma UI3** (Material), **DTCG**, **JSON**, a re-importable parametric **Config**, and a
-  **Download-all `.zip`** of every format.
+  **Download-all `.zip`**. An **Include** toggle row picks which token systems — **Color · Typography ·
+  Geometry** — ride the Download-All `.zip` and the Brand-Kit MCP.
 - **Typography.** The type analog of the color engine — a few params → a **systematic type scale**
   (Display · Heading · Body · UI), with derived size (modular scale), optical letter-spacing, leading, and
   weight. Pick a **treatment** (Lifestyle, Luxury, Editorial, Technical, Brutalist), preview a live
@@ -58,9 +59,9 @@ collections.
   square, and the slot paddings all fall out of it). Pick a **treatment** (Comfortable, Compact, Spacious,
   Touch, Pill), preview a live size ramp, export **CSS + DTCG** `dimension` tokens.
 - **Brand-Kit MCP.** Download a **zero-dependency MCP server** pre-filled with your tokens — point
-  **Claude Code / Cursor / any MCP agent** at it (`node brand-kit-server.mjs`) and it serves your
-  palettes, ramps, and the resolved 37-role semantic layer (light + dark) so the agent builds with your
-  exact tokens. See `mcp/`.
+  **Claude Code / Cursor / any MCP agent** at it (`node brand-kit-server.mjs`) and it serves the
+  **systems you opted in** (palettes, ramps + the 37-role semantic layer in light + dark; the typography
+  scale; the geometry scale) so the agent builds with your exact tokens. See `mcp/`.
 - **System / light / dark.** The app chrome and the canvas preview each follow the OS by default
   (sun · moon · system toggles); the chrome dogfoods the very tokens the tool generates.
 
