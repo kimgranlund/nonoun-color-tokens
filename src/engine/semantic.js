@@ -70,7 +70,7 @@ export function refKey(ref) {
 }
 
 /**
- * Build the canonical 49-role semantic table for a palette.
+ * Build the canonical 53-role semantic table for a palette.
  * @param {string} paletteName lowercase palette name (e.g. "primary")
  * @returns {{ key: string, suffix: string, light: string, dark: string }[]}
  */
