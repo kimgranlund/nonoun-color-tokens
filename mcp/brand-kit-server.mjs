@@ -4,7 +4,7 @@
 // ChatGPT — anything that speaks MCP. Pure Node, no `npm install` — just `node brand-kit-server.mjs`.
 //
 // It reads a sibling `brand-kit.json` (the resolved tokens, produced by "Color Tokens by NONOUN") and
-// exposes the palettes, the perceptual ramps, and the resolved 37-role semantic layer (light + dark) as
+// exposes the palettes, the perceptual ramps, and the resolved 53-role semantic layer (light + dark) as
 // MCP resources + tools + a usage prompt, so an agent builds with the brand's EXACT tokens instead of
 // guessing a colour.
 //

@@ -4033,7 +4033,7 @@ class HctApp extends HTMLElement {
     );
   }
 
-  // Roles panel — the 37-role table for the selected palette: key · suffix · the
+  // Roles panel — the 53-role table for the selected palette: key · suffix · the
   // light ref swatch + the dark ref swatch · plus a small live semantic preview.
   renderRolesInspector(view) {
     const idx = this.selectedIndex();

@@ -8,7 +8,7 @@ single-file build, served straight from GitHub Pages. (It's the very same `.html
 local build; download it and it runs offline from `file://`.)
 
 A perceptual color-palette and **design-token** generator. It builds tonal ramps that are visually
-even across their whole range, derives a **37-role semantic layer** (surfaces, on-colors, outlines,
+even across their whole range, derives a **53-role semantic layer** (surfaces, on-colors, outlines,
 containers, scrims, inverse), and exports to **CSS, Tailwind v4, shadcn/ui, Figma, DTCG, JSON** and
 more — plus a one-click `.zip` of everything.
 
@@ -38,7 +38,7 @@ collections.
   on your primary), an **Environmental** neutral (the set's chroma-weighted-mean hue at a restrained
   chroma), or a **Custom** pick (a native color picker, or hue + chroma) — with a hue × chroma plot and a
   live ramp preview before you commit. Drag palettes by their handle to reorder.
-- **37-role semantic layer.** From each palette the engine derives the full role set — accents,
+- **53-role semantic layer.** From each palette the engine derives the full role set — accents,
   on-colors, surfaces (dim/bright/low/high), outlines, containers, scrims, and inverse — resolved for
   **Light and Dark** in one pass.
 - **Gallery + Color Categories.** Keep your own sets under **Your Palettes**, or browse **Color
@@ -60,7 +60,7 @@ collections.
   Touch, Pill), preview a live size ramp, export **CSS + DTCG** `dimension` tokens.
 - **Brand-Kit MCP.** Download a **zero-dependency MCP server** pre-filled with your tokens — point
   **Claude Code / Cursor / any MCP agent** at it (`node brand-kit-server.mjs`) and it serves the
-  **systems you opted in** (palettes, ramps + the 37-role semantic layer in light + dark; the typography
+  **systems you opted in** (palettes, ramps + the 53-role semantic layer in light + dark; the typography
   scale; the geometry scale) so the agent builds with your exact tokens. See `mcp/`.
 - **System / light / dark.** The app chrome and the canvas preview each follow the OS by default
   (sun · moon · system toggles); the chrome dogfoods the very tokens the tool generates.
@@ -92,7 +92,7 @@ npm test           # regenerates the build artifacts, then runs every verifier +
 ```
 
 The test suite is the real coverage — pure-`node` verifiers per layer (engine round-trips, tonal-curve
-fidelity, the OKHSL ↔ sRGB module, the 37-role table vs. the canonical answer key, the export formats,
+fidelity, the OKHSL ↔ sRGB module, the 53-role table vs. the canonical answer key, the export formats,
 the Figma raw→semantic cascade, persistence round-trip) plus a DOM-shim boot
 (`test/ui/headless-boot.mjs`) that drives the real `app.js` — gallery, color categories, editor, exports —
 without a browser.

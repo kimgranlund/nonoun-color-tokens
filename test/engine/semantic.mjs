@@ -4,7 +4,7 @@
 // Exit 0=pass / 1=fail; validate.py mints the signal from this status.
 //
 // Module ESM contract (./semantic.js):
-//   semanticRoles(paletteName) -> [{ key, suffix, light, dark }]   (37 rows)
+//   semanticRoles(paletteName) -> [{ key, suffix, light, dark }]   (53 rows)
 //   refKey(ref) -> padded ref ("50"->"050", "500-200"->"500-200")
 import { readFileSync } from "node:fs";
 import * as S from "../../src/engine/semantic.js";

@@ -38,13 +38,15 @@ The non-obvious do/don'ts (each one is a real trap in this repo), then a worked 
   (line ~132) and `references/decomposition.md`; `docs/spec/CHANGELOG.md` entries (which say "37"); OD/ADR
   decision records ("37 (not 51)"); and color-data files (e.g. `nature.json`). Those record what WAS true at
   a point in time. Bumping them rewrites history and destroys the cautionary tale.
-- **Stale comment drift exists and is NOT a gate.** `src/engine/exports.js` (lines ~146/203/355/356/468,
-  mixed 37/49), `src/ui/model.mjs` (lines ~191/337/458/482, "37"), `src/ui/app.js:4036` ("37-role"),
-  `figma/binder/bind-plan.mjs` (lines 11/43, "49"), and the `semanticRoles` docstring (`semantic.js:73`,
-  "49-role") carry stale `37`/`49` numbers in PROSE. They don't fail tests. Note `src/ui/mcp-assets.js` is
-  GENERATED from `mcp/brand-kit-server.mjs` + `mcp/README.md` (regenerate with `npm run gen:mcp-assets` after
-  editing the `mcp/` sources — never hand-edit the generated file). Fix the comment in any file you touch;
-  don't go on a global hunt that risks touching a historical count.
+- **Stale comment drift is real and is NOT a gate.** The per-palette role count is repeated in PROSE across
+  the emitters (`src/engine/exports.js`), `src/ui/model.mjs`, `src/ui/app.js`, `figma/binder/bind-plan.mjs`,
+  the MCP server + `mcp/README.md`, and the root `README.md` — none of which a test checks, so they silently
+  rot to the OLD count. After a count change, SWEEP them deliberately (a classified grep is safe; the danger
+  is only a careless one): `git grep -nE "\b<oldcount>\b" -- src test mcp '*.md' | grep -iE "role|semantic"`,
+  fix the CURRENT-state hits, then re-grep to confirm only historical references remain. `src/ui/mcp-assets.js`
+  is GENERATED from `mcp/brand-kit-server.mjs` + `mcp/README.md` — regenerate with `npm run gen:mcp-assets`
+  (also run by `npm test`); never hand-edit it. (This very skill must not hardcode the stale line numbers — a
+  list of "lines that say 37" is itself fossil-prone; the grep is the durable form.)
 
 ### Refs and shape
 

@@ -188,7 +188,7 @@ export function figmaBundle(doc) {
 }
 
 // brandKit — the resolved brand-kit data the downloadable MCP server (`mcp/brand-kit-server.mjs`) reads:
-// every enabled palette's identity colour + tonal ramp, its 37 semantic roles resolved for BOTH light &
+// every enabled palette's identity colour + tonal ramp, its 53 semantic roles resolved for BOTH light &
 // dark, the typography scale, and the geometry scale. A pure projection (projectView) — the server itself
 // is engine-free and just serves this. `systems` opts each token SYSTEM in/out (Color · Typography ·
 // Geometry); omitted/undefined → all three (the back-compatible default). An omitted system's section is
@@ -334,7 +334,7 @@ export function projectView(doc) {
   const controls = controlsOf(doc);
   const allPalettes = doc.palettes ?? [];
 
-  // Per-palette: the display ramp (19 STOPS), its 37 resolved roles, and the
+  // Per-palette: the display ramp (19 STOPS), its 53 resolved roles, and the
   // L*xC plot points (applied chroma vs gamut ceiling along the tone line).
   const palettes = [];
   const plot = [];
@@ -455,7 +455,7 @@ function round2(x) {
 // appThemeCSS — the FIXED app-theme stylesheet: exportCSS over the 8 default
 // palettes (NOT the user's edited document, so the chrome stays stable while
 // editing). This is the dogfooding hook — the same `exportCSS` the tool ships to
-// users generates the `--{n}-{stop}` raw vars + 37 `--c-{n}{suffix}` semantic
+// users generates the `--{n}-{stop}` raw vars + 53 `--c-{n}{suffix}` semantic
 // roles per palette that the app's own styles.css then consumes as design tokens.
 // Injected once on boot as <style id="nonoun-color-tokens-theme"> (see app.js).
 export function appThemeCSS() {
@@ -479,9 +479,10 @@ export function appThemeCSS() {
 // app-footer "{tokens} tokens" readout). Counts only enabled palettes.
 export function tokenCount(doc) {
   const enabled = (doc.palettes ?? []).filter((p) => p.on !== false).length;
-  // per palette: 25 solids (EXPORT_STOPS) + scrims (SCRIM_BASES × SCRIM_STEPS) + 37 semantic --c-*.
-  // Derived from the engine constants so it can't drift (the old hard-coded 3 * 7 was stale).
-  return enabled * (EXPORT_STOPS.length + SCRIM_BASES.length * SCRIM_STEPS.length + 37);
+  // per palette: 25 solids (EXPORT_STOPS) + scrims (SCRIM_BASES × SCRIM_STEPS) + the semantic --c-* roles.
+  // Derived from the engine (semanticRoles) so it can't drift — a hard-coded literal here had gone stale
+  // at 37 while the role set grew to 53. The count is palette-name-independent, so any name resolves it.
+  return enabled * (EXPORT_STOPS.length + SCRIM_BASES.length * SCRIM_STEPS.length + semanticRoles("primary").length);
 }
 
 // Re-exports the app needs from the core (so app.js imports one module).

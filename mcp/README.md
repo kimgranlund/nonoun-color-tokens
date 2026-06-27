@@ -17,7 +17,7 @@ surface reflects what's present: the colour tools/resources appear only with pal
 
 - `brand-kit-server.mjs` — the server. Pure Node, **no `npm install`**.
 - `brand-kit.json` — your resolved tokens (produced by `brandKit(doc, systems)` — the opted-in palettes +
-  37 semantic roles (light + dark), the typography scale, and/or the geometry scale). The server reads
+  53 semantic roles (light + dark), the typography scale, and/or the geometry scale). The server reads
   this sibling file.
 
 ## Run it
@@ -54,7 +54,7 @@ those systems are included)
 | `list_palettes` | the palettes + their identity colour |
 | `get_ramp(palette)` | a palette's full tonal ramp (stop → hex) |
 | `resolve_token(palette, role, scheme)` | the hex for a semantic role in `light`/`dark` (role can be `"palette/role"`) |
-| `get_semantic(scheme)` | all 37 roles per palette resolved for a scheme |
+| `get_semantic(scheme)` | all 53 roles per palette resolved for a scheme |
 | `nearest_token(hex)` | the brand token closest to a hex (reuse the system, don't invent a colour) |
 | `get_type` | the typography scale — treatment, fonts, and the per-voice size ramp |
 | `get_geometry` | the geometry scale — the size ramp, the centering law, radius + spacing |

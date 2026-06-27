@@ -40,7 +40,7 @@ function targetName(paletteName, ref) {
 
 /**
  * Every raw-colors variable name the binder aliases across the given palettes.
- * For each palette, each of its 49 roles contributes BOTH its light and its dark target.
+ * For each palette, each of its 53 roles contributes BOTH its light and its dark target.
  * @param {string[]} paletteNames lowercase palette names
  * @returns {string[]} de-duped, lexicographically sorted target names
  */

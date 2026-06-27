@@ -143,7 +143,7 @@ function enabledPalettes(state) {
 
 // derivePalette — everything an emitter needs for one palette, computed once:
 //   slug, the 25 solid stops keyed by pad3, a stop->rgb lookup, the 11 scrims,
-//   the 37 resolved semantic roles, and a ref->rgb resolver shared by all formats.
+//   the 53 resolved semantic roles, and a ref->rgb resolver shared by all formats.
 function derivePalette(palette, controls, overrides) {
   const n = slug(palette.name);
   const ctl = {
@@ -352,8 +352,8 @@ export function exportJSON(state) {
 // 4. Figma DTCG — exactly the 3 named files
 // ──────────────────────────────────────────────────────────────────────────────
 // palette.tokens.json  -> RAW collection (mode Value): 25 solids + 11 scrims per palette.
-// Light_tokens.json    -> SEMANTIC (mode Light): 37 roles RESOLVED to the LIGHT ref's color.
-// Dark_tokens.json     -> SEMANTIC (mode Dark):  37 roles RESOLVED to the DARK  ref's color.
+// Light_tokens.json    -> SEMANTIC (mode Light): 53 roles RESOLVED to the LIGHT ref's color.
+// Dark_tokens.json     -> SEMANTIC (mode Dark):  53 roles RESOLVED to the DARK  ref's color.
 //
 // opts.rawColl branch (ADR-002):
 //   BLANK/undefined -> NO semantic leaf carries com.figma.aliasData (resolved-only;
@@ -465,7 +465,7 @@ function roleOklch(end) {
 // 7. TAILWIND (v4 `@theme`)
 // ──────────────────────────────────────────────────────────────────────────────
 // The ramps ARE a Tailwind color scale: every stop -> --color-{n}-{stop} (oklch),
-// so `bg-{n}-500` / `text-{n}-50` work. The 37 semantic roles emit as
+// so `bg-{n}-500` / `text-{n}-50` work. The 53 semantic roles emit as
 // --color-{n}{suffix} with a light-dark() value, so `bg-{n}` / `text-surface` flip
 // automatically (needs `color-scheme: light dark` on a root — noted in the header).
 export function exportTailwind(state) {

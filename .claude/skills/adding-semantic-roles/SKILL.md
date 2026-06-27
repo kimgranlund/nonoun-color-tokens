@@ -36,8 +36,8 @@ colors→containers→surfaces→scrims); and on-color roles can be **re-pointed
 1. **`src/engine/semantic.js`** — add the `role(...)` call(s) in the right group, matching the
    light/dark ref grammar of its neighbours. If adding scrims, extend `SCRIM_STRENGTH_STEPS` +
    `SCRIM_SUFFIXES` + `SCRIM_KEYS` together (they index in lockstep, weakest→strongest). Bump the
-   **header count comment** (line 1 "the 53 semantic token roles"). The `semanticRoles` docstring
-   (line ~73 "49-role") is STALE prose — fix it to match while you're here, but it is not a gate.
+   **header count comment** (line 1 "the N semantic token roles") AND the `semanticRoles` docstring just
+   above the function — both state the count in prose (not gated; bump them so the file doesn't drift).
 2. **`docs/spec/data/role-table.json`** — the canonical ANSWER KEY. It has **no generator** (there is no
    `gen:role-table` script) — hand-edit `roleTable` (the primary-palette rows: `key`/`suffix`/`light`/`dark`,
    same ORDER as semantic.js) and bump `rolesPerPalette`. `test/engine/semantic.mjs`'s `refs-canonical`
@@ -69,8 +69,11 @@ emitters map over each palette's resolved `roles`, so a new role emits a leaf au
 Mapping canvas + the MCP brand-kit likewise. **EXCEPTION — ShadCN:** `exportShadcn` (exports.js ~504) maps a
 FIXED `SHADCN_ORDER` over a curated suffix-lookup `MAP`, NOT all roles. A new role neither breaks ShadCN nor
 appears in it — surface it there only by deliberately wiring it into `MAP`, and that is a design choice, not
-a gate. (Several emitter/model/bind-plan files carry STALE `37`/`49` prose in comments — fix the comment in
-a file you touch; don't hunt globally, you'd risk a historical count.)
+a gate. (The per-palette count also recurs in PROSE across the emitters, `model.mjs`, `app.js`,
+`bind-plan.mjs`, the MCP server + READMEs, and the root `README.md`. After a count change, sweep them:
+`git grep -nE "\b<oldcount>\b" -- src test mcp '*.md' | grep -iE "role|semantic"`, fix the current-state
+hits, LEAVE the historical (CHANGELOG, decision-records, the "36 vs 37" anecdote, docs/spec history,
+color-data) — see `references/best-practices.md`.)
 
 ## Validate (draft → check → fix → re-check)
 
