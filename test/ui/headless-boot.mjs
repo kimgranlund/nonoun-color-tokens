@@ -1278,6 +1278,27 @@ app.commit((d) => { d.type = { treatment: "product", bodyBase: 16 }; }); // rest
 app.closeTypography(); flushRaf();
 ok(app.typeOpen === false, "(ty) closeTypography dismisses the modal");
 
+// ── (geo) Geometry modal: treatment + base height → live size ramp + dimension-token download ──
+app.openGeometry(); flushRaf();
+ok(app.geomOpen === true && !!app.querySelector(".geom"), "(geo) openGeometry shows the Geometry <dialog>");
+ok(app.querySelectorAll(".geom-line").length === 6, "(geo) the specimen shows the 6-step ramp (XS..2XL)");
+const { geomScale: gScale } = await import("../../src/engine/geometry.mjs");
+const { brandKit: bkGeo } = await import("../../src/ui/model.mjs");
+app.commit((d) => { d.geometry = { treatment: "spacious", baseHeight: 40 }; }); flushRaf();
+const gsc = gScale(app.doc.geometry);
+ok(gsc.treatment === "spacious" && gsc.baseHeight === 40, `(geo) treatment + base apply (treatment ${gsc.treatment}, base ${gsc.baseHeight})`);
+ok(gsc.sizes.MD.padding === (gsc.sizes.MD.height - gsc.sizes.MD.icon) / 2, "(geo) the centering law holds on the resolved scale (pad = (h−icon)/2)");
+ok(hydSet(serSet(app.doc)).geometry.treatment === "spacious" && hydSet(serSet(app.doc)).geometry.baseHeight === 40, "(geo) the geometry config round-trips through persist");
+ok(bkGeo(app.doc).geometry && bkGeo(app.doc).geometry.sizes && bkGeo(app.doc).geometry.treatment === "spacious", "(geo) brandKit carries the geometry scale (the MCP serves it)");
+let geomZip = null; const realDBgeo = app.downloadBytes.bind(app);
+app.downloadBytes = (bytes, name) => { geomZip = { bytes, name }; };
+app.downloadGeomTokens();
+ok(geomZip && /geometry-tokens\.zip$/.test(geomZip.name) && geomZip.bytes && geomZip.bytes.length > 200, `(geo) downloadGeomTokens emits a .zip (${geomZip && geomZip.name})`);
+app.downloadBytes = realDBgeo;
+app.commit((d) => { d.geometry = { treatment: "comfortable", baseHeight: 28 }; }); // restore default
+app.closeGeometry(); flushRaf();
+ok(app.geomOpen === false, "(geo) closeGeometry dismisses the modal");
+
 // ── report ──────────────────────────────────────────────────────────────────────────
 if (fails.length) {
   console.error("HEADLESS BOOT FAIL:");

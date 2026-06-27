@@ -53,6 +53,10 @@ collections.
   (Display · Heading · Body · UI), with derived size (modular scale), optical letter-spacing, leading, and
   weight. Pick a **treatment** (Lifestyle, Luxury, Editorial, Technical, Brutalist), preview a live
   specimen, export **CSS + DTCG** type tokens.
+- **Geometry.** The spatial analog — a few params → a **systematic size ramp** (XS–2XL) → derived control
+  geometry on one **centering law** (edge padding = (height − glyph) / 2; the pill radius, the icon-only
+  square, and the slot paddings all fall out of it). Pick a **treatment** (Comfortable, Compact, Spacious,
+  Touch, Pill), preview a live size ramp, export **CSS + DTCG** `dimension` tokens.
 - **Brand-Kit MCP.** Download a **zero-dependency MCP server** pre-filled with your tokens — point
   **Claude Code / Cursor / any MCP agent** at it (`node brand-kit-server.mjs`) and it serves your
   palettes, ramps, and the resolved 37-role semantic layer (light + dark) so the agent builds with your

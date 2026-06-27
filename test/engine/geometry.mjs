@@ -1,0 +1,91 @@
+#!/usr/bin/env node
+// geometry.mjs — verifier for the dimensional engine (src/engine/geometry.mjs). Pure, no DOM.
+import * as G from "../../src/engine/geometry.mjs";
+
+const fails = [];
+const ok = (c, m) => { if (!c) fails.push(m); };
+
+// ── treatments: 5 presets, each a density + radius style + base height ──
+ok(G.GEOMETRY_TREATMENTS.length === 5, `5 treatments (got ${G.GEOMETRY_TREATMENTS.length})`);
+ok(G.GEOMETRY_TREATMENTS.every((t) => typeof t.density === "number" && t.radiusStyle && t.baseHeight), "every treatment has density/radiusStyle/baseHeight");
+ok(["comfortable", "compact", "spacious", "touch", "pill"].every((id) => G.GEOMETRY_TREATMENTS.some((t) => t.id === id)), "has comfortable/compact/spacious/touch/pill");
+
+// ── the reference ramp: the power law reproduces the hand-tuned table (component-sizes.md) to ±1px ──
+{
+  const s = G.geomScale({ treatment: "comfortable", baseHeight: 28 });
+  const REF = { XS: { height: 20, icon: 14, font: 12 }, SM: { height: 24, icon: 16, font: 13 }, MD: { height: 28, icon: 18, font: 14 }, LG: { height: 36, icon: 20, font: 16 }, XL: { height: 48, icon: 24, font: 18 }, "2XL": { height: 64, icon: 28, font: 20 } };
+  for (const [name, r] of Object.entries(REF)) {
+    const sz = s.sizes[name];
+    ok(sz.height === r.height, `${name} height = ${r.height} (got ${sz.height})`);
+    ok(Math.abs(sz.icon - r.icon) <= 1, `${name} icon ≈ ${r.icon} (got ${sz.icon})`);
+    ok(Math.abs(sz.font - r.font) <= 1, `${name} font ≈ ${r.font} (got ${sz.font})`);
+  }
+  // sizes strictly increase XS→2XL
+  const heights = ["XS", "SM", "MD", "LG", "XL", "2XL"].map((k) => s.sizes[k].height);
+  ok(heights.every((v, i) => i === 0 || v > heights[i - 1]), `heights strictly increase (${heights})`);
+}
+
+// ── THE CENTERING LAW: edge padding = (height − icon) / 2 exactly, for every size ──
+{
+  const s = G.geomScale({ treatment: "comfortable" });
+  for (const [name, sz] of Object.entries(s.sizes)) {
+    ok(sz.padding === (sz.height - sz.icon) / 2, `${name}: padding = (h−icon)/2 (got ${sz.padding}, want ${(sz.height - sz.icon) / 2})`);
+    ok(sz.edgePadding === Math.round(sz.height / 2), `${name}: slotless edge = h/2 (got ${sz.edgePadding})`);
+    ok(sz.radiusPill === Math.round(sz.height / 2), `${name}: pill radius = h/2 (got ${sz.radiusPill})`);
+    ok(sz.minWidth === sz.height, `${name}: min-width = height (the square floor)`);
+    ok(sz.icon > 0 && sz.icon <= sz.height, `${name}: 0 < icon ≤ height`);
+  }
+}
+
+// ── the two families: caret = font (rhythm); density rides the gap, NOT the frame ──
+{
+  const comf = G.geomScale({ treatment: "comfortable" });
+  const comp = G.geomScale({ treatment: "compact" });
+  ok(Object.values(comf.sizes).every((s) => s.caret === s.font), "caret = font at every size (the rhythm rule)");
+  // compact (density 0.75) tightens the gap but NOT the centering padding (the frame is geometric).
+  // compare at the SAME height so density is the only variable.
+  const a = G.geomScale({ treatment: "comfortable", baseHeight: 28 }).sizes.MD;
+  const b = G.geomScale({ treatment: "compact", baseHeight: 28 }).sizes.MD;
+  ok(b.gap < a.gap, `compact gap < comfortable gap at same height (got ${b.gap} vs ${a.gap})`);
+  ok(b.padding === a.padding, `density does NOT change the frame padding (got ${b.padding} vs ${a.padding})`);
+  void comp;
+}
+
+// ── baseHeight scales the whole ramp uniformly (the shape is preserved) ──
+{
+  const a = G.geomScale({ treatment: "comfortable", baseHeight: 28 });
+  const b = G.geomScale({ treatment: "comfortable", baseHeight: 40 });
+  ok(b.sizes.MD.height > a.sizes.MD.height, "a larger baseHeight scales MD up");
+  ok(b.sizes["2XL"].height > a.sizes["2XL"].height, "a larger baseHeight scales 2XL up too");
+}
+
+// ── unknown treatment falls back to the first ──
+ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id, "unknown treatment → first treatment");
+
+// ── radius ladder + space scale present and monotonic ──
+{
+  const s = G.geomScale({ treatment: "comfortable" });
+  ok(s.radii.none === 0 && s.radii.full === 9999, "radius ladder: none 0, full pill (9999)");
+  ok(s.radii.sm <= s.radii.md && s.radii.md <= s.radii.lg, "radius ladder monotonic sm≤md≤lg");
+  const sp = Object.values(s.space);
+  ok(sp[0] === 0 && sp.every((v, i) => i === 0 || v >= sp[i - 1]), `space scale starts 0 and is monotonic (${sp})`);
+}
+
+// ── CSS emit: custom props + a utility class per size ──
+{
+  const css = G.geomTokensCSS(G.geomScale({ treatment: "comfortable" }));
+  ok(css.includes("--size-md-height:") && css.includes("--radius-sm:") && css.includes("--space-4:"), "CSS has size + radius + space custom props");
+  ok(/\.control-md\s*\{[^}]*block-size: var\(--size-md-height\)[^}]*padding-block: 0/.test(css), "CSS emits a .control-md utility class (block-size lever, padding-block 0)");
+}
+
+// ── DTCG emit: size composite + radius + space dimension groups ──
+{
+  const d = G.geomTokensDTCG(G.geomScale({ treatment: "spacious" }));
+  ok(d.size && d.radius && d.space, "DTCG has size/radius/space groups");
+  ok(d.size.MD.height.$type === "dimension" && /px$/.test(d.size.MD.height.$value), "DTCG dimension token (px value)");
+  ok(d.size.MD.padding.$type === "dimension" && d.radius.full.$type === "dimension", "DTCG padding + radius are dimension tokens");
+}
+
+if (fails.length) { console.error(`geometry FAIL (${fails.length}):\n  ` + fails.join("\n  ")); process.exit(1); }
+console.log("geometry PASS — the ramp, the centering law, the two families, treatments, CSS + DTCG emit");
+process.exit(0);

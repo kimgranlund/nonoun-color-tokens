@@ -157,6 +157,15 @@ try {
   console.log("  · screenshot → smoke-out/typography.png");
   await evalJS(`${el}.closeTypography()`); await sleep(120);
 
+  // Geometry modal: treatment + live size ramp (XS..2XL mock controls on the centering law).
+  await evalJS(`${el}.openGeometry()`); await sleep(300);
+  ok(await evalJS(`(()=>{const d=${el}.querySelector("dialog.geom");return !!d && d.open && ${el}.querySelectorAll(".geom-line").length===6})()`), "Geometry modal opens with the 6-step size ramp");
+  ok(await evalJS(`(()=>{const b=${el}.querySelector(".geom-ctl");if(!b)return false;const r=b.getBoundingClientRect();return r.height>=18 && r.height<=80})()`), "Geometry specimen renders a real mock control box on the ramp");
+  const geoShot = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(resolve(OUT, "geometry.png"), Buffer.from(geoShot.data, "base64"));
+  console.log("  · screenshot → smoke-out/geometry.png");
+  await evalJS(`${el}.closeGeometry()`); await sleep(120);
+
   const shot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(resolve(OUT, "editor.png"), Buffer.from(shot.data, "base64"));
   console.log("  · screenshot → smoke-out/editor.png");

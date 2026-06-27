@@ -1060,6 +1060,33 @@ dialog.typo::backdrop { background: rgba(10,14,22,.34); }
 .typo-foot { display: flex; gap: 10px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); }
 .typo-foot .spacer { flex: 1; }
 
+/* ── Geometry modal — shares the typo dialog shell; the specimen is live mock controls on the ramp ── */
+dialog.geom {
+  position: fixed; inset: 0; margin: auto;
+  width: min(720px, 94vw); height: min(82vh, 760px); max-width: 94vw; max-height: 90vh;
+  padding: 0; border: none; border-radius: var(--r-lg);
+  background: var(--panel); color: var(--ink); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+dialog.geom:not([open]) { display: none; }
+dialog.geom::backdrop { background: rgba(10,14,22,.34); }
+.geom-specimen { padding: 14px 16px; overflow: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.geom-line { display: flex; gap: 16px; align-items: center; }
+.geom-step { flex: none; width: 70px; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+.geom-ctl { display: inline-flex; align-items: center; box-sizing: border-box; flex: none;
+  background: var(--accent); color: var(--accent-ink); font-weight: 600; line-height: 1; }
+.geom-glyph { flex: none; border-radius: 3px; background: currentColor; opacity: .85; }
+.geom-ctl-label { white-space: nowrap; }
+.geom-caret { flex: none; display: inline-flex; align-items: center; justify-content: center; transform: rotate(-90deg); opacity: .9; }
+.geom-caret .ic, .geom-caret svg { width: 100%; height: 100%; }
+.geom-readout { color: var(--ink-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; margin-left: auto; flex: none; }
+.geom-scales { padding: 4px 16px 0; display: flex; flex-direction: column; gap: 10px; }
+.geom-scale { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.geom-scale b { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-dim); width: 54px; flex: none; }
+.geom-chip { display: inline-flex; gap: 5px; align-items: center; font-size: 10.5px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.geom-radius-swatch { width: 18px; height: 18px; background: var(--c-neutral-container); border: 1.5px solid var(--accent); }
+.geom-space-bar { height: 10px; background: var(--accent); border-radius: 2px; display: inline-block; opacity: .7; }
+
 /* ── responsive toolbars — the plugin window can be narrow; toolbars must never overflow ── */
 /* never break a button's own label across lines (no 3-line "⚑ Add Variables → Figma"). */
 .app-header button, .canvas-header button, .drawer-foot button, .drawer-head button { white-space: nowrap; }
