@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 1.40 — 2026-06-26 — Typography generator (the type analog of the color engine)
+
+A second token system: `src/engine/type.mjs` derives a **systematic type scale** from a few params,
+mirroring the target schema's four voices — **Display · Heading · Body · UI** — each a size ramp whose
+every step's `size` (modular scale `base·ratio^n`), `lineHeight` (per-role leading), `letterSpacing`
+(optical — negative tightens big display, positive loosens small UI), and `weight` are **derived**, not
+hand-authored. Five **treatments** (Product/Lifestyle, Luxury, Editorial, Technical, Brutalist) seed the
+params (the type analog of the colour Color-Categories presets); `typeScale(config)` resolves it,
+`typeTokensCSS` / `typeTokensDTCG` emit. A ⓣ **Typography modal** picks treatment + body base, shows a
+live specimen, and downloads `type.css` + `type.tokens.json`. The config (`doc.type = { treatment,
+bodyBase }`) is persisted (enum + clamped int, roundtrip-safe) and folded into **`brandKit(doc)`** so the
+**Brand-Kit MCP serves type too**. Covered by `test/engine/type.mjs` (scale math, optical tracking,
+treatments, CSS + DTCG emit) and `(ty)` headless (modal + specimen + persist + brandKit + `.zip`).
+Next (after this): the **geometry / dimensional system** (size/padding/icon/caret), which composes with
+this type scale.
+
 ## 1.39 — 2026-06-26 — Brand-Kit MCP (downloadable, zero-dep server) — spike
 
 A new distribution surface: serve the generated tokens to AI agents via **MCP** (Model Context Protocol).

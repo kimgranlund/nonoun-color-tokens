@@ -238,8 +238,21 @@ export function hydrate(snapshot) {
     theme: clampEnum(s.theme, DOMAINS.theme.values, DOMAINS.theme.default),
     selected,
     roleOverrides: clampOverrides(s.roleOverrides),
+    type: clampType(s.type),
     palettes,
     ...(typeof s.vol === "string" && s.vol ? { vol: s.vol } : {}),
     ...(story ? { story } : {}),
   };
+}
+
+// clampType — the typography config (treatment + body base). Treatment to a known id, base size to a
+// sane integer range. Identity-preserving for an in-domain value (so the roundtrip gate holds).
+const TYPE_TREATMENTS = ["product", "luxury", "editorial", "technical", "statement"];
+function clampType(t) {
+  t = (t && typeof t === "object") ? t : {};
+  const treatment = TYPE_TREATMENTS.includes(t.treatment) ? t.treatment : "product";
+  let bodyBase = Number(t.bodyBase);
+  if (!Number.isFinite(bodyBase)) bodyBase = 16;
+  bodyBase = Math.max(10, Math.min(32, Math.round(bodyBase)));
+  return { treatment, bodyBase };
 }

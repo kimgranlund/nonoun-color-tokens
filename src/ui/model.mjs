@@ -26,6 +26,7 @@ import {
   DEFAULT_CONTROLS,
 } from "../engine/tonal.js";
 import { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAccentRef } from "../engine/semantic.js";
+import { typeScale, DEFAULT_TYPE } from "../engine/type.mjs";
 import {
   exportCSS,
   exportOKLCH,
@@ -118,6 +119,7 @@ export function defaultDocument() {
     theme: "auto",
     selected: 0,
     roleOverrides: {}, // per-doc semantic-mapping re-points (empty = canonical role table)
+    type: { ...DEFAULT_TYPE }, // typography config (treatment + body base) — see engine/type.mjs
   };
 }
 
@@ -193,7 +195,7 @@ export function brandKit(doc) {
     for (const role of p.roles) r[role.key] = { light: role.lightHex, dark: role.darkHex };
     roles[slug(p.name)] = r;
   }
-  return { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Color Tokens by NONOUN", stops, palettes, roles };
+  return { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Color Tokens by NONOUN", stops, palettes, roles, type: typeScale(doc.type || DEFAULT_TYPE) };
 }
 
 // WCAG relative-luminance contrast ratio between two [r,g,b] int triples.

@@ -1258,6 +1258,26 @@ app.commit((d) => { d.accentRef = "mode"; }); // restore default
 app.closeSettings(); flushRaf();
 ok(app.settingsOpen === false, "(set) closeSettings dismisses the modal");
 
+// ── (ty) Typography modal: treatment + body base → live specimen + token download ──
+app.openTypography(); flushRaf();
+ok(app.typeOpen === true && !!app.querySelector(".typo"), "(ty) openTypography shows the Typography <dialog>");
+ok(app.querySelectorAll(".typo-cat").length === 4 && app.querySelectorAll(".typo-sample").length >= 6, "(ty) the specimen shows the 4 voices (Display/Heading/Body/UI)");
+const { typeScale: tScale } = await import("../../src/engine/type.mjs");
+const { brandKit: bkTy } = await import("../../src/ui/model.mjs");
+app.commit((d) => { d.type = { treatment: "luxury", bodyBase: 18 }; }); flushRaf();
+const tysc = tScale(app.doc.type);
+ok(tysc.treatment === "luxury" && tysc.categories.Body.MD.size === 18, `(ty) treatment + base apply (treatment ${tysc.treatment}, body MD ${tysc.categories.Body.MD.size})`);
+ok(hydSet(serSet(app.doc)).type.treatment === "luxury" && hydSet(serSet(app.doc)).type.bodyBase === 18, "(ty) the type config round-trips through persist");
+ok(bkTy(app.doc).type && bkTy(app.doc).type.categories.Body && bkTy(app.doc).type.treatment === "luxury", "(ty) brandKit carries the type scale (the MCP serves it)");
+let typeZip = null; const realDBty = app.downloadBytes.bind(app);
+app.downloadBytes = (bytes, name) => { typeZip = { bytes, name }; };
+app.downloadTypeTokens();
+ok(typeZip && /type-tokens\.zip$/.test(typeZip.name) && typeZip.bytes && typeZip.bytes.length > 200, `(ty) downloadTypeTokens emits a .zip (${typeZip && typeZip.name})`);
+app.downloadBytes = realDBty;
+app.commit((d) => { d.type = { treatment: "product", bodyBase: 16 }; }); // restore default
+app.closeTypography(); flushRaf();
+ok(app.typeOpen === false, "(ty) closeTypography dismisses the modal");
+
 // ── report ──────────────────────────────────────────────────────────────────────────
 if (fails.length) {
   console.error("HEADLESS BOOT FAIL:");
