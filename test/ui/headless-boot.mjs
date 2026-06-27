@@ -1312,6 +1312,8 @@ app.setSection("typography"); flushRaf();
 ok(app.section === "typography" && !!app.querySelector(".type-spec"), "(ty) the section switcher enters Typography (the canvas specimen renders)");
 ok(app.querySelectorAll(".type-spec-line").length === 41 && app.querySelectorAll(".type-spec-group").length === 7, `(ty) the canvas shows the FULL specimen — 41 steps across the 7 named groups (Display·H-Editorial·H-Context·H-Eyebrow·Body·UI·Code) (got ${app.querySelectorAll(".type-spec-line").length} lines / ${app.querySelectorAll(".type-spec-group").length} groups)`);
 ok(app.querySelectorAll(".an-card").length >= 4, `(ty) the left rail shows the type analysis cards (got ${app.querySelectorAll(".an-card").length})`);
+// specimen order: each group lists LARGEST → smallest (the first token in the document is Display's XL step)
+ok(txtOf(app.querySelectorAll(".type-spec-token")[0] || {}) === "type-display-xl", `(ty) the specimen lists each group largest→smallest (first token is type-display-xl, got ${txtOf(app.querySelectorAll(".type-spec-token")[0] || {})})`);
 ok(!!app.querySelector(".tyi-voices") || !!app.querySelector(".insp-title"), "(ty) the right pane shows the Typography inspector");
 const { typeScale: tScale } = await import("../../src/engine/type.mjs");
 const { brandKit: bkTy } = await import("../../src/ui/model.mjs");
@@ -1338,6 +1340,8 @@ ok(app.section === "color" && !app.querySelector(".type-spec") && !!app.querySel
 app.setSection("geometry"); flushRaf();
 ok(app.section === "geometry" && !!app.querySelector(".geom-spec"), "(geo) the section switcher enters Geometry (the canvas dataset renders)");
 ok(app.querySelectorAll(".geom-spec-line").length === 6, `(geo) the canvas shows the 6-step control ramp (XS..2XL) (got ${app.querySelectorAll(".geom-spec-line").length})`);
+// control ramp order: LARGEST → smallest (the first token in the document is the 2XL control)
+ok(txtOf(app.querySelectorAll(".geom-spec-token")[0] || {}) === "--size-2xl", `(geo) the control ramp lists largest→smallest (first token is --size-2xl, got ${txtOf(app.querySelectorAll(".geom-spec-token")[0] || {})})`);
 ok(app.querySelectorAll(".an-card").length >= 4, `(geo) the left rail shows the geometry analysis cards (got ${app.querySelectorAll(".an-card").length})`);
 ok(!!app.querySelector(".tyi-voices") || !!app.querySelector(".insp-title"), "(geo) the right pane shows the Geometry inspector");
 const { geomScale: gScale } = await import("../../src/engine/geometry.mjs");

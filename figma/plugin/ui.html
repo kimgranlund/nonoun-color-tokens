@@ -7556,12 +7556,15 @@ class HctApp extends HTMLElement {
     const total = cats.reduce((a, c) => a + Object.keys(scale.categories[c]).length, 0);
     const groups = cats.map((cat) => {
       const steps = Object.keys(scale.categories[cat]);
+      // render the specimen LARGEST → smallest (biggest example first) — sort by resolved size descending,
+      // robust to the engine's step-key order. (The `steps.length` count is order-independent.)
+      const ordered = [...steps].sort((a, b) => (scale.categories[cat][b]?.size || 0) - (scale.categories[cat][a]?.size || 0));
       const role = scale.roleOf[cat] || "body";
       return h(
         "div",
         { class: "type-spec-group" },
         h("div", { class: "type-spec-grouphead" }, h("b", {}, cat), h("small", {}, scale.fonts[role]), h("span", { class: "type-spec-count" }, `${steps.length} steps`)),
-        ...steps.map((step) => line(cat, step)),
+        ...ordered.map((step) => line(cat, step)),
       );
     });
     return h(
@@ -9411,7 +9414,8 @@ class HctApp extends HTMLElement {
     const t = GEOMETRY_TREATMENTS.find((x) => x.id === cfg.treatment) || GEOMETRY_TREATMENTS[0];
     const tokensOnly = this.geomSpecMode === "tokens";
     const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const SIZE_NAMES = ["XS", "SM", "MD", "LG", "XL", "2XL"];
+    // the control ramp renders LARGEST → smallest (biggest example first); heights are monotonic by step.
+    const SIZE_NAMES = ["2XL", "XL", "LG", "MD", "SM", "XS"];
     const ctlLine = (name) => {
       const s = scale.sizes[name];
       if (!s) return false;
