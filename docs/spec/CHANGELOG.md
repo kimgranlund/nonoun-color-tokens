@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 1.39 — 2026-06-26 — Brand-Kit MCP (downloadable, zero-dep server) — spike
+
+A new distribution surface: serve the generated tokens to AI agents via **MCP** (Model Context Protocol).
+`mcp/brand-kit-server.mjs` is a **zero-dependency** Node stdio server (JSON-RPC 2.0, newline-delimited)
+that reads a `brand-kit.json` and exposes the palettes, ramps, and the 37-role semantic layer (light +
+dark) as MCP **resources** (`brand://kit|palettes|semantic/*|guide`), **tools** (`list_palettes`,
+`get_ramp`, `resolve_token`, `get_semantic`, `nearest_token`), and a **prompt** (`apply_brand`). The
+resolved data comes from a new pure `brandKit(doc)` projection (model.mjs). The app hands users a
+ready-to-run `.zip` (server + their `brand-kit.json` + README + package.json) via "Brand-Kit MCP" in the
+export drawer's Config tab — the server inlined through `gen-mcp-assets.mjs` → `src/ui/mcp-assets.js`
+(bundled like `figma-plugin-assets.js`). Covered by a **12th verifier** (`test/mcp/brand-kit.mjs`) that
+generates a kit, spawns the server, and drives the full MCP handshake (initialize → tools/resources/
+prompts → unknown-method error), plus `(mc)` headless assertions for the inlined server + the `.zip`
+download. Status: spike — the **hosted** brand-kit MCP (the recurring tier) is the next step.
+
 ## 1.38 — 2026-06-26 — Settings modal + `accentRef` prime-accent mapping
 
 A new control `accentRef` (`"mode"` default / `"single"`) lets the **prime accent role** export as either

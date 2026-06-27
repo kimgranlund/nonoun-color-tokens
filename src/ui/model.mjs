@@ -176,6 +176,26 @@ export function figmaBundle(doc) {
   return exportDTCG(stateOf(doc), { rawColl: "Color Primitives" });
 }
 
+// brandKit — the resolved brand-kit data the downloadable MCP server (`mcp/brand-kit-server.mjs`) reads:
+// every enabled palette's identity colour + tonal ramp, and its 37 semantic roles resolved for BOTH
+// light & dark. A pure projection (projectView) — the server itself is engine-free and just serves this.
+export function brandKit(doc) {
+  const view = projectView(doc);
+  const on = view.palettes.filter((p) => p.on);
+  const stops = on[0] ? on[0].ramp.map((s) => s.stop) : [];
+  const palettes = on.map((p) => ({
+    name: p.name, slug: slug(p.name), key: p.key,
+    ramp: p.ramp.map((s) => ({ stop: s.stop, hex: s.hex })),
+  }));
+  const roles = {};
+  for (const p of on) {
+    const r = {};
+    for (const role of p.roles) r[role.key] = { light: role.lightHex, dark: role.darkHex };
+    roles[slug(p.name)] = r;
+  }
+  return { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Color Tokens by NONOUN", stops, palettes, roles };
+}
+
 // WCAG relative-luminance contrast ratio between two [r,g,b] int triples.
 function relLum(rgb) {
   const ch = rgb.map((v) => {

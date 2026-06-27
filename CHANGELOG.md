@@ -11,6 +11,12 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-06-26
 
 #### Added
+- **Brand-Kit MCP (download).** "Brand-Kit MCP" in the export drawer's Config tab downloads a `.zip` with
+  a **zero-dependency MCP server** + your resolved tokens (`brand-kit.json`) + a setup README. Point
+  **Claude Code / Cursor / any MCP agent** at it (`node brand-kit-server.mjs` or `claude mcp add`) and it
+  serves your palettes, tonal ramps, and the 37-role semantic layer (light + dark) as MCP resources/tools
+  (`resolve_token`, `get_ramp`, `nearest_token`, …) + a brand-usage prompt — so the agent builds with your
+  exact tokens. New `brandKit(doc)` projection; a 12th verifier drives the server over the MCP protocol.
 - **Settings modal** (⚙ in the header) for doc-level **token-mapping** preferences. First controls:
   **Primary accent** — `Mode-specific · 550 / 450` *(default)* vs `Single · 500 / 500` (one
   mode-agnostic accent token) — and **On-colors** (`fixed` / WCAG-`contrast`, surfaced here too). A
