@@ -19,11 +19,13 @@ import {
   configFromVariables,
   seedFromKeyColor,
   hexToOklch,
+  brandKit,
   SCRIM_BASES,
   SCRIM_STEPS,
 } from "./model.mjs";
 import { STORAGE_KEY, serialize, hydrate } from "./persist.js";
 import { FIGMA_PLUGIN } from "./figma-plugin-assets.js";
+import { MCP_BRAND_KIT } from "./mcp-assets.js";
 import { CATEGORY_INDEX, loadCategory } from "./categories/index.js";
 import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.mjs";
 import { zipStore } from "./zip.mjs";
@@ -3645,6 +3647,7 @@ class HctApp extends HTMLElement {
               { class: "config-bar" },
               btn([icon("upload"), "Save to project"], { title: this.inFigma ? "Save this config into this Figma file (travels with the file)" : "Save this config to the project (localStorage)", onclick: () => this.saveToProject() }),
               btn([icon("download"), "Load from project"], { title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project", onclick: () => this.loadFromProject() }),
+              btn([icon("download"), "Brand-Kit MCP"], { title: "Download a ready-to-run MCP server (your tokens, for Claude Code / Cursor / any agent) — a .zip with the zero-dep server + your brand-kit.json + setup README", onclick: () => this.downloadBrandKitMcp() }),
               h("span", { class: "config-note" }, this.inFigma ? "Source of truth: this Figma file (travels with the file)" : "Source of truth: your browser (localStorage)"),
             )
           : false,
@@ -4074,6 +4077,26 @@ class HctApp extends HTMLElement {
   downloadFigmaPlugin() {
     this.download(FIGMA_PLUGIN.manifest, "manifest.json");
     setTimeout(() => this.download(FIGMA_PLUGIN.code, "code.js"), 150);
+  }
+
+  // downloadBrandKitMcp — hand the user a ready-to-run Brand-Kit MCP package as one .zip: the zero-dep
+  // server (inlined from mcp/), THEIR resolved tokens (brandKit), a setup README, and a package.json.
+  // `node brand-kit-server.mjs` (or `claude mcp add`) and an agent can query the brand's exact tokens.
+  downloadBrandKitMcp() {
+    const kit = brandKit(this.doc);
+    const base = slug(kit.name) || "brand-kit";
+    const pkg = JSON.stringify(
+      { name: "nonoun-brand-kit", version: "0.1.0", type: "module", description: `MCP server for the "${kit.name}" brand kit (Color Tokens by NONOUN)`, bin: { "brand-kit-mcp": "brand-kit-server.mjs" }, private: true },
+      null, 2,
+    );
+    const files = [
+      { name: "brand-kit-server.mjs", data: MCP_BRAND_KIT.server },
+      { name: "brand-kit.json", data: JSON.stringify(kit, null, 2) },
+      { name: "README.md", data: MCP_BRAND_KIT.readme },
+      { name: "package.json", data: pkg },
+    ];
+    this.downloadBytes(zipStore(files), `${base}-mcp.zip`, "application/zip");
+    this.toast("Brand-Kit MCP downloaded — `node brand-kit-server.mjs`");
   }
 
   copy(text) {

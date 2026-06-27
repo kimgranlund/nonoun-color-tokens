@@ -607,6 +607,19 @@ app.downloadFigmaPlugin();
 ok(dl >= 1, "(t4) the plugin download emits the plugin file(s)");
 app.download = realDl;
 
+// ── (mc) Brand-Kit MCP: inlined server + a downloadable .zip from the Config tab ──
+const { MCP_BRAND_KIT: MK } = await import("../../src/ui/mcp-assets.js");
+ok(MK && MK.server.includes("brand-kit") && MK.server.length > 2000 && MK.readme.length > 200, "(mc1) the zero-dep MCP server + README are inlined");
+app.exportTab = "config"; app.render(); flushRaf();
+const txtOf = (n) => (n._text || "") + (n.children || []).map(txtOf).join("");
+ok(walk(app, (e) => e.tagName === "BUTTON" && txtOf(e).includes("Brand-Kit MCP")).length >= 1, "(mc2) the Config tab offers a Brand-Kit MCP download button");
+let mcpZip = null; const realDBmcp = app.downloadBytes.bind(app);
+app.downloadBytes = (bytes, name) => { mcpZip = { bytes, name }; };
+app.downloadBrandKitMcp();
+ok(mcpZip && /-mcp\.zip$/.test(mcpZip.name) && mcpZip.bytes && mcpZip.bytes.length > 1000, `(mc3) downloadBrandKitMcp emits a .zip (${mcpZip && mcpZip.name})`);
+app.downloadBytes = realDBmcp;
+app.exportOpen = false; app.render(); flushRaf();
+
 // ── (u) per-palette edge hue rotation slider + engine effect ──────────────────────────
 app.openSet(app.sets[0].id); flushRaf(); app.setSegment("palette"); flushRaf();
 ok(!!findFk("slider:Edge hue"), "(u1) the palette inspector has an Edge hue slider");

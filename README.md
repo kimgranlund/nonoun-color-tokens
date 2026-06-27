@@ -49,6 +49,10 @@ collections.
 - **Exports.** CSS (Hex or **OKLCH**), **Tailwind v4**, **shadcn/ui**, **Figma** variables,
   **Figma UI3** (Material), **DTCG**, **JSON**, a re-importable parametric **Config**, and a
   **Download-all `.zip`** of every format.
+- **Brand-Kit MCP.** Download a **zero-dependency MCP server** pre-filled with your tokens — point
+  **Claude Code / Cursor / any MCP agent** at it (`node brand-kit-server.mjs`) and it serves your
+  palettes, ramps, and the resolved 37-role semantic layer (light + dark) so the agent builds with your
+  exact tokens. See `mcp/`.
 - **System / light / dark.** The app chrome and the canvas preview each follow the OS by default
   (sun · moon · system toggles); the chrome dogfoods the very tokens the tool generates.
 
