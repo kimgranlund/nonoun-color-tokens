@@ -11,6 +11,13 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-06-26
 
 #### Added
+- **Typography generator.** The type analog of the color engine: a few params → a systematic type scale.
+  A ⓣ Typography modal (header) picks a **treatment** (Product/Lifestyle, Luxury, Editorial, Technical,
+  Brutalist) + body base size, previews a **live specimen** (Display / Heading / Body / UI voices), and
+  downloads **type tokens** (CSS utility classes + DTCG `typography` tokens) as a `.zip`. The engine
+  (`src/engine/type.mjs`) derives every step's size (modular scale), line-height (per-role leading),
+  letter-spacing (optical — tightens big display, loosens small UI), and weight. It travels with the set
+  (persisted) and is **served by the Brand-Kit MCP** too.
 - **Brand-Kit MCP (download).** "Brand-Kit MCP" in the export drawer's Config tab downloads a `.zip` with
   a **zero-dependency MCP server** + your resolved tokens (`brand-kit.json`) + a setup README. Point
   **Claude Code / Cursor / any MCP agent** at it (`node brand-kit-server.mjs` or `claude mcp add`) and it

@@ -28,6 +28,7 @@ import { FIGMA_PLUGIN } from "./figma-plugin-assets.js";
 import { MCP_BRAND_KIT } from "./mcp-assets.js";
 import { CATEGORY_INDEX, loadCategory } from "./categories/index.js";
 import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.mjs";
+import { typeScale, typeTokensCSS, typeTokensDTCG, TYPE_TREATMENTS, DEFAULT_TYPE } from "../engine/type.mjs";
 import { zipStore } from "./zip.mjs";
 import { icon, brandMark } from "./icons.js";
 
@@ -313,6 +314,7 @@ class HctApp extends HTMLElement {
     this.applyGateRebuild = false; // the pending action: false = apply, true = regroup
     this.applyGateDontShow = false; // the "don't show again" checkbox (transient, reset on open)
     this.settingsOpen = false; // the Settings modal (token-mapping + app prefs)
+    this.typeOpen = false; // the Typography modal (type-scale treatment + specimen + export)
     this.figmaFile = "light"; // which Figma mode file the Figma tab previews/downloads
     this.hover = null; // hovered swatch info for footers
     this.search = "";
@@ -670,6 +672,7 @@ class HctApp extends HTMLElement {
     this._syncNewPal(); // same, for the New-Palette modal
     this._syncApplyGate(); // same, for the Apply-to-Figma consent gate
     this._syncSettings(); // same, for the Settings modal
+    this._syncTypography(); // same, for the Typography modal
   }
 
   // _syncDrawer — reconcile the native export <dialog> with this.exportOpen AFTER each render.
@@ -1189,6 +1192,7 @@ class HctApp extends HTMLElement {
       this.renderNewPalette(view),
       this.renderApplyGate(),
       this.renderSettings(),
+      this.renderTypography(),
       this.toastEl || (this.toastEl = h("div", { class: "toast", role: "status", "aria-live": "polite" })),
     );
   }
@@ -1230,6 +1234,7 @@ class HctApp extends HTMLElement {
       btn(icon("arrow-counter-clockwise"), { cls: "undo-btn", title: "Undo (⌘Z)", ariaLabel: "Undo", disabled: !this.canUndo(), onclick: () => this.undo() }),
       btn(icon("arrow-clockwise"), { cls: "redo-btn", title: "Redo (⇧⌘Z)", ariaLabel: "Redo", disabled: !this.canRedo(), onclick: () => this.redo() }),
       this.themeBtn(),
+      btn(icon("type"), { cls: "type-btn", title: "Typography — type scale + treatments", ariaLabel: "Typography", onclick: () => this.openTypography() }),
       btn(icon("gear"), { cls: "settings-btn", title: "Settings — token mapping & preferences", ariaLabel: "Settings", onclick: () => this.openSettings() }),
       btn([icon("plus"), "New"], { onclick: () => this.createSet() }),
       btn([icon("export"), "Export"], { variant: "primary", cls: "export-open-btn", title: "Open export drawer", onclick: () => this.toggleDrawer(true) }),
@@ -3961,6 +3966,109 @@ class HctApp extends HTMLElement {
         { class: "settings-foot" },
         h("div", { class: "spacer" }),
         btn("Done", { variant: "primary", onclick: () => this.closeSettings() }),
+      ),
+    );
+  }
+
+  // ── Typography modal (type-scale treatment + live specimen + export) ──────────────────
+  openTypography() { this.typeOpen = true; this.render(); }
+  closeTypography() { this.typeOpen = false; this.render(); }
+  _syncTypography() {
+    const d = this.querySelector(".typo");
+    if (!d || typeof d.showModal !== "function") return;
+    if (this.typeOpen && !d.open) { try { d.showModal(); } catch { /* not attached */ } }
+    else if (!this.typeOpen && d.open) { try { d.close(); } catch { /* already closed */ } }
+  }
+  // download the resolved type tokens (CSS utility classes + DTCG typography tokens) as one .zip.
+  downloadTypeTokens() {
+    const scale = typeScale(this.doc.type || DEFAULT_TYPE);
+    const files = [
+      { name: "type.css", data: typeTokensCSS(scale) },
+      { name: "type.tokens.json", data: JSON.stringify(typeTokensDTCG(scale), null, 2) },
+    ];
+    this.downloadBytes(zipStore(files), "type-tokens.zip", "application/zip");
+    this.toast("Type tokens downloaded");
+  }
+  // a sample line rendered in the resolved style for one category/step (font falls back gracefully).
+  _typeSample(scale, cat, step, text) {
+    const s = scale.categories[cat] && scale.categories[cat][step];
+    if (!s) return false;
+    const role = scale.roleOf[cat] || "body";
+    const fam = scale.fonts[role] || "Inter";
+    const generic = role === "mono" || /mono/i.test(fam) ? "monospace" : /serif/i.test(fam) ? "serif" : "sans-serif";
+    return h(
+      "div",
+      { class: "typo-line" },
+      h("span", { class: "typo-step" }, `${step} · ${s.size}/${s.lineHeight}`),
+      h("div", { class: "typo-sample", style: `font-family:${fam}, ${generic};font-size:${s.size}px;line-height:${s.lineHeight}px;letter-spacing:${s.letterSpacing}px;font-weight:${s.weight}` }, text),
+    );
+  }
+  renderTypography() {
+    const cfg = this.doc.type || DEFAULT_TYPE;
+    const scale = typeScale(cfg);
+    const t = TYPE_TREATMENTS.find((x) => x.id === cfg.treatment) || TYPE_TREATMENTS[0];
+    const SAMPLE = { Display: "Yao Ming", Heading: "Latest Stories", Body: "Follow the latest updates, highlights, and analysis from across the league.", UI: "26 PTS · 13 REB · 3 BLK · +9 +/−" };
+    const SHOW = { Display: ["XL", "MD"], Heading: ["XL", "MD", "XS"], Body: ["LG", "MD", "XS"], UI: ["XL", "MD", "XS"] };
+    const baseReadout = h("b", {}, cfg.bodyBase + "px");
+    return h(
+      "dialog",
+      {
+        class: "typo",
+        "aria-label": "Typography",
+        onclick: (e) => { if (e.target === e.currentTarget) this.closeTypography(); },
+        oncancel: (e) => { e.preventDefault(); this.closeTypography(); },
+      },
+      h(
+        "div",
+        { class: "drawer-head" },
+        h("h3", {}, icon("type"), "Typography"),
+        h("div", { class: "spacer" }),
+        btn(icon("x"), { ariaLabel: "Close typography", onclick: () => this.closeTypography() }),
+      ),
+      h(
+        "div",
+        { class: "typo-controls" },
+        h(
+          "div",
+          { class: "field" },
+          h("label", { for: "typo-treatment" }, "Treatment"),
+          h(
+            "select",
+            { id: "typo-treatment", "aria-label": "Treatment", onchange: (e) => this.commit((d) => { d.type = { ...(d.type || DEFAULT_TYPE), treatment: e.target.value }; }) },
+            ...TYPE_TREATMENTS.map((x) => h("option", { value: x.id, selected: cfg.treatment === x.id ? true : undefined }, x.label)),
+          ),
+        ),
+        h(
+          "div",
+          { class: "field" },
+          h("label", {}, "Body base", baseReadout),
+          h("input", {
+            type: "range", "data-fk": "typo:base", "aria-label": "Body base size",
+            min: 12, max: 22, step: 1, value: cfg.bodyBase,
+            oninput: (e) => { baseReadout.textContent = e.target.value + "px"; },
+            onchange: (e) => this.commit((d) => { d.type = { ...(d.type || DEFAULT_TYPE), bodyBase: parseInt(e.target.value, 10) }; }),
+          }),
+        ),
+      ),
+      h("p", { class: "typo-note" }, t.note + " — fonts are swappable; the size scale, optical tracking, weight, and leading are the system."),
+      h(
+        "div",
+        { class: "typo-specimen" },
+        ...["Display", "Heading", "Body", "UI"].map((cat) =>
+          h(
+            "div",
+            { class: "typo-cat" },
+            h("div", { class: "typo-cat-head" }, h("b", {}, cat), h("small", {}, scale.fonts[scale.roleOf[cat]])),
+            ...SHOW[cat].map((step) => this._typeSample(scale, cat, step, SAMPLE[cat])),
+          ),
+        ),
+      ),
+      h(
+        "div",
+        { class: "typo-foot" },
+        btn([icon("download"), "Download type tokens"], { title: "CSS utility classes + DTCG typography tokens, as a .zip", onclick: () => this.downloadTypeTokens() }),
+        h("div", { class: "spacer" }),
+        btn("Done", { variant: "primary", onclick: () => this.closeTypography() }),
       ),
     );
   }

@@ -1035,6 +1035,31 @@ dialog.settings::backdrop { background: rgba(10,14,22,.34); }
 .settings-foot { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line); }
 .settings-foot .spacer { flex: 1; }
 
+/* ── Typography modal — type-scale treatment picker + live specimen + export. ── */
+dialog.typo {
+  position: fixed; inset: 0; margin: auto;
+  width: min(720px, 94vw); height: min(82vh, 760px); max-width: 94vw; max-height: 90vh;
+  padding: 0; border: none; border-radius: var(--r-lg);
+  background: var(--panel); color: var(--ink); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+dialog.typo:not([open]) { display: none; }
+dialog.typo::backdrop { background: rgba(10,14,22,.34); }
+.typo-controls { display: flex; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.typo-controls .field { flex: 1; margin: 0; }
+.typo-note { color: var(--ink-dim); font-size: 12px; line-height: 1.55; margin: 12px 16px 0; }
+.typo-specimen { padding: 14px 16px; overflow: auto; flex: 1; min-height: 0; }
+.typo-cat { margin-bottom: 20px; }
+.typo-cat-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.typo-cat-head b { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-dim); }
+.typo-cat-head small { color: var(--ink-faint); font-size: 11px; }
+.typo-line { display: flex; gap: 14px; align-items: baseline; padding: 5px 0; }
+.typo-step { flex: none; width: 92px; color: var(--ink-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.typo-sample { color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.typo-cat:nth-child(3) .typo-sample { white-space: normal; }
+.typo-foot { display: flex; gap: 10px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); }
+.typo-foot .spacer { flex: 1; }
+
 /* ── responsive toolbars — the plugin window can be narrow; toolbars must never overflow ── */
 /* never break a button's own label across lines (no 3-line "⚑ Add Variables → Figma"). */
 .app-header button, .canvas-header button, .drawer-foot button, .drawer-head button { white-space: nowrap; }

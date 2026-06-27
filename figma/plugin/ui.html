@@ -1039,6 +1039,31 @@ dialog.settings::backdrop { background: rgba(10,14,22,.34); }
 .settings-foot { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line); }
 .settings-foot .spacer { flex: 1; }
 
+/* ── Typography modal — type-scale treatment picker + live specimen + export. ── */
+dialog.typo {
+  position: fixed; inset: 0; margin: auto;
+  width: min(720px, 94vw); height: min(82vh, 760px); max-width: 94vw; max-height: 90vh;
+  padding: 0; border: none; border-radius: var(--r-lg);
+  background: var(--panel); color: var(--ink); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+dialog.typo:not([open]) { display: none; }
+dialog.typo::backdrop { background: rgba(10,14,22,.34); }
+.typo-controls { display: flex; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.typo-controls .field { flex: 1; margin: 0; }
+.typo-note { color: var(--ink-dim); font-size: 12px; line-height: 1.55; margin: 12px 16px 0; }
+.typo-specimen { padding: 14px 16px; overflow: auto; flex: 1; min-height: 0; }
+.typo-cat { margin-bottom: 20px; }
+.typo-cat-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.typo-cat-head b { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-dim); }
+.typo-cat-head small { color: var(--ink-faint); font-size: 11px; }
+.typo-line { display: flex; gap: 14px; align-items: baseline; padding: 5px 0; }
+.typo-step { flex: none; width: 92px; color: var(--ink-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.typo-sample { color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.typo-cat:nth-child(3) .typo-sample { white-space: normal; }
+.typo-foot { display: flex; gap: 10px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); }
+.typo-foot .spacer { flex: 1; }
+
 /* ── responsive toolbars — the plugin window can be narrow; toolbars must never overflow ── */
 /* never break a button's own label across lines (no 3-line "⚑ Add Variables → Figma"). */
 .app-header button, .canvas-header button, .drawer-foot button, .drawer-head button { white-space: nowrap; }
@@ -2117,6 +2142,136 @@ function deriveRelative(id, samples) {
 
 return { weightedMeanHue, deriveNeutral, RELATIONSHIPS, deriveRelative };
 })();
+__M.type = (function(){
+// type.mjs — the perceptual TYPOGRAPHY engine: the type analog of the color engine. A few parameters
+// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Mirrors the structure of the target
+// schema (docs/spec/typography/typography.tokens.json): four role "voices" — Display · Heading · Body
+// (Content) · UI — each a size ramp whose every step carries size, line-height, letter-spacing, weight,
+// and paragraph spacing, all DERIVED from the treatment's params (no hand-authored magic numbers).
+//
+// The system relationships (see docs/spec/typography/README.md):
+//   size          = base · ratio^n           (a modular scale; n = the step's distance from the base)
+//   lineHeight     = round(size · leading)     (per-role leading; single-line = size)
+//   letterSpacing = round(size · trackingEm)  (optical: negative tightens big display, positive loosens UI)
+//   weight        = the role's weight
+//   paragraphSpacing = size, indent = 0       (schema defaults)
+
+const round = (v, d = 0) => { const f = 10 ** d; return Math.round(v * f) / f; };
+
+// step ramps: [name, exponent] where exponent is the step's distance from the base (size = base·ratio^n).
+const STEPS_5 = [["XS", -2], ["SM", -1], ["MD", 0], ["LG", 1], ["XL", 2]];
+const STEPS_UI = [["3XS", -4], ["2XS", -3], ["XS", -2], ["SM", -1], ["MD", 0], ["LG", 1], ["XL", 2], ["2XL", 3]];
+
+// classic modular ratios (the "musical" scale), for reference + the UI's ratio picker.
+const TYPE_RATIOS = [
+  { id: "minor-second", value: 1.067, label: "Minor second" },
+  { id: "major-second", value: 1.125, label: "Major second" },
+  { id: "minor-third", value: 1.2, label: "Minor third" },
+  { id: "major-third", value: 1.25, label: "Major third" },
+  { id: "perfect-fourth", value: 1.333, label: "Perfect fourth" },
+  { id: "aug-fourth", value: 1.414, label: "Augmented fourth" },
+  { id: "perfect-fifth", value: 1.5, label: "Perfect fifth" },
+  { id: "golden", value: 1.618, label: "Golden ratio" },
+];
+
+// A "treatment" seeds the params, exactly as the color "Color Categories" presets seed palette params.
+// Each category: { role, base, ratio, leading, weight, trackingEm, steps }. Fonts are swappable; the
+// SCALE + tracking + weight + leading relationships are the product. Free/widely-available families only.
+const cat = (role, base, ratio, leading, weight, trackingEm, steps = STEPS_5) => ({ role, base, ratio, leading, weight, trackingEm, steps });
+
+const TYPE_TREATMENTS = [
+  { id: "product", label: "Product / Lifestyle", note: "Neutral geometric sans — screen-native, calm, versatile.",
+    fonts: { display: "Inter Tight", heading: "Inter Tight", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
+    categories: { Display: cat("display", 56, 1.333, 1.05, 800, -0.02), Heading: cat("heading", 22, 1.25, 1.2, 700, -0.01), Body: cat("body", 16, 1.2, 1.5, 450, 0), UI: cat("ui", 14, 1.125, 1.45, 450, 0.01, STEPS_UI) } },
+  { id: "luxury", label: "Luxury / Premium", note: "Elegant high-contrast serif display, airy sans, wide tracking.",
+    fonts: { display: "Source Serif 4", heading: "Source Serif 4", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
+    categories: { Display: cat("display", 64, 1.5, 1.1, 400, -0.01), Heading: cat("heading", 24, 1.333, 1.3, 500, 0.02), Body: cat("body", 17, 1.25, 1.65, 400, 0), UI: cat("ui", 13, 1.125, 1.5, 450, 0.04, STEPS_UI) } },
+  { id: "editorial", label: "Editorial / Magazine", note: "Serif headlines, sans body, mono metadata.",
+    fonts: { display: "Source Serif 4", heading: "Inter Tight", body: "Inter", ui: "JetBrains Mono", mono: "JetBrains Mono" },
+    categories: { Display: cat("display", 56, 1.414, 1.05, 700, -0.015), Heading: cat("heading", 22, 1.333, 1.2, 700, 0), Body: cat("body", 18, 1.25, 1.55, 400, 0), UI: cat("ui", 13, 1.125, 1.45, 450, 0.02, STEPS_UI) } },
+  { id: "technical", label: "Technical / Data", note: "Mono-forward — tabular figures, dense, tight leading.",
+    fonts: { display: "Inter", heading: "Inter", body: "Inter", ui: "JetBrains Mono", mono: "JetBrains Mono" },
+    categories: { Display: cat("display", 40, 1.25, 1.1, 700, -0.01), Heading: cat("heading", 20, 1.2, 1.25, 600, 0), Body: cat("body", 15, 1.2, 1.5, 450, 0), UI: cat("ui", 13, 1.125, 1.4, 450, 0, STEPS_UI) } },
+  { id: "statement", label: "Brutalist / Statement", note: "One heavy grotesque, tight tracking, dramatic jumps.",
+    fonts: { display: "Inter Tight", heading: "Inter Tight", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
+    categories: { Display: cat("display", 72, 1.618, 0.95, 900, -0.03), Heading: cat("heading", 24, 1.5, 1.1, 800, -0.02), Body: cat("body", 16, 1.25, 1.45, 500, 0), UI: cat("ui", 14, 1.2, 1.4, 500, 0, STEPS_UI) } },
+];
+
+const DEFAULT_TYPE = { treatment: "product", bodyBase: 16 };
+
+function buildCategory(p, factor) {
+  const out = {};
+  for (const [name, n] of p.steps) {
+    const size = Math.max(8, Math.round(p.base * factor * p.ratio ** n));
+    out[name] = {
+      size,
+      lineHeight: Math.round(size * p.leading),
+      letterSpacing: round(size * p.trackingEm, 2),
+      weight: p.weight,
+      paragraphSpacing: size,
+      paragraphIndent: 0,
+    };
+  }
+  return out;
+}
+
+// typeScale — the resolved scale for a config { treatment, bodyBase }. `bodyBase` (the Body base size)
+// uniformly scales every category so the whole system grows/shrinks together while keeping its ratios.
+function typeScale(config = {}) {
+  const t = TYPE_TREATMENTS.find((x) => x.id === config.treatment) || TYPE_TREATMENTS[0];
+  const bodyBase = Number(config.bodyBase) || t.categories.Body.base;
+  const factor = bodyBase / t.categories.Body.base;
+  const categories = {};
+  for (const [name, p] of Object.entries(t.categories)) categories[name] = buildCategory(p, factor);
+  return { treatment: t.id, label: t.label, fonts: { ...t.fonts }, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories };
+}
+
+// ── emitters ───────────────────────────────────────────────────────────────────────────────────
+const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+// typeTokensCSS — CSS custom properties (font families + per-step size/line/tracking/weight) plus a
+// utility class per step. Drop-in: `class="type-display-xl"`.
+function typeTokensCSS(scale) {
+  const lines = [":root {"];
+  for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: ${family};`);
+  for (const [cName, steps] of Object.entries(scale.categories)) {
+    for (const [sName, s] of Object.entries(steps)) {
+      const p = `--type-${kebab(cName)}-${kebab(sName)}`;
+      lines.push(`  ${p}-size: ${s.size}px; ${p}-line: ${s.lineHeight}px; ${p}-tracking: ${s.letterSpacing}px; ${p}-weight: ${s.weight};`);
+    }
+  }
+  lines.push("}");
+  for (const [cName, steps] of Object.entries(scale.categories)) {
+    const role = scale.roleOf[cName] || "body";
+    for (const sName of Object.keys(steps)) {
+      const c = kebab(cName), s = kebab(sName);
+      lines.push(`.type-${c}-${s} { font-family: var(--font-${role}); font-size: var(--type-${c}-${s}-size); line-height: var(--type-${c}-${s}-line); letter-spacing: var(--type-${c}-${s}-tracking); font-weight: var(--type-${c}-${s}-weight); }`);
+    }
+  }
+  return lines.join("\n") + "\n";
+}
+
+// typeTokensDTCG — the type scale as DTCG tokens: a fontFamily group + a typography group per
+// category/step (composite `typography` $type, the W3C-DTCG shape).
+function typeTokensDTCG(scale) {
+  const fontFamily = {};
+  for (const [role, family] of Object.entries(scale.fonts)) fontFamily[role] = { $type: "fontFamily", $value: family };
+  const typography = {};
+  for (const [cName, steps] of Object.entries(scale.categories)) {
+    const role = scale.roleOf[cName] || "body";
+    typography[cName] = {};
+    for (const [sName, s] of Object.entries(steps)) {
+      typography[cName][sName] = {
+        $type: "typography",
+        $value: { fontFamily: scale.fonts[role], fontSize: `${s.size}px`, lineHeight: `${s.lineHeight}px`, letterSpacing: `${s.letterSpacing}px`, fontWeight: s.weight, paragraphSpacing: `${s.paragraphSpacing}px`, paragraphIndent: `${s.paragraphIndent}px` },
+      };
+    }
+  }
+  return { fontFamily, typography };
+}
+
+return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, typeScale, typeTokensCSS, typeTokensDTCG };
+})();
 __M.persist = (function(){
 // persist.js — UI state persistence for the HCT Palette Generator.
 //
@@ -2358,10 +2513,23 @@ function hydrate(snapshot) {
     theme: clampEnum(s.theme, DOMAINS.theme.values, DOMAINS.theme.default),
     selected,
     roleOverrides: clampOverrides(s.roleOverrides),
+    type: clampType(s.type),
     palettes,
     ...(typeof s.vol === "string" && s.vol ? { vol: s.vol } : {}),
     ...(story ? { story } : {}),
   };
+}
+
+// clampType — the typography config (treatment + body base). Treatment to a known id, base size to a
+// sane integer range. Identity-preserving for an in-domain value (so the roundtrip gate holds).
+const TYPE_TREATMENTS = ["product", "luxury", "editorial", "technical", "statement"];
+function clampType(t) {
+  t = (t && typeof t === "object") ? t : {};
+  const treatment = TYPE_TREATMENTS.includes(t.treatment) ? t.treatment : "product";
+  let bodyBase = Number(t.bodyBase);
+  if (!Number.isFinite(bodyBase)) bodyBase = 16;
+  bodyBase = Math.max(10, Math.min(32, Math.round(bodyBase)));
+  return { treatment, bodyBase };
 }
 
 return { STORAGE_KEY, DOMAINS, serialize, hydrate };
@@ -3552,6 +3720,7 @@ const ICONS = {
   "upload": "<path d=\"M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z\"/>",
   "flag": "<path d=\"M42.76,50A8,8,0,0,0,40,56V224a8,8,0,0,0,16,0V179.77c26.79-21.16,49.87-9.75,76.45,3.41,16.4,8.11,34.06,16.85,53,16.85,13.93,0,28.54-4.75,43.82-18a8,8,0,0,0,2.76-6V56A8,8,0,0,0,218.76,50c-28,24.23-51.72,12.49-79.21-1.12C111.07,34.76,78.78,18.79,42.76,50ZM216,172.25c-26.79,21.16-49.87,9.74-76.45-3.41-25-12.35-52.81-26.13-83.55-8.4V59.79c26.79-21.16,49.87-9.75,76.45,3.4,25,12.35,52.82,26.13,83.55,8.4Z\"/>",
   "roles": "<path d=\"M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z\"/>",
+  "type": "<path d=\"M208,56V88a8,8,0,0,1-16,0V64H136V192h24a8,8,0,0,1,0,16H96a8,8,0,0,1,0-16h24V64H64V88a8,8,0,0,1-16,0V56a8,8,0,0,1,8-8H200A8,8,0,0,1,208,56Z\"/>",
   "dot": "<circle cx=\"128\" cy=\"128\" r=\"60\"/>",
   "sun": "<path d=\"M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z\"/>",
   "moon": "<path d=\"M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z\"/>",
@@ -3606,6 +3775,7 @@ const { hctToRgb, lstarFromRgb, cam16FromRgb, peakC } = __M.hct;
 const { oklchToRgb } = __M.okhsl;
 const { paletteStops, effHue, STOPS, EXPORT_STOPS, DEFAULT_CONTROLS } = __M.tonal;
 const { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAccentRef } = __M.semantic;
+const { typeScale, DEFAULT_TYPE } = __M.type;
 const { exportCSS, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, SCRIM_BASES, SCRIM_STEPS } = __M.exports;
 
 // Re-export the scrim model so the UI (app.js) can build the Mapping tab's re-point targets from the
@@ -3687,6 +3857,7 @@ function defaultDocument() {
     theme: "auto",
     selected: 0,
     roleOverrides: {}, // per-doc semantic-mapping re-points (empty = canonical role table)
+    type: { ...DEFAULT_TYPE }, // typography config (treatment + body base) — see engine/type.mjs
   };
 }
 
@@ -3762,7 +3933,7 @@ function brandKit(doc) {
     for (const role of p.roles) r[role.key] = { light: role.lightHex, dark: role.darkHex };
     roles[slug(p.name)] = r;
   }
-  return { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Color Tokens by NONOUN", stops, palettes, roles };
+  return { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Color Tokens by NONOUN", stops, palettes, roles, type: typeScale(doc.type || DEFAULT_TYPE) };
 }
 
 // WCAG relative-luminance contrast ratio between two [r,g,b] int triples.
@@ -4052,6 +4223,7 @@ const { FIGMA_PLUGIN } = __M.figmaPlugin;
 const { MCP_BRAND_KIT } = __M.mcpAssets;
 const { CATEGORY_INDEX, loadCategory } = __M.categoryIndex;
 const { deriveNeutral, deriveRelative, RELATIONSHIPS } = __M.derive;
+const { typeScale, typeTokensCSS, typeTokensDTCG, TYPE_TREATMENTS, DEFAULT_TYPE } = __M.type;
 const { zipStore } = __M.zip;
 const { icon, brandMark } = __M.icons;
 
@@ -4337,6 +4509,7 @@ class HctApp extends HTMLElement {
     this.applyGateRebuild = false; // the pending action: false = apply, true = regroup
     this.applyGateDontShow = false; // the "don't show again" checkbox (transient, reset on open)
     this.settingsOpen = false; // the Settings modal (token-mapping + app prefs)
+    this.typeOpen = false; // the Typography modal (type-scale treatment + specimen + export)
     this.figmaFile = "light"; // which Figma mode file the Figma tab previews/downloads
     this.hover = null; // hovered swatch info for footers
     this.search = "";
@@ -4694,6 +4867,7 @@ class HctApp extends HTMLElement {
     this._syncNewPal(); // same, for the New-Palette modal
     this._syncApplyGate(); // same, for the Apply-to-Figma consent gate
     this._syncSettings(); // same, for the Settings modal
+    this._syncTypography(); // same, for the Typography modal
   }
 
   // _syncDrawer — reconcile the native export <dialog> with this.exportOpen AFTER each render.
@@ -5213,6 +5387,7 @@ class HctApp extends HTMLElement {
       this.renderNewPalette(view),
       this.renderApplyGate(),
       this.renderSettings(),
+      this.renderTypography(),
       this.toastEl || (this.toastEl = h("div", { class: "toast", role: "status", "aria-live": "polite" })),
     );
   }
@@ -5254,6 +5429,7 @@ class HctApp extends HTMLElement {
       btn(icon("arrow-counter-clockwise"), { cls: "undo-btn", title: "Undo (⌘Z)", ariaLabel: "Undo", disabled: !this.canUndo(), onclick: () => this.undo() }),
       btn(icon("arrow-clockwise"), { cls: "redo-btn", title: "Redo (⇧⌘Z)", ariaLabel: "Redo", disabled: !this.canRedo(), onclick: () => this.redo() }),
       this.themeBtn(),
+      btn(icon("type"), { cls: "type-btn", title: "Typography — type scale + treatments", ariaLabel: "Typography", onclick: () => this.openTypography() }),
       btn(icon("gear"), { cls: "settings-btn", title: "Settings — token mapping & preferences", ariaLabel: "Settings", onclick: () => this.openSettings() }),
       btn([icon("plus"), "New"], { onclick: () => this.createSet() }),
       btn([icon("export"), "Export"], { variant: "primary", cls: "export-open-btn", title: "Open export drawer", onclick: () => this.toggleDrawer(true) }),
@@ -7985,6 +8161,109 @@ class HctApp extends HTMLElement {
         { class: "settings-foot" },
         h("div", { class: "spacer" }),
         btn("Done", { variant: "primary", onclick: () => this.closeSettings() }),
+      ),
+    );
+  }
+
+  // ── Typography modal (type-scale treatment + live specimen + export) ──────────────────
+  openTypography() { this.typeOpen = true; this.render(); }
+  closeTypography() { this.typeOpen = false; this.render(); }
+  _syncTypography() {
+    const d = this.querySelector(".typo");
+    if (!d || typeof d.showModal !== "function") return;
+    if (this.typeOpen && !d.open) { try { d.showModal(); } catch { /* not attached */ } }
+    else if (!this.typeOpen && d.open) { try { d.close(); } catch { /* already closed */ } }
+  }
+  // download the resolved type tokens (CSS utility classes + DTCG typography tokens) as one .zip.
+  downloadTypeTokens() {
+    const scale = typeScale(this.doc.type || DEFAULT_TYPE);
+    const files = [
+      { name: "type.css", data: typeTokensCSS(scale) },
+      { name: "type.tokens.json", data: JSON.stringify(typeTokensDTCG(scale), null, 2) },
+    ];
+    this.downloadBytes(zipStore(files), "type-tokens.zip", "application/zip");
+    this.toast("Type tokens downloaded");
+  }
+  // a sample line rendered in the resolved style for one category/step (font falls back gracefully).
+  _typeSample(scale, cat, step, text) {
+    const s = scale.categories[cat] && scale.categories[cat][step];
+    if (!s) return false;
+    const role = scale.roleOf[cat] || "body";
+    const fam = scale.fonts[role] || "Inter";
+    const generic = role === "mono" || /mono/i.test(fam) ? "monospace" : /serif/i.test(fam) ? "serif" : "sans-serif";
+    return h(
+      "div",
+      { class: "typo-line" },
+      h("span", { class: "typo-step" }, `${step} · ${s.size}/${s.lineHeight}`),
+      h("div", { class: "typo-sample", style: `font-family:${fam}, ${generic};font-size:${s.size}px;line-height:${s.lineHeight}px;letter-spacing:${s.letterSpacing}px;font-weight:${s.weight}` }, text),
+    );
+  }
+  renderTypography() {
+    const cfg = this.doc.type || DEFAULT_TYPE;
+    const scale = typeScale(cfg);
+    const t = TYPE_TREATMENTS.find((x) => x.id === cfg.treatment) || TYPE_TREATMENTS[0];
+    const SAMPLE = { Display: "Yao Ming", Heading: "Latest Stories", Body: "Follow the latest updates, highlights, and analysis from across the league.", UI: "26 PTS · 13 REB · 3 BLK · +9 +/−" };
+    const SHOW = { Display: ["XL", "MD"], Heading: ["XL", "MD", "XS"], Body: ["LG", "MD", "XS"], UI: ["XL", "MD", "XS"] };
+    const baseReadout = h("b", {}, cfg.bodyBase + "px");
+    return h(
+      "dialog",
+      {
+        class: "typo",
+        "aria-label": "Typography",
+        onclick: (e) => { if (e.target === e.currentTarget) this.closeTypography(); },
+        oncancel: (e) => { e.preventDefault(); this.closeTypography(); },
+      },
+      h(
+        "div",
+        { class: "drawer-head" },
+        h("h3", {}, icon("type"), "Typography"),
+        h("div", { class: "spacer" }),
+        btn(icon("x"), { ariaLabel: "Close typography", onclick: () => this.closeTypography() }),
+      ),
+      h(
+        "div",
+        { class: "typo-controls" },
+        h(
+          "div",
+          { class: "field" },
+          h("label", { for: "typo-treatment" }, "Treatment"),
+          h(
+            "select",
+            { id: "typo-treatment", "aria-label": "Treatment", onchange: (e) => this.commit((d) => { d.type = { ...(d.type || DEFAULT_TYPE), treatment: e.target.value }; }) },
+            ...TYPE_TREATMENTS.map((x) => h("option", { value: x.id, selected: cfg.treatment === x.id ? true : undefined }, x.label)),
+          ),
+        ),
+        h(
+          "div",
+          { class: "field" },
+          h("label", {}, "Body base", baseReadout),
+          h("input", {
+            type: "range", "data-fk": "typo:base", "aria-label": "Body base size",
+            min: 12, max: 22, step: 1, value: cfg.bodyBase,
+            oninput: (e) => { baseReadout.textContent = e.target.value + "px"; },
+            onchange: (e) => this.commit((d) => { d.type = { ...(d.type || DEFAULT_TYPE), bodyBase: parseInt(e.target.value, 10) }; }),
+          }),
+        ),
+      ),
+      h("p", { class: "typo-note" }, t.note + " — fonts are swappable; the size scale, optical tracking, weight, and leading are the system."),
+      h(
+        "div",
+        { class: "typo-specimen" },
+        ...["Display", "Heading", "Body", "UI"].map((cat) =>
+          h(
+            "div",
+            { class: "typo-cat" },
+            h("div", { class: "typo-cat-head" }, h("b", {}, cat), h("small", {}, scale.fonts[scale.roleOf[cat]])),
+            ...SHOW[cat].map((step) => this._typeSample(scale, cat, step, SAMPLE[cat])),
+          ),
+        ),
+      ),
+      h(
+        "div",
+        { class: "typo-foot" },
+        btn([icon("download"), "Download type tokens"], { title: "CSS utility classes + DTCG typography tokens, as a .zip", onclick: () => this.downloadTypeTokens() }),
+        h("div", { class: "spacer" }),
+        btn("Done", { variant: "primary", onclick: () => this.closeTypography() }),
       ),
     );
   }

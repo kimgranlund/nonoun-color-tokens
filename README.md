@@ -49,6 +49,10 @@ collections.
 - **Exports.** CSS (Hex or **OKLCH**), **Tailwind v4**, **shadcn/ui**, **Figma** variables,
   **Figma UI3** (Material), **DTCG**, **JSON**, a re-importable parametric **Config**, and a
   **Download-all `.zip`** of every format.
+- **Typography.** The type analog of the color engine — a few params → a **systematic type scale**
+  (Display · Heading · Body · UI), with derived size (modular scale), optical letter-spacing, leading, and
+  weight. Pick a **treatment** (Lifestyle, Luxury, Editorial, Technical, Brutalist), preview a live
+  specimen, export **CSS + DTCG** type tokens.
 - **Brand-Kit MCP.** Download a **zero-dependency MCP server** pre-filled with your tokens — point
   **Claude Code / Cursor / any MCP agent** at it (`node brand-kit-server.mjs`) and it serves your
   palettes, ramps, and the resolved 37-role semantic layer (light + dark) so the agent builds with your

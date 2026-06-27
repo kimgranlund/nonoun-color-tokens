@@ -149,6 +149,14 @@ try {
   console.log("  · screenshot → smoke-out/settings.png");
   await evalJS(`${el}.closeSettings()`); await sleep(120);
 
+  // Typography modal: treatment + live specimen (Display / Heading / Body / UI).
+  await evalJS(`${el}.openTypography()`); await sleep(300);
+  ok(await evalJS(`(()=>{const d=${el}.querySelector("dialog.typo");return !!d && d.open && ${el}.querySelectorAll(".typo-cat").length===4 && ${el}.querySelectorAll(".typo-sample").length>=6})()`), "Typography modal opens with the 4-voice specimen");
+  const tyShot = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(resolve(OUT, "typography.png"), Buffer.from(tyShot.data, "base64"));
+  console.log("  · screenshot → smoke-out/typography.png");
+  await evalJS(`${el}.closeTypography()`); await sleep(120);
+
   const shot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(resolve(OUT, "editor.png"), Buffer.from(shot.data, "base64"));
   console.log("  · screenshot → smoke-out/editor.png");
