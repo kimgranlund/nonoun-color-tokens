@@ -8,7 +8,7 @@
 //
 // CONTRACT (the load-bearing checks):
 //   bindingTargets(paletteNames) -> de-duped, sorted string[] of every raw-colors target
-//     the binder aliases. For each palette n, for each of its 49 semantic roles, BOTH the
+//     the binder aliases. For each palette n, for each of its 53 semantic roles, BOTH the
 //     light and the dark ref become a target "{n}/{refKey(ref)}". Because every target is
 //     refKey(ref) of a ref drawn from the validated role table (solid stops in EXPORT_STOPS
 //     -> pad3; scrims on base 500 / 250 / 500 with alpha% = step/10 -> "{base}-{step}" verbatim),
