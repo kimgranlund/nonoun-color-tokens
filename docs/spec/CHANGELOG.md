@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 1.43 — 2026-06-26 — Type ↔ Geometry composition + Geometry → Figma number variables
+
+The two new systems now **cohere**. A control's box and its text share **one number**: `geomScale(config,
+{ typeScale })` takes the per-size text `font` from the type scale's **UI voice** at the matching step
+(geometry XS → UI XS … 2XL → UI 2XL) instead of the standalone power law — so the brand's body base /
+treatment drives the control text everywhere. Only the rhythm follows (`caret = font`, `gap = font/2`);
+the **frame** (height/icon/padding/radius) is untouched, so the centering law still holds exactly. The
+single join point is `geometryScale(doc)` in model.mjs (used by `brandKit`, the Geometry modal, and every
+geometry export); the engine stays decoupled (no-opts `geomScale` is still the pure power law). The modal
+shows a "font comes from the Typography UI scale" note + the composed sizes; `geomScale` reports a `typed`
+flag. Separately, `geomTokensFigma(scale)` emits a **"Geometry" collection of DTCG `number` tokens**
+(unitless FLOAT values) — the shape a Figma variable importer turns into native **number variables**
+(height · icon · font · gap · padding · radius · space) — shipped as `figma/dimension.variables.json` in
+Download-All + the geometry `.zip`. Covered by `test/engine/geometry.mjs` (the composed font = the type UI
+size, the frame untouched, the number-variable emit), `(geo)`/`(ee)` headless (the app + brandKit share the
+font; the renamed Figma variables file is number-typed), and `test/mcp/brand-kit.mjs` (the served geometry
+font is composed end-to-end).
+
 ## 1.42 — 2026-06-26 — Per-system export opt-in (Color · Typography · Geometry)
 
 The three token systems are now **independently selectable at export**. The export drawer grows an

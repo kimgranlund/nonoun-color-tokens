@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // geometry.mjs — verifier for the dimensional engine (src/engine/geometry.mjs). Pure, no DOM.
 import * as G from "../../src/engine/geometry.mjs";
+import { typeScale } from "../../src/engine/type.mjs";
 
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
@@ -84,6 +85,32 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(d.size && d.radius && d.space, "DTCG has size/radius/space groups");
   ok(d.size.MD.height.$type === "dimension" && /px$/.test(d.size.MD.height.$value), "DTCG dimension token (px value)");
   ok(d.size.MD.padding.$type === "dimension" && d.radius.full.$type === "dimension", "DTCG padding + radius are dimension tokens");
+}
+
+// ── COMPOSITION with typography: the per-step `font` comes from the type UI scale, the frame is untouched ──
+{
+  const ts = typeScale({ treatment: "product", bodyBase: 16 });
+  const standalone = G.geomScale({ treatment: "comfortable", baseHeight: 28 });
+  const composed = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { typeScale: ts });
+  ok(composed.typed === true && standalone.typed === false, "geomScale reports `typed` only when a type scale is supplied");
+  for (const name of ["XS", "SM", "MD", "LG", "XL", "2XL"]) {
+    ok(composed.sizes[name].font === ts.categories.UI[name].size, `${name}: composed font = type UI ${name} size (${composed.sizes[name].font} vs ${ts.categories.UI[name].size})`);
+    ok(composed.sizes[name].caret === composed.sizes[name].font, `${name}: caret follows the shared font`);
+    // the FRAME is unchanged by composition — the centering law still holds with the shared font
+    ok(composed.sizes[name].height === standalone.sizes[name].height && composed.sizes[name].padding === standalone.sizes[name].padding, `${name}: composition leaves height + padding (the frame) untouched`);
+    ok(composed.sizes[name].padding === (composed.sizes[name].height - composed.sizes[name].icon) / 2, `${name}: centering law holds on the composed scale`);
+  }
+  // the two engines share ONE number — a bigger body base scales the control text too
+  const big = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { typeScale: typeScale({ treatment: "product", bodyBase: 22 }) });
+  ok(big.sizes.MD.font > composed.sizes.MD.font, "a larger type bodyBase scales the geometry font (shared source of truth)");
+}
+
+// ── Figma number-variable emit: a "Geometry" collection of unitless FLOAT tokens ──
+{
+  const f = G.geomTokensFigma(G.geomScale({ treatment: "comfortable" }));
+  ok(f.Geometry && f.Geometry.size && f.Geometry.radius && f.Geometry.space, "Figma export wraps a Geometry collection (size/radius/space)");
+  ok(f.Geometry.size.MD.height.$type === "number" && typeof f.Geometry.size.MD.height.$value === "number", "Figma tokens are number ($type number, numeric unitless value)");
+  ok(f.Geometry.radius.full.$type === "number" && f.Geometry.space["4"].$type === "number", "radius + space are number variables too");
 }
 
 if (fails.length) { console.error(`geometry FAIL (${fails.length}):\n  ` + fails.join("\n  ")); process.exit(1); }

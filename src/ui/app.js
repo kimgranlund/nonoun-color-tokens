@@ -20,6 +20,7 @@ import {
   seedFromKeyColor,
   hexToOklch,
   brandKit,
+  geometryScale,
   SCRIM_BASES,
   SCRIM_STEPS,
 } from "./model.mjs";
@@ -29,7 +30,7 @@ import { MCP_BRAND_KIT } from "./mcp-assets.js";
 import { CATEGORY_INDEX, loadCategory } from "./categories/index.js";
 import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.mjs";
 import { typeScale, typeTokensCSS, typeTokensDTCG, TYPE_TREATMENTS, DEFAULT_TYPE } from "../engine/type.mjs";
-import { geomScale, geomTokensCSS, geomTokensDTCG, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
+import { geomTokensCSS, geomTokensDTCG, geomTokensFigma, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
 import { icon, brandMark } from "./icons.js";
 
@@ -3592,7 +3593,7 @@ class HctApp extends HTMLElement {
     // the per-system token output for the Typography / Geometry format tabs (the colour formats live on
     // view.exports). Computed from the same engines the modals + the Brand-Kit MCP use.
     const typeSc = typeScale(this.doc.type || DEFAULT_TYPE);
-    const geomSc = geomScale(this.doc.geometry || DEFAULT_GEOMETRY);
+    const geomSc = geometryScale(this.doc);
     const SYSTEM_CODE = {
       "type-css": () => typeTokensCSS(typeSc),
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc), null, 2),
@@ -3827,12 +3828,12 @@ class HctApp extends HTMLElement {
       );
     }
     if (sys.geometry) {
-      const gsc = geomScale(this.doc.geometry || DEFAULT_GEOMETRY);
+      const gsc = geometryScale(this.doc); // composed with the type scale (the per-step `font` is shared)
       const gDtcg = JSON.stringify(geomTokensDTCG(gsc), null, 2);
       files.push(
         { name: "geometry/geometry.css", data: geomTokensCSS(gsc) },
         { name: "geometry/geometry.tokens.json", data: gDtcg },
-        { name: "figma/dimension.tokens.json", data: gDtcg }, // importable as Figma number/dimension variables
+        { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
       );
     }
     // the re-importable parametric config — ALWAYS (it carries the colour + type + geometry params).
@@ -4197,12 +4198,15 @@ class HctApp extends HTMLElement {
     if (this.geomOpen && !d.open) { try { d.showModal(); } catch { /* not attached */ } }
     else if (!this.geomOpen && d.open) { try { d.close(); } catch { /* already closed */ } }
   }
-  // download the resolved geometry tokens (CSS custom props + utility classes + DTCG dimension tokens).
+  // download the resolved geometry tokens — CSS custom props + utility classes, DTCG dimension tokens, and
+  // a Figma NUMBER-variable file (the "Geometry" collection). The scale is composed with the type scale so
+  // the per-step `font` is the brand's UI text size.
   downloadGeomTokens() {
-    const scale = geomScale(this.doc.geometry || DEFAULT_GEOMETRY);
+    const scale = geometryScale(this.doc);
     const files = [
       { name: "geometry.css", data: geomTokensCSS(scale) },
       { name: "geometry.tokens.json", data: JSON.stringify(geomTokensDTCG(scale), null, 2) },
+      { name: "dimension.variables.json", data: JSON.stringify(geomTokensFigma(scale), null, 2) },
     ];
     this.downloadBytes(zipStore(files), "geometry-tokens.zip", "application/zip");
     this.toast("Geometry tokens downloaded");
@@ -4233,7 +4237,7 @@ class HctApp extends HTMLElement {
   }
   renderGeometry() {
     const cfg = this.doc.geometry || DEFAULT_GEOMETRY;
-    const scale = geomScale(cfg);
+    const scale = geometryScale(this.doc); // composed with the type scale — the per-step `font` is the brand's UI text size
     const t = GEOMETRY_TREATMENTS.find((x) => x.id === cfg.treatment) || GEOMETRY_TREATMENTS[0];
     const baseReadout = h("b", {}, scale.baseHeight + "px");
     return h(
@@ -4277,6 +4281,9 @@ class HctApp extends HTMLElement {
         ),
       ),
       h("p", { class: "typo-note" }, t.note + " — every glyph centers in a square cell of side = the control height, so edge padding = (height − glyph) / 2. The ramp + paddings are computed, not authored."),
+      scale.typed
+        ? h("p", { class: "geom-shared-note" }, icon("type"), h("span", {}, "Text size (", h("b", {}, "font"), ") per step comes from the ", h("b", {}, "Typography UI"), " scale — one source of truth, so a control's box and its text stay in sync."))
+        : false,
       h(
         "div",
         { class: "geom-specimen" },

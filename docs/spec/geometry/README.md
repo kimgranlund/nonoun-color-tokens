@@ -52,6 +52,24 @@ These reproduce the hand-tuned reference ramp to ±1px — so the table is not s
 | `radius` | the flat radius ladder — `none · sm · md · lg · full` (full = the CSS-pill `9999px`) |
 | `space` | the `--space-*` layout scale (page/section/card rhythm — the space **between** components, a separate concern from control padding) |
 
+## Composition with typography (one number, two engines)
+
+A control's **box** (geometry) and the **text** in it (typography) share a single source of truth: the
+app resolves geometry via `geometryScale(doc) = geomScale(doc.geometry, { typeScale: typeScale(doc.type) })`,
+which replaces each size's power-law `font` with the type scale's **UI voice** at the matching step
+(geometry `XS → UI XS … 2XL → UI 2XL`). So changing the brand's type treatment or body base moves the
+control text everywhere it's used. Only the *rhythm* follows (`caret = font`, `gap = font/2`); the *frame*
+(height/icon/padding/radius) is untouched, so the centering law still holds. The pure engine
+(`geomScale(config)` with no opts) keeps the standalone power-law `font`; the sample above is that pure
+output.
+
+## Figma number variables (`dimension.variables.json`)
+
+`geomTokensFigma(scale)` emits the same numbers as **DTCG `number` tokens** (unitless) under a top-level
+**`Geometry`** group — the shape a Figma variable importer turns into native **FLOAT variables** you bind
+to auto-layout sizing, corner radius, and gaps. Shipped in the Download-All `figma/` folder + the geometry
+`.zip` (px is 1:1 with Figma's unitless floats).
+
 ## The parameters (what the generator derives from)
 
 Mirroring color (`{hue, chroma, distribution}`) and type (`{ base, ratio, leading, … }`), geometry derives

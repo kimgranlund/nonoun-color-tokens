@@ -28,6 +28,13 @@ import {
 import { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAccentRef } from "../engine/semantic.js";
 import { typeScale, DEFAULT_TYPE } from "../engine/type.mjs";
 import { geomScale, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
+
+// geometryScale — the resolved geometry for a doc, COMPOSED with its type scale so a control's text size
+// (the per-step `font`) comes from the brand's Typography UI voice (one source of truth). The single place
+// the two systems are joined; brandKit + the app's Geometry modal/exports all go through it.
+export function geometryScale(doc) {
+  return geomScale(doc.geometry || DEFAULT_GEOMETRY, { typeScale: typeScale(doc.type || DEFAULT_TYPE) });
+}
 import {
   exportCSS,
   exportOKLCH,
@@ -205,7 +212,7 @@ export function brandKit(doc, systems) {
     }
   }
   if (sys.type) kit.type = typeScale(doc.type || DEFAULT_TYPE);
-  if (sys.geometry) kit.geometry = geomScale(doc.geometry || DEFAULT_GEOMETRY);
+  if (sys.geometry) kit.geometry = geometryScale(doc); // composed with the type scale (shared `font`)
   return kit;
 }
 

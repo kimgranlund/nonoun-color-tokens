@@ -67,10 +67,12 @@ const SPACE_STEPS = [0, 1, 2, 3, 4, 6, 8, 12, 16, 24];
 
 // buildSize — derive the full geometry of one size row from its (scaled) control height + the density.
 // Everything below the height is DERIVED — the glyphs by the power law, the pads by the centering law.
-function buildSize(rawHeight, density) {
+// `fontOverride` (when the geometry COMPOSES with a type scale) replaces the power-law text size with the
+// type scale's UI voice at the matching step, so a control's box and its text share ONE number.
+function buildSize(rawHeight, density, fontOverride) {
   const height = roundEven(rawHeight);
   const icon = roundEven(2.49 * height ** 0.58); // frame family — the leading content-icon / slot side
-  const font = round(3.16 * height ** 0.45); // ≈ √h — the text size
+  const font = fontOverride != null ? fontOverride : round(3.16 * height ** 0.45); // ≈ √h — the text size
   const caret = font; // rhythm family — the affordance mark = text height (the v4 rule)
   return {
     height,
@@ -87,17 +89,24 @@ function buildSize(rawHeight, density) {
 
 // geomScale — the resolved geometry for a config { treatment, baseHeight }. `baseHeight` (the MD control
 // height) uniformly scales the whole ramp; the treatment seeds density + the radius ladder + spacing.
-export function geomScale(config = {}) {
+//
+// COMPOSITION with typography: pass `opts.typeScale` (a resolved `typeScale(...)`) and each size's text
+// `font` comes from the type scale's UI voice at the MATCHING step (XS→UI XS … 2XL→UI 2XL) instead of the
+// standalone power law — so the box (geometry) and the text in it (typography) share one source of truth.
+// `caret = font` and `gap = font/2` follow; the FRAME (height/icon/pad/radius) is untouched, so the
+// centering law still holds. `typed` reports whether the fonts came from the type scale.
+export function geomScale(config = {}, opts = {}) {
   const t = GEOMETRY_TREATMENTS.find((x) => x.id === config.treatment) || GEOMETRY_TREATMENTS[0];
   const baseHeight = Number(config.baseHeight) || t.baseHeight;
   const factor = baseHeight / CANON_MD;
+  const uiSteps = opts.typeScale && opts.typeScale.categories && opts.typeScale.categories.UI;
   const sizes = {};
-  for (const [name, h] of SIZES) sizes[name] = buildSize(h * factor, t.density);
+  for (const [name, h] of SIZES) sizes[name] = buildSize(h * factor, t.density, uiSteps && uiSteps[name] ? uiSteps[name].size : null);
   const ladder = RADIUS_LADDERS[t.radiusStyle] || RADIUS_LADDERS.soft;
   const radii = { none: ladder[0], sm: ladder[1], md: ladder[2], lg: ladder[3], full: 9999 };
   const space = {};
   SPACE_STEPS.forEach((m, i) => { space[i] = m * t.spaceBase; });
-  return { treatment: t.id, label: t.label, density: t.density, radiusStyle: t.radiusStyle, baseHeight, sizes, radii, space };
+  return { treatment: t.id, label: t.label, density: t.density, radiusStyle: t.radiusStyle, baseHeight, typed: !!uiSteps, sizes, radii, space };
 }
 
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
@@ -139,4 +148,26 @@ export function geomTokensDTCG(scale) {
   const space = {};
   for (const [k, v] of Object.entries(scale.space)) space[k] = dim(v);
   return { size, radius, space };
+}
+
+// geomTokensFigma — the geometry as DTCG `number` tokens (UNITLESS values), the shape a Figma variable
+// importer turns into **FLOAT (number) variables** — a "Geometry" collection with size/radius/space groups
+// (px is 1:1 with Figma's unitless floats). Same numbers as the DTCG dimension export, minus the `px`
+// suffix, so height/icon/font/gap/padding/radius/space land as native number variables you can bind to
+// auto-layout, corner radius, gaps, and sizing.
+export function geomTokensFigma(scale) {
+  const num = (v) => ({ $type: "number", $value: v });
+  const size = {};
+  for (const [name, s] of Object.entries(scale.sizes)) {
+    size[name] = {
+      height: num(s.height), icon: num(s.icon), caret: num(s.caret), font: num(s.font),
+      gap: num(s.gap), padding: num(s.padding), edgePadding: num(s.edgePadding),
+      radius: num(s.radiusPill), minWidth: num(s.minWidth),
+    };
+  }
+  const radius = {};
+  for (const [k, v] of Object.entries(scale.radii)) radius[k] = num(v);
+  const space = {};
+  for (const [k, v] of Object.entries(scale.space)) space[k] = num(v);
+  return { Geometry: { size, radius, space } };
 }

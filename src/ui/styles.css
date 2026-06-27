@@ -1074,6 +1074,8 @@ dialog.geom {
 }
 dialog.geom:not([open]) { display: none; }
 dialog.geom::backdrop { background: rgba(10,14,22,.34); }
+.geom-shared-note { display: flex; align-items: center; gap: 6px; margin: 8px 16px 0; padding: 6px 10px; border-radius: var(--r-sm); background: var(--c-neutral-container); color: var(--ink-dim); font-size: 11.5px; line-height: 1.45; }
+.geom-shared-note .ic { flex: none; color: var(--accent); }
 .geom-specimen { padding: 14px 16px; overflow: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 .geom-line { display: flex; gap: 16px; align-items: center; }
 .geom-step { flex: none; width: 70px; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; }

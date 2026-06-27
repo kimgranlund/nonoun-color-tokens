@@ -997,8 +997,10 @@ ok(eocdSig && entries === 21, `(ee) the EOCD reports 21 entries — colour (10) 
 const zipText = Buffer.from(zb).toString("latin1");
 const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "nonoun-color-tokens-my-set-config.json",
   "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt",
-  "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.tokens.json"];
+  "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.variables.json"];
 ok(wantPaths.every((p) => zipText.includes(p)), "(ee) every colour format + typography/ + geometry/ + the config + the figma-aliased/ cascade variant is present in the archive");
+// the Figma dimension file is NUMBER-typed (FLOAT variables), not the px dimension strings — so Figma imports it as number variables
+ok(zipText.includes("dimension.variables.json") && /"\$type":\s*"number"/.test(zipText) && zipText.includes('"Geometry"'), "(ee) figma/dimension.variables.json is a Geometry collection of number ($type number) variables");
 // the aliased variant carries com.figma.aliasData (the cascade); the default figma/ does not (ADR-002 resolved).
 ok(zipText.includes("com.figma.aliasData") && zipText.includes("Color Primitives"), "(ee) figma-aliased/ carries com.figma.aliasData targeting Color Primitives (the OD-004 cascade variant)");
 
@@ -1323,13 +1325,23 @@ app.openGeometry(); flushRaf();
 ok(app.geomOpen === true && !!app.querySelector(".geom"), "(geo) openGeometry shows the Geometry <dialog>");
 ok(app.querySelectorAll(".geom-line").length === 6, "(geo) the specimen shows the 6-step ramp (XS..2XL)");
 const { geomScale: gScale } = await import("../../src/engine/geometry.mjs");
-const { brandKit: bkGeo } = await import("../../src/ui/model.mjs");
+const { brandKit: bkGeo, geometryScale: geoScaleOf } = await import("../../src/ui/model.mjs");
+const { typeScale: tScaleGeo } = await import("../../src/engine/type.mjs");
 app.commit((d) => { d.geometry = { treatment: "spacious", baseHeight: 40 }; }); flushRaf();
 const gsc = gScale(app.doc.geometry);
 ok(gsc.treatment === "spacious" && gsc.baseHeight === 40, `(geo) treatment + base apply (treatment ${gsc.treatment}, base ${gsc.baseHeight})`);
 ok(gsc.sizes.MD.padding === (gsc.sizes.MD.height - gsc.sizes.MD.icon) / 2, "(geo) the centering law holds on the resolved scale (pad = (h−icon)/2)");
 ok(hydSet(serSet(app.doc)).geometry.treatment === "spacious" && hydSet(serSet(app.doc)).geometry.baseHeight === 40, "(geo) the geometry config round-trips through persist");
 ok(bkGeo(app.doc).geometry && bkGeo(app.doc).geometry.sizes && bkGeo(app.doc).geometry.treatment === "spacious", "(geo) brandKit carries the geometry scale (the MCP serves it)");
+// COMPOSITION: the geometry the app/brandKit resolves shares its per-step `font` with the type UI scale
+{
+  app.commit((d) => { d.type = { treatment: "luxury", bodyBase: 20 }; }); flushRaf();
+  const composed = geoScaleOf(app.doc);
+  const ui = tScaleGeo(app.doc.type).categories.UI;
+  ok(composed.typed === true && composed.sizes.MD.font === ui.MD.size, `(geo) the composed geometry font = type UI MD size (${composed.sizes.MD.font} = ${ui.MD.size})`);
+  ok(bkGeo(app.doc).geometry.sizes.MD.font === ui.MD.size, "(geo) brandKit's geometry shares the type UI font (one source of truth)");
+  app.commit((d) => { d.type = { treatment: "product", bodyBase: 16 }; }); // restore
+}
 let geomZip = null; const realDBgeo = app.downloadBytes.bind(app);
 app.downloadBytes = (bytes, name) => { geomZip = { bytes, name }; };
 app.downloadGeomTokens();

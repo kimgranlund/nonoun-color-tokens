@@ -11,6 +11,17 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-06-26
 
 #### Added
+- **Type ↔ Geometry composition.** A control's box and its text now share **one number**: the geometry
+  engine's per-size `font` comes from the brand's **Typography UI** scale (matching step — geometry XS →
+  UI XS … 2XL → UI 2XL) instead of a standalone power law, so changing the type treatment or body base
+  moves the control text everywhere it's used. The frame (height/icon/padding/radius) is untouched, so the
+  centering law still holds. The Geometry modal shows the shared-source note and the composed sizes; the
+  Brand-Kit MCP serves the composed geometry. New `geometryScale(doc)` (the single join point) +
+  `geomScale(config, { typeScale })`.
+- **Geometry → Figma number variables.** The Download-All bundle's `figma/dimension.variables.json` (and
+  the Geometry modal's `.zip`) now ships a **"Geometry" collection of DTCG `number` tokens** (unitless) —
+  the shape a Figma variable importer turns into native **FLOAT variables** (height · icon · font · gap ·
+  padding · radius · space) you bind to auto-layout, corner radius, gaps, and sizing. New `geomTokensFigma`.
 - **Per-system export opt-in (Color · Typography · Geometry).** The export drawer gains an **Include**
   toggle row — choose which token systems go into the **Download-All `.zip`** and the **Brand-Kit MCP**.
   Color gates every colour format + the palettes/roles; Typography adds `typography/type.{css,tokens.json}`;
