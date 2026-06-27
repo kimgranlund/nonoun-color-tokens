@@ -4698,10 +4698,24 @@ const TYPE_FONTS_LINK_ID = "nonoun-type-fonts";
 function ensureTypeFonts() {
   if (typeof document === "undefined" || !document.head) return;
   if (document.getElementById(TYPE_FONTS_LINK_ID)) return; // inject exactly once
+  // Inject the declarative @font-face <style> (the CSS path) …
   const style = document.createElement("style");
   style.id = TYPE_FONTS_LINK_ID;
   style.textContent = TYPE_FONTS_CSS;
   document.head.appendChild(style);
+  // … AND eagerly register + load each face via the FontFace API. The <style> @font-face path is LAZY —
+  // Chromium only activates a face the first time an element uses it, so a font not in the current
+  // treatment (e.g. Source Serif 4 while on a sans treatment) stays inactive and its first use flashes the
+  // fallback. document.fonts.add + load() activates ALL four up front (data: URIs, so still offline-safe).
+  if (document.fonts && typeof FontFace === "function") {
+    for (const m of TYPE_FONTS_CSS.matchAll(/font-family:'([^']+)';font-style:normal;font-weight:([^;]+);font-display:swap;src:url\((data:[^)]+)\)/g)) {
+      try {
+        const ff = new FontFace(m[1], `url(${m[3]})`, { weight: m[2].trim(), style: "normal", display: "swap" });
+        document.fonts.add(ff);
+        ff.load().catch(() => { /* offline/blocked — the generic fallback holds */ });
+      } catch { /* ignore a malformed face */ }
+    }
+  }
 }
 
 // setColorScheme — flip the document's color-scheme so EVERY light-dark() token —

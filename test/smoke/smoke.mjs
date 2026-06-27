@@ -165,13 +165,19 @@ try {
   // faces offline + in the Figma plugin (networkAccess:none). Confirm there's NO Google Fonts CDN request.
   ok(await evalJS(`(()=>{const s=document.getElementById("nonoun-type-fonts");return !!s && s.tagName==="STYLE" && /@font-face/.test(s.textContent) && /base64/.test(s.textContent) && /Inter Tight/.test(s.textContent)})()`), "Typography injects the self-hosted base64 @font-face (renders offline + in the Figma plugin)");
   ok(await evalJS(`(()=>{return ![...document.querySelectorAll("link[href]")].some(l=>/fonts\\.(googleapis|gstatic)\\.com/.test(l.href))})()`), "no Google Fonts CDN request (offline-proof + Figma networkAccess:none compliant)");
-  // opportunistic: if the smoke env has network, confirm a referenced face actually loaded (non-fatal offline).
-  await sleep(600);
-  const fontLoaded = await evalJS(`(async()=>{try{await document.fonts.ready;return document.fonts.check('16px "Inter Tight"')||document.fonts.check('700 24px "Inter Tight"')}catch(e){return "noapi"}})()`, true);
-  console.log(`  · Inter Tight loaded in-browser: ${fontLoaded} ${fontLoaded === true ? "✓" : "(offline/no-network — generic fallback holds, as designed)"}`);
+  // all four embedded faces must actually APPLY in real layout (the DOM is what the app renders) — measured
+  // by a width delta vs monospace at the weights the specimen uses. NB: document.fonts.check() and canvas
+  // measureText give false negatives for variable fonts in Chromium, so we measure real DOM layout instead.
+  await sleep(700);
+  const applyReport = await evalJS(`(async()=>{await document.fonts.ready;const mk=(ff,w)=>{const s=document.createElement("span");s.style.cssText='position:absolute;visibility:hidden;font-size:48px;font-weight:'+w+';white-space:nowrap;font-family:'+ff;s.textContent='Yao Ming Featured Matchups';document.body.appendChild(s);const x=s.offsetWidth;s.remove();return x;};const fams=["Inter","Inter Tight","Source Serif 4","JetBrains Mono"];const out={};for(const f of fams){const base=mk("monospace",400);out[f]=Math.abs(mk('"'+f+'", monospace',400)-base)>1 && Math.abs(mk('"'+f+'", monospace',700)-base)>1;}return out;})()`, true);
+  console.log("  · embedded fonts apply (DOM):", JSON.stringify(applyReport));
+  ok(applyReport && applyReport["Source Serif 4"] && applyReport["Inter Tight"] && applyReport["JetBrains Mono"] && applyReport["Inter"], "all 4 self-hosted faces APPLY in real DOM layout (incl. the Source Serif 4 serif)");
+  // screenshot at a Source Serif 4 treatment (Luxury) so the artifact visibly proves the SERIF renders.
+  await evalJS(`${el}.commit((d)=>{ d.type = { treatment: "luxury", bodyBase: 16 }; })`); await sleep(900);
   const tyShot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(resolve(OUT, "typography.png"), Buffer.from(tyShot.data, "base64"));
-  console.log("  · screenshot → smoke-out/typography.png");
+  console.log("  · screenshot → smoke-out/typography.png (Luxury / Source Serif 4)");
+  await evalJS(`${el}.commit((d)=>{ d.type = { treatment: "product", bodyBase: 16 }; })`); await sleep(120);
   await evalJS(`${el}.setSection("color")`); await sleep(120);
 
   // Geometry modal: treatment + live size ramp (XS..2XL mock controls on the centering law).

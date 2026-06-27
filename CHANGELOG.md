@@ -17,7 +17,11 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   Typography section opens. `data:` URIs are inline, not network requests, so the specimen renders in the
   real faces with **no Google Fonts CDN call at all** — offline-proof, privacy-clean, and compliant with
   the Figma plugin's `networkAccess:"none"` (which hard-blocked the old CDN `<link>`). A `gen:type-fonts`
-  script regenerates the asset when the font set changes.
+  script regenerates the asset when the font set changes. The faces are **eagerly activated** via the
+  FontFace API (`document.fonts.add` + `load()`), not just declared in a `<style>` — Chromium's `@font-face`
+  path is lazy (a face isn't activated until an element uses it), which left a font outside the current
+  treatment (e.g. **Source Serif 4** on a sans treatment) inactive and flashed the fallback on first use.
+  Eager activation makes all four render reliably from first paint, on every treatment.
 
 #### Changed
 - **Typography expanded to the seven named groups** (the canonical taxonomy from the spec): **Display ·
