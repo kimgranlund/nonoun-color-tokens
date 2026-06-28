@@ -560,13 +560,25 @@ nonoun-color-tokens.reordering, nonoun-color-tokens.reordering * { cursor: grabb
 .canvas-area.is-table { cursor: default; overflow: hidden; }
 .canvas-area.is-table .canvas-scene {
   position: static; transform: none !important; inset: auto;
-  width: 100%; height: 100%; max-height: 100%; overflow: auto; display: block; padding: 14px;
+  /* top padding is 0 so a sticky thead/first-col sticks FLUSH to the scroll top (the gutter moves to the
+     inner wrap's margin); see .map-table — its overflow must be visible for the sticky scrollport to be
+     THIS scene, not the table itself. */
+  width: 100%; height: 100%; max-height: 100%; overflow: auto; display: block; padding: 0 14px 14px;
 }
-.map-wrap { max-width: 720px; margin: 0 auto; }
+.map-wrap, .tok-wrap { margin-top: 14px; } /* the top gutter (scene top-padding is 0 for sticky headers) */
+.map-wrap { max-width: 720px; margin-left: auto; margin-right: auto; }
 .map-head { display: flex; align-items: baseline; gap: 10px; margin: 0 2px 10px; }
 .map-head small { color: var(--ink-dim); }
-.map-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+/* overflow:visible (not hidden) so the STICKY thead + first column stick to the scrolling .canvas-scene,
+   not to the table's own box — overflow!=visible would make the table the scrollport and headers would
+   scroll away. The radius is dropped: it needed overflow:hidden to clip, which would re-trap the scrollport;
+   the table is square-cornered inside the (square) .canvas-area. */
+.map-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); border: 1px solid var(--line); overflow: visible; }
 .map-table th { text-align: left; font-weight: 600; color: var(--ink-dim); padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--panel-2); position: sticky; top: 0; z-index: 1; }
+/* the pinned header's bottom rule as an inset box-shadow, NOT only the collapsed border: under
+   border-collapse, WebKit can paint a sticky th's border at its scrolled-away position (header loses its
+   rule). A box-shadow isn't part of the collapsed grid, so it pins cleanly in every engine. */
+.map-table thead th { box-shadow: inset 0 -1px 0 var(--line); }
 .map-table td { padding: 5px 10px; border-bottom: 1px solid var(--line-2); }
 .map-row.map-role-top td { border-top: 2px solid var(--line); }
 .map-mode { color: var(--ink-dim); width: 52px; }
@@ -620,20 +632,17 @@ nonoun-color-tokens.reordering, nonoun-color-tokens.reordering * { cursor: grabb
 /* ── Tokens MATRIX (Type / Geom) — a READ-ONLY token table in the .is-table canvas slot.
    Rows = steps grouped by voice/size; columns = Base + one per breakpoint mode. Extends .map-table
    (sticky head, monospace code cells); the first column (token name) is sticky-left too. */
-.tok-wrap { max-width: min(100%, 1040px); margin: 0 auto; }
+.tok-wrap { max-width: min(100%, 1040px); margin-left: auto; margin-right: auto; }
 .tok-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 0 2px 10px; }
 .tok-head small { color: var(--ink-dim); }
 .tok-hint { flex-basis: 100%; font-style: italic; color: var(--ink-dim); }
 .tok-table { table-layout: auto; }
 .tok-table td, .tok-table th { vertical-align: top; }
-/* the token-name FIRST column. The sticky setup is authored correctly for a tbody-<th> matrix:
-   sticky-LEFT only (top:auto — .map-table sets top:0 for THEAD headers, but these <th> live in the
-   tbody), group headers scroll (static), and only the corner pins on both axes. NOTE: the shared
-   .map-table carries overflow:hidden (to clip its radius), which currently makes the TABLE itself the
-   sticky scrollport — so, exactly like the Color Mapping view, the headers scroll WITH the table
-   rather than pinning. Making the canvas data-tables TRULY sticky (overflow:visible + closing the
-   .canvas-scene top-padding gap + a Safari pass, for BOTH Mapping and this matrix) is a tracked
-   follow-up; these rules make this table correct the moment that lands. */
+/* the token-name FIRST column — sticky-LEFT only (top:auto: .map-table sets top:0 for THEAD headers, but
+   these <th> live in the tbody), group headers scroll (static), only the corner pins on both axes. The
+   sticky scrollport is the .canvas-scene (since .map-table is now overflow:visible + the scene's top
+   padding is 0), so the column headers AND this column genuinely pin on scroll — verified Δ0px in Chrome
+   for both Mapping and this matrix (CDP scroll probe). */
 .tok-table th.tok-name {
   text-align: left; position: sticky; left: 0; top: auto; z-index: 1;
   background: var(--panel); border-right: 1px solid var(--line); white-space: nowrap;

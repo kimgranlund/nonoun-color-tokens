@@ -76,10 +76,12 @@ Type/Geom **Tokens** matrix both do this:
   unclamped value diverges live-vs-persist and can yield negative geom padding); `deleteMode` strips stale
   `|<id>` keys; identity holds (no override ⇒ byte-identical). Keep overrides **mode-local** (Base does not
   cascade into breakpoint columns) + say so in a one-line UI hint.
-- **Known gap (tracked):** the sticky `thead`/first-column don't actually stick — `.map-table`'s
-  `overflow:hidden` (for its radius) makes the *table* the sticky scrollport, so headers scroll with the
-  table (both Mapping + the matrix). Fixing it (overflow:visible + the `.canvas-scene` top-padding gap +
-  a Safari pass) is a backlog item, not yet done.
+- **Sticky headers (the scrollport gotcha):** for the `thead`/first-column to pin, the **table** must be
+  `overflow: visible` — `overflow != visible` makes the *table itself* the sticky scrollport (so headers
+  scroll away with it). The scroll lives on `.canvas-scene` (set its top padding to 0 so a sticky header
+  sits flush; move the gutter to the inner wrap's margin). The table loses its `border-radius` (it needed
+  `overflow:hidden` to clip). Verify with a CDP scroll probe (headers pin Δ0px); WebKit supports sticky on
+  `<th>` in `thead` AND `tbody`, but it's a Safari-sensitive area — sanity-check there.
 
 ## Validate (draft → check → fix → re-check)
 
