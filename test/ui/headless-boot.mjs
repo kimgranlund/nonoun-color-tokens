@@ -1160,8 +1160,8 @@ ok(vpKC && vpKC.keyColors && vpKC.keyColors.length === 1 && vpKC.keyColors[0].ro
    && typeof vpKC.keyColors[0].nearStop === "number" && typeof vpKC.keyColors[0].drift === "number" && /^oklch\(/.test(vpKC.keyColors[0].css || ""),
    "(kc2) the key color is placed on the ramp (role + nearStop + drift + oklch css)");
 const driftBefore = vpKC.keyColors[0].drift;
-// seed the palette from the key color → hue/chroma match the recovered seed
-const seed = seedKC(KO);
+// seed the palette from the key color → hue/chroma match the recovered seed IN THE DOC'S HUE SPACE
+const seed = seedKC(KO, app.doc.hueSpace);
 app.seedFromKey(0, "dominant"); flushRaf();
 ok(app.doc.palettes[0].hue === seed.hue && app.doc.palettes[0].chroma === seed.chroma,
    `(kc3) 'seed from key' sets the palette hue/chroma from the color (got ${app.doc.palettes[0].hue}/${app.doc.palettes[0].chroma}, want ${seed.hue}/${seed.chroma})`);

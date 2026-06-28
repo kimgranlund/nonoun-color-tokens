@@ -92,7 +92,9 @@ export function configFromVariables(liveVars) {
     });
   }
   if (!palettes.length) return null;
-  return { name: "From Figma", palettes };
+  // the recovered hues are CAM16 (cam16FromRgb above) — tag the config cam16 so they're interpreted in
+  // their own space (an absent hueSpace would now hydrate to oklch and double-map the recovered hue).
+  return { name: "From Figma", hueSpace: "cam16", palettes };
 }
 
 // slug — palette name -> token namespace (mirrors exports.js / semantic keying).
@@ -106,10 +108,12 @@ export function slug(name) {
 // camHueToOklch — convert a CAM16 hue to its OKLCH-hue EQUIVALENT by sampling the hue's vivid
 // identity (its cusp: peakC's chroma at its tone) and reading the OKLCH hue back off it. The OKLCH
 // hue that, fed to effHue→oklchToCam16Hue under hueSpace:"oklch", recovers the same color family —
-// so a starter authored as a CAM16 hue renders IDENTICALLY once the doc is OKLCH-native.
-function camHueToOklch(camHue) {
+// so a starter authored as a CAM16 hue renders ≈ identically once the doc is OKLCH-native. The
+// accurate oklchToCam16Hue inverse closes the round-trip to within ~2° (the hct.js hct-oklch-inverse gate).
+function camHueToOklch(camHue, chromaFrac = 1) {
   const pk = peakC(camHue);
-  return Math.round(((hctToOklch(camHue, pk.c, pk.tone)[2] % 360) + 360) % 360);
+  const c = Math.max(Math.min(1, Math.max(0, chromaFrac)) * pk.c, 8); // anchor at the starter's OWN chroma
+  return Math.round(((hctToOklch(camHue, c, pk.tone)[2] % 360) + 360) % 360);
 }
 
 // defaultDocument — a fresh State: deep-cloned default palettes + the tonal
@@ -123,7 +127,7 @@ function camHueToOklch(camHue) {
 export function defaultDocument() {
   return {
     name: "Default",
-    palettes: DEFAULT_PALETTES.map((p) => ({ ...p, hue: camHueToOklch(p.hue) })),
+    palettes: DEFAULT_PALETTES.map((p) => ({ ...p, hue: camHueToOklch(p.hue, (p.chroma ?? 0) / 100) })),
     curve: DEFAULT_CONTROLS.curve,
     tension: DEFAULT_CONTROLS.tension,
     lmin: DEFAULT_CONTROLS.lmin,
@@ -294,11 +298,14 @@ function placeKeyColors(keyColors, fullStops) {
 // `hue` is the input's OWN OKLCH hue (oklch[2]) — so a seed pairs with the default hueSpace:"oklch" and
 // the slider reads the source hue directly; `chroma` is still the %-of-peak recovered from CAM16, and
 // `tone` is the input's L*. So the inspector's "Seed from key color" aligns the family to the brand.
-export function seedFromKeyColor(oklch) {
+export function seedFromKeyColor(oklch, hueSpace = "oklch") {
   if (!Array.isArray(oklch) || oklch.length !== 3) return null;
   const rgb = oklchToRgb(oklch[0], oklch[1], oklch[2]);
-  const { chroma } = cam16FromRgb(rgb);
-  return { hue: Math.round(((oklch[2] % 360) + 360) % 360), chroma: Math.round(Math.min(100, chroma)), tone: Math.round(lstarFromRgb(rgb)) };
+  const cam = cam16FromRgb(rgb);
+  // hue in the CONSUMING doc's space: an OKLCH-native doc stores the input's own OKLCH hue; a legacy
+  // cam16 doc stores the CAM16 hue, so the seeded family lands true in either. (round THEN wrap: 359.7→0.)
+  const hue = Math.round(hueSpace === "cam16" ? cam.hue : oklch[2]);
+  return { hue: ((hue % 360) + 360) % 360, chroma: Math.round(Math.min(100, cam.chroma)), tone: Math.round(lstarFromRgb(rgb)) };
 }
 
 // rgbToOklchArr — [r,g,b] → [L,C,H] (for capturing a manual hex/identity color as OKLCH).
@@ -398,7 +405,7 @@ export function projectView(doc) {
     // key = the palette's VIVID identity color: the cusp (peak-chroma) hue at the palette's intended
     // chroma, computed straight from hue+chroma so it stays vivid regardless of toneMode (the perceptual
     // ramp damps mid-stop chroma, so a ramp stop reads muted; this is what the gallery tile should show).
-    const baseHue = effHue(p.hue, controls.hueSpace);
+    const baseHue = effHue(p.hue, controls.hueSpace, (p.chroma ?? 0) / 100);
     const pk = peakC(baseHue);
     const keyChroma = ((p.chroma ?? 0) / 100) * pk.c;
     // keyOklch = the key color's HIGH-RES OKLCH (float, no 8-bit round-trip) — the model's source of

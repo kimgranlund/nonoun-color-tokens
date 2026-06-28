@@ -1614,31 +1614,29 @@ function peakC(hue) {
 
 // ── oklchToCam16Hue — sample a fixed mid OKLCH color, read its CAM16 hue ──────
 const _oh = new Map();
-function oklchToCam16Hue(h) {
-  const key = h.toFixed(2);
+function oklchToCam16Hue(h, chromaFrac = 1) {
+  const target = ((h % 360) + 360) % 360;
+  const cf = Math.min(1, Math.max(0, chromaFrac));
+  const key = target.toFixed(2) + ":" + cf.toFixed(3);
   const hit = _oh.get(key);
   if (hit !== undefined) return hit;
-  const L = 0.72;
-  const a = 0.1 * Math.cos((h * Math.PI) / 180);
-  const b = 0.1 * Math.sin((h * Math.PI) / 180);
-  // OKLab -> LMS' -> LMS (cube) -> linear sRGB
-  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
-  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
-  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
-  const l = l_ ** 3;
-  const m = m_ ** 3;
-  const s = s_ ** 3;
-  let R = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
-  let G = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
-  let B = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s;
-  // clamp negatives, treat as linear sRGB in 0..1 -> scale to 0..100 -> XYZ -> CAM16 hue.
-  R = Math.max(0, R);
-  G = Math.max(0, G);
-  B = Math.max(0, B);
-  const xyz = matMul(SRGB_TO_XYZ, [R * 100, G * 100, B * 100]);
-  const hue = cam16FromXyz(xyz[0], xyz[1], xyz[2]).hue;
-  _oh.set(key, hue);
-  return hue;
+  // The ACCURATE, CHROMA-AWARE inverse of the render path: find the CAM16 hue X such that a color at
+  // `chromaFrac` of X's peak chroma (and peak tone) renders at OKLCH hue `target` — so the palette's
+  // IDENTITY color (the key, at its own chroma) lands on the requested OKLCH hue. The OKLCH↔CAM16 hue
+  // map shifts with chroma (Abney), so a fixed sample is wrong at one end (the old L=0.72/C=0.1 drifted
+  // ~15° on vivid blues; a cusp-only anchor drifts ~11° on muted hues) — anchoring at the palette's own
+  // chroma is right across the board. f(X) is ~monotonic, slope ≈1, so the step X ← X − (f(X) − target)
+  // is Newton with derivative ≈1; a chroma floor keeps the hue well-defined for near-greys.
+  let x = target; // first-order seed: CAM16 hue ≈ OKLCH hue
+  for (let i = 0; i < 12; i++) {
+    const pk = peakC(x);
+    const got = hctToOklch(x, Math.max(cf * pk.c, 8), pk.tone)[2];
+    const err = (((got - target) % 360) + 540) % 360 - 180; // signed (got − target) ∈ (−180, 180]
+    if (Math.abs(err) < 1e-3) break;
+    x = (((x - err) % 360) + 360) % 360;
+  }
+  _oh.set(key, x);
+  return x;
 }
 
 return { hctToRgb, hctToOklch, cam16FromRgb, lstarFromRgb, maxChromaInGamut, peakC, oklchToCam16Hue };
@@ -2192,8 +2190,10 @@ const lerp = (a, b, t) => a + (b - a) * t;
 // 'oklch' inputs are mapped through the engine; 'cam16' (default) pass straight.
 // Compute this a single time and feed the SAME value to every stop so the
 // emitted CAM16 hue is constant across the ramp (hue-stability).
-function effHue(hue, hueSpace) {
-  return hueSpace === "oklch" ? oklchToCam16Hue(hue) : hue;
+// chromaFrac (0..1, default 1) anchors the OKLCH→CAM16 inverse at the palette's OWN chroma (chroma
+// is %-of-peak), so the identity color lands on the requested OKLCH hue regardless of saturation.
+function effHue(hue, hueSpace, chromaFrac = 1) {
+  return hueSpace === "oklch" ? oklchToCam16Hue(hue, chromaFrac) : hue;
 }
 
 // shape — remap normalized position p∈[0,1] (0=light end, 1=dark end) to q∈[0,1].
@@ -2245,7 +2245,7 @@ function paletteStops(palette, controls, stops) {
   if (mode === "perceptual" || mode === "peak") return okhslStops(palette, controls, stops, mode);
   // Resolve the BASE hue once. The per-stop hue may be EDGE-ROTATED below (hueShift);
   // when hueShift=0 every stop uses baseHue (the flat-hue, hue-stability default).
-  const baseHue = effHue(palette.hue, controls.hueSpace);
+  const baseHue = effHue(palette.hue, controls.hueSpace, (palette.chroma ?? 0) / 100);
   const shift = palette.hueShift ?? 0; // edge hue rotation: ±deg at the ends
   const sameDir = palette.hueSameDir === true; // true = both ends bend the SAME way (|s|), else opposite (s)
   const pk = peakC(baseHue).c; // the BASE hue's max chroma in sRGB
@@ -2318,7 +2318,7 @@ function okhslLAt(lstar) {
 }
 
 function okhslStops(palette, controls, stops, mode) {
-  const baseHue = effHue(palette.hue, controls.hueSpace);
+  const baseHue = effHue(palette.hue, controls.hueSpace, (palette.chroma ?? 0) / 100);
   const pk = peakC(baseHue);                                       // { c, tone } — the cusp
   const hOk = rgbToOkhsl(hctToRgb(baseHue, pk.c, pk.tone).rgb).h;  // the palette's hue in OKHSL space
   const shift = palette.hueShift ?? 0;
@@ -3252,7 +3252,7 @@ function controlsOf(state) {
     dampCurve: state.dampCurve ?? DEFAULT_CONTROLS.dampCurve,
     dampAmp: state.dampAmp ?? DEFAULT_CONTROLS.dampAmp,
     dampBias: state.dampBias ?? DEFAULT_CONTROLS.dampBias,
-    hueSpace: state.hueSpace ?? DEFAULT_CONTROLS.hueSpace,
+    hueSpace: state.hueSpace ?? "cam16", // a raw legacy state without the field was authored in cam16 (mirror the UI's legacy-preservation stamp); a live doc always carries it explicitly
     // distribution mode + its shapers — previously dropped here, so exports always used the
     // default mode regardless of the doc. Threaded now so exports match what the UI renders.
     toneMode: state.toneMode ?? DEFAULT_CONTROLS.toneMode,
@@ -4036,7 +4036,7 @@ const PRESETS = [
   {"name":"Summer of Love · the Haight-Ashbury palette","vol":"X","story":{"title":"A flower-power scene of warm orange, paisley pink, sky blue, and grass green","kicker":"Summer of Love · the Haight-Ashbury palette","narrative":"Color from '67: flower-power orange, paisley pink, sky blue, grass green, and a sunny yellow.","refuses":"Faded hippie sepia. The Summer of Love is warm saturated flower-power colour — orange, pink, blue, green — joyous, not faded.","groups":[{"hier":"d","pct":50,"note":"Flower-power orange leads the era."},{"hier":"s","pct":40,"note":"Paisley pink, sky blue, and grass green."},{"hier":"a","pct":10,"note":"Sunny yellow and deep purple as small reads."}]},"curve":"logistic","tension":0,"lmin":5,"lmax":100,"damp":70,"dampCurve":1.5,"dampAmp":55,"dampBias":0,"hueSpace":"oklch","relChroma":false,"chromaFloor":40,"toneMode":"perceptual","vibrancy":0,"onColorMode":"fixed","accentRef":"mode","palettes":[{"name":"neutral","hue":49,"chroma":5,"skew":0,"lift":0,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.66,0.018,48.72554526702538]}],"on":true},{"name":"primary-base","hue":56,"chroma":49,"skew":0,"lift":19,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.702,0.142,56]}],"colorName":"Flower-power orange, warm","description":"The warm dominant of the era.","colorRole":"dominant","on":true},{"name":"primary-muted","hue":358,"chroma":43,"skew":0,"lift":17,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.692,0.118,358]}],"colorName":"Paisley pink","description":"The paisley-print pink.","colorRole":"supporting","on":true},{"name":"secondary-base","hue":142,"chroma":45,"skew":0,"lift":14,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.642,0.118,142]}],"colorName":"Grass green","description":"The park green.","colorRole":"supporting","on":true},{"name":"secondary-muted","hue":232,"chroma":44,"skew":0,"lift":18,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.682,0.108,232]}],"colorName":"Sky blue","description":"The bright optimistic blue.","colorRole":"supporting","on":true},{"name":"accent-base","hue":92,"chroma":44,"skew":0,"lift":34,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.822,0.132,92]}],"colorName":"Sunny yellow","description":"The flower yellow.","colorRole":"accent","on":true},{"name":"accent-muted","hue":306,"chroma":48,"skew":0,"lift":-8,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.472,0.132,306]}],"colorName":"Purple, deep","description":"The paisley purple.","colorRole":"accent","on":true},{"name":"danger","hue":27,"chroma":76,"skew":0,"lift":-6,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.52,0.176,27]}],"on":true},{"name":"warning","hue":73,"chroma":46,"skew":0,"lift":4,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.62,0.118,73]}],"on":true},{"name":"success","hue":152,"chroma":42,"skew":0,"lift":1,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.56,0.115,152]}],"on":true}]},
   {"name":"Mod & British Invasion · the op-art club","vol":"X","story":{"title":"A '60s mod palette of target red-white-blue, op-art black-white, and scooter chrome","kicker":"Mod & British Invasion · the op-art club","narrative":"Color from mod: target red, navy blue, op-art white, op-art black, and scooter chrome.","refuses":"Faded vintage wash. Mod is crisp target red-white-blue and op-art black-white — sharp graphic pop, not a faded retro tone.","groups":[{"hier":"d","pct":50,"note":"Target red leads the mod palette."},{"hier":"s","pct":40,"note":"Navy blue, op-art white, and op-art black."},{"hier":"a","pct":10,"note":"Scooter chrome and mustard gold as small reads."}]},"curve":"logistic","tension":0,"lmin":5,"lmax":100,"damp":70,"dampCurve":1.5,"dampAmp":55,"dampBias":0,"hueSpace":"oklch","relChroma":false,"chromaFloor":40,"toneMode":"perceptual","vibrancy":0,"onColorMode":"fixed","accentRef":"mode","palettes":[{"name":"neutral","hue":36,"chroma":6,"skew":0,"lift":0,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.66,0.018,36.358631490958714]}],"on":true},{"name":"primary-base","hue":30,"chroma":60,"skew":0,"lift":-2,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.532,0.152,30]}],"colorName":"RAF-target red","description":"The mod-target red.","colorRole":"dominant","on":true},{"name":"primary-muted","hue":256,"chroma":37,"skew":0,"lift":-14,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.412,0.092,256]}],"colorName":"Navy blue","description":"The target and parka blue.","colorRole":"supporting","on":true},{"name":"secondary-base","hue":280,"chroma":5,"skew":0,"lift":-31,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.262,0.008,280]}],"colorName":"Op-art black","description":"The op-art line.","colorRole":"supporting","on":true},{"name":"secondary-muted","hue":90,"chroma":2,"skew":0,"lift":40,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.892,0.006,90]}],"colorName":"Op-art white","description":"The op-art ground.","colorRole":"supporting","on":true},{"name":"accent-base","hue":250,"chroma":6,"skew":0,"lift":28,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.772,0.008,250]}],"colorName":"Scooter chrome, silver","description":"The Vespa chrome.","colorRole":"accent","on":true},{"name":"accent-muted","hue":86,"chroma":35,"skew":0,"lift":23,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.732,0.108,86]}],"colorName":"Union mustard, gold","description":"A mod-gold accent.","colorRole":"accent","on":true},{"name":"danger","hue":27,"chroma":76,"skew":0,"lift":-6,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.52,0.176,27]}],"on":true},{"name":"warning","hue":73,"chroma":46,"skew":0,"lift":4,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.62,0.118,73]}],"on":true},{"name":"success","hue":152,"chroma":42,"skew":0,"lift":1,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.56,0.115,152]}],"on":true}]},
   {"name":"Pastel idol concept · the debut MV","vol":"XI","story":{"title":"A soft idol-pop concept of cotton-candy pink, mint, lilac, and cream","kicker":"Pastel idol concept · the debut MV","narrative":"Color from the pastel concept: cotton-candy pink, mint green, lilac, butter cream, and a sky blue.","refuses":"Muted indie palette. The idol concept is full candy pastel — pink, mint, lilac — sweet and bright, not understated.","groups":[{"hier":"d","pct":50,"note":"Cotton-candy pink leads the pastel concept."},{"hier":"s","pct":40,"note":"Mint green, lilac, and butter cream."},{"hier":"a","pct":10,"note":"Pale sky blue and cherry red as small reads."}]},"curve":"logistic","tension":0,"lmin":5,"lmax":100,"damp":70,"dampCurve":1.5,"dampAmp":55,"dampBias":0,"hueSpace":"oklch","relChroma":false,"chromaFloor":40,"toneMode":"perceptual","vibrancy":0,"onColorMode":"fixed","accentRef":"mode","palettes":[{"name":"neutral","hue":11,"chroma":6,"skew":0,"lift":0,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.66,0.018,10.709749740180655]}],"on":true},{"name":"primary-base","hue":358,"chroma":22,"skew":0,"lift":35,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.842,0.062,358]}],"colorName":"Cotton-candy pink","description":"The soft idol-concept pink.","colorRole":"dominant","on":true},{"name":"primary-muted","hue":308,"chroma":25,"skew":0,"lift":32,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.812,0.062,308]}],"colorName":"Lilac","description":"The soft purple.","colorRole":"supporting","on":true},{"name":"secondary-base","hue":162,"chroma":26,"skew":0,"lift":40,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.872,0.062,162]}],"colorName":"Mint green","description":"The pastel mint set.","colorRole":"supporting","on":true},{"name":"secondary-muted","hue":92,"chroma":14,"skew":0,"lift":40,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.892,0.046,92]}],"colorName":"Butter cream","description":"The warm cream backdrop.","colorRole":"supporting","on":true},{"name":"accent-base","hue":232,"chroma":25,"skew":0,"lift":36,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.842,0.052,232]}],"colorName":"Sky blue, pale","description":"The pastel-blue accent.","colorRole":"accent","on":true},{"name":"accent-muted","hue":22,"chroma":52,"skew":0,"lift":11,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.642,0.142,22]}],"colorName":"Cherry, accent red","description":"A pop of saturated red.","colorRole":"accent","on":true},{"name":"danger","hue":27,"chroma":76,"skew":0,"lift":-6,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.52,0.176,27]}],"on":true},{"name":"warning","hue":73,"chroma":46,"skew":0,"lift":4,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.62,0.118,73]}],"on":true},{"name":"success","hue":152,"chroma":42,"skew":0,"lift":1,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.56,0.115,152]}],"on":true}]},
-  {"name":"Neon MV · the night-set choreography","vol":"XI","story":{"title":"A high-energy neon music-video set of magenta, cyan, and electric purple","kicker":"Neon MV · the night-set choreography","narrative":"Color from the neon set: magenta, electric cyan, neon purple, hot yellow, and a deep black.","refuses":"Soft natural light. The neon MV is saturated magenta-and-cyan on black — electric and high-contrast, not naturally lit.","groups":[{"hier":"d","pct":50,"note":"Neon magenta leads the MV set."},{"hier":"s","pct":40,"note":"Electric cyan, set black, and neon purple."},{"hier":"a","pct":10,"note":"Hot yellow and neon green as small reads."}]},"curve":"logistic","tension":0,"lmin":5,"lmax":100,"damp":70,"dampCurve":1.5,"dampAmp":55,"dampBias":0,"hueSpace":"oklch","relChroma":false,"chromaFloor":40,"toneMode":"perceptual","vibrancy":0,"onColorMode":"fixed","accentRef":"mode","palettes":[{"name":"neutral","hue":360,"chroma":7,"skew":0,"lift":0,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.66,0.018,359.50788026056307]}],"on":true},{"name":"primary-base","hue":352,"chroma":68,"skew":0,"lift":6,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.602,0.182,352]}],"colorName":"Neon magenta","description":"The dominant neon pink.","colorRole":"dominant","on":true},{"name":"primary-muted","hue":308,"chroma":55,"skew":0,"lift":-3,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.522,0.152,308]}],"colorName":"Neon purple","description":"The purple wash.","colorRole":"supporting","on":true},{"name":"secondary-base","hue":208,"chroma":50,"skew":0,"lift":24,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.722,0.132,208]}],"colorName":"Electric cyan","description":"The complementary neon blue.","colorRole":"supporting","on":true},{"name":"secondary-muted","hue":300,"chroma":9,"skew":0,"lift":-31,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.262,0.018,300]}],"colorName":"Set black, dark","description":"The dark stage the neon pops on.","colorRole":"supporting","on":true},{"name":"accent-base","hue":96,"chroma":52,"skew":0,"lift":35,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.832,0.152,96]}],"colorName":"Hot yellow","description":"A neon-yellow accent.","colorRole":"accent","on":true},{"name":"accent-muted","hue":152,"chroma":57,"skew":0,"lift":29,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.762,0.152,152]}],"colorName":"Neon green","description":"A neon-green accent.","colorRole":"accent","on":true},{"name":"danger","hue":27,"chroma":76,"skew":0,"lift":-6,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.52,0.176,27]}],"on":true},{"name":"warning","hue":73,"chroma":46,"skew":0,"lift":4,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.62,0.118,73]}],"on":true},{"name":"success","hue":152,"chroma":42,"skew":0,"lift":1,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.56,0.115,152]}],"on":true}]},
+  {"name":"Neon MV · the night-set choreography","vol":"XI","story":{"title":"A high-energy neon music-video set of magenta, cyan, and electric purple","kicker":"Neon MV · the night-set choreography","narrative":"Color from the neon set: magenta, electric cyan, neon purple, hot yellow, and a deep black.","refuses":"Soft natural light. The neon MV is saturated magenta-and-cyan on black — electric and high-contrast, not naturally lit.","groups":[{"hier":"d","pct":50,"note":"Neon magenta leads the MV set."},{"hier":"s","pct":40,"note":"Electric cyan, set black, and neon purple."},{"hier":"a","pct":10,"note":"Hot yellow and neon green as small reads."}]},"curve":"logistic","tension":0,"lmin":5,"lmax":100,"damp":70,"dampCurve":1.5,"dampAmp":55,"dampBias":0,"hueSpace":"oklch","relChroma":false,"chromaFloor":40,"toneMode":"perceptual","vibrancy":0,"onColorMode":"fixed","accentRef":"mode","palettes":[{"name":"neutral","hue":0,"chroma":7,"skew":0,"lift":0,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.66,0.018,359.50788026056307]}],"on":true},{"name":"primary-base","hue":352,"chroma":68,"skew":0,"lift":6,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.602,0.182,352]}],"colorName":"Neon magenta","description":"The dominant neon pink.","colorRole":"dominant","on":true},{"name":"primary-muted","hue":308,"chroma":55,"skew":0,"lift":-3,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.522,0.152,308]}],"colorName":"Neon purple","description":"The purple wash.","colorRole":"supporting","on":true},{"name":"secondary-base","hue":208,"chroma":50,"skew":0,"lift":24,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.722,0.132,208]}],"colorName":"Electric cyan","description":"The complementary neon blue.","colorRole":"supporting","on":true},{"name":"secondary-muted","hue":300,"chroma":9,"skew":0,"lift":-31,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.262,0.018,300]}],"colorName":"Set black, dark","description":"The dark stage the neon pops on.","colorRole":"supporting","on":true},{"name":"accent-base","hue":96,"chroma":52,"skew":0,"lift":35,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.832,0.152,96]}],"colorName":"Hot yellow","description":"A neon-yellow accent.","colorRole":"accent","on":true},{"name":"accent-muted","hue":152,"chroma":57,"skew":0,"lift":29,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.762,0.152,152]}],"colorName":"Neon green","description":"A neon-green accent.","colorRole":"accent","on":true},{"name":"danger","hue":27,"chroma":76,"skew":0,"lift":-6,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.52,0.176,27]}],"on":true},{"name":"warning","hue":73,"chroma":46,"skew":0,"lift":4,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.62,0.118,73]}],"on":true},{"name":"success","hue":152,"chroma":42,"skew":0,"lift":1,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.56,0.115,152]}],"on":true}]},
   {"name":"Harajuku · the street-fashion clash","vol":"XI","story":{"title":"A decora street-fashion riot of clashing pink, turquoise, yellow, and toy colour","kicker":"Harajuku · the street-fashion clash","narrative":"Color from Harajuku: clashing pink, turquoise, lemon yellow, purple, and a candy red.","refuses":"Coordinated muted palette. Harajuku decora is a deliberate clash of bright pink, turquoise, and yellow — maximalist, not tasteful.","groups":[{"hier":"d","pct":50,"note":"Decora pink leads the street clash."},{"hier":"s","pct":40,"note":"Bright turquoise, lemon yellow, and purple."},{"hier":"a","pct":10,"note":"Candy red and pale mint as small reads."}]},"curve":"logistic","tension":0,"lmin":5,"lmax":100,"damp":70,"dampCurve":1.5,"dampAmp":55,"dampBias":0,"hueSpace":"oklch","relChroma":false,"chromaFloor":40,"toneMode":"perceptual","vibrancy":0,"onColorMode":"fixed","accentRef":"mode","palettes":[{"name":"neutral","hue":25,"chroma":6,"skew":0,"lift":0,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.66,0.018,24.757867486626424]}],"on":true},{"name":"primary-base","hue":358,"chroma":52,"skew":0,"lift":20,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.722,0.142,358]}],"colorName":"Decora pink, bright","description":"The dominant street-fashion pink.","colorRole":"dominant","on":true},{"name":"primary-muted","hue":308,"chroma":51,"skew":0,"lift":2,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.562,0.142,308]}],"colorName":"Purple, bright","description":"The clashing violet.","colorRole":"supporting","on":true},{"name":"secondary-base","hue":96,"chroma":48,"skew":0,"lift":37,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.852,0.142,96]}],"colorName":"Lemon yellow","description":"The bright yellow.","colorRole":"supporting","on":true},{"name":"secondary-muted","hue":196,"chroma":44,"skew":0,"lift":24,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.722,0.108,196]}],"colorName":"Turquoise, bright","description":"The clashing teal.","colorRole":"supporting","on":true},{"name":"accent-base","hue":28,"chroma":62,"skew":0,"lift":7,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.612,0.162,28]}],"colorName":"Candy red","description":"A red accent.","colorRole":"accent","on":true},{"name":"accent-muted","hue":162,"chroma":27,"skew":0,"lift":39,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.862,0.062,162]}],"colorName":"Mint, pale","description":"A soft mint note.","colorRole":"accent","on":true},{"name":"danger","hue":27,"chroma":76,"skew":0,"lift":-6,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.52,0.176,27]}],"on":true},{"name":"warning","hue":73,"chroma":46,"skew":0,"lift":4,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.62,0.118,73]}],"on":true},{"name":"success","hue":152,"chroma":42,"skew":0,"lift":1,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.56,0.115,152]}],"on":true}]},
   {"name":"City pop · the '80s Tokyo-night sleeve","vol":"XI","story":{"title":"A Japanese city-pop palette of sunset gradient, neon, palm, and chrome","kicker":"City pop · the '80s Tokyo-night sleeve","narrative":"Color from city pop: sunset magenta-orange, ocean teal, neon cyan, palm-night purple, and chrome.","refuses":"Muted retro tone. City pop is a saturated sunset gradient with neon and chrome — glossy '80s glamour, not a faded photo.","groups":[{"hier":"d","pct":50,"note":"Magenta-orange sunset leads city pop."},{"hier":"s","pct":40,"note":"Ocean teal, neon cyan, and palm-night purple."},{"hier":"a","pct":10,"note":"Chrome and hot pink as small reads."}]},"curve":"logistic","tension":0,"lmin":5,"lmax":100,"damp":70,"dampCurve":1.5,"dampAmp":55,"dampBias":0,"hueSpace":"oklch","relChroma":false,"chromaFloor":40,"toneMode":"perceptual","vibrancy":0,"onColorMode":"fixed","accentRef":"mode","palettes":[{"name":"neutral","hue":315,"chroma":9,"skew":0,"lift":0,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.66,0.018,315.4373752808543]}],"on":true},{"name":"primary-base","hue":30,"chroma":51,"skew":0,"lift":16,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.682,0.142,30]}],"colorName":"Sunset gradient, magenta-orange","description":"The city-pop sunset.","colorRole":"dominant","on":true},{"name":"primary-muted","hue":200,"chroma":39,"skew":0,"lift":9,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.602,0.092,200]}],"colorName":"Ocean teal","description":"The seaside drive teal.","colorRole":"supporting","on":true},{"name":"secondary-base","hue":208,"chroma":48,"skew":0,"lift":23,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.722,0.118,208]}],"colorName":"Neon cyan","description":"The Tokyo-night neon.","colorRole":"supporting","on":true},{"name":"secondary-muted","hue":300,"chroma":36,"skew":0,"lift":-14,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.422,0.092,300]}],"colorName":"Palm night, purple","description":"The dusk palm sky.","colorRole":"supporting","on":true},{"name":"accent-base","hue":250,"chroma":6,"skew":0,"lift":28,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.772,0.008,250]}],"colorName":"Chrome, silver","description":"The car and type chrome.","colorRole":"accent","on":true},{"name":"accent-muted","hue":352,"chroma":56,"skew":0,"lift":9,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.632,0.152,352]}],"colorName":"Hot pink","description":"A neon-pink accent.","colorRole":"accent","on":true},{"name":"danger","hue":27,"chroma":76,"skew":0,"lift":-6,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.52,0.176,27]}],"on":true},{"name":"warning","hue":73,"chroma":46,"skew":0,"lift":4,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.62,0.118,73]}],"on":true},{"name":"success","hue":152,"chroma":42,"skew":0,"lift":1,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.56,0.115,152]}],"on":true}]},
   {"name":"Delta blues · the juke joint","vol":"XII","story":{"title":"A Mississippi juke joint of warm amber light, dark wood, and a deep blue night","kicker":"Delta blues · the juke joint","narrative":"Color from the joint: juke amber, dark-wood brown, Delta-night blue, neon-beer red, and a guitar-gold.","refuses":"Cold blue grade. The juke joint is warm amber and dark wood against a blue night — intimate warmth, not a cold modern bar.","groups":[{"hier":"d","pct":50,"note":"Warm juke amber leads the joint."},{"hier":"s","pct":40,"note":"Dark wood, Delta-night blue, and smoke."},{"hier":"a","pct":10,"note":"Neon-beer red and steel-gold guitar as small reads."}]},"curve":"logistic","tension":0,"lmin":5,"lmax":100,"damp":70,"dampCurve":1.5,"dampAmp":55,"dampBias":0,"hueSpace":"oklch","relChroma":false,"chromaFloor":40,"toneMode":"perceptual","vibrancy":0,"onColorMode":"fixed","accentRef":"mode","palettes":[{"name":"neutral","hue":50,"chroma":5,"skew":0,"lift":0,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.66,0.018,49.53496482365034]}],"on":true},{"name":"primary-base","hue":70,"chroma":30,"skew":0,"lift":11,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.632,0.092,70]}],"colorName":"Juke light, warm amber","description":"The dim warm bar light.","colorRole":"dominant","on":true},{"name":"primary-muted","hue":80,"chroma":4,"skew":0,"lift":5,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.572,0.012,80]}],"colorName":"Smoke, grey haze","description":"The smoky air.","colorRole":"supporting","on":true},{"name":"secondary-base","hue":256,"chroma":27,"skew":0,"lift":-17,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.382,0.062,256]}],"colorName":"Delta night, deep blue","description":"The blue night outside.","colorRole":"supporting","on":true},{"name":"secondary-muted","hue":50,"chroma":16,"skew":0,"lift":-19,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.372,0.044,50]}],"colorName":"Wall & wood, dark brown","description":"The dark juke-joint interior.","colorRole":"supporting","on":true},{"name":"accent-base","hue":30,"chroma":55,"skew":0,"lift":-1,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.542,0.142,30]}],"colorName":"Neon beer sign, red","description":"The bar's neon.","colorRole":"accent","on":true},{"name":"accent-muted","hue":80,"chroma":23,"skew":0,"lift":17,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.682,0.072,80]}],"colorName":"Resonator guitar, steel gold","description":"The metal-body guitar.","colorRole":"accent","on":true},{"name":"danger","hue":27,"chroma":76,"skew":0,"lift":-6,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.52,0.176,27]}],"on":true},{"name":"warning","hue":73,"chroma":46,"skew":0,"lift":4,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.62,0.118,73]}],"on":true},{"name":"success","hue":152,"chroma":42,"skew":0,"lift":1,"hueShift":0,"hueSameDir":false,"keyColors":[{"role":"dominant","oklch":[0.56,0.115,152]}],"on":true}]},
@@ -4430,7 +4430,9 @@ function configFromVariables(liveVars) {
     });
   }
   if (!palettes.length) return null;
-  return { name: "From Figma", palettes };
+  // the recovered hues are CAM16 (cam16FromRgb above) — tag the config cam16 so they're interpreted in
+  // their own space (an absent hueSpace would now hydrate to oklch and double-map the recovered hue).
+  return { name: "From Figma", hueSpace: "cam16", palettes };
 }
 
 // slug — palette name -> token namespace (mirrors exports.js / semantic keying).
@@ -4444,10 +4446,12 @@ function slug(name) {
 // camHueToOklch — convert a CAM16 hue to its OKLCH-hue EQUIVALENT by sampling the hue's vivid
 // identity (its cusp: peakC's chroma at its tone) and reading the OKLCH hue back off it. The OKLCH
 // hue that, fed to effHue→oklchToCam16Hue under hueSpace:"oklch", recovers the same color family —
-// so a starter authored as a CAM16 hue renders IDENTICALLY once the doc is OKLCH-native.
-function camHueToOklch(camHue) {
+// so a starter authored as a CAM16 hue renders ≈ identically once the doc is OKLCH-native. The
+// accurate oklchToCam16Hue inverse closes the round-trip to within ~2° (the hct.js hct-oklch-inverse gate).
+function camHueToOklch(camHue, chromaFrac = 1) {
   const pk = peakC(camHue);
-  return Math.round(((hctToOklch(camHue, pk.c, pk.tone)[2] % 360) + 360) % 360);
+  const c = Math.max(Math.min(1, Math.max(0, chromaFrac)) * pk.c, 8); // anchor at the starter's OWN chroma
+  return Math.round(((hctToOklch(camHue, c, pk.tone)[2] % 360) + 360) % 360);
 }
 
 // defaultDocument — a fresh State: deep-cloned default palettes + the tonal
@@ -4461,7 +4465,7 @@ function camHueToOklch(camHue) {
 function defaultDocument() {
   return {
     name: "Default",
-    palettes: DEFAULT_PALETTES.map((p) => ({ ...p, hue: camHueToOklch(p.hue) })),
+    palettes: DEFAULT_PALETTES.map((p) => ({ ...p, hue: camHueToOklch(p.hue, (p.chroma ?? 0) / 100) })),
     curve: DEFAULT_CONTROLS.curve,
     tension: DEFAULT_CONTROLS.tension,
     lmin: DEFAULT_CONTROLS.lmin,
@@ -4632,11 +4636,14 @@ function placeKeyColors(keyColors, fullStops) {
 // `hue` is the input's OWN OKLCH hue (oklch[2]) — so a seed pairs with the default hueSpace:"oklch" and
 // the slider reads the source hue directly; `chroma` is still the %-of-peak recovered from CAM16, and
 // `tone` is the input's L*. So the inspector's "Seed from key color" aligns the family to the brand.
-function seedFromKeyColor(oklch) {
+function seedFromKeyColor(oklch, hueSpace = "oklch") {
   if (!Array.isArray(oklch) || oklch.length !== 3) return null;
   const rgb = oklchToRgb(oklch[0], oklch[1], oklch[2]);
-  const { chroma } = cam16FromRgb(rgb);
-  return { hue: Math.round(((oklch[2] % 360) + 360) % 360), chroma: Math.round(Math.min(100, chroma)), tone: Math.round(lstarFromRgb(rgb)) };
+  const cam = cam16FromRgb(rgb);
+  // hue in the CONSUMING doc's space: an OKLCH-native doc stores the input's own OKLCH hue; a legacy
+  // cam16 doc stores the CAM16 hue, so the seeded family lands true in either. (round THEN wrap: 359.7→0.)
+  const hue = Math.round(hueSpace === "cam16" ? cam.hue : oklch[2]);
+  return { hue: ((hue % 360) + 360) % 360, chroma: Math.round(Math.min(100, cam.chroma)), tone: Math.round(lstarFromRgb(rgb)) };
 }
 
 // rgbToOklchArr — [r,g,b] → [L,C,H] (for capturing a manual hex/identity color as OKLCH).
@@ -4736,7 +4743,7 @@ function projectView(doc) {
     // key = the palette's VIVID identity color: the cusp (peak-chroma) hue at the palette's intended
     // chroma, computed straight from hue+chroma so it stays vivid regardless of toneMode (the perceptual
     // ramp damps mid-stop chroma, so a ramp stop reads muted; this is what the gallery tile should show).
-    const baseHue = effHue(p.hue, controls.hueSpace);
+    const baseHue = effHue(p.hue, controls.hueSpace, (p.chroma ?? 0) / 100);
     const pk = peakC(baseHue);
     const keyChroma = ((p.chroma ?? 0) / 100) * pk.c;
     // keyOklch = the key color's HIGH-RES OKLCH (float, no 8-bit round-trip) — the model's source of
@@ -7048,7 +7055,7 @@ class HctApp extends HTMLElement {
       const samples = this.newPalSamples(view);
       if (!samples.length) return null;
       target = tab === "environmental" ? deriveNeutral(samples) : deriveRelative(this.newPalRel, samples);
-      const s = seedFromKeyColor(target) || { hue: 200, chroma: 60 };
+      const s = seedFromKeyColor(target, this.doc.hueSpace) || { hue: 200, chroma: 60 };
       pal = { name: "_probe", hue: s.hue, chroma: s.chroma, on: true, keyColors: [{ role: "dominant", oklch: target.map(Number) }] };
     }
     let pv;
@@ -7189,7 +7196,7 @@ class HctApp extends HTMLElement {
           value: (proposed && proposed.hex) || "#888888",
           // live: recover hue/chroma from the picked color + refresh the preview in place (don't
           // rebuild the input mid-pick — that would detach the OS color panel).
-          oninput: (e) => { const s = seedFromKeyColor(hexToOklch(e.target.value)); if (s) { c.hue = s.hue; c.chroma = s.chroma; this._refreshNewPalPreview(); } },
+          oninput: (e) => { const s = seedFromKeyColor(hexToOklch(e.target.value), this.doc.hueSpace); if (s) { c.hue = s.hue; c.chroma = s.chroma; this._refreshNewPalPreview(); } },
           // settle: full render so the Hue/Chroma sliders move to reflect the picked color.
           onchange: () => this.render(),
         }),
@@ -9029,11 +9036,12 @@ class HctApp extends HTMLElement {
     this.commit((d) => { (d.palettes[i].keyColors = (d.palettes[i].keyColors || []).filter((k) => k.role !== role)).push({ role, oklch }); });
   }
 
-  // seedFromKey — set the palette's hue + chroma from a key color (CAM16 recovery), so the
-  // generated ramp's family matches the brand color. One undo step.
+  // seedFromKey — set the palette's hue + chroma from a key color, in the ACTIVE doc's hue space
+  // (OKLCH for new docs, CAM16 for a preserved legacy doc), so the generated ramp's family matches the
+  // brand color. One undo step.
   seedFromKey(i, role) {
     const kc = (this.doc.palettes[i].keyColors || []).find((k) => k.role === role);
-    const s = kc && seedFromKeyColor(kc.oklch);
+    const s = kc && seedFromKeyColor(kc.oklch, this.doc.hueSpace);
     if (!s) return;
     this.commit((d) => { d.palettes[i].hue = s.hue; d.palettes[i].chroma = s.chroma; });
   }
@@ -10449,10 +10457,11 @@ class HctApp extends HTMLElement {
     this.openConfigAsSet(config, "Loaded from project");
   }
 
-  // openConfigAsSet — shape-clamp an (untrusted) config and open it as a new set. hydrate() domain-clamps
-  // every field, so a junk/partial config is sanitized, never trusted as-is.
+  // openConfigAsSet — shape-clamp an (untrusted) config and open it as a new set. hydrateStoredDoc()
+  // domain-clamps every field AND applies the legacy stamp (a config lacking hueSpace was authored under
+  // cam16 — keep it cam16, consistent with openSet), so a junk/partial config is sanitized + preserved.
   openConfigAsSet(config, toastMsg) {
-    const doc = hydrate(config);
+    const doc = hydrateStoredDoc(config);
     const name = (typeof config.name === "string" && config.name.trim()) || "Project";
     doc.name = name;
     const id = "set-" + Date.now().toString(36);

@@ -75,7 +75,7 @@ const palette = (name, hex, oklch, sw) => {
   const { chroma } = cam16FromRgb(rgb);
   return {
     name,
-    hue: Math.round(((Number(oklch[2]) % 360) + 360) % 360),
+    hue: ((Math.round(Number(oklch[2])) % 360) + 360) % 360, // round THEN wrap so 359.7 → 0, not 360
     chroma: Math.round(Math.min(100, Math.max(0, chroma))),
     skew: 0,
     lift: Math.round(clamp(lstarFromRgb(rgb) - PRIME_TONE, -40, 40)),
