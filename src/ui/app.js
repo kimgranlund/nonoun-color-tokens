@@ -406,7 +406,8 @@ class HctApp extends HTMLElement {
     this.canvasView = "palettes"; // canvas content: palettes (the ramps) | scrims | mapping (the role→raw table)
     this.section = "color"; // editor section: color | typography | geometry — ui-session, routes the whole editor (never persisted)
     this.typeSpecMode = "specimen"; // typography canvas: specimen (live faces) | tokens (editable token matrix: Base + breakpoints) — type-section sub-state
-    this.typeMode = "base"; // active Typography breakpoint mode: "base" | a doc.type.modes[].id (Phase 5) — ui-session
+    this.typeMode = "base"; // active Typography breakpoint mode: "base" | a doc.type.modes[].id | "compare" (Phase 5/5.3) — ui-session
+    this._typeModeOverride = null; // a Compare column forces its breakpoint mode ("base"|id) while its scene builds (mirrors _schemeOverride) — transient
     this.stopsMode = "core"; // palette ramp density: core (19 display stops) | extended (25 EXPORT_STOPS)
     this.mapTextMode = false; // Mapping table raw-token editor: false = select menu, true = free text input
     this.viewport = { panX: 0, panY: 0, zoom: 1 };
@@ -432,7 +433,8 @@ class HctApp extends HTMLElement {
     this.settingsOpen = false; // the Settings page (token-mapping + app prefs)
     this.settingsSection = "mapping"; // which Settings nav item is active (left-nav page layout)
     this.geomSpecMode = "controls"; // geometry canvas: controls (live mock controls on the ramp) | tokens (editable token matrix: Base + breakpoints) — geom-section sub-state
-    this.geomMode = "base"; // active Geometry breakpoint mode: "base" | a doc.geometry.modes[].id (Phase 5) — ui-session
+    this.geomMode = "base"; // active Geometry breakpoint mode: "base" | a doc.geometry.modes[].id | "compare" (Phase 5/5.3) — ui-session
+    this._geomModeOverride = null; // a Compare column forces its breakpoint mode ("base"|id) while its scene builds (mirrors _schemeOverride) — transient
     this.geomSegment = "ramp"; // right-pane Geometry inspector tab: ramp | radius | space (ui-session)
     this.typeSegment = "scale"; // right-pane Typography inspector tab: scale | fonts | specimen (ui-session)
     this.figmaFile = "light"; // which Figma mode file the Figma tab previews/downloads
@@ -2655,27 +2657,36 @@ class HctApp extends HTMLElement {
   // ── Typography breakpoint modes (Phase 5) — named bodyBase variants layered over doc.type. The ACTIVE
   // mode drives the canvas preview + the inspector; "base" is doc.type itself. (Per-mode Compare + export
   // are the follow-up slices.) Modes persist on doc.type.modes = [{ id, name, bodyBase }].
+  // _effTypeMode — the mode the ACTIVE resolvers paint in: a Compare column's _typeModeOverride wins (so its
+  // scene + scale build at THAT breakpoint while it renders, exactly like _schemeOverride), else this.typeMode.
+  // "compare" is not a real mode id, so off-override it falls through _typeScaleFor's unknown-mode → base.
+  _effTypeMode() { return this._typeModeOverride != null ? this._typeModeOverride : this.typeMode; }
   _activeType() {
     const t = this.doc.type || DEFAULT_TYPE;
-    if (this.typeMode === "base") return t;
-    const m = (t.modes || []).find((x) => x.id === this.typeMode);
-    return m ? { ...t, bodyBase: m.bodyBase } : t; // a deleted/unknown mode falls back to base
+    const mode = this._effTypeMode();
+    if (mode === "base") return t;
+    const m = (t.modes || []).find((x) => x.id === mode);
+    return m ? { ...t, bodyBase: m.bodyBase } : t; // a deleted/unknown mode (incl. "compare") falls back to base
   }
   // the resolved type scale at the ACTIVE mode, WITH that mode's per-cell overrides (so the specimen +
   // inspector reflect the matrix edits). A deleted/unknown mode resolves through "base" in _typeScaleFor.
   _activeTypeScale() {
     const t = this.doc.type || DEFAULT_TYPE;
-    const key = this.typeMode === "base" || !(t.modes || []).some((m) => m.id === this.typeMode) ? "base" : this.typeMode;
+    const mode = this._effTypeMode();
+    const key = mode === "base" || !(t.modes || []).some((m) => m.id === mode) ? "base" : mode;
     return this._typeScaleFor(key);
   }
   // the Mode control in the Typography canvas header: Base + each breakpoint, plus "+" to add one.
   typeModeControl() {
     const t = this.doc.type || DEFAULT_TYPE;
     const modes = t.modes || [];
-    if (this.typeMode !== "base" && !modes.some((m) => m.id === this.typeMode)) this.typeMode = "base";
+    // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
+    if (this.typeMode !== "base" && this.typeMode !== "compare" && !modes.some((m) => m.id === this.typeMode)) this.typeMode = "base";
     const items = [
       { id: "base", label: "Base", title: `Base type scale · ${t.bodyBase ?? 16}px` },
       ...modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: `${m.name || "Mode"} · ${m.bodyBase}px body` })),
+      // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only Base, so only when ≥1 mode.
+      ...(modes.length ? [{ id: "compare", label: "Compare", title: "All breakpoints side by side" }] : []),
     ];
     return h(
       "div",
@@ -2823,6 +2834,9 @@ class HctApp extends HTMLElement {
   // Tokens mode renders an EDITABLE token MATRIX (Phase 3 — per-cell size/height overrides + ↺) (rows = steps, cols = Base + each breakpoint) in the
   // scrolling .is-table shell instead — exactly how Color's Mapping view flips (see renderCanvasArea).
   renderTypeCanvas(view) {
+    // Compare (Phase 5.3) — all breakpoints side by side. A Specimen/Controls view, so it wins over the tokens
+    // table (mirrors how Color's "Both" wins over a non-table view in renderCanvasArea).
+    if (this.typeMode === "compare") return this.renderTypeCompareArea(view);
     if (this.typeSpecMode === "tokens") return this._tokensTableArea("Typography tokens — Base + breakpoints", this.renderTypeTokensTable());
     const area = h(
       "div",
@@ -2836,6 +2850,36 @@ class HctApp extends HTMLElement {
     this.wirePanZoom(area);
     requestAnimationFrame(() => this.applyTransform());
     return area;
+  }
+
+  // renderTypeCompareArea — the Typography "Compare" mode: the specimen rendered at Base AND each breakpoint
+  // mode, side by side, inside ONE pannable .canvas-scene (so pan/zoom/fit move all columns together).
+  // Mirrors Color's renderCompareArea; each column forces its breakpoint via _typeModeOverride while it builds.
+  renderTypeCompareArea(view) {
+    const t = this.doc.type || DEFAULT_TYPE;
+    const modes = t.modes || [];
+    const area = h(
+      "div",
+      { class: "canvas-area canvas-compare type-canvas canvas-scheme-" + this.resolvedCanvasScheme(),
+        role: "group", "aria-label": "Compare — every typography breakpoint side by side · drag to pan, wheel to zoom" },
+      h("div", { class: "canvas-scene compare" },
+        this._typeCompareColumn(view, "base", "Base"),
+        ...modes.map((m) => this._typeCompareColumn(view, m.id, m.name || "Mode"))),
+    );
+    this.wirePanZoom(area);
+    requestAnimationFrame(() => this.applyTransform());
+    return area;
+  }
+  _typeCompareColumn(view, modeId, label) {
+    this._typeModeOverride = modeId; // force _activeType()/_activeTypeScale() while this column's scene builds
+    const scene = this.renderTypographyScene(view);
+    this._typeModeOverride = null;
+    return h(
+      "div",
+      { class: "compare-col canvas-scheme-" + this.resolvedCanvasScheme() },
+      h("div", { class: "compare-col-label" }, label),
+      scene,
+    );
   }
 
   // _tokensTableArea — the scrolling .is-table canvas shell (no pan/zoom) that hosts a tokens MATRIX,
@@ -3916,7 +3960,7 @@ class HctApp extends HTMLElement {
           ...TYPE_TREATMENTS.map((x) => h("option", { value: x.id, selected: cfg.treatment === x.id ? true : undefined }, x.label)),
         ),
       ),
-      this.slider(this.typeMode === "base" ? "Body base" : "Body base · this breakpoint", cfg.bodyBase, 12, 22, 1, (v) => fmt(v) + "px", (v) => this._setActiveTypeBodyBase(v)),
+      this.slider(this.typeMode === "base" || this.typeMode === "compare" ? "Body base" : "Body base · this breakpoint", cfg.bodyBase, 12, 22, 1, (v) => fmt(v) + "px", (v) => this._setActiveTypeBodyBase(v)),
       this._typeModeEditor(),
       h("p", { class: "insp-sub tyi-note" }, t.note),
       h(
@@ -5161,10 +5205,14 @@ class HctApp extends HTMLElement {
 
   // ── Geometry breakpoint modes (Phase 5) — named baseHeight variants over doc.geometry. Mirrors the
   // Typography mode helpers; the ACTIVE mode drives the canvas preview + the inspector. Export stays on Base.
+  // _effGeomMode — the mode the ACTIVE resolvers paint in: a Compare column's _geomModeOverride wins (so its
+  // scene + scale build at THAT breakpoint while it renders, like _schemeOverride), else this.geomMode.
+  _effGeomMode() { return this._geomModeOverride != null ? this._geomModeOverride : this.geomMode; }
   _activeGeometry() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    if (this.geomMode === "base") return g;
-    const m = (g.modes || []).find((x) => x.id === this.geomMode);
+    const mode = this._effGeomMode();
+    if (mode === "base") return g;
+    const m = (g.modes || []).find((x) => x.id === mode);
     return m ? { ...g, baseHeight: m.baseHeight } : g;
   }
   // the resolved scale at the active mode — composes geometry with the type scale at the SAME mode AND
@@ -5172,7 +5220,8 @@ class HctApp extends HTMLElement {
   // through _geomScaleFor so overrides are consistent with the matrix + every export.
   _activeGeomScale() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const key = this.geomMode === "base" || !(g.modes || []).some((m) => m.id === this.geomMode) ? "base" : this.geomMode;
+    const mode = this._effGeomMode();
+    const key = mode === "base" || !(g.modes || []).some((m) => m.id === mode) ? "base" : mode;
     return this._geomScaleFor(key);
   }
   // the breakpoint-mode scales for the responsive CSS export — [{ name, minWidth, scale }], one per mode.
@@ -5198,10 +5247,13 @@ class HctApp extends HTMLElement {
   geomModeControl() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     const modes = g.modes || [];
-    if (this.geomMode !== "base" && !modes.some((m) => m.id === this.geomMode)) this.geomMode = "base";
+    // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
+    if (this.geomMode !== "base" && this.geomMode !== "compare" && !modes.some((m) => m.id === this.geomMode)) this.geomMode = "base";
     const items = [
       { id: "base", label: "Base", title: `Base size ramp · ${g.baseHeight ?? 28}px` },
       ...modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: `${m.name || "Mode"} · ${m.baseHeight}px base height` })),
+      // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only Base, so only when ≥1 mode.
+      ...(modes.length ? [{ id: "compare", label: "Compare", title: "All breakpoints side by side" }] : []),
     ];
     return h(
       "div",
@@ -5347,6 +5399,8 @@ class HctApp extends HTMLElement {
   // renders an EDITABLE token MATRIX (Phase 3 — per-cell size/height overrides + ↺) (rows = sizes, cols = Base + each breakpoint) in the scrolling
   // .is-table shell instead — mirrors renderTypeCanvas / Color's Mapping flip.
   renderGeomCanvas(view) {
+    // Compare (Phase 5.3) — all breakpoints side by side. A Controls view, so it wins over the tokens table.
+    if (this.geomMode === "compare") return this.renderGeomCompareArea(view);
     if (this.geomSpecMode === "tokens") return this._tokensTableArea("Geometry tokens — Base + breakpoints", this.renderGeomTokensTable());
     const area = h(
       "div",
@@ -5360,6 +5414,36 @@ class HctApp extends HTMLElement {
     this.wirePanZoom(area);
     requestAnimationFrame(() => this.applyTransform());
     return area;
+  }
+
+  // renderGeomCompareArea — the Geometry "Compare" mode: the control ramp rendered at Base AND each breakpoint
+  // mode, side by side, in ONE pannable .canvas-scene. Mirrors renderTypeCompareArea / Color's renderCompareArea;
+  // each column forces its breakpoint via _geomModeOverride while it builds.
+  renderGeomCompareArea(view) {
+    const g = this.doc.geometry || DEFAULT_GEOMETRY;
+    const modes = g.modes || [];
+    const area = h(
+      "div",
+      { class: "canvas-area canvas-compare geom-canvas canvas-scheme-" + this.resolvedCanvasScheme(),
+        role: "group", "aria-label": "Compare — every geometry breakpoint side by side · drag to pan, wheel to zoom" },
+      h("div", { class: "canvas-scene compare" },
+        this._geomCompareColumn(view, "base", "Base"),
+        ...modes.map((m) => this._geomCompareColumn(view, m.id, m.name || "Mode"))),
+    );
+    this.wirePanZoom(area);
+    requestAnimationFrame(() => this.applyTransform());
+    return area;
+  }
+  _geomCompareColumn(view, modeId, label) {
+    this._geomModeOverride = modeId; // force _activeGeometry()/_activeGeomScale() while this column's scene builds
+    const scene = this.renderGeometryScene(view);
+    this._geomModeOverride = null;
+    return h(
+      "div",
+      { class: "compare-col canvas-scheme-" + this.resolvedCanvasScheme() },
+      h("div", { class: "compare-col-label" }, label),
+      scene,
+    );
   }
 
   // renderGeometryScene — the canvas "Geometry" view: the FULL dataset. (1) the 6-size CONTROL ramp, each
@@ -5591,7 +5675,7 @@ class HctApp extends HTMLElement {
           ...GEOMETRY_TREATMENTS.map((x) => h("option", { value: x.id, selected: cfg.treatment === x.id ? true : undefined }, x.label)),
         ),
       ),
-      this.slider(this.geomMode === "base" ? "Base height" : "Base height · this breakpoint", scale.baseHeight, 20, 48, 2, (v) => fmt(v) + "px", (v) => this._setActiveGeomBaseHeight(v)),
+      this.slider(this.geomMode === "base" || this.geomMode === "compare" ? "Base height" : "Base height · this breakpoint", scale.baseHeight, 20, 48, 2, (v) => fmt(v) + "px", (v) => this._setActiveGeomBaseHeight(v)),
       this._geomModeEditor(),
       h("p", { class: "insp-sub tyi-note" }, t.note),
       h(
