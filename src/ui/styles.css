@@ -623,12 +623,20 @@ nonoun-color-tokens.reordering, nonoun-color-tokens.reordering * { cursor: grabb
 .tok-head small { color: var(--ink-dim); }
 .tok-table { table-layout: auto; }
 .tok-table td, .tok-table th { vertical-align: top; }
-/* the sticky FIRST column — the token name */
+/* the token-name FIRST column. The sticky setup is authored correctly for a tbody-<th> matrix:
+   sticky-LEFT only (top:auto — .map-table sets top:0 for THEAD headers, but these <th> live in the
+   tbody), group headers scroll (static), and only the corner pins on both axes. NOTE: the shared
+   .map-table carries overflow:hidden (to clip its radius), which currently makes the TABLE itself the
+   sticky scrollport — so, exactly like the Color Mapping view, the headers scroll WITH the table
+   rather than pinning. Making the canvas data-tables TRULY sticky (overflow:visible + closing the
+   .canvas-scene top-padding gap + a Safari pass, for BOTH Mapping and this matrix) is a tracked
+   follow-up; these rules make this table correct the moment that lands. */
 .tok-table th.tok-name {
-  text-align: left; position: sticky; left: 0; z-index: 1;
+  text-align: left; position: sticky; left: 0; top: auto; z-index: 1;
   background: var(--panel); border-right: 1px solid var(--line); white-space: nowrap;
 }
-.tok-table th.tok-name-head { z-index: 2; background: var(--panel-2); }
+.tok-table th.tok-name-head { top: 0; z-index: 2; background: var(--panel-2); } /* the corner — sticky on BOTH axes */
+.tok-table th.tok-grouphead { position: static; } /* group-header rows scroll with the body, never pin to the top */
 .tok-table th.tok-name code { color: var(--ink); font-weight: 600; }
 /* breakpoint column heads — name above, ≥{minWidth}px beneath */
 .tok-col { white-space: nowrap; }
@@ -1155,13 +1163,11 @@ dialog.settings::backdrop { background: rgba(10,14,22,.34); }
 .type-spec-count { margin-left: auto; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
 .type-spec-line { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: var(--r); border: 1px solid transparent; background: color-mix(in srgb, var(--panel) 70%, transparent); }
 .type-spec-line:hover { border-color: var(--line); }
-.type-spec-line.tokens { padding: 6px 8px; }
 .type-spec-meta { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--ink-faint); }
 .type-spec-token { font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px; color: var(--ink-dim); background: color-mix(in srgb, var(--line) 60%, transparent); padding: 1px 5px; border-radius: 4px; }
 .type-spec-dims { color: var(--ink-faint); }
 .type-spec-render { color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .type-spec-render.para { white-space: normal; overflow: visible; max-width: 640px; }
-.type-spec.is-tokens .type-spec-line { background: transparent; }
 
 /* typography analysis — the seven-group series (display · 3 headings · body · ui · code), shared palette */
 /* the .ty-sN series classes ride BOTH the line <path> and the dot <circle>; the dots need their `fill`,
@@ -1227,8 +1233,6 @@ dialog.settings::backdrop { background: rgba(10,14,22,.34); }
 .geom-spec-count { margin-left: auto; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
 .geom-spec-line { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: var(--r); border: 1px solid transparent; background: color-mix(in srgb, var(--panel) 70%, transparent); }
 .geom-spec-line:hover { border-color: var(--line); }
-.geom-spec-line.tokens { padding: 6px 8px; }
-.geom-spec.is-tokens .geom-spec-line { background: transparent; }
 .geom-spec-meta { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--ink-faint); }
 .geom-spec-token { font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px; color: var(--ink-dim); background: color-mix(in srgb, var(--line) 60%, transparent); padding: 1px 5px; border-radius: 4px; }
 .geom-spec-dims { color: var(--ink-faint); }

@@ -1343,10 +1343,12 @@ app.setTypeSpecMode("tokens"); flushRaf();
 ok(!!app.querySelector(".tok-table") && !app.querySelector(".type-spec"), "(ty-tok) the Specimen·Tokens toggle renders the token matrix table (no specimen scene)");
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(ty-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
 ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 1, "(ty-tok) there is exactly one Base column header");
+ok(app._typeTokenColumns().length === 1, "(ty-tok) base-only — exactly one column (Base) with no breakpoints");
 ok(app.querySelectorAll(".tok-row").length === 41, `(ty-tok) one row per type step (41) (got ${app.querySelectorAll(".tok-row").length})`);
 ok(app.querySelectorAll(".tok-group").length === 7, `(ty-tok) the rows are grouped by voice — 7 group headers (got ${app.querySelectorAll(".tok-group").length})`);
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}).startsWith("--type-display-xl"), `(ty-tok) the first (sticky) token name is the --type-display-xl step (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setTypeSpecMode("specimen"); flushRaf();
+ok(!!app.querySelector(".type-spec") && !app.querySelector(".tok-table"), "(ty-tok) toggling back to Specimen restores the live specimen (token table gone)");
 let typeZip = null; const realDBty = app.downloadBytes.bind(app);
 app.downloadBytes = (bytes, name) => { typeZip = { bytes, name }; };
 app.downloadTypeTokens();
@@ -1368,6 +1370,9 @@ ok(app._typeModeDTCGFiles().length === 1 && app._typeModeDTCGFiles()[0].name ===
 app.setTypeSpecMode("tokens"); flushRaf();
 ok(app._typeTokenColumns().length === 2 && app._typeTokenColumns()[0].id === "base" && app._typeTokenColumns()[1].minWidth === 768, "(ty-tok) the matrix has a column per breakpoint — Base + the ≥768px mode (sorted by minWidth)");
 ok(walk(app, (e) => e.classList && e.classList.contains("tok-col-bp") && txtOf(e).includes("768")).length === 1, "(ty-tok) the breakpoint column header shows its ≥768px min-width");
+// CRITICAL: typeMode is STILL the breakpoint (bodyBase 20) here. The Base column must show the DOCUMENT
+// base (Body MD 16), NOT the active mode — and the breakpoint column carries the mode's 20.
+ok(app._typeTokenColumns()[0].scale.categories.Body.MD.size === 16 && app._typeTokenColumns()[1].scale.categories.Body.MD.size === 20, `(ty-tok) the Base column is pinned to the document base (Body MD 16), not the active mode (20) (got Base=${app._typeTokenColumns()[0].scale.categories.Body.MD.size}, bp=${app._typeTokenColumns()[1].scale.categories.Body.MD.size})`);
 app.setTypeSpecMode("specimen"); flushRaf();
 app.typeMode = "base"; flushRaf();
 ok(app._activeType().bodyBase === 16, "(ty-bp) switching back to Base resolves the base body size");
@@ -1410,9 +1415,11 @@ app.setGeomSpecMode("tokens"); flushRaf();
 ok(!!app.querySelector(".tok-table") && !app.querySelector(".geom-spec"), "(geo-tok) the Controls·Tokens toggle renders the token matrix table (no controls scene)");
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(geo-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
 ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 1, "(geo-tok) there is exactly one Base column header");
+ok(app._geomTokenColumns().length === 1, "(geo-tok) base-only — exactly one column (Base) with no breakpoints");
 ok(app.querySelectorAll(".tok-row").length === 6, `(geo-tok) one row per control size (6) (got ${app.querySelectorAll(".tok-row").length})`);
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}) === "--size-2xl", `(geo-tok) the first (sticky) token name is --size-2xl (largest→smallest) (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setGeomSpecMode("controls"); flushRaf();
+ok(!!app.querySelector(".geom-spec") && !app.querySelector(".tok-table"), "(geo-tok) toggling back to Controls restores the live controls scene (token table gone)");
 let geomZip = null; const realDBgeo = app.downloadBytes.bind(app);
 app.downloadBytes = (bytes, name) => { geomZip = { bytes, name }; };
 app.downloadGeomTokens();
@@ -1434,6 +1441,9 @@ ok(app._geomModeDTCGFiles().length === 1 && app._geomModeDTCGFiles()[0].name ===
 app.setGeomSpecMode("tokens"); flushRaf();
 ok(app._geomTokenColumns().length === 2 && app._geomTokenColumns()[0].id === "base" && app._geomTokenColumns()[1].minWidth === 600, "(geo-tok) the matrix has a column per breakpoint — Base + the ≥600px mode (sorted by minWidth)");
 ok(walk(app, (e) => e.classList && e.classList.contains("tok-col-bp") && txtOf(e).includes("600")).length === 1, "(geo-tok) the breakpoint column header shows its ≥600px min-width");
+// CRITICAL: geomMode is STILL the breakpoint (baseHeight 40) here. The Base column must show the DOCUMENT
+// base (28), NOT the active mode — and the breakpoint column carries the mode's 40.
+ok(app._geomTokenColumns()[0].scale.baseHeight === 28 && app._geomTokenColumns()[1].scale.baseHeight === 40, `(geo-tok) the Base column is pinned to the document base (28), not the active mode (40) (got Base=${app._geomTokenColumns()[0].scale.baseHeight}, bp=${app._geomTokenColumns()[1].scale.baseHeight})`);
 app.setGeomSpecMode("controls"); flushRaf();
 app.geomMode = "base"; flushRaf();
 ok(app._activeGeomScale().baseHeight === 28, "(geo-bp) switching back to Base resolves the base height");
