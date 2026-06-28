@@ -6,6 +6,7 @@
 //
 // Public contract (the grading harness imports exactly these):
 //   hctToRgb(hue, chroma, tone) -> { rgb:[r,g,b] (0-255 ints), inGamut:boolean, lstar }
+//   hctToOklch(hue, chroma, tone) -> [L, C, H°] (FLOAT — high-res, no 8-bit round-trip)
 //   cam16FromRgb([r,g,b])       -> { hue, chroma, J }
 //   lstarFromRgb([r,g,b])       -> CIELAB L* (0-100)
 //   maxChromaInGamut(hue, tone) -> number
@@ -170,15 +171,15 @@ function xyzFromCam16(J, C, hue) {
 }
 
 // ── hctToRgb — branches in order (endpoints, neutral gray, then J tone-search) ─
-export function hctToRgb(hue, chroma, tone) {
+// _hctToLinRGB — the shared CAM16 solve: HCT -> converged linear sRGB (0..100 scale) + lstar + inGamut.
+// hctToRgb delins this to 0..255 ints; hctToOklch converts the SAME float pixel to OKLab — so a
+// perceptual readout reflects the high-res model, never an 8-bit round-trip.
+function _hctToLinRGB(hue, chroma, tone) {
   // 1) tone clamps to pure black / white.
-  if (tone <= 0) return { rgb: [0, 0, 0], inGamut: true, lstar: 0 };
-  if (tone >= 100) return { rgb: [255, 255, 255], inGamut: true, lstar: 100 };
+  if (tone <= 0) return { linRGB: [0, 0, 0], inGamut: true, lstar: 0 };
+  if (tone >= 100) return { linRGB: [100, 100, 100], inGamut: true, lstar: 100 };
   // 3) near-neutral: CAM16 inversion is noisy below 0.4 chroma — emit gray at the tone.
-  if (chroma < 0.4) {
-    const v = delin(yFromL(tone));
-    return { rgb: [v, v, v], inGamut: true, lstar: tone };
-  }
+  if (chroma < 0.4) { const y = yFromL(tone); return { linRGB: [y, y, y], inGamut: true, lstar: tone }; }
   // 4) binary-search CAM16 lightness J so the resulting Y reproduces the target tone (L*).
   let lo = 0;
   let hi = 100;
@@ -191,11 +192,35 @@ export function hctToRgb(hue, chroma, tone) {
     if (lMid < tone) lo = mid;
     else hi = mid;
   }
-  // final XYZ at the converged J -> linear sRGB -> gamut test -> delin to 0..255.
+  // final XYZ at the converged J -> linear sRGB -> gamut test.
   const linRGB = matMul(XYZ_TO_SRGB, xyz);
   const inGamut = linRGB.every((ch) => ch >= -0.0001 && ch <= 100.0001);
-  const rgb = linRGB.map((ch) => delin(ch));
-  return { rgb, inGamut, lstar: lFromY(xyz[1]) };
+  return { linRGB, inGamut, lstar: lFromY(xyz[1]) };
+}
+
+export function hctToRgb(hue, chroma, tone) {
+  const { linRGB, inGamut, lstar } = _hctToLinRGB(hue, chroma, tone);
+  return { rgb: linRGB.map((ch) => delin(ch)), inGamut, lstar };
+}
+
+// hctToOklch(hue, chroma, tone) -> [L, C, H°] in FLOAT. Reuses the CAM16 solve, then sends the
+// converged linear sRGB straight through OKLab (Björn Ottosson's matrices — the same constants as
+// okhsl.js linearSrgbToOklab; inlined to keep hct.js dependency-free). NO 8-bit step, so analysis /
+// readouts read the perceptual coords from the high-res model, not the rendered pixel.
+export function hctToOklch(hue, chroma, tone) {
+  const { linRGB } = _hctToLinRGB(hue, chroma, tone);
+  const r = Math.min(Math.max(linRGB[0] / 100, 0), 1);
+  const g = Math.min(Math.max(linRGB[1] / 100, 0), 1);
+  const b = Math.min(Math.max(linRGB[2] / 100, 0), 1);
+  const l_ = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m_ = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s_ = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const L = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_;
+  const a = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_;
+  const bb = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_;
+  let H = (Math.atan2(bb, a) * 180) / Math.PI;
+  H = ((H % 360) + 360) % 360;
+  return [L, Math.hypot(a, bb), H];
 }
 
 // ── Forward helpers from sRGB ────────────────────────────────────────────────
@@ -248,29 +273,27 @@ export function peakC(hue) {
 
 // ── oklchToCam16Hue — sample a fixed mid OKLCH color, read its CAM16 hue ──────
 const _oh = new Map();
-export function oklchToCam16Hue(h) {
-  const key = h.toFixed(2);
+export function oklchToCam16Hue(h, chromaFrac = 1) {
+  const target = ((h % 360) + 360) % 360;
+  const cf = Math.min(1, Math.max(0, chromaFrac));
+  const key = target.toFixed(2) + ":" + cf.toFixed(3);
   const hit = _oh.get(key);
   if (hit !== undefined) return hit;
-  const L = 0.72;
-  const a = 0.1 * Math.cos((h * Math.PI) / 180);
-  const b = 0.1 * Math.sin((h * Math.PI) / 180);
-  // OKLab -> LMS' -> LMS (cube) -> linear sRGB
-  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
-  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
-  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
-  const l = l_ ** 3;
-  const m = m_ ** 3;
-  const s = s_ ** 3;
-  let R = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
-  let G = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
-  let B = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s;
-  // clamp negatives, treat as linear sRGB in 0..1 -> scale to 0..100 -> XYZ -> CAM16 hue.
-  R = Math.max(0, R);
-  G = Math.max(0, G);
-  B = Math.max(0, B);
-  const xyz = matMul(SRGB_TO_XYZ, [R * 100, G * 100, B * 100]);
-  const hue = cam16FromXyz(xyz[0], xyz[1], xyz[2]).hue;
-  _oh.set(key, hue);
-  return hue;
+  // The ACCURATE, CHROMA-AWARE inverse of the render path: find the CAM16 hue X such that a color at
+  // `chromaFrac` of X's peak chroma (and peak tone) renders at OKLCH hue `target` — so the palette's
+  // IDENTITY color (the key, at its own chroma) lands on the requested OKLCH hue. The OKLCH↔CAM16 hue
+  // map shifts with chroma (Abney), so a fixed sample is wrong at one end (the old L=0.72/C=0.1 drifted
+  // ~15° on vivid blues; a cusp-only anchor drifts ~11° on muted hues) — anchoring at the palette's own
+  // chroma is right across the board. f(X) is ~monotonic, slope ≈1, so the step X ← X − (f(X) − target)
+  // is Newton with derivative ≈1; a chroma floor keeps the hue well-defined for near-greys.
+  let x = target; // first-order seed: CAM16 hue ≈ OKLCH hue
+  for (let i = 0; i < 12; i++) {
+    const pk = peakC(x);
+    const got = hctToOklch(x, Math.max(cf * pk.c, 8), pk.tone)[2];
+    const err = (((got - target) % 360) + 540) % 360 - 180; // signed (got − target) ∈ (−180, 180]
+    if (Math.abs(err) < 1e-3) break;
+    x = (((x - err) % 360) + 360) % 360;
+  }
+  _oh.set(key, x);
+  return x;
 }

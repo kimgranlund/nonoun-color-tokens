@@ -11,6 +11,7 @@
 //   peakC(hue)                -> { c, tone }
 //   oklchToCam16Hue(h)        -> number (CAM16 hue degrees)
 import * as E from "../../src/engine/hct.js";
+import { oklchToRgb } from "../../src/engine/okhsl.js";
 
 // ── deterministic PRNG (LCG) — pristine: the worker never sees this seed stream ──────────
 let _s = 0x9e3779b1 >>> 0;
@@ -84,8 +85,45 @@ for (let i = 0; i < 50; i++) {
   if (a !== b || b !== c) { FAIL("oklch-deterministic", `non-deterministic at h=${h.toFixed(2)}: ${a},${b},${c}`); break; }
 }
 
+// ── GATE hct-oklch-inverse — oklchToCam16Hue is the ACCURATE inverse of the render path: the CAM16 hue
+// it returns must render (at its cusp) back to the requested OKLCH hue. This is what makes an OKLCH-native
+// palette land on its stored hue — the old fixed-sample version drifted 6-15° at the blue/violet pole. ──
+let invMaxD = 0;
+for (let H = 0; H < 360 && invMaxD <= 3; H += 3) {
+  // CHROMA-AWARE: the inverse must round-trip at the anchored chroma fraction (the Abney-correct fix —
+  // a fixed anchor drifts at the other end). Check vivid (cusp) AND muted (half-peak).
+  for (const cf of [1, 0.5]) {
+    const x = E.oklchToCam16Hue(H, cf);
+    const pk = E.peakC(x);
+    const back = E.hctToOklch(x, Math.max(cf * pk.c, 8), pk.tone)[2];
+    const d = Math.abs((((back - H) % 360) + 540) % 360 - 180);
+    if (d > invMaxD) invMaxD = d;
+    if (d > 3) { FAIL("hct-oklch-inverse", `OKLCH ${H}° @cf${cf} → cam16 ${x.toFixed(1)} renders OKLCH ${back.toFixed(1)} (Δ${d.toFixed(2)}° > 3)`); break; }
+  }
+}
+
+// ── GATE hct-oklch — the FLOAT HCT→OKLCH readout (no 8-bit round-trip). It must describe the SAME
+// color hctToRgb renders, so oklchToRgb(hctToOklch(...)) ≈ hctToRgb(...).rgb for in-gamut colors;
+// values stay in range; it's deterministic; a neutral collapses to ~0 chroma. ──────────────────
+let okOklchMaxD = 0;
+for (let i = 0; i < 200; i++) {
+  const hue = rnd() * 360, tone = 20 + rnd() * 60;
+  const chroma = rnd() * E.peakC(hue).c * 0.9; // comfortably in-gamut
+  const out = E.hctToRgb(hue, chroma, tone);
+  if (!out.inGamut) continue;
+  const lch = E.hctToOklch(hue, chroma, tone);
+  if (!(lch[0] > 0 && lch[0] < 1 && lch[1] >= 0 && lch[2] >= 0 && lch[2] < 360)) { FAIL("hct-oklch", `out-of-range [${lch}] at h=${hue.toFixed(1)}`); break; }
+  const lch2 = E.hctToOklch(hue, chroma, tone);
+  if (lch2[0] !== lch[0] || lch2[1] !== lch[1] || lch2[2] !== lch[2]) { FAIL("hct-oklch", `non-deterministic at h=${hue.toFixed(1)}`); break; }
+  const back = oklchToRgb(lch[0], lch[1], lch[2]);
+  const d = Math.max(...back.map((v, j) => Math.abs(v - out.rgb[j])));
+  if (d > okOklchMaxD) okOklchMaxD = d;
+  if (d > 2) { FAIL("hct-oklch", `round-trip Δ=${d} at h=${hue.toFixed(1)} c=${chroma.toFixed(1)} t=${tone.toFixed(1)}`); break; }
+}
+if (E.hctToOklch(120, 0, 50)[1] > 0.02) FAIL("hct-oklch", `near-neutral not achromatic (C=${E.hctToOklch(120, 0, 50)[1]})`);
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-const GATES = ["anchor-roundtrip", "random-roundtrip", "gamut-ceiling", "branches", "oklch-deterministic"];
+const GATES = ["anchor-roundtrip", "random-roundtrip", "gamut-ceiling", "branches", "oklch-deterministic", "hct-oklch", "hct-oklch-inverse"];
 for (const g of GATES) {
   const gf = fails.filter((f) => f.startsWith(g + ":"));
   console.log(`  ${gf.length ? "FAIL" : "pass"}  ${g}${gf.length ? "  — " + gf[0].slice(g.length + 2) : ""}`);
