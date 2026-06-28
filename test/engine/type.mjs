@@ -79,6 +79,17 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(lux.includes("--font-display: 'Source Serif 4'"), "CSS quotes font family names (digit names like 'Source Serif 4' are invalid unquoted in Safari)");
 }
 
+// ── responsive CSS: per-breakpoint @media blocks re-declaring the size vars (Phase 5.4) ──
+{
+  const base = T.typeScale({ treatment: "product", bodyBase: 16 });
+  const mobile = T.typeScale({ treatment: "product", bodyBase: 13 });
+  const css = T.typeTokensResponsiveCSS(base, [{ name: "Mobile", minWidth: 768, scale: mobile }, { name: "NoWidth", scale: mobile }]);
+  ok(css.startsWith(T.typeTokensCSS(base)), "responsive CSS begins with the full base CSS");
+  ok(/@media \(min-width: 768px\) \{\s*:root \{[^}]*--type-body-md-size: 13px/.test(css), "a mode with minWidth emits @media (min-width) re-declaring the size vars at the mode's body size");
+  ok((css.match(/@media/g) || []).length === 1, "a mode WITHOUT a minWidth is skipped (no @media)");
+  ok(T.typeTokensResponsiveCSS(base, []) === T.typeTokensCSS(base), "no modes → identical to the base CSS");
+}
+
 // ── DTCG emit: fontFamily group + composite typography tokens ──
 {
   const d = T.typeTokensDTCG(T.typeScale({ treatment: "editorial" }));

@@ -117,15 +117,23 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 
 // typeTokensCSS — CSS custom properties (font families + per-step size/line/tracking/weight) plus a
 // utility class per step. Drop-in: `class="type-display-xl"`.
-export function typeTokensCSS(scale) {
-  const lines = [":root {"];
-  for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
+// the per-step `--type-*` custom-property lines for a scale (no :root wrapper) — shared by the base export
+// and the per-breakpoint @media overrides, since bodyBase scales these and only these.
+function typeVarLines(scale, indent = "  ") {
+  const out = [];
   for (const [cName, steps] of Object.entries(scale.categories)) {
     for (const [sName, s] of Object.entries(steps)) {
       const p = `--type-${kebab(cName)}-${kebab(sName)}`;
-      lines.push(`  ${p}-size: ${s.size}px; ${p}-line: ${s.lineHeight}px; ${p}-tracking: ${s.letterSpacing}px; ${p}-weight: ${s.weight};`);
+      out.push(`${indent}${p}-size: ${s.size}px; ${p}-line: ${s.lineHeight}px; ${p}-tracking: ${s.letterSpacing}px; ${p}-weight: ${s.weight};`);
     }
   }
+  return out.join("\n");
+}
+
+export function typeTokensCSS(scale) {
+  const lines = [":root {"];
+  for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
+  lines.push(typeVarLines(scale));
   lines.push("}");
   for (const [cName, steps] of Object.entries(scale.categories)) {
     const role = scale.roleOf[cName] || "body";
@@ -136,6 +144,18 @@ export function typeTokensCSS(scale) {
     }
   }
   return lines.join("\n") + "\n";
+}
+
+// typeTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
+// re-declares the per-step size vars at that mode's scale (the utilities + font vars are unchanged, so they
+// auto-track). `modes` = [{ name, minWidth, scale }]; a mode without a positive minWidth is skipped.
+export function typeTokensResponsiveCSS(scale, modes = []) {
+  let css = typeTokensCSS(scale);
+  for (const m of modes) {
+    if (!(Number(m.minWidth) > 0) || !m.scale) continue;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ")}\n  }\n}\n`;
+  }
+  return css;
 }
 
 // typeTokensDTCG — the type scale as DTCG tokens: a fontFamily group + a typography group per

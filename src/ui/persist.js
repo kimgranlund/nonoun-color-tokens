@@ -246,6 +246,10 @@ export function hydrate(snapshot) {
   };
 }
 
+// a breakpoint mode's @media min-width (px) — OPTIONAL: {} when absent/invalid (no media query), or
+// { minWidth } when a positive width is set. Keeps the hydrate identity gate (absent stays absent).
+const clampMinWidth = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? { minWidth: Math.max(1, Math.min(3840, Math.round(n))) } : {}; };
+
 // clampType — the typography config (treatment + body base). Treatment to a known id, base size to a
 // sane integer range. Identity-preserving for an in-domain value (so the roundtrip gate holds).
 const TYPE_TREATMENTS = ["product", "luxury", "editorial", "technical", "statement"];
@@ -260,7 +264,7 @@ function clampType(t) {
   if (Array.isArray(t.modes) && t.modes.length) {
     const modes = t.modes
       .filter((m) => m && typeof m === "object" && typeof m.id === "string")
-      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", bodyBase: clampBody(m.bodyBase) }));
+      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", bodyBase: clampBody(m.bodyBase), ...clampMinWidth(m.minWidth) }));
     if (modes.length) out.modes = modes;
   }
   return out;
@@ -280,7 +284,7 @@ function clampGeometry(g) {
   if (Array.isArray(g.modes) && g.modes.length) {
     const modes = g.modes
       .filter((m) => m && typeof m === "object" && typeof m.id === "string")
-      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", baseHeight: clampH(m.baseHeight) }));
+      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", baseHeight: clampH(m.baseHeight), ...clampMinWidth(m.minWidth) }));
     if (modes.length) out.modes = modes;
   }
   return out;

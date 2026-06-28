@@ -79,6 +79,17 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(/\.control-md\s*\{[^}]*block-size: var\(--size-md-height\)[^}]*padding-block: 0/.test(css), "CSS emits a .control-md utility class (block-size lever, padding-block 0)");
 }
 
+// ── responsive CSS: per-breakpoint @media blocks re-declaring the per-size vars (Phase 5.4) ──
+{
+  const base = G.geomScale({ treatment: "comfortable", baseHeight: 28 });
+  const touch = G.geomScale({ treatment: "comfortable", baseHeight: 40 });
+  const css = G.geomTokensResponsiveCSS(base, [{ name: "Touch", minWidth: 600, scale: touch }, { name: "NoWidth", scale: touch }]);
+  ok(css.startsWith(G.geomTokensCSS(base)), "responsive CSS begins with the full base CSS");
+  ok(/@media \(min-width: 600px\) \{\s*:root \{[^}]*--size-md-height: 40px/.test(css), "a mode with minWidth emits @media re-declaring the size vars at the mode's base height");
+  ok((css.match(/@media/g) || []).length === 1, "a mode WITHOUT a minWidth is skipped (no @media)");
+  ok(G.geomTokensResponsiveCSS(base, []) === G.geomTokensCSS(base), "no modes → identical to the base CSS");
+}
+
 // ── DTCG emit: size composite + radius + space dimension groups ──
 {
   const d = G.geomTokensDTCG(G.geomScale({ treatment: "spacious" }));

@@ -30,8 +30,8 @@ import { MCP_BRAND_KIT } from "./mcp-assets.js";
 import { TYPE_FONTS_CSS } from "./type-fonts.js";
 import { CATEGORY_INDEX, loadCategory } from "./categories/index.js";
 import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.mjs";
-import { typeScale, typeTokensCSS, typeTokensDTCG, TYPE_TREATMENTS, DEFAULT_TYPE } from "../engine/type.mjs";
-import { geomTokensCSS, geomTokensDTCG, geomTokensFigma, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
+import { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, TYPE_TREATMENTS, DEFAULT_TYPE } from "../engine/type.mjs";
+import { geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geomTokensFigma, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
 import { icon, brandMark } from "./icons.js";
 
@@ -2719,7 +2719,30 @@ class HctApp extends HTMLElement {
           onchange: (e) => this.renameTypeMode(m.id, e.target.value.trim()) }),
         btn(icon("trash"), { ariaLabel: "Delete this breakpoint", title: "Delete this breakpoint mode", onclick: () => this.deleteTypeMode(m.id) }),
       ),
+      h("label", { class: "mode-editor-label", for: "fld-mode-mw" }, "Breakpoint width — @media min-width"),
+      h(
+        "div",
+        { class: "mode-editor-row" },
+        h("input", { id: "fld-mode-mw", type: "number", min: 0, max: 3840, step: 1, value: m.minWidth || "", placeholder: "e.g. 768", "data-fk": "tmode-mw", "aria-label": "Breakpoint min-width in px",
+          onchange: (e) => this.setTypeModeMinWidth(m.id, e.target.value) }),
+        h("span", { class: "mode-editor-unit" }, "px"),
+      ),
+      h("p", { class: "insp-sub tyi-future" }, m.minWidth
+        ? `Exports as @media (min-width: ${m.minWidth}px) — the size vars re-declare at this body size above ${m.minWidth}px.`
+        : "Set a width to emit a CSS @media breakpoint in the export; blank = preview-only."),
     );
+  }
+  setTypeModeMinWidth(id, v) {
+    const n = Math.round(Number(v));
+    this.commit((d) => {
+      if (!d.type || !Array.isArray(d.type.modes)) return;
+      d.type = { ...d.type, modes: d.type.modes.map((m) => {
+        if (m.id !== id) return m;
+        const mm = { ...m };
+        if (Number.isFinite(n) && n > 0) mm.minWidth = Math.max(1, Math.min(3840, n)); else delete mm.minWidth;
+        return mm;
+      }) };
+    });
   }
 
   // renderTypeCanvasHeader — the Typography section's own canvas header: pane toggles + the
@@ -4243,9 +4266,9 @@ class HctApp extends HTMLElement {
     const typeSc = typeScale(this.doc.type || DEFAULT_TYPE);
     const geomSc = geometryScale(this.doc);
     const SYSTEM_CODE = {
-      "type-css": () => typeTokensCSS(typeSc),
+      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales()),
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc), null, 2),
-      "geom-css": () => geomTokensCSS(geomSc),
+      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales()),
       "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc), null, 2),
     };
     const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG" };
@@ -4470,7 +4493,7 @@ class HctApp extends HTMLElement {
       const tsc = typeScale(this.doc.type || DEFAULT_TYPE);
       const tDtcg = JSON.stringify(typeTokensDTCG(tsc), null, 2);
       files.push(
-        { name: "typography/type.css", data: typeTokensCSS(tsc) },
+        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales()) },
         { name: "typography/type.tokens.json", data: tDtcg },
         { name: "figma/type.tokens.json", data: tDtcg }, // importable as Figma text styles (via a tokens plugin)
       );
@@ -4479,7 +4502,7 @@ class HctApp extends HTMLElement {
       const gsc = geometryScale(this.doc); // composed with the type scale (the per-step `font` is shared)
       const gDtcg = JSON.stringify(geomTokensDTCG(gsc), null, 2);
       files.push(
-        { name: "geometry/geometry.css", data: geomTokensCSS(gsc) },
+        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales()) },
         { name: "geometry/geometry.tokens.json", data: gDtcg },
         { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
       );
@@ -4798,7 +4821,7 @@ class HctApp extends HTMLElement {
   downloadTypeTokens() {
     const scale = typeScale(this.doc.type || DEFAULT_TYPE);
     const files = [
-      { name: "type.css", data: typeTokensCSS(scale) },
+      { name: "type.css", data: typeTokensResponsiveCSS(scale, this._typeModeScales()) },
       { name: "type.tokens.json", data: JSON.stringify(typeTokensDTCG(scale), null, 2) },
     ];
     this.downloadBytes(zipStore(files), "type-tokens.zip", "application/zip");
@@ -4837,6 +4860,15 @@ class HctApp extends HTMLElement {
   // the resolved scale at the active mode — geometryScale composes geometry with the (base) type scale, so
   // pass a doc whose geometry is the active mode (no new import; reuses the model's join + composition).
   _activeGeomScale() { return geometryScale({ ...this.doc, geometry: this._activeGeometry() }); }
+  // the breakpoint-mode scales for the responsive CSS export — [{ name, minWidth, scale }], one per mode.
+  _typeModeScales() {
+    const t = this.doc.type || DEFAULT_TYPE;
+    return (t.modes || []).map((m) => ({ name: m.name, minWidth: m.minWidth, scale: typeScale({ ...t, bodyBase: m.bodyBase }) }));
+  }
+  _geomModeScales() {
+    const g = this.doc.geometry || DEFAULT_GEOMETRY;
+    return (g.modes || []).map((m) => ({ name: m.name, minWidth: m.minWidth, scale: geometryScale({ ...this.doc, geometry: { ...g, baseHeight: m.baseHeight } }) }));
+  }
   geomModeControl() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     const modes = g.modes || [];
@@ -4906,7 +4938,30 @@ class HctApp extends HTMLElement {
           onchange: (e) => this.renameGeomMode(m.id, e.target.value.trim()) }),
         btn(icon("trash"), { ariaLabel: "Delete this breakpoint", title: "Delete this breakpoint mode", onclick: () => this.deleteGeomMode(m.id) }),
       ),
+      h("label", { class: "mode-editor-label", for: "fld-gmode-mw" }, "Breakpoint width — @media min-width"),
+      h(
+        "div",
+        { class: "mode-editor-row" },
+        h("input", { id: "fld-gmode-mw", type: "number", min: 0, max: 3840, step: 1, value: m.minWidth || "", placeholder: "e.g. 768", "data-fk": "gmode-mw", "aria-label": "Breakpoint min-width in px",
+          onchange: (e) => this.setGeomModeMinWidth(m.id, e.target.value) }),
+        h("span", { class: "mode-editor-unit" }, "px"),
+      ),
+      h("p", { class: "insp-sub tyi-future" }, m.minWidth
+        ? `Exports as @media (min-width: ${m.minWidth}px) — the size vars re-declare at this base height above ${m.minWidth}px.`
+        : "Set a width to emit a CSS @media breakpoint in the export; blank = preview-only."),
     );
+  }
+  setGeomModeMinWidth(id, v) {
+    const n = Math.round(Number(v));
+    this.commit((d) => {
+      if (!d.geometry || !Array.isArray(d.geometry.modes)) return;
+      d.geometry = { ...d.geometry, modes: d.geometry.modes.map((m) => {
+        if (m.id !== id) return m;
+        const mm = { ...m };
+        if (Number.isFinite(n) && n > 0) mm.minWidth = Math.max(1, Math.min(3840, n)); else delete mm.minWidth;
+        return mm;
+      }) };
+    });
   }
   // download the resolved geometry tokens — CSS custom props + utility classes, DTCG dimension tokens, and
   // a Figma NUMBER-variable file (the "Geometry" collection). The scale is composed with the type scale so
@@ -4914,7 +4969,7 @@ class HctApp extends HTMLElement {
   downloadGeomTokens() {
     const scale = geometryScale(this.doc);
     const files = [
-      { name: "geometry.css", data: geomTokensCSS(scale) },
+      { name: "geometry.css", data: geomTokensResponsiveCSS(scale, this._geomModeScales()) },
       { name: "geometry.tokens.json", data: JSON.stringify(geomTokensDTCG(scale), null, 2) },
       { name: "dimension.variables.json", data: JSON.stringify(geomTokensFigma(scale), null, 2) },
     ];

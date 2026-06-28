@@ -115,12 +115,17 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 // geomTokensCSS — CSS custom properties (per-size height/icon/caret/font/gap/padding/radius, the radius
 // ladder, the space scale, the density) plus a `.control-{size}` utility class that EMBODIES the law:
 // block-size off the ramp, padding-block 0, inline padding = the slotless h/2, the pill radius.
-export function geomTokensCSS(scale) {
-  const lines = [":root {", `  --density: ${scale.density};`];
-  for (const [name, s] of Object.entries(scale.sizes)) {
+// the per-size `--size-*` custom-property lines (no :root) — shared by the base export + the @media
+// overrides; only these scale with baseHeight (density/radii/space are treatment-derived, mode-independent).
+function geomSizeVarLines(scale, indent = "  ") {
+  return Object.entries(scale.sizes).map(([name, s]) => {
     const p = `--size-${kebab(name)}`;
-    lines.push(`  ${p}-height: ${s.height}px; ${p}-icon: ${s.icon}px; ${p}-caret: ${s.caret}px; ${p}-font: ${s.font}px; ${p}-gap: ${s.gap}px; ${p}-pad: ${s.padding}px; ${p}-pad-edge: ${s.edgePadding}px; ${p}-radius: ${s.radiusPill}px; ${p}-min: ${s.minWidth}px;`);
-  }
+    return `${indent}${p}-height: ${s.height}px; ${p}-icon: ${s.icon}px; ${p}-caret: ${s.caret}px; ${p}-font: ${s.font}px; ${p}-gap: ${s.gap}px; ${p}-pad: ${s.padding}px; ${p}-pad-edge: ${s.edgePadding}px; ${p}-radius: ${s.radiusPill}px; ${p}-min: ${s.minWidth}px;`;
+  }).join("\n");
+}
+
+export function geomTokensCSS(scale) {
+  const lines = [":root {", `  --density: ${scale.density};`, geomSizeVarLines(scale)];
   for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --radius-${k}: ${v}px;`);
   for (const [k, v] of Object.entries(scale.space)) lines.push(`  --space-${k}: ${v}px;`);
   lines.push("}");
@@ -129,6 +134,18 @@ export function geomTokensCSS(scale) {
     lines.push(`.control-${s} { box-sizing: border-box; block-size: var(--size-${s}-height); min-inline-size: var(--size-${s}-min); font-size: var(--size-${s}-font); padding-inline: var(--size-${s}-pad-edge); padding-block: 0; gap: var(--size-${s}-gap); border-radius: var(--size-${s}-radius); }`);
   }
   return lines.join("\n") + "\n";
+}
+
+// geomTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
+// re-declares the per-size vars at that mode's scale (radii/space/density + the .control-* utilities are
+// mode-independent, so they auto-track). `modes` = [{ name, minWidth, scale }]; no-minWidth modes skipped.
+export function geomTokensResponsiveCSS(scale, modes = []) {
+  let css = geomTokensCSS(scale);
+  for (const m of modes) {
+    if (!(Number(m.minWidth) > 0) || !m.scale) continue;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ")}\n  }\n}\n`;
+  }
+  return css;
 }
 
 // geomTokensDTCG — the geometry as DTCG dimension tokens: a `size` group (one composite of dimensions per

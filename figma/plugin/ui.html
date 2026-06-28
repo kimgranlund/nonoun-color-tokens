@@ -451,6 +451,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 .mode-editor-label { display: block; font-size: 11px; color: var(--ink-dim); margin-bottom: 4px; }
 .mode-editor-row { display: flex; gap: 6px; align-items: center; }
 .mode-editor-row input { flex: 1; min-width: 0; }
+.mode-editor-unit { flex: none; font-size: 11px; color: var(--ink-faint); }
 .zoom-readout { color: var(--ink-dim); min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
 
 .canvas-area {
@@ -2500,15 +2501,23 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 
 // typeTokensCSS — CSS custom properties (font families + per-step size/line/tracking/weight) plus a
 // utility class per step. Drop-in: `class="type-display-xl"`.
-function typeTokensCSS(scale) {
-  const lines = [":root {"];
-  for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
+// the per-step `--type-*` custom-property lines for a scale (no :root wrapper) — shared by the base export
+// and the per-breakpoint @media overrides, since bodyBase scales these and only these.
+function typeVarLines(scale, indent = "  ") {
+  const out = [];
   for (const [cName, steps] of Object.entries(scale.categories)) {
     for (const [sName, s] of Object.entries(steps)) {
       const p = `--type-${kebab(cName)}-${kebab(sName)}`;
-      lines.push(`  ${p}-size: ${s.size}px; ${p}-line: ${s.lineHeight}px; ${p}-tracking: ${s.letterSpacing}px; ${p}-weight: ${s.weight};`);
+      out.push(`${indent}${p}-size: ${s.size}px; ${p}-line: ${s.lineHeight}px; ${p}-tracking: ${s.letterSpacing}px; ${p}-weight: ${s.weight};`);
     }
   }
+  return out.join("\n");
+}
+
+function typeTokensCSS(scale) {
+  const lines = [":root {"];
+  for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
+  lines.push(typeVarLines(scale));
   lines.push("}");
   for (const [cName, steps] of Object.entries(scale.categories)) {
     const role = scale.roleOf[cName] || "body";
@@ -2519,6 +2528,18 @@ function typeTokensCSS(scale) {
     }
   }
   return lines.join("\n") + "\n";
+}
+
+// typeTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
+// re-declares the per-step size vars at that mode's scale (the utilities + font vars are unchanged, so they
+// auto-track). `modes` = [{ name, minWidth, scale }]; a mode without a positive minWidth is skipped.
+function typeTokensResponsiveCSS(scale, modes = []) {
+  let css = typeTokensCSS(scale);
+  for (const m of modes) {
+    if (!(Number(m.minWidth) > 0) || !m.scale) continue;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ")}\n  }\n}\n`;
+  }
+  return css;
 }
 
 // typeTokensDTCG — the type scale as DTCG tokens: a fontFamily group + a typography group per
@@ -2540,7 +2561,7 @@ function typeTokensDTCG(scale) {
   return { fontFamily, typography };
 }
 
-return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, typeScale, typeTokensCSS, typeTokensDTCG };
+return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG };
 })();
 __M.geometry = (function(){
 // geometry.mjs — the GEOMETRY / dimensional engine: the spatial analog of the color & type engines.
@@ -2660,12 +2681,17 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 // geomTokensCSS — CSS custom properties (per-size height/icon/caret/font/gap/padding/radius, the radius
 // ladder, the space scale, the density) plus a `.control-{size}` utility class that EMBODIES the law:
 // block-size off the ramp, padding-block 0, inline padding = the slotless h/2, the pill radius.
-function geomTokensCSS(scale) {
-  const lines = [":root {", `  --density: ${scale.density};`];
-  for (const [name, s] of Object.entries(scale.sizes)) {
+// the per-size `--size-*` custom-property lines (no :root) — shared by the base export + the @media
+// overrides; only these scale with baseHeight (density/radii/space are treatment-derived, mode-independent).
+function geomSizeVarLines(scale, indent = "  ") {
+  return Object.entries(scale.sizes).map(([name, s]) => {
     const p = `--size-${kebab(name)}`;
-    lines.push(`  ${p}-height: ${s.height}px; ${p}-icon: ${s.icon}px; ${p}-caret: ${s.caret}px; ${p}-font: ${s.font}px; ${p}-gap: ${s.gap}px; ${p}-pad: ${s.padding}px; ${p}-pad-edge: ${s.edgePadding}px; ${p}-radius: ${s.radiusPill}px; ${p}-min: ${s.minWidth}px;`);
-  }
+    return `${indent}${p}-height: ${s.height}px; ${p}-icon: ${s.icon}px; ${p}-caret: ${s.caret}px; ${p}-font: ${s.font}px; ${p}-gap: ${s.gap}px; ${p}-pad: ${s.padding}px; ${p}-pad-edge: ${s.edgePadding}px; ${p}-radius: ${s.radiusPill}px; ${p}-min: ${s.minWidth}px;`;
+  }).join("\n");
+}
+
+function geomTokensCSS(scale) {
+  const lines = [":root {", `  --density: ${scale.density};`, geomSizeVarLines(scale)];
   for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --radius-${k}: ${v}px;`);
   for (const [k, v] of Object.entries(scale.space)) lines.push(`  --space-${k}: ${v}px;`);
   lines.push("}");
@@ -2674,6 +2700,18 @@ function geomTokensCSS(scale) {
     lines.push(`.control-${s} { box-sizing: border-box; block-size: var(--size-${s}-height); min-inline-size: var(--size-${s}-min); font-size: var(--size-${s}-font); padding-inline: var(--size-${s}-pad-edge); padding-block: 0; gap: var(--size-${s}-gap); border-radius: var(--size-${s}-radius); }`);
   }
   return lines.join("\n") + "\n";
+}
+
+// geomTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
+// re-declares the per-size vars at that mode's scale (radii/space/density + the .control-* utilities are
+// mode-independent, so they auto-track). `modes` = [{ name, minWidth, scale }]; no-minWidth modes skipped.
+function geomTokensResponsiveCSS(scale, modes = []) {
+  let css = geomTokensCSS(scale);
+  for (const m of modes) {
+    if (!(Number(m.minWidth) > 0) || !m.scale) continue;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ")}\n  }\n}\n`;
+  }
+  return css;
 }
 
 // geomTokensDTCG — the geometry as DTCG dimension tokens: a `size` group (one composite of dimensions per
@@ -2717,7 +2755,7 @@ function geomTokensFigma(scale) {
   return { Geometry: { size, radius, space } };
 }
 
-return { GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY, geomScale, geomTokensCSS, geomTokensDTCG, geomTokensFigma };
+return { GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY, geomScale, geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geomTokensFigma };
 })();
 __M.persist = (function(){
 // persist.js — UI state persistence for the HCT Palette Generator.
@@ -2968,6 +3006,10 @@ function hydrate(snapshot) {
   };
 }
 
+// a breakpoint mode's @media min-width (px) — OPTIONAL: {} when absent/invalid (no media query), or
+// { minWidth } when a positive width is set. Keeps the hydrate identity gate (absent stays absent).
+const clampMinWidth = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? { minWidth: Math.max(1, Math.min(3840, Math.round(n))) } : {}; };
+
 // clampType — the typography config (treatment + body base). Treatment to a known id, base size to a
 // sane integer range. Identity-preserving for an in-domain value (so the roundtrip gate holds).
 const TYPE_TREATMENTS = ["product", "luxury", "editorial", "technical", "statement"];
@@ -2982,7 +3024,7 @@ function clampType(t) {
   if (Array.isArray(t.modes) && t.modes.length) {
     const modes = t.modes
       .filter((m) => m && typeof m === "object" && typeof m.id === "string")
-      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", bodyBase: clampBody(m.bodyBase) }));
+      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", bodyBase: clampBody(m.bodyBase), ...clampMinWidth(m.minWidth) }));
     if (modes.length) out.modes = modes;
   }
   return out;
@@ -3002,7 +3044,7 @@ function clampGeometry(g) {
   if (Array.isArray(g.modes) && g.modes.length) {
     const modes = g.modes
       .filter((m) => m && typeof m === "object" && typeof m.id === "string")
-      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", baseHeight: clampH(m.baseHeight) }));
+      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", baseHeight: clampH(m.baseHeight), ...clampMinWidth(m.minWidth) }));
     if (modes.length) out.modes = modes;
   }
   return out;
@@ -4728,8 +4770,8 @@ const { MCP_BRAND_KIT } = __M.mcpAssets;
 const { TYPE_FONTS_CSS } = __M.typeFonts;
 const { CATEGORY_INDEX, loadCategory } = __M.categoryIndex;
 const { deriveNeutral, deriveRelative, RELATIONSHIPS } = __M.derive;
-const { typeScale, typeTokensCSS, typeTokensDTCG, TYPE_TREATMENTS, DEFAULT_TYPE } = __M.type;
-const { geomTokensCSS, geomTokensDTCG, geomTokensFigma, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } = __M.geometry;
+const { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, TYPE_TREATMENTS, DEFAULT_TYPE } = __M.type;
+const { geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geomTokensFigma, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } = __M.geometry;
 const { zipStore } = __M.zip;
 const { icon, brandMark } = __M.icons;
 
@@ -7417,7 +7459,30 @@ class HctApp extends HTMLElement {
           onchange: (e) => this.renameTypeMode(m.id, e.target.value.trim()) }),
         btn(icon("trash"), { ariaLabel: "Delete this breakpoint", title: "Delete this breakpoint mode", onclick: () => this.deleteTypeMode(m.id) }),
       ),
+      h("label", { class: "mode-editor-label", for: "fld-mode-mw" }, "Breakpoint width — @media min-width"),
+      h(
+        "div",
+        { class: "mode-editor-row" },
+        h("input", { id: "fld-mode-mw", type: "number", min: 0, max: 3840, step: 1, value: m.minWidth || "", placeholder: "e.g. 768", "data-fk": "tmode-mw", "aria-label": "Breakpoint min-width in px",
+          onchange: (e) => this.setTypeModeMinWidth(m.id, e.target.value) }),
+        h("span", { class: "mode-editor-unit" }, "px"),
+      ),
+      h("p", { class: "insp-sub tyi-future" }, m.minWidth
+        ? `Exports as @media (min-width: ${m.minWidth}px) — the size vars re-declare at this body size above ${m.minWidth}px.`
+        : "Set a width to emit a CSS @media breakpoint in the export; blank = preview-only."),
     );
+  }
+  setTypeModeMinWidth(id, v) {
+    const n = Math.round(Number(v));
+    this.commit((d) => {
+      if (!d.type || !Array.isArray(d.type.modes)) return;
+      d.type = { ...d.type, modes: d.type.modes.map((m) => {
+        if (m.id !== id) return m;
+        const mm = { ...m };
+        if (Number.isFinite(n) && n > 0) mm.minWidth = Math.max(1, Math.min(3840, n)); else delete mm.minWidth;
+        return mm;
+      }) };
+    });
   }
 
   // renderTypeCanvasHeader — the Typography section's own canvas header: pane toggles + the
@@ -8941,9 +9006,9 @@ class HctApp extends HTMLElement {
     const typeSc = typeScale(this.doc.type || DEFAULT_TYPE);
     const geomSc = geometryScale(this.doc);
     const SYSTEM_CODE = {
-      "type-css": () => typeTokensCSS(typeSc),
+      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales()),
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc), null, 2),
-      "geom-css": () => geomTokensCSS(geomSc),
+      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales()),
       "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc), null, 2),
     };
     const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG" };
@@ -9168,7 +9233,7 @@ class HctApp extends HTMLElement {
       const tsc = typeScale(this.doc.type || DEFAULT_TYPE);
       const tDtcg = JSON.stringify(typeTokensDTCG(tsc), null, 2);
       files.push(
-        { name: "typography/type.css", data: typeTokensCSS(tsc) },
+        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales()) },
         { name: "typography/type.tokens.json", data: tDtcg },
         { name: "figma/type.tokens.json", data: tDtcg }, // importable as Figma text styles (via a tokens plugin)
       );
@@ -9177,7 +9242,7 @@ class HctApp extends HTMLElement {
       const gsc = geometryScale(this.doc); // composed with the type scale (the per-step `font` is shared)
       const gDtcg = JSON.stringify(geomTokensDTCG(gsc), null, 2);
       files.push(
-        { name: "geometry/geometry.css", data: geomTokensCSS(gsc) },
+        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales()) },
         { name: "geometry/geometry.tokens.json", data: gDtcg },
         { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
       );
@@ -9496,7 +9561,7 @@ class HctApp extends HTMLElement {
   downloadTypeTokens() {
     const scale = typeScale(this.doc.type || DEFAULT_TYPE);
     const files = [
-      { name: "type.css", data: typeTokensCSS(scale) },
+      { name: "type.css", data: typeTokensResponsiveCSS(scale, this._typeModeScales()) },
       { name: "type.tokens.json", data: JSON.stringify(typeTokensDTCG(scale), null, 2) },
     ];
     this.downloadBytes(zipStore(files), "type-tokens.zip", "application/zip");
@@ -9535,6 +9600,15 @@ class HctApp extends HTMLElement {
   // the resolved scale at the active mode — geometryScale composes geometry with the (base) type scale, so
   // pass a doc whose geometry is the active mode (no new import; reuses the model's join + composition).
   _activeGeomScale() { return geometryScale({ ...this.doc, geometry: this._activeGeometry() }); }
+  // the breakpoint-mode scales for the responsive CSS export — [{ name, minWidth, scale }], one per mode.
+  _typeModeScales() {
+    const t = this.doc.type || DEFAULT_TYPE;
+    return (t.modes || []).map((m) => ({ name: m.name, minWidth: m.minWidth, scale: typeScale({ ...t, bodyBase: m.bodyBase }) }));
+  }
+  _geomModeScales() {
+    const g = this.doc.geometry || DEFAULT_GEOMETRY;
+    return (g.modes || []).map((m) => ({ name: m.name, minWidth: m.minWidth, scale: geometryScale({ ...this.doc, geometry: { ...g, baseHeight: m.baseHeight } }) }));
+  }
   geomModeControl() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     const modes = g.modes || [];
@@ -9604,7 +9678,30 @@ class HctApp extends HTMLElement {
           onchange: (e) => this.renameGeomMode(m.id, e.target.value.trim()) }),
         btn(icon("trash"), { ariaLabel: "Delete this breakpoint", title: "Delete this breakpoint mode", onclick: () => this.deleteGeomMode(m.id) }),
       ),
+      h("label", { class: "mode-editor-label", for: "fld-gmode-mw" }, "Breakpoint width — @media min-width"),
+      h(
+        "div",
+        { class: "mode-editor-row" },
+        h("input", { id: "fld-gmode-mw", type: "number", min: 0, max: 3840, step: 1, value: m.minWidth || "", placeholder: "e.g. 768", "data-fk": "gmode-mw", "aria-label": "Breakpoint min-width in px",
+          onchange: (e) => this.setGeomModeMinWidth(m.id, e.target.value) }),
+        h("span", { class: "mode-editor-unit" }, "px"),
+      ),
+      h("p", { class: "insp-sub tyi-future" }, m.minWidth
+        ? `Exports as @media (min-width: ${m.minWidth}px) — the size vars re-declare at this base height above ${m.minWidth}px.`
+        : "Set a width to emit a CSS @media breakpoint in the export; blank = preview-only."),
     );
+  }
+  setGeomModeMinWidth(id, v) {
+    const n = Math.round(Number(v));
+    this.commit((d) => {
+      if (!d.geometry || !Array.isArray(d.geometry.modes)) return;
+      d.geometry = { ...d.geometry, modes: d.geometry.modes.map((m) => {
+        if (m.id !== id) return m;
+        const mm = { ...m };
+        if (Number.isFinite(n) && n > 0) mm.minWidth = Math.max(1, Math.min(3840, n)); else delete mm.minWidth;
+        return mm;
+      }) };
+    });
   }
   // download the resolved geometry tokens — CSS custom props + utility classes, DTCG dimension tokens, and
   // a Figma NUMBER-variable file (the "Geometry" collection). The scale is composed with the type scale so
@@ -9612,7 +9709,7 @@ class HctApp extends HTMLElement {
   downloadGeomTokens() {
     const scale = geometryScale(this.doc);
     const files = [
-      { name: "geometry.css", data: geomTokensCSS(scale) },
+      { name: "geometry.css", data: geomTokensResponsiveCSS(scale, this._geomModeScales()) },
       { name: "geometry.tokens.json", data: JSON.stringify(geomTokensDTCG(scale), null, 2) },
       { name: "dimension.variables.json", data: JSON.stringify(geomTokensFigma(scale), null, 2) },
     ];
