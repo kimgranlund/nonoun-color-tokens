@@ -1,12 +1,20 @@
 # Changelog
 
-All notable changes to **Color Tokens by NONOUN** are documented here.
+All notable changes to **Ultimate Tokens by NONOUN** are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims
 to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Entries are grouped by the day
 they landed on `main` and reference the squash-merged PR that introduced them.
 
 ## [Unreleased]
+
+### 2026-06-28
+
+#### Changed
+- **Product identity: renamed to "Ultimate Tokens by NONOUN"** (was "Color Tokens by NONOUN"). The
+  display name updates across the app title/wordmark + About, the Figma plugin manifest, the favicon
+  web-manifest, the MCP brand-kit `generator` field + server/README, and the CSS/Tailwind/shadcn export
+  headers. The internal id (`nonoun-color-tokens` — repo, package, storage keys) is unchanged.
 
 ### 2026-06-27
 

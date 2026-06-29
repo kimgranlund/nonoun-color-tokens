@@ -1,6 +1,6 @@
 # Brand-Kit MCP
 
-A **zero-dependency** [MCP](https://modelcontextprotocol.io/) server that serves a **Color Tokens by
+A **zero-dependency** [MCP](https://modelcontextprotocol.io/) server that serves an **Ultimate Tokens by
 NONOUN** brand kit (your generated design tokens) to AI agents — **Claude Code / Claude Design, Cursor,
 VS Code, ChatGPT**, anything that speaks MCP. The agent then builds with your brand's *exact* tokens
 instead of guessing.

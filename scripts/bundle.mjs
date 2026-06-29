@@ -68,7 +68,7 @@ const favHref = "data:image/svg+xml;base64," + Buffer.from(readFileSync(`${ROOT}
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="${favHref}">
-<title>Color Tokens by NONOUN</title>
+<title>Ultimate Tokens by NONOUN</title>
 <style>${css}</style></head>
 <body><nonoun-color-tokens></nonoun-color-tokens>
 <script type="module">

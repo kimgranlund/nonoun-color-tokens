@@ -1,4 +1,4 @@
-# Color Tokens by NONOUN
+# Ultimate Tokens by NONOUN
 
 [![CI](https://github.com/kimgranlund/nonoun-color-tokens/actions/workflows/ci.yml/badge.svg)](https://github.com/kimgranlund/nonoun-color-tokens/actions/workflows/ci.yml)
 [![Live demo](https://img.shields.io/badge/demo-live-2b8a3e)](https://kimgranlund.github.io/nonoun-color-tokens/)

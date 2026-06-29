@@ -1110,7 +1110,7 @@ class HctApp extends HTMLElement {
       h(
         "header",
         { class: "gallery-header" },
-        h("div", { class: "brand" }, brandMark(), "Color Tokens by NONOUN"),
+        h("div", { class: "brand" }, brandMark(), "Ultimate Tokens by NONOUN"),
         h("div", { class: "spacer" }),
         btn([icon("download"), "Project"], { onclick: () => this.loadFromProject(), title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project (Source of Truth)" }),
         btn([icon("upload"), "Import"], { onclick: () => this.importSet(), title: "Import a palette config (.json) exported from Export → Config" }),
@@ -5223,7 +5223,7 @@ class HctApp extends HTMLElement {
     if (sec === "account") return this._accountPanel();
     if (sec === "about") {
       return {
-        title: "About", desc: "Color Tokens by NONOUN.",
+        title: "About", desc: "Ultimate Tokens by NONOUN.",
         body: [h("div", { class: "settings-about" },
           h("p", {}, "Generate perceptual color palettes, a systematic type scale, and a dimensional geometry system — exported as CSS, DTCG, Tailwind, shadcn, Figma variables, and a downloadable Brand-Kit MCP."),
           this._settingsGroup(null, [
@@ -6137,7 +6137,7 @@ class HctApp extends HTMLElement {
     const kit = brandKit(this.doc, this.exportSystems);
     const base = slug(kit.name) || "brand-kit";
     const pkg = JSON.stringify(
-      { name: "nonoun-brand-kit", version: "0.1.0", type: "module", description: `MCP server for the "${kit.name}" brand kit (Color Tokens by NONOUN)`, bin: { "brand-kit-mcp": "brand-kit-server.mjs" }, private: true },
+      { name: "nonoun-brand-kit", version: "0.1.0", type: "module", description: `MCP server for the "${kit.name}" brand kit (Ultimate Tokens by NONOUN)`, bin: { "brand-kit-mcp": "brand-kit-server.mjs" }, private: true },
       null, 2,
     );
     const files = [

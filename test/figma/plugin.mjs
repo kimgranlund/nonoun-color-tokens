@@ -40,7 +40,7 @@ if (/\bcatch\s*\{/.test(codeNoComments)) FAIL("vmsyntax", "code.js uses optional
 if (/figma\.notify\([^;]*\b(?:e\.message|String\(e\)|err\.message|\.stack)\b/.test(codeNoComments))
   FAIL("compliance", "code.js surfaces a raw error in figma.notify — show a friendly message; log the detail to console only");
 if (/figma\.notify\([^;]*HCT/.test(codeNoComments))
-  FAIL("compliance", "a user-facing figma.notify still says 'HCT' (stale branding) — the product is 'Color Tokens by NONOUN'");
+  FAIL("compliance", "a user-facing figma.notify still says 'HCT' (stale branding) — the product is 'Ultimate Tokens by NONOUN'");
 
 // ── ui.html: the generator + the Figma bridge ───────────────────────────────────
 if (!existsSync(`${HERE}/ui.html`)) FAIL("ui", "ui.html not generated — run gen-ui.mjs");

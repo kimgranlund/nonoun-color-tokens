@@ -1,4 +1,4 @@
-// code.js — Color Tokens by NONOUN, Figma plugin SANDBOX (the `main`).
+// code.js — Ultimate Tokens by NONOUN, Figma plugin SANDBOX (the `main`).
 //
 // Runs in Figma's plugin VM: the `figma` global is available, but there is NO DOM, no
 // fetch/XMLHttpRequest/WebSocket, no localStorage (ADR-010 / AC-P3 — offline by design;

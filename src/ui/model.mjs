@@ -236,7 +236,7 @@ export function figmaBundle(doc) {
 // absent from the kit entirely, so the MCP serves only what the user chose to include.
 export function brandKit(doc, systems) {
   const sys = systems || { color: true, type: true, geometry: true };
-  const kit = { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Color Tokens by NONOUN" };
+  const kit = { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Ultimate Tokens by NONOUN" };
   if (sys.color) {
     const view = projectView(doc);
     const on = view.palettes.filter((p) => p.on);
