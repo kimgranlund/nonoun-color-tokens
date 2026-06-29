@@ -24,6 +24,7 @@ import {
   SCRIM_STEPS,
 } from "./model.mjs";
 import { STORAGE_KEY, serialize, hydrate } from "./persist.js";
+import { clampProfile, resolveFlags, flagOf as flagFromFlags } from "../engine/flags.js";
 import { FIGMA_PLUGIN } from "./figma-plugin-assets.js";
 import { MCP_BRAND_KIT } from "./mcp-assets.js";
 import { TYPE_FONTS_CSS } from "./type-fonts.js";
@@ -42,6 +43,9 @@ const SETS_KEY = STORAGE_KEY + "-sets";
 // The single "source of truth" config slot. In the browser it's a localStorage key; in a Figma
 // plugin the config lives IN the file on the document's root pluginData (round-tripped over the bridge).
 const PROJECT_KEY = STORAGE_KEY + "-project";
+// The per-MACHINE user profile (item 7, Layer 1) — tier + dev flag overrides. NOT per-doc (a license/tier
+// isn't a property of a brand kit), so it lives in its own storage slot alongside sets, never in the doc.
+const PROFILE_KEY = STORAGE_KEY + "-profile";
 
 // README shipped inside the Download-All zip's experimental figma-aliased/ folder (OD-004).
 const ALIASED_README = `figma-aliased/ — EXPERIMENTAL plugin-free cascade (OD-004)
@@ -103,6 +107,17 @@ function saveSets(sets) {
   } catch {
     /* no persistence available — run in-memory */
   }
+}
+
+// loadProfile/saveProfile — the per-machine profile, best-effort like sets (a sandboxed Figma iframe blocks
+// localStorage). clampProfile sanitizes whatever was stored; a fresh machine → { tier:"free" }.
+function loadProfile() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null"); } catch { raw = null; }
+  return clampProfile(raw);
+}
+function saveProfile(profile) {
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(clampProfile(profile))); } catch { /* in-memory */ }
 }
 
 function newSet(name) {
@@ -384,6 +399,7 @@ class HctApp extends HTMLElement {
     ensureAppTheme(); // inject the generated --c-* design tokens once, globally
     migrateStorageKeys(); // copy any pre-rename saved sets/config into the new key namespace
     this.sets = loadSets();
+    this.profile = loadProfile(); // per-machine { tier, flagOverrides } — drives this.flagOf() (item 7)
     // session (UI-only, not persisted with the doc)
     this.view = "gallery"; // gallery | editor
     this.category = null; // open Category category slug within the gallery hub (null = hub). UI-session only.
@@ -1176,6 +1192,22 @@ class HctApp extends HTMLElement {
       parent.postMessage({ pluginMessage: { type: "read-variables" } }, "*"); // the variable structure (fallback)
       parent.postMessage({ pluginMessage: { type: "load-sets" } }, "*");      // the gallery's saved sets (clientStorage)
     } catch { /* no frame */ }
+  }
+
+  // flagOf(key) — the SINGLE gate check for a Pro/feature flag (item 7, Layer 1). Resolves from the
+  // per-machine profile's tier + dev overrides; returns a boolean or a value (e.g. maxSets → 2|Infinity).
+  // Gated surfaces MUST read this, never `this.profile.tier === "pro"`. Pre-launch it returns the unlocked
+  // values (TIERS_ENFORCED is false), so wiring a guard now is a safe no-op until payment lands (Layer 2).
+  flagOf(key) {
+    return flagFromFlags(resolveFlags(this.profile), key);
+  }
+
+  // setProfile(patch) — merge + clamp + persist the profile (used by Layer 2's license entry / Layer 3's
+  // Settings « Account »). Re-renders so any flagOf-gated UI updates. No payment code here yet.
+  setProfile(patch) {
+    this.profile = clampProfile({ ...this.profile, ...patch });
+    saveProfile(this.profile);
+    this.render();
   }
 
   // persistSets — write the gallery's sets to durable storage. The browser uses localStorage; a Figma

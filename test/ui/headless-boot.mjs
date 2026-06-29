@@ -1599,6 +1599,14 @@ ok(app.section === "color" && !app.querySelector(".geom-spec") && !!app.querySel
   ok(app.doc.hueSpace === "oklch", `(hs) a set saved hueSpace:"oklch" opens as oklch, got ${app.doc.hueSpace}`);
 }
 
+// ── (fl) feature-flag substrate (item 7, Layer 1) — the app exposes flagOf() off the per-machine profile ──
+ok(app.profile && app.profile.tier === "free", `(fl) a fresh app boots with a free-tier profile (got ${app.profile && app.profile.tier})`);
+ok(app.flagOf("proExport") === true && app.flagOf("maxSets") === Infinity, "(fl) pre-launch (TIERS_ENFORCED off) every flag is unlocked — no current feature gated");
+app.setProfile({ flagOverrides: { proExport: false, maxSets: 1 } }); flushRaf();
+ok(app.flagOf("proExport") === false && app.flagOf("maxSets") === 1, "(fl) setProfile applies dev flag overrides through flagOf");
+ok(app.flagOf("nope") === false, "(fl) an unknown flag resolves false (restrictive default)");
+app.setProfile({ flagOverrides: {} }); flushRaf(); // restore unlocked
+
 // ── report ──────────────────────────────────────────────────────────────────────────
 if (fails.length) {
   console.error("HEADLESS BOOT FAIL:");
