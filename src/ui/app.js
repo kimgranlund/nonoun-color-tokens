@@ -1233,7 +1233,8 @@ class HctApp extends HTMLElement {
   // Pre-launch it returns the unlocked values (TIERS_ENFORCED is false), so wiring a guard now is a safe
   // no-op until the product flips enforcement on.
   flagOf(key) {
-    return flagFromFlags(resolveFlags({ ...this.profile, tier: this.tier() }), key);
+    // resolveFlags resolves the effective tier from the entitlement itself; pass nowMs to enforce expiry.
+    return flagFromFlags(resolveFlags(this.profile, { nowMs: Date.now() }), key);
   }
 
   // setProfile(patch) — merge + clamp + persist the profile (used by the license entry + the Settings

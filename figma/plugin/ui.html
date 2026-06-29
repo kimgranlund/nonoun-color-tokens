@@ -2997,8 +2997,11 @@ const TIERS_ENFORCED = false;
 
 // resolveFlags(profile, opts?) → the resolved flag map. base = the tier's values when enforced, else the
 // unlocked (pro) values; then any explicit flagOverrides (dev / QA / early-access) win.
-function resolveFlags(profile = {}, { enforced = TIERS_ENFORCED } = {}) {
-  const tier = profile && profile.tier === "pro" ? "pro" : "free";
+function resolveFlags(profile = {}, { enforced = TIERS_ENFORCED, nowMs } = {}) {
+  // resolve the EFFECTIVE tier from the entitlement (a stored tier:"pro" with no valid entitlement is
+  // free) — so the entitlement gate can't be bypassed by a direct caller, not just app.flagOf. Clockless:
+  // pass nowMs to ALSO enforce expiry; without it only the no-entitlement spoof is caught, not staleness.
+  const tier = resolveTier(profile, nowMs);
   const base = enforced ? TIER_FLAGS[tier] || TIER_FLAGS.free : TIER_FLAGS.pro;
   const overrides = profile && profile.flagOverrides && typeof profile.flagOverrides === "object" ? profile.flagOverrides : {};
   const out = { ...base };
@@ -6383,7 +6386,8 @@ class HctApp extends HTMLElement {
   // Pre-launch it returns the unlocked values (TIERS_ENFORCED is false), so wiring a guard now is a safe
   // no-op until the product flips enforcement on.
   flagOf(key) {
-    return flagFromFlags(resolveFlags({ ...this.profile, tier: this.tier() }), key);
+    // resolveFlags resolves the effective tier from the entitlement itself; pass nowMs to enforce expiry.
+    return flagFromFlags(resolveFlags(this.profile, { nowMs: Date.now() }), key);
   }
 
   // setProfile(patch) — merge + clamp + persist the profile (used by the license entry + the Settings

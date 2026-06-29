@@ -1621,7 +1621,7 @@ ok(!!app.querySelector(".account-manage"), "(acct) a Manage-subscription link is
 app._licenseValidator = (key) => ({ ok: !!key, entitlement: { status: "active", expiresAt: Date.now() + 3600000 } });
 await app.enterLicense("PRO-TEST-1234"); flushRaf();
 ok(app.tier() === "pro" && app.profile.entitlement && app.profile.entitlement.status === "active", `(acct) enterLicense with an active entitlement flips the effective tier to pro (got ${app.tier()})`);
-ok(app.flagOf("proExport") === true, "(acct) flagOf still resolves through the effective tier");
+ok(app.flagOf("proExport") === true, "(acct) flagOf returns unlocked pre-launch (TIERS_ENFORCED off — the entitlement gate itself is unit-tested in flags.mjs; app.tier() above proves the effective-tier resolution)");
 const acctStored = JSON.parse(localStorage.getItem("nonoun-color-tokens-profile") || "null");
 ok(acctStored && acctStored.tier === "pro" && acctStored.licenseKey === "PRO-TEST-1234" && acctStored.entitlement.status === "active", "(acct) the license + entitlement persist to the profile store");
 app.render(); flushRaf();

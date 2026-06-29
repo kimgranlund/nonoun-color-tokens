@@ -23,8 +23,11 @@ export const TIERS_ENFORCED = false;
 
 // resolveFlags(profile, opts?) → the resolved flag map. base = the tier's values when enforced, else the
 // unlocked (pro) values; then any explicit flagOverrides (dev / QA / early-access) win.
-export function resolveFlags(profile = {}, { enforced = TIERS_ENFORCED } = {}) {
-  const tier = profile && profile.tier === "pro" ? "pro" : "free";
+export function resolveFlags(profile = {}, { enforced = TIERS_ENFORCED, nowMs } = {}) {
+  // resolve the EFFECTIVE tier from the entitlement (a stored tier:"pro" with no valid entitlement is
+  // free) — so the entitlement gate can't be bypassed by a direct caller, not just app.flagOf. Clockless:
+  // pass nowMs to ALSO enforce expiry; without it only the no-entitlement spoof is caught, not staleness.
+  const tier = resolveTier(profile, nowMs);
   const base = enforced ? TIER_FLAGS[tier] || TIER_FLAGS.free : TIER_FLAGS.pro;
   const overrides = profile && profile.flagOverrides && typeof profile.flagOverrides === "object" ? profile.flagOverrides : {};
   const out = { ...base };

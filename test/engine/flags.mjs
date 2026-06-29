@@ -13,10 +13,15 @@ ok(F.TIER_FLAGS.free.proExport === false && F.TIER_FLAGS.pro.proExport === true,
 // ── resolveFlags ENFORCED: the tier drives the values ──
 {
   const free = F.resolveFlags({ tier: "free" }, { enforced: true });
-  const pro = F.resolveFlags({ tier: "pro" }, { enforced: true });
+  // pro REQUIRES a valid entitlement now (resolveFlags folds resolveTier) — a bare tier:"pro" is free.
+  const pro = F.resolveFlags({ tier: "pro", entitlement: { status: "active" } }, { enforced: true });
   ok(free.maxSets === 2 && free.proExport === false && free.hostedMcp === false, "enforced free → the free values");
-  ok(pro.maxSets === Infinity && pro.proExport === true && pro.advancedTreatments === true, "enforced pro → the pro values");
+  ok(pro.maxSets === Infinity && pro.proExport === true && pro.advancedTreatments === true, "enforced pro (with an active entitlement) → the pro values");
   ok(F.resolveFlags({ tier: "nope" }, { enforced: true }).proExport === false, "an unknown tier resolves as free");
+  // SPOOF CLOSED at the engine: a stored tier:"pro" with NO/expired entitlement resolves to FREE through
+  // resolveFlags directly (not just app.flagOf) — a faked-tier consumer can't unlock Pro.
+  ok(F.resolveFlags({ tier: "pro" }, { enforced: true }).proExport === false, "enforced tier:pro WITHOUT an entitlement → free values (entitlement gate is engine-level)");
+  ok(F.resolveFlags({ tier: "pro", entitlement: { status: "active", expiresAt: 1000 } }, { enforced: true, nowMs: 2000 }).proExport === false, "enforced tier:pro with an EXPIRED entitlement (nowMs past expiry) → free values");
 }
 
 // ── resolveFlags UNENFORCED (pre-launch): everyone unlocked regardless of tier ──
