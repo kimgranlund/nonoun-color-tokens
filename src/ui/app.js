@@ -1308,7 +1308,7 @@ class HctApp extends HTMLElement {
     }
     this._licenseError = null;
     this._licenseDraft = "";
-    this.setProfile({ tier: "pro", licenseKey: k, instanceId: res.instanceId, entitlement: res.entitlement, checkedAt: Date.now() }); // re-renders
+    this.setProfile({ tier: "pro", licenseKey: k, instanceId: res.instanceId, seats: res.seats, entitlement: res.entitlement, checkedAt: Date.now() }); // re-renders
     this.toast("Pro unlocked");
     return true;
   }
@@ -1331,9 +1331,40 @@ class HctApp extends HTMLElement {
     this._licenseDraft = "";
     const licenseKey = this.profile && this.profile.licenseKey;
     const instanceId = this.profile && this.profile.instanceId;
-    this.setProfile({ tier: "free", licenseKey: undefined, instanceId: undefined, entitlement: undefined, checkedAt: undefined });
+    this.setProfile({ tier: "free", licenseKey: undefined, instanceId: undefined, seats: undefined, entitlement: undefined, checkedAt: undefined });
     this._releaseSeat(licenseKey, instanceId); // best-effort, after the local state is already Free
     this.toast("Switched to Free");
+  }
+
+  // revalidateLicense() — WEB-ONLY, best-effort, fired once on boot for an activated license. Re-checks the
+  // key+instance against the service to (a) refresh the cached entitlement + live seat count and (b) downgrade
+  // to Free if the license/seat was DEFINITIVELY revoked (cancelled subscription, removed seat). A network
+  // error (throw) is IGNORED — never downgrade on a transient failure; the cached entitlement keeps gating
+  // (main.ts's lsPost throws on 5xx so a server blip can't masquerade as a revocation). No-op in Figma / when
+  // there's no pro license / with no validate method.
+  async revalidateLicense() {
+    if (this.inFigma) return;
+    const p = this.profile || {};
+    if (p.tier !== "pro" || !p.licenseKey || !this._licenseService || !this._licenseService.validate) return;
+    let res;
+    try {
+      res = await this._licenseService.validate(p.licenseKey, p.instanceId);
+    } catch (e) {
+      if (typeof console !== "undefined" && console.error) console.error("license revalidation failed (kept cached):", e);
+      return; // transient — do NOT downgrade
+    }
+    if (res && res.ok && res.entitlement && entitlementActive(res.entitlement, Date.now())) {
+      this.setProfile({ entitlement: res.entitlement, seats: res.seats }); // refresh entitlement + live seat count
+    } else if (res && res.revoked) {
+      // ONLY a RECOGNIZED revocation downgrades (cancelled sub / removed seat / disabled key). An ambiguous
+      // not-ok (unparseable body, rate-limit page, proxy) keeps the cached license — never strip a payer on a
+      // transient blip. Free this device's seat too, so a real revocation doesn't orphan it.
+      const licenseKey = this.profile && this.profile.licenseKey;
+      const instanceId = this.profile && this.profile.instanceId;
+      this.setProfile({ tier: "free", licenseKey: undefined, instanceId: undefined, seats: undefined, entitlement: undefined, checkedAt: undefined });
+      this._releaseSeat(licenseKey, instanceId);
+    }
+    // else: ambiguous / transient not-ok → keep the cached license unchanged
   }
 
   // setFlagOverride(key, value) — write/clear a single dev flag override (Settings › Account toggles).
@@ -5334,11 +5365,15 @@ class HctApp extends HTMLElement {
     if (web) {
       const rows = [];
       if (isPro) {
+        const seats = this.profile.seats;
+        const seatText = seats && Number.isFinite(seats.limit)
+          ? ` · ${seats.usage} of ${seats.limit} seat${seats.limit === 1 ? "" : "s"} in use`
+          : "";
         rows.push(h("div", { class: "settings-row" },
           h("div", { class: "settings-row-text" },
             h("b", {}, "License"),
-            h("small", {}, "Active on this machine." + (expText ? " Valid until " + expText + "." : ""))),
-          btn("Remove", { cls: "account-remove", onclick: () => this.clearLicense() })));
+            h("small", { class: "account-license-status" }, "Active on this device." + (expText ? " Valid until " + expText + "." : "") + seatText)),
+          btn("Release seat", { cls: "account-remove", title: "Deactivate this device and free its seat", onclick: () => this.clearLicense() })));
       } else {
         rows.push(h("div", { class: "settings-row" },
           h("div", { class: "settings-row-text" },

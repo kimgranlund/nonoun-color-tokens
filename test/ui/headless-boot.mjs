@@ -1622,18 +1622,20 @@ ok(!!app.querySelector(".account-upgrade") && !!app.querySelector(".account-buy-
 // id), deactivate frees it. We spy on deactivate to prove clearLicense releases the Studio seat.
 let acctDeactivated = null;
 app._licenseService = {
-  activate: (key) => ({ ok: !!key, entitlement: { status: "active", expiresAt: Date.now() + 3600000 }, instanceId: "inst-acct" }),
+  activate: (key) => ({ ok: !!key, entitlement: { status: "active", expiresAt: Date.now() + 3600000 }, instanceId: "inst-acct", seats: { limit: 5, usage: 2 } }),
   validate: (key) => ({ ok: !!key, entitlement: { status: "active" } }),
   deactivate: (key, instanceId) => { acctDeactivated = { key, instanceId }; return { ok: true }; },
 };
 await app.enterLicense("PRO-TEST-1234"); flushRaf();
 ok(app.tier() === "pro" && app.profile.entitlement && app.profile.entitlement.status === "active", `(acct) enterLicense with an active entitlement flips the effective tier to pro (got ${app.tier()})`);
 ok(app.profile.instanceId === "inst-acct", "(acct) enterLicense records the activation instance id (this device's seat)");
+ok(app.profile.seats && app.profile.seats.limit === 5 && app.profile.seats.usage === 2, "(acct) enterLicense stores the seat count {limit,usage}");
 ok(app.flagOf("proExport") === true, "(acct) flagOf returns unlocked pre-launch (TIERS_ENFORCED off — the entitlement gate itself is unit-tested in flags.mjs; app.tier() above proves the effective-tier resolution)");
 const acctStored = JSON.parse(localStorage.getItem("nonoun-color-tokens-profile") || "null");
 ok(acctStored && acctStored.tier === "pro" && acctStored.licenseKey === "PRO-TEST-1234" && acctStored.instanceId === "inst-acct" && acctStored.entitlement.status === "active", "(acct) the license + instance + entitlement persist to the profile store");
 app.render(); flushRaf();
 ok(acctTier() === "Pro" && !app.querySelector(".account-license-input") && !!app.querySelector(".account-remove"), "(acct) once Pro the badge reads Pro and the entry becomes Remove");
+ok(/2 of 5 seats/.test(txtOf(app.querySelector(".account-license-status") || {})), "(acct) the License row shows 'N of M seats in use'");
 
 // resolveTier is the source of truth: a stored tier:pro can't survive an expired entitlement
 app.profile = { ...app.profile, entitlement: { status: "active", expiresAt: Date.now() - 1000 } };
@@ -1655,6 +1657,33 @@ app._licenseService = {
 const acctLeakOk = await app.enterLicense("PRO-LEAK-9999"); flushRaf();
 ok(acctLeakOk === false && app.tier() === "free" && !app.profile.instanceId, "(acct) an already-expired activation is rejected and not stored");
 ok(acctLeakReleased && acctLeakReleased.instanceId === "inst-leak", "(acct) the seat consumed by that rejected activation is released (no seat leak)");
+
+// revalidateLicense (boot re-check): refresh entitlement + live seats on ok; downgrade on a DEFINITIVE
+// not-ok; NEVER downgrade on a transient throw. Re-establish Pro first (we're Free after the leak test).
+let acctRevalCall = null;
+app._licenseService = {
+  activate: () => ({ ok: true, entitlement: { status: "active", expiresAt: Date.now() + 3600000 }, instanceId: "inst-reval", seats: { limit: 5, usage: 2 } }),
+  validate: (key, instanceId) => { acctRevalCall = { key, instanceId }; return { ok: true, entitlement: { status: "active", expiresAt: Date.now() + 3600000 }, seats: { limit: 5, usage: 4 } }; },
+  deactivate: () => ({ ok: true }),
+};
+await app.enterLicense("PRO-REVAL-0001"); flushRaf();
+await app.revalidateLicense(); flushRaf();
+ok(acctRevalCall && acctRevalCall.instanceId === "inst-reval", "(acct) revalidateLicense re-checks the stored key + instance");
+ok(app.tier() === "pro" && app.profile.seats.usage === 4, "(acct) revalidate refreshes the live seat count (2 → 4)");
+app._licenseService.validate = () => { throw new Error("network"); };
+await app.revalidateLicense(); flushRaf();
+ok(app.tier() === "pro", "(acct) revalidate keeps Pro on a transient validate THROW (no false downgrade)");
+// ambiguous not-ok (unparseable body / proxy page → {ok:false} with NO revoked flag) → KEEP Pro
+app._licenseService.validate = () => ({ ok: false, error: "hmm" });
+await app.revalidateLicense(); flushRaf();
+ok(app.tier() === "pro", "(acct) revalidate keeps Pro on an AMBIGUOUS not-ok (no revoked flag) — no false downgrade");
+// DEFINITIVE revocation (revoked:true) → downgrade to Free AND free the seat (no orphan)
+let acctRevokeReleased = null;
+app._licenseService.deactivate = (k, instanceId) => { acctRevokeReleased = instanceId; return { ok: true }; };
+app._licenseService.validate = () => ({ ok: false, revoked: true });
+await app.revalidateLicense(); flushRaf();
+ok(app.tier() === "free" && !app.profile.licenseKey && !app.profile.seats, "(acct) revalidate downgrades to Free on a RECOGNIZED revocation");
+ok(acctRevokeReleased === "inst-reval", "(acct) a revocation downgrade also releases the seat (no orphan)");
 
 // the license entry is ABSENT inside the offline Figma plugin (the plugin stays free)
 app.inFigma = true; app.render(); flushRaf();

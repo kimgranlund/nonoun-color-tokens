@@ -78,12 +78,13 @@ function clampEntitlement(raw) {
   return ent;
 }
 
-// clampProfile(raw) → a sanitized profile { tier, flagOverrides?, licenseKey?, instanceId?, entitlement?,
-// checkedAt? }. Unknown/invalid drops; default free. flagOverrides keeps only known keys with the right TYPE
-// (maxSets = a finite int ≥ 0; the rest boolean). The Layer-2 payment fields are OPTIONAL and individually
-// clamped: licenseKey = a non-empty string · instanceId = a non-empty string (the Lemon-Squeezy activation
-// instance that holds this device's SEAT) · entitlement = a sane {status, expiresAt?} · checkedAt = a finite
-// ms ≥ 0. Emit order is stable (tier → flagOverrides → licenseKey → instanceId → entitlement → checkedAt).
+// clampProfile(raw) → a sanitized profile { tier, flagOverrides?, licenseKey?, instanceId?, seats?,
+// entitlement?, checkedAt? }. Unknown/invalid drops; default free. flagOverrides keeps only known keys with
+// the right TYPE (maxSets = a finite int ≥ 0; the rest boolean). The Layer-2 payment fields are OPTIONAL and
+// individually clamped: licenseKey = a non-empty string · instanceId = a non-empty string (the Lemon-Squeezy
+// activation instance that holds this device's SEAT) · seats = { limit, usage } finite ints ≥ 0 (last-known
+// activation count, for display) · entitlement = a sane {status, expiresAt?} · checkedAt = a finite ms ≥ 0.
+// Emit order is stable (tier → flagOverrides → licenseKey → instanceId → seats → entitlement → checkedAt).
 export function clampProfile(raw) {
   const p = raw && typeof raw === "object" ? raw : {};
   const out = { tier: p.tier === "pro" ? "pro" : "free" };
@@ -101,6 +102,10 @@ export function clampProfile(raw) {
   if (Object.keys(fo).length) out.flagOverrides = fo;
   if (typeof p.licenseKey === "string" && p.licenseKey) out.licenseKey = p.licenseKey;
   if (typeof p.instanceId === "string" && p.instanceId) out.instanceId = p.instanceId;
+  if (p.seats && typeof p.seats === "object" && p.seats.limit != null) {
+    const limit = Number(p.seats.limit), usage = Number(p.seats.usage);
+    if (Number.isFinite(limit) && limit >= 0) out.seats = { limit, usage: Number.isFinite(usage) && usage >= 0 ? usage : 0 };
+  }
   const ent = clampEntitlement(p.entitlement);
   if (ent) out.entitlement = ent;
   if (p.checkedAt != null) {
@@ -146,18 +151,42 @@ function licenseKeyResult(lk) {
   return { entitlement };
 }
 
-// lemonEntitlement(json, opts?) → { ok, entitlement?, error? } from a POST /v1/licenses/validate response —
-// the (re)check path. Requires valid:true AND an active key.
+// seatsOf(lk) → { limit, usage } when the key carries a finite activation_limit (so the UI can show
+// "N of M seats in use"), else undefined. usage defaults to 0 if absent/non-finite.
+function seatsOf(lk) {
+  const key = lk && typeof lk === "object" ? lk : {};
+  if (key.activation_limit == null) return undefined; // null/absent = an UNLIMITED key → no finite seat count
+  const limit = Number(key.activation_limit);
+  if (!Number.isFinite(limit)) return undefined;
+  const usage = Number(key.activation_usage);
+  return { limit, usage: Number.isFinite(usage) ? usage : 0 };
+}
+
+// lemonEntitlement(json, opts?) → { ok, entitlement?, seats?, error?, revoked? } from a POST
+// /v1/licenses/validate response — the (re)check path. Requires valid:true AND an active key.
+// `revoked: true` marks a RECOGNIZED revocation — LS explicitly reports the key not-valid or carries an
+// explicit inactive status (expired/disabled/inactive). An ambiguous/empty/unparseable body returns
+// `{ ok:false }` WITHOUT `revoked`, so a caller re-validating on boot keeps the cached license (a flaky
+// 200/4xx body or a proxy page must never strip a paying user of Pro). A store mismatch is an anomaly, not
+// a revocation, so it is also NOT marked revoked.
 export function lemonEntitlement(json, { storeId = null } = {}) {
   if (!json || typeof json !== "object") return { ok: false, error: LICENSE_GENERIC_ERROR };
   const pin = storePinFails(json, storeId);
   if (pin) return { ok: false, error: pin };
-  if (json.valid !== true) {
+  const lk = json.license_key && typeof json.license_key === "object" ? json.license_key : null;
+  const status = lk && typeof lk.status === "string" ? lk.status : null;
+  const revoked = json.valid === false || status === "expired" || status === "disabled" || status === "inactive";
+  if (json.valid !== true || status !== "active") {
     const r = licenseKeyResult(json.license_key);
-    return { ok: false, error: r.error || LICENSE_GENERIC_ERROR };
+    const out = { ok: false, error: r.error || LICENSE_GENERIC_ERROR };
+    if (revoked) out.revoked = true;
+    return out;
   }
   const r = licenseKeyResult(json.license_key);
-  return r.entitlement ? { ok: true, entitlement: r.entitlement } : { ok: false, error: r.error };
+  const out = { ok: true, entitlement: r.entitlement };
+  const seats = seatsOf(json.license_key);
+  if (seats) out.seats = seats;
+  return out;
 }
 
 // lemonActivation(json, opts?) → { ok, entitlement?, instanceId?, error? } from a POST /v1/licenses/activate
@@ -181,7 +210,10 @@ export function lemonActivation(json, { storeId = null } = {}) {
   if (!r.entitlement) return { ok: false, error: r.error };
   const inst = json.instance;
   const instanceId = inst && typeof inst === "object" && inst.id != null ? String(inst.id) : undefined;
-  return { ok: true, entitlement: r.entitlement, instanceId };
+  const out = { ok: true, entitlement: r.entitlement, instanceId };
+  const seats = seatsOf(json.license_key);
+  if (seats) out.seats = seats;
+  return out;
 }
 
 // lemonDeactivation(json) → { ok } from a POST /v1/licenses/deactivate response. Best-effort (freeing a

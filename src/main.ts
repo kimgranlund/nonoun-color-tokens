@@ -25,7 +25,7 @@ type LicenseService = {
   validate: (key: string, instanceId?: string) => Promise<LicenseResult>;
   deactivate: (key: string, instanceId: string) => Promise<{ ok: boolean }>;
 };
-type LicensedElement = HTMLElement & { _licenseService?: LicenseService };
+type LicensedElement = HTMLElement & { _licenseService?: LicenseService; revalidateLicense?: () => void };
 
 // PIN activation to the NONOUN Lemon Squeezy store (id 420293) — the mappers are FAIL-CLOSED on this, so a
 // valid key issued by any OTHER store is rejected. null would accept any active key from any store.
@@ -39,6 +39,9 @@ async function lsPost(path: string, params: Record<string, string>): Promise<unk
     body: new URLSearchParams(params).toString(),
     signal: AbortSignal.timeout(10000), // bound the round-trip so activate/validate can't hang the UI
   });
+  // 5xx is a transient server error — throw so callers treat it as a network failure (no false downgrade on
+  // revalidate). A 4xx still carries a meaningful JSON body (e.g. an invalid/expired key) — parse it.
+  if (resp.status >= 500) throw new Error(`license service responded ${resp.status}`);
   try {
     return await resp.json();
   } catch {
@@ -66,5 +69,10 @@ if (root) {
   // The element upgrades synchronously on innerHTML (app.js already ran customElements.define), so it's
   // present here; swap its offline default seam for the real Lemon-Squeezy service before any user action.
   const el = root.querySelector("nonoun-color-tokens") as LicensedElement | null;
-  if (el) el._licenseService = lemonSqueezyLicenseService;
+  if (el) {
+    el._licenseService = lemonSqueezyLicenseService;
+    // boot re-check of an activated license against LS (refresh entitlement + live seat count; downgrade if
+    // the seat/subscription was revoked). Runs only here in the web entry → never in the offline plugin.
+    el.revalidateLicense?.();
+  }
 }

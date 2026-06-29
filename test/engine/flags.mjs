@@ -110,6 +110,12 @@ ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" }, meta: { 
 ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" }, meta: { store_id: 7 } }, { storeId: 7 }).ok === true, "lemonEntitlement: storeId match → ok");
 ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" } }, { storeId: 7 }).ok === false, "lemonEntitlement: storeId set but response carries no meta.store_id → rejected (fail-closed)");
 ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" } }).ok === true, "lemonEntitlement: storeId UNset (null) → store check skipped, any active key passes (soft-launch default)");
+// the `revoked` discriminator — drives boot revalidation's downgrade-ONLY-on-recognized-revocation
+ok(F.lemonEntitlement({ valid: false, license_key: { status: "inactive" } }).revoked === true, "lemonEntitlement: valid:false → revoked (recognized revocation)");
+ok(F.lemonEntitlement({ valid: true, license_key: { status: "expired" } }).revoked === true && F.lemonEntitlement({ valid: true, license_key: { status: "disabled" } }).revoked === true, "lemonEntitlement: expired/disabled key → revoked");
+ok(F.lemonEntitlement({}).ok === false && F.lemonEntitlement({}).revoked === undefined, "lemonEntitlement: ambiguous/empty body → NOT revoked (transient — caller keeps cached)");
+ok(F.lemonEntitlement(null).revoked === undefined, "lemonEntitlement: null body → NOT revoked (transient)");
+ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" }, meta: { store_id: 42 } }, { storeId: 7 }).revoked === undefined, "lemonEntitlement: a store mismatch is an anomaly, not a revocation (NOT revoked)");
 
 // ── Layer 2 (seats): lemonActivation — the seat-consuming POST /v1/licenses/activate path ──
 {
@@ -127,6 +133,18 @@ ok(/expired/i.test(F.lemonActivation({ activated: false, license_key: { status: 
 ok(F.lemonActivation({ activated: true, license_key: { status: "active" }, meta: { store_id: 42 } }, { storeId: 7 }).ok === false, "lemonActivation: store mismatch → rejected (fail-closed, shared with validate)");
 ok(F.lemonActivation(null).ok === false && typeof F.lemonActivation(null).error === "string", "lemonActivation: null/garbage JSON → friendly error (no throw)");
 
+// ── Layer 2 (seats): seat COUNT surfaced for the Account display (activation_limit/usage → seats) ──
+{
+  const a = F.lemonActivation({ activated: true, license_key: { status: "active", activation_limit: 5, activation_usage: 3 }, instance: { id: "i" } });
+  ok(a.seats && a.seats.limit === 5 && a.seats.usage === 3, "lemonActivation: surfaces seats {limit,usage} from activation_limit/usage");
+}
+{
+  const v = F.lemonEntitlement({ valid: true, license_key: { status: "active", activation_limit: 5, activation_usage: 2 } });
+  ok(v.seats && v.seats.limit === 5 && v.seats.usage === 2, "lemonEntitlement: surfaces the live seats count on re-validate");
+}
+ok(F.lemonActivation({ activated: true, license_key: { status: "active" }, instance: { id: "i" } }).seats === undefined, "lemonActivation: no activation_limit → no seats field");
+ok(F.lemonEntitlement({ valid: true, license_key: { status: "active", activation_limit: 5 } }).seats.usage === 0, "seats usage defaults to 0 when activation_usage is absent");
+
 // ── Layer 2 (seats): lemonDeactivation — frees a seat ──
 ok(F.lemonDeactivation({ deactivated: true }).ok === true, "lemonDeactivation: deactivated:true → ok");
 ok(F.lemonDeactivation({ deactivated: false }).ok === false && F.lemonDeactivation(null).ok === false && F.lemonDeactivation({}).ok === false, "lemonDeactivation: false/garbage/missing → not ok");
@@ -134,9 +152,13 @@ ok(F.lemonDeactivation({ deactivated: false }).ok === false && F.lemonDeactivati
 // clampProfile keeps a valid instanceId (the seat handle) and drops a non-string one
 ok(F.clampProfile({ tier: "pro", instanceId: "inst-1" }).instanceId === "inst-1", "clampProfile keeps a string instanceId");
 ok(!("instanceId" in F.clampProfile({ tier: "pro", instanceId: 42 })), "clampProfile drops a non-string instanceId");
+// clampProfile keeps a valid seats snapshot (finite ints ≥ 0), defaults usage to 0, and drops a garbage one
+ok(JSON.stringify(F.clampProfile({ tier: "pro", seats: { limit: 5, usage: 3 } }).seats) === JSON.stringify({ limit: 5, usage: 3 }), "clampProfile keeps a valid seats {limit,usage}");
+ok(F.clampProfile({ tier: "pro", seats: { limit: 5 } }).seats.usage === 0, "clampProfile defaults seats.usage to 0");
+ok(!("seats" in F.clampProfile({ tier: "pro", seats: { limit: "lots" } })), "clampProfile drops seats with a non-finite limit");
 {
-  const c = F.clampProfile({ tier: "pro", licenseKey: "PRO-A-1", instanceId: "inst-1", entitlement: { status: "active" }, checkedAt: 5 });
-  ok(JSON.stringify(F.clampProfile(JSON.parse(JSON.stringify(c)))) === JSON.stringify(c), "a profile with an instanceId round-trips through JSON unchanged (stable emit order)");
+  const c = F.clampProfile({ tier: "pro", licenseKey: "PRO-A-1", instanceId: "inst-1", seats: { limit: 5, usage: 3 }, entitlement: { status: "active" }, checkedAt: 5 });
+  ok(JSON.stringify(F.clampProfile(JSON.parse(JSON.stringify(c)))) === JSON.stringify(c), "a profile with instanceId + seats round-trips through JSON unchanged (stable emit order)");
 }
 
 if (fails.length) { console.error(`flags FAIL (${fails.length}):\n  ` + fails.join("\n  ")); process.exit(1); }
