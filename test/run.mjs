@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TESTS = [
   "engine/hct.mjs", "engine/tonal.mjs", "engine/semantic.mjs", "engine/exports.mjs", "engine/okhsl.mjs", "engine/derive.mjs", "engine/type.mjs", "engine/geometry.mjs", "engine/flags.mjs",
-  "ui/persist.mjs", "ui/shell.mjs", "ui/headless-boot.mjs",
+  "ui/persist.mjs", "ui/shell.mjs", "ui/zip.mjs", "ui/headless-boot.mjs",
   "figma/plugin.mjs", "figma/binder.mjs",
   "mcp/brand-kit.mjs",
 ];

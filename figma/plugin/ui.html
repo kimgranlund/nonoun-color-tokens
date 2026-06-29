@@ -4588,8 +4588,22 @@ function crc32(bytes) {
 const enc = new TextEncoder();
 const toBytes = (d) => (typeof d === "string" ? enc.encode(d) : d);
 
+// dosDateTime(d) — encode a JS Date as the ZIP timestamp pair { time, date } (two u16s, little-endian).
+// The DOS epoch is 1980-01-01, so earlier dates clamp to it. NOTE: a zero date/time (the old behaviour)
+// is exactly what unzippers render as ~1979 — so we stamp a REAL time, giving exported files a sane date.
+// Time packs (hours<<11 | minutes<<5 | seconds/2); date packs ((year-1980)<<9 | month<<5 | day).
+function dosDateTime(d) {
+  if (!(d instanceof Date) || isNaN(d.getTime()) || d.getFullYear() < 1980) return { time: 0, date: 0x21 }; // 1980-01-01
+  const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  return { time: time & 0xffff, date: date & 0xffff };
+}
+
 // zipStore — files: [{ name, data }] (data: string | Uint8Array) -> Uint8Array (a complete .zip).
-function zipStore(files) {
+// opts.date stamps every entry's modification time (default: now — what a user expects on a download).
+// Pass a fixed Date for a byte-reproducible archive.
+function zipStore(files, { date = new Date() } = {}) {
+  const dt = dosDateTime(date);
   const items = files.map((f) => {
     const data = toBytes(f.data);
     return { name: enc.encode(f.name), data, crc: crc32(data) };
@@ -4612,7 +4626,7 @@ function zipStore(files) {
     u16(20);         // version needed to extract (2.0)
     u16(0);          // general-purpose flags
     u16(0);          // method = 0 (store)
-    u16(0); u16(0);  // mod time, mod date (fixed 0 → reproducible archives)
+    u16(dt.time); u16(dt.date); // mod time, mod date (a real timestamp — 0 reads as ~1979 in unzippers)
     u32(it.crc);     // crc-32
     u32(it.data.length); // compressed size (== uncompressed for store)
     u32(it.data.length); // uncompressed size
@@ -4629,7 +4643,7 @@ function zipStore(files) {
     u16(20);         // version needed
     u16(0);          // flags
     u16(0);          // method
-    u16(0); u16(0);  // mod time, date
+    u16(dt.time); u16(dt.date); // mod time, date (matches the local header)
     u32(it.crc);
     u32(it.data.length);
     u32(it.data.length);
