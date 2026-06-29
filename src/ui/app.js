@@ -4664,7 +4664,7 @@ class HctApp extends HTMLElement {
     );
   }
 
-  // Roles panel — the 53-role table for the selected palette: key · suffix · the
+  // Roles panel — the 59-role table for the selected palette: key · suffix · the
   // light ref swatch + the dark ref swatch · plus a small live semantic preview.
   renderRolesInspector(view) {
     const idx = this.selectedIndex();
@@ -4674,7 +4674,7 @@ class HctApp extends HTMLElement {
       "div",
       {},
       h("h3", { class: "insp-title" }, icon("roles"), "Roles"),
-      h("div", { class: "insp-sub" }, `${p ? p.name : ""} — 53 semantic roles · light / dark refs`),
+      h("div", { class: "insp-sub" }, `${p ? p.name : ""} — 59 semantic roles · light / dark refs`),
       // (the live component preview is pinned at the bottom of the pane on every
       // tab — see .seg-example / exampleCard — so the Roles panel no longer repeats
       // it here at the top.)

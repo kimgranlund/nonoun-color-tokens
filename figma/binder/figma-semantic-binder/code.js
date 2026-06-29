@@ -41,7 +41,7 @@ function refKey(ref) {
   return s.slice(0, dash).padStart(3, "0") + s.slice(dash);
 }
 
-// roleTable(n) — the 53 roles for a palette, name-substituted exactly as semantic.js /
+// roleTable(n) — the 59 roles for a palette, name-substituted exactly as semantic.js /
 // bind-plan.mjs produce them: accent + on-accent keys carry the palette name; shared roles do
 // not. Refs are the canonical values from data/role-table.json (validated semantic-mapping).
 // `key` is the semantic variable name part ("{n}/{key}"); `light`/`dark` feed targetName.
@@ -74,6 +74,16 @@ function roleTable(n) {
     // 3. ON-SURFACE — shared.
     { key: "onSurface", suffix: "-on-surface", light: "950", dark: "50" },
     { key: "onSurfaceVariant", suffix: "-on-surface-variant", light: "750", dark: "250" },
+
+    // 3b. ON-SURFACE INTERACTION STATES — shared. onSurface holds at the ceiling (950/50); onSurfaceVariant
+    //     intensifies +1/+2 step; disabled a translucent inert label on the 500 ramp. Lockstep w/ semantic.js.
+    { key: "onSurfaceHover", suffix: "-on-surface-hover", light: "950", dark: "50" },
+    { key: "onSurfaceActive", suffix: "-on-surface-active", light: "950", dark: "50" },
+    { key: "onSurfaceDisabled", suffix: "-on-surface-disabled", light: "500-400", dark: "500-400" },
+    { key: "onSurfaceVariantHover", suffix: "-on-surface-variant-hover", light: "850", dark: "150" },
+    { key: "onSurfaceVariantActive", suffix: "-on-surface-variant-active", light: "900", dark: "100" },
+    { key: "onSurfaceVariantDisabled", suffix: "-on-surface-variant-disabled", light: "500-300", dark: "500-300" },
+
     // placeholder — field placeholder text: one mirrored step MORE muted than onSurfaceVariant (650/350);
     // a SOLID stop (translucent placeholder text is the classic a11y failure), fixed per mode.
     { key: "placeholder", suffix: "-placeholder", light: "650", dark: "350" },
