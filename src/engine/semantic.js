@@ -1,4 +1,4 @@
-// semantic-mapping — the 53 semantic token roles per palette.
+// semantic-mapping — the 59 semantic token roles per palette.
 //
 // Two-layer model: raw primitives are mode-independent; the light/dark FLIP
 // lives only here in the semantic layer. Each role declares a `light` ref and a
@@ -70,7 +70,7 @@ export function refKey(ref) {
 }
 
 /**
- * Build the canonical 53-role semantic table for a palette.
+ * Build the canonical 59-role semantic table for a palette.
  * @param {string} paletteName lowercase palette name (e.g. "primary")
  * @returns {{ key: string, suffix: string, light: string, dark: string }[]}
  */
@@ -116,6 +116,19 @@ export function semanticRoles(paletteName) {
   // 3. ON-SURFACE — shared keys (NOT name-prefixed).
   role('onSurface', '-on-surface', '950', '50');
   role('onSurfaceVariant', '-on-surface-variant', '750', '250');
+
+  // 3b. ON-SURFACE INTERACTION STATES — shared. onSurface sits at the contrast CEILING at rest (950/50),
+  //     so hover/active HOLD there (no stronger solid stop exists; the emphasis is carried by the surface/
+  //     container behind the text, like on-accent hover/active). onSurfaceVariant has headroom, so it
+  //     intensifies toward the ceiling (hover +1, active +2 step, mode-mirrored). DISABLED is a translucent
+  //     inert label on the 500 ramp (opts out of the contrast guarantee), variant one notch fainter.
+  role('onSurfaceHover', '-on-surface-hover', '950', '50');
+  role('onSurfaceActive', '-on-surface-active', '950', '50');
+  role('onSurfaceDisabled', '-on-surface-disabled', '500-400', '500-400'); // translucent inert label
+  role('onSurfaceVariantHover', '-on-surface-variant-hover', '850', '150');
+  role('onSurfaceVariantActive', '-on-surface-variant-active', '900', '100');
+  role('onSurfaceVariantDisabled', '-on-surface-variant-disabled', '500-300', '500-300');
+
   // placeholder — input/field placeholder text: one mirrored step MORE muted than onSurfaceVariant
   // (650/350 vs 750/250), so it reads as a secondary hint yet still clears a legibility floor against the
   // field surface. A SOLID stop, NOT a translucent wash — translucent placeholder text is the classic a11y
