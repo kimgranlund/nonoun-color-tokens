@@ -74,7 +74,9 @@ figma.ui.onmessage = async (msg) => {
   if (!msg) return;
   try {
     if (msg.type === "apply") {
-      const r = await applyBundle(msg.dtcg, { rebuildSemantic: !!msg.rebuildSemantic });
+      // `dtcg` is OMITTED when the Color system is toggled off in the UI — skip the color collections
+      // entirely (the existing ones are left untouched, not pruned). Type/Geometry filtering happens UI-side.
+      const r = msg.dtcg ? await applyBundle(msg.dtcg, { rebuildSemantic: !!msg.rebuildSemantic }) : null;
       // Embed the exact params in the file ALONGSIDE the variables, so a later read round-trips
       // losslessly (the variables alone can only seed an approximate hue/chroma).
       if (msg.config) writeConfig(msg.config);
@@ -86,9 +88,10 @@ figma.ui.onmessage = async (msg) => {
         try { fr = await applyFloatPlans(msg.floatPlans); }
         catch (e) { console.error("[Ultimate Tokens] type/geometry apply failed:", e); }
       }
-      let note = `Applied ${r.raw} primitives + ${r.semantic} semantic variables (Light / Dark)` + (r.rebuilt ? ", regrouped" : "") + (r.pruned ? `, ${r.pruned} stale pruned` : "");
-      if (fr && fr.collections) note += ` · ${fr.variables} type/geometry variable${fr.variables === 1 ? "" : "s"} across ${fr.collections} collection${fr.collections === 1 ? "" : "s"}`;
-      figma.notify(note);
+      const parts = [];
+      if (r) parts.push(`${r.raw} primitives + ${r.semantic} semantic variables (Light / Dark)` + (r.rebuilt ? ", regrouped" : "") + (r.pruned ? `, ${r.pruned} stale pruned` : ""));
+      if (fr && fr.collections) parts.push(`${fr.variables} type/geometry variable${fr.variables === 1 ? "" : "s"} across ${fr.collections} collection${fr.collections === 1 ? "" : "s"}`);
+      figma.notify(parts.length ? "Applied " + parts.join(" · ") : "Nothing to apply — every system is toggled off.");
     } else if (msg.type === "save-config") {
       writeConfig(msg.config);
       figma.notify("Palette set saved into this file");
