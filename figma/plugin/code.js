@@ -37,6 +37,12 @@ const LEGACY_CONFIG_KEY = "hct-config"; // pre-rename key — read as a fallback
 // key `nonoun-color-tokens-sets`, so the same gallery data model round-trips in both environments.)
 const SETS_KEY = "nonoun-color-tokens-sets";
 
+// FLOAT_REGISTRY_KEY — the PROVENANCE registry for the breakpoint-moded Type/Geometry collections, a
+// name→collectionId map stored in root pluginData (travels with the .fig, like CONFIG_KEY). applyFloatPlans
+// reconciles/prunes ONLY a collection we created (matched by id), so a user's OWN pre-existing collection
+// named "Typography"/"Geometry" is never canonicalized or pruned — we make a separate one instead.
+const FLOAT_REGISTRY_KEY = "nonoun-color-tokens-float-collections";
+
 // writeConfig / readConfig — the file-embedded parametric config (root pluginData is a string store;
 // getPluginData returns "" when unset). JSON-encoded; a corrupt value reads back as null, never throws.
 function writeConfig(config) { figma.root.setPluginData(CONFIG_KEY, JSON.stringify(config)); }
@@ -45,6 +51,13 @@ function readConfig() {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (e) { return null; } // NB: param required — Figma's plugin VM rejects optional catch binding (ES2019)
 }
+// readFloatRegistry / writeFloatRegistry — the {name: collectionId} provenance map (see FLOAT_REGISTRY_KEY).
+function readFloatRegistry() {
+  const raw = figma.root.getPluginData(FLOAT_REGISTRY_KEY);
+  if (!raw) return {};
+  try { const r = JSON.parse(raw); return r && typeof r === "object" ? r : {}; } catch (e) { return {}; }
+}
+function writeFloatRegistry(reg) { figma.root.setPluginData(FLOAT_REGISTRY_KEY, JSON.stringify(reg)); }
 
 // ACTIONS — each request mapped to a human action, so a failure reads as "couldn't <do X>" instead of a
 // raw developer error (Figma policy: never surface raw error text / stack traces to users).
@@ -121,6 +134,19 @@ function aliasTarget(leaf) {
 async function ensureCollection(name) {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   return cols.find((c) => c.name === name) || figma.variables.createVariableCollection(name);
+}
+// ensureFloatCollection — OUR managed Type/Geometry collection for `name`, by PROVENANCE (the registry's
+// stored id), creating + registering it if absent. Unlike ensureCollection (color), it NEVER adopts a
+// same-named collection it didn't create — so applyFloatPlans' rename/prune can't ever hit a user's own
+// "Typography"/"Geometry". A user manual-rename survives (we track id, not name); a user-deleted one is
+// re-created. `reg` is mutated in place; the caller persists it once via writeFloatRegistry.
+async function ensureFloatCollection(name, reg) {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const known = reg[name] && cols.find((c) => c.id === reg[name]);
+  if (known) return known;
+  const made = figma.variables.createVariableCollection(name);
+  reg[name] = made.id;
+  return made;
 }
 // rgbaToHex — a Figma color value {r,g,b,a} (0..1) -> "#RRGGBB" (or "#RRGGBBAA" when a < 1),
 // matching the generator's emitted hex form so a live value can be diffed against generated.
@@ -246,9 +272,10 @@ async function applyBundle(dtcg, opts) {
 // leaving a removed breakpoint's mode behind). Value-complete plans mean no mode is ever left unset.
 async function applyFloatPlans(plans) {
   let collections = 0, variables = 0;
+  const reg = readFloatRegistry(); // provenance: only ever touch a collection NONOUN created (see ensureFloatCollection)
   for (const plan of (Array.isArray(plans) ? plans : [])) {
     if (!plan || !plan.collection || !Array.isArray(plan.modes) || !plan.modes.length) continue;
-    const coll = await ensureCollection(plan.collection);
+    const coll = await ensureFloatCollection(plan.collection, reg);
     // The collection's DEFAULT mode (Figma rejects removing it) — rename it to the plan's first mode ("Base");
     // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a NONOUN-created
     // collection they coincide, but a foreign same-named collection's default may not be the first mode, and
@@ -279,6 +306,7 @@ async function applyFloatPlans(plans) {
     for (const name of Object.keys(byName)) if (!current.has(name)) byName[name].remove();
     collections++;
   }
+  writeFloatRegistry(reg); // persist the name→id provenance map (any newly-created collections)
   return { collections: collections, variables: variables };
 }
 

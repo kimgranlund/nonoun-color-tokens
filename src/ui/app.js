@@ -515,6 +515,7 @@ class HctApp extends HTMLElement {
     this.geomSegment = "ramp"; // right-pane Geometry inspector tab: ramp | radius | space (ui-session)
     this.typeSegment = "scale"; // right-pane Typography inspector tab: scale | fonts | specimen (ui-session)
     this.typeVoice = null; // the selected voice in the Scale tab (null = none expanded) — drives per-voice tuning
+    this.examplesExpanded = false; // right-pane preview gallery: collapsed to the first artifact until expanded (ui-session)
     this.figmaFile = "light"; // which Figma mode file the Figma tab previews/downloads
     this.hover = null; // hovered swatch info for footers
     this.search = "";
@@ -4548,8 +4549,21 @@ class HctApp extends HTMLElement {
 
   // exampleArtifacts — the pinned preview gallery: the role card + the native slider + the native form set,
   // each painted from the selected palette's roles. All input-free demos, so liveRefresh can replaceChildren.
+  // Collapsed to the FIRST artifact (the role card) until expanded — the slider + form are revealed by the
+  // toggle. examplesExpanded is ui-session view state (not doc-bound), so the toggle just flips it + refreshes.
   exampleArtifacts(view) {
-    return [this.exampleCard(view), this.exampleSlider(view), this.exampleForm(view)];
+    const rest = [this.exampleSlider(view), this.exampleForm(view)];
+    const toggle = h(
+      "button",
+      {
+        class: "ex-collapse-toggle",
+        type: "button",
+        "aria-expanded": this.examplesExpanded ? "true" : "false",
+        onclick: () => { this.examplesExpanded = !this.examplesExpanded; this.liveRefresh(); },
+      },
+      this.examplesExpanded ? "Show less" : `Show ${rest.length} more example${rest.length === 1 ? "" : "s"}`,
+    );
+    return [this.exampleCard(view), ...(this.examplesExpanded ? rest : []), toggle];
   }
 
   // slider — a range control. `onInput(v)` mutates live (through editDrag, which

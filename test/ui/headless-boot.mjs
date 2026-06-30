@@ -1427,6 +1427,16 @@ ok(app._activeType().bodyBase === 20 && tScale(app._activeType()).categories.Bod
 app.setTypeModeMinWidth(_bpId, 768); flushRaf();
 ok(app.doc.type.modes[0].minWidth === 768 && app._typeModeScales()[0].minWidth === 768, "(ty-bp) setTypeModeMinWidth persists + flows to the responsive-export mode scales (→ @media min-width)");
 ok(app._typeModeDTCGFiles().length === 1 && app._typeModeDTCGFiles()[0].name === "type.768.tokens.json" && JSON.parse(app._typeModeDTCGFiles()[0].data).typography, "(ty-bp) the breakpoint emits a per-mode DTCG file keyed by width");
+// (ty-fig) the NATIVE Figma apply payload: _figmaFloatPlans() composes the emitters → validateModeInterchange
+// → modeApplyPlan, so the "Apply to Figma" message carries a Typography plan (Base + this 768 breakpoint) and
+// a Geometry plan (Base-only — no geometry breakpoints here). Proves the validate→plan glue, not just its parts.
+const _fplans = app._figmaFloatPlans();
+const _typlan = _fplans.find((p) => p.collection === "Typography");
+const _geolan = _fplans.find((p) => p.collection === "Geometry");
+ok(!!_typlan && !!_geolan, "(ty-fig) _figmaFloatPlans yields a Typography + a Geometry apply plan");
+ok(_typlan && _typlan.modes[0] === "Base" && _typlan.modes.length === 2, `(ty-fig) the Typography plan has Base + the 768 breakpoint mode (got ${_typlan && _typlan.modes.join()})`);
+ok(_geolan && _geolan.modes.length === 1 && _geolan.modes[0] === "Base", `(ty-fig) the Geometry plan is Base-only with no geometry breakpoints (got ${_geolan && _geolan.modes.join()})`);
+ok(_fplans.every((p) => p.variables.length > 0 && p.variables.every((v) => v.type === "FLOAT" && v.values.length === p.modes.length && v.values.every((x) => Number.isFinite(x.value)))), "(ty-fig) every emitted plan is value-complete (FLOAT, one finite value per mode) — the validateModeInterchange gate held");
 // Phase 2: common-breakpoint quick-pick chips flank the min-width field (the number field stays for custom).
 const tPresets = () => walk(app, (e) => e.classList && e.classList.contains("mode-preset"));
 ok(tPresets().length === 6, `(ty-bp) the breakpoint editor offers 6 width quick-picks (got ${tPresets().length})`);

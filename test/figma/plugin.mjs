@@ -286,13 +286,27 @@ if (applyFloatPlans) {
     const aVar = sVars.find((v) => v.name === "a");
     if (!aVar) FAIL("floatprune", "variable 'a' missing after re-apply");
     else if (aVar.valuesByMode[synth.modes[0].modeId] !== 9) FAIL("floatprune", "variable 'a' not updated to 9 on re-apply");
+
+    // PROVENANCE: apply must NEVER canonicalize a USER's own pre-existing same-named collection — it tracks
+    // the collections IT created by id in root pluginData and makes a SEPARATE one. Fresh mock so the user's
+    // "Typography" is the only one until apply runs.
+    const F2 = mockFigma();
+    const a2 = new Function("figma", "__html__", "module", code + "\nreturn { applyFloatPlans };")(F2.figma, "<html>", undefined).applyFloatPlans;
+    const userColl = F2.figma.variables.createVariableCollection("Typography"); // the user's own, pre-existing
+    F2.figma.variables.createVariable("user/keepme", userColl, "FLOAT").setValueForMode(userColl.modes[0].modeId, 123);
+    await a2(modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), [])));
+    if (F2.collections.filter((c) => c.name === "Typography").length !== 2) FAIL("floatprov", `expected the user's Typography + a separate NONOUN one (2), got ${F2.collections.filter((c) => c.name === "Typography").length}`);
+    if (!F2.variables.some((v) => v.variableCollectionId === userColl.id && v.name === "user/keepme")) FAIL("floatprov", "apply pruned a variable from the user's OWN Typography collection");
+    if (userColl.modes[0].name !== "Mode 1") FAIL("floatprov", "apply renamed the default mode of the user's OWN Typography collection");
+    await a2(modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), []))); // re-apply: reconcile OURS by id, not the user's
+    if (F2.collections.filter((c) => c.name === "Typography").length !== 2) FAIL("floatprov", "re-apply made a 3rd Typography (provenance registry not persisted to root pluginData)");
   } catch (e) { FAIL("floatapply", "applyFloatPlans threw: " + e.message); }
 } else {
   FAIL("floatapply", "code.js exported no applyFloatPlans");
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "floatapply", "floatidem", "floatprune", "config", "read"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "floatapply", "floatidem", "floatprune", "floatprov", "config", "read"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
