@@ -65,7 +65,17 @@ figma.ui.onmessage = async (msg) => {
       // Embed the exact params in the file ALONGSIDE the variables, so a later read round-trips
       // losslessly (the variables alone can only seed an approximate hue/chroma).
       if (msg.config) writeConfig(msg.config);
-      figma.notify(`Applied ${r.raw} primitives + ${r.semantic} semantic variables (Light / Dark)` + (r.rebuilt ? ", regrouped" : "") + (r.pruned ? `, ${r.pruned} stale pruned` : ""));
+      // Type + Geometry breakpoint-moded FLOAT collections (UI-computed, pre-validated apply plans). Isolated
+      // in its OWN try so a float-apply failure can't mask the color apply that already succeeded above — the
+      // user still gets the color result (+ a console error), and a re-apply (idempotent) converges the rest.
+      let fr = null;
+      if (Array.isArray(msg.floatPlans) && msg.floatPlans.length) {
+        try { fr = await applyFloatPlans(msg.floatPlans); }
+        catch (e) { console.error("[Ultimate Tokens] type/geometry apply failed:", e); }
+      }
+      let note = `Applied ${r.raw} primitives + ${r.semantic} semantic variables (Light / Dark)` + (r.rebuilt ? ", regrouped" : "") + (r.pruned ? `, ${r.pruned} stale pruned` : "");
+      if (fr && fr.collections) note += ` · ${fr.variables} type/geometry variable${fr.variables === 1 ? "" : "s"} across ${fr.collections} collection${fr.collections === 1 ? "" : "s"}`;
+      figma.notify(note);
     } else if (msg.type === "save-config") {
       writeConfig(msg.config);
       figma.notify("Palette set saved into this file");
@@ -225,5 +235,52 @@ async function applyBundle(dtcg, opts) {
   return { raw: rawCount, semantic: semCount, pruned: pruned, rebuilt: rebuilt };
 }
 
+// ── the breakpoint-moded FLOAT apply (Type / Geometry) ────────────────────────────
+// applyFloatPlans — execute the UI-computed apply PLANS that figma/binder/mode-apply-plan.mjs produces
+// (one entry per collection: { collection, modes, defaultMode:"Base", addModes, variables:[{name,type,
+// values:[{mode,value}]}] }). The plan is pure DATA the UI already ran validateModeInterchange + ordering
+// over, so this file stays a thin EXECUTOR — there is no planner to inline or parity-gate (unlike the color
+// cascade, which mirrors a role table). It mirrors the operation sequence documented in that module's header.
+// Idempotent: collections, modes, and variables are reconciled BY NAME and stale ones pruned, so re-applying
+// after a breakpoint/voice change converges the file to exactly the current plan (never doubling, never
+// leaving a removed breakpoint's mode behind). Value-complete plans mean no mode is ever left unset.
+async function applyFloatPlans(plans) {
+  let collections = 0, variables = 0;
+  for (const plan of (Array.isArray(plans) ? plans : [])) {
+    if (!plan || !plan.collection || !Array.isArray(plan.modes) || !plan.modes.length) continue;
+    const coll = await ensureCollection(plan.collection);
+    // The collection's DEFAULT mode (Figma rejects removing it) — rename it to the plan's first mode ("Base");
+    // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a NONOUN-created
+    // collection they coincide, but a foreign same-named collection's default may not be the first mode, and
+    // pruning it would throw. (The headless mock has no defaultModeId → falls back to modes[0].)
+    const defaultId = coll.defaultModeId || coll.modes[0].modeId;
+    coll.renameMode(defaultId, plan.defaultMode);
+    const findMode = (nm) => coll.modes.find((m) => m.name.toLowerCase() === String(nm).toLowerCase());
+    const modeId = {};
+    modeId[plan.defaultMode] = defaultId;
+    for (const nm of plan.addModes) { const ex = findMode(nm); modeId[nm] = ex ? ex.modeId : coll.addMode(nm); }
+    // prune stale modes (a breakpoint the user removed) — never the default, never the last remaining mode.
+    const wanted = new Set(plan.modes.map((m) => String(m).toLowerCase()));
+    for (const m of coll.modes.slice()) {
+      if (m.modeId === defaultId) continue;
+      if (!wanted.has(m.name.toLowerCase()) && coll.modes.length > 1) coll.removeMode(m.modeId);
+    }
+    // variables: create-or-reuse by name; write every mode's value; prune orphans scoped to THIS collection.
+    const byName = await varsByName(coll.id);
+    const current = new Set();
+    for (const v of plan.variables) {
+      const vr = byName[v.name] || figma.variables.createVariable(v.name, coll, v.type || "FLOAT");
+      for (const pair of v.values) {
+        const mid = modeId[pair.mode];
+        if (mid != null && Number.isFinite(Number(pair.value))) vr.setValueForMode(mid, Number(pair.value));
+      }
+      byName[v.name] = vr; current.add(v.name); variables++;
+    }
+    for (const name of Object.keys(byName)) if (!current.has(name)) byName[name].remove();
+    collections++;
+  }
+  return { collections: collections, variables: variables };
+}
+
 // Exposed for the headless verifier (a no-op inside Figma's VM).
-if (typeof module !== "undefined") module.exports = { applyBundle, rgbaOf, aliasTarget, childKeys };
+if (typeof module !== "undefined") module.exports = { applyBundle, applyFloatPlans, rgbaOf, aliasTarget, childKeys };

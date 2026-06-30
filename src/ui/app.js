@@ -33,6 +33,7 @@ import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.m
 import { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, typeTokensFigmaModes, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS } from "../engine/type.mjs";
 import { geomScale, geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
+import { modeApplyPlan, validateModeInterchange } from "../../figma/binder/mode-apply-plan.mjs";
 import { icon, brandMark } from "./icons.js";
 
 // ── Multi-set storage ─────────────────────────────────────────────────────────
@@ -5382,11 +5383,25 @@ class HctApp extends HTMLElement {
     try {
       // Send the variables AND the exact params together — code.js embeds the config in the file
       // (root pluginData) so a later read reproduces this state losslessly, not approximately.
-      parent.postMessage({ pluginMessage: { type: "apply", dtcg: this.figmaBundle(), config: serialize(this.doc), rebuildSemantic: !!rebuild } }, "*");
+      // floatPlans = the Type + Geometry breakpoint-moded collections as validated apply plans (below).
+      parent.postMessage({ pluginMessage: { type: "apply", dtcg: this.figmaBundle(), config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans() } }, "*");
       this.toast(rebuild ? "Regrouping Color Modes…" : "Sent to Figma — check the Variables panel");
     } catch {
       /* not in a frame / blocked — nothing to apply to */
     }
+  }
+
+  // _figmaFloatPlans — the Type + Geometry breakpoint-moded collections (typeTokensFigmaModes /
+  // geomTokensFigmaModes over the override-aware base + per-breakpoint mode scales), turned into the
+  // pure apply PLANS code.js executes (figma/binder/mode-apply-plan.mjs). Each interchange is VALIDATED
+  // here first — a malformed one (the half-bound-import failure) is dropped rather than half-applied to
+  // the user's file; an engine error on one system never blocks the other (or the color apply).
+  _figmaFloatPlans() {
+    const out = [];
+    const add = (ix) => { try { if (ix && validateModeInterchange(ix).length === 0) out.push(...modeApplyPlan(ix)); } catch { /* skip a malformed system */ } };
+    try { add(typeTokensFigmaModes(this._typeScaleFor("base"), this._typeModeScales())); } catch { /* skip type */ }
+    try { add(geomTokensFigmaModes(this._geomScaleFor("base"), this._geomModeScales())); } catch { /* skip geometry */ }
+    return out;
   }
 
   // _syncApplyGate — reconcile the gate <dialog> with applyGateOpen (mirrors _syncDrawer/_syncNewPal).

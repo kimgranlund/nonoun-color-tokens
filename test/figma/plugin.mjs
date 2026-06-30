@@ -9,6 +9,9 @@ import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { figmaBundle, defaultDocument } from "../../src/ui/model.mjs";
+import * as TYPE from "../../src/engine/type.mjs";
+import * as GEOM from "../../src/engine/geometry.mjs";
+import { modeApplyPlan } from "../../figma/binder/mode-apply-plan.mjs";
 
 const HERE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "figma", "plugin"); // the generator-as-plugin lives in figma/plugin/
 const fails = [];
@@ -74,6 +77,7 @@ function mockFigma() {
           id: "c" + id++, name, modes: [{ modeId: "m" + id++, name: "Mode 1" }],
           renameMode(mid, nm) { const m = this.modes.find((x) => x.modeId === mid); if (m) m.name = nm; },
           addMode(nm) { const m = { modeId: "m" + id++, name: nm }; this.modes.push(m); return m.modeId; },
+          removeMode(mid) { const i = this.modes.findIndex((x) => x.modeId === mid); if (i > 0) this.modes.splice(i, 1); }, // i>0: never the default
           remove() { // real Figma drops the collection AND its variables
             const i = collections.indexOf(this); if (i >= 0) collections.splice(i, 1);
             for (let j = variables.length - 1; j >= 0; j--) if (variables[j].variableCollectionId === this.id) variables.splice(j, 1);
@@ -96,11 +100,12 @@ function mockFigma() {
 }
 
 // ── END-TO-END contract: figmaBundle() -> applyBundle() on the mock ──────────────
-let applyBundle;
+let applyBundle, applyFloatPlans;
 const F = mockFigma();
 try {
-  const load = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle };");
-  applyBundle = load(F.figma, "<html>", undefined).applyBundle; // closes over the MOCK figma
+  const load = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyFloatPlans };");
+  const loaded = load(F.figma, "<html>", undefined); // closes over the MOCK figma
+  applyBundle = loaded.applyBundle; applyFloatPlans = loaded.applyFloatPlans;
 } catch (e) { FAIL("parse", "code.js failed to load: " + e.message); }
 
 if (applyBundle) {
@@ -229,11 +234,68 @@ if (applyBundle) {
   }
 }
 
+// ── breakpoint-moded FLOAT apply (Type + Geometry) — the NATIVE side of #125's interchange export ──
+// applyFloatPlans executes the UI-computed plans (figma/binder/mode-apply-plan.mjs.modeApplyPlan) against
+// the figma API: one collection per system, mode[0]="Base" + one mode per breakpoint, value-complete FLOAT
+// vars. Proven (not assumed): idempotent re-apply, stale-mode prune on breakpoint removal, orphan-var prune.
+if (applyFloatPlans) {
+  try {
+    const typeIx = TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), [{ name: "Mobile", scale: TYPE.typeScale({ treatment: "product", bodyBase: 13 }) }]);
+    const geomIx = GEOM.geomTokensFigmaModes(GEOM.geomScale({ treatment: "comfortable", baseHeight: 28 }), [{ name: "Desktop", scale: GEOM.geomScale({ treatment: "comfortable", baseHeight: 40 }) }]);
+    const fr = await applyFloatPlans([...modeApplyPlan(typeIx), ...modeApplyPlan(geomIx)]);
+
+    const typ = F.collections.find((c) => c.name === "Typography");
+    const geo = F.collections.find((c) => c.name === "Geometry");
+    if (!typ) FAIL("floatapply", "no Typography collection created");
+    if (!geo) FAIL("floatapply", "no Geometry collection created");
+    if (typ && typ.modes.map((m) => m.name).join() !== "Base,Mobile") FAIL("floatapply", `Typography modes = ${typ && typ.modes.map((m) => m.name)}, want Base,Mobile`);
+    if (geo && geo.modes.map((m) => m.name).join() !== "Base,Desktop") FAIL("floatapply", `Geometry modes = ${geo && geo.modes.map((m) => m.name)}, want Base,Desktop`);
+    if (fr.collections !== 2) FAIL("floatapply", `applyFloatPlans reported ${fr.collections} collections, want 2`);
+
+    // every Typography var is FLOAT + value-complete across both modes; per-mode values DIFFER (16 vs 13).
+    if (typ) {
+      const tVars = F.variables.filter((v) => v.variableCollectionId === typ.id);
+      const planLen = modeApplyPlan(typeIx)[0].variables.length;
+      if (tVars.length !== planLen) FAIL("floatapply", `Typography has ${tVars.length} vars, want ${planLen}`);
+      if (!tVars.every((v) => v.type === "FLOAT")) FAIL("floatapply", "a Typography variable is not FLOAT");
+      const baseId = typ.modes[0].modeId, mobId = typ.modes[1].modeId;
+      const bodyMd = tVars.find((v) => v.name === "Body/MD/size");
+      if (!bodyMd) FAIL("floatapply", "Body/MD/size variable missing");
+      else if (!Number.isFinite(bodyMd.valuesByMode[baseId]) || !Number.isFinite(bodyMd.valuesByMode[mobId])) FAIL("floatapply", "Body/MD/size not value-complete across modes");
+      else if (bodyMd.valuesByMode[baseId] === bodyMd.valuesByMode[mobId]) FAIL("floatapply", "Body/MD/size Base == Mobile (per-mode values should differ at bodyBase 16 vs 13)");
+    }
+
+    // IDEMPOTENT re-apply — no duplicate collection / modes / variables.
+    await applyFloatPlans([...modeApplyPlan(typeIx), ...modeApplyPlan(geomIx)]);
+    if (F.collections.filter((c) => c.name === "Typography").length !== 1) FAIL("floatidem", "re-apply duplicated the Typography collection");
+    if (typ && typ.modes.length !== 2) FAIL("floatidem", `re-apply left ${typ && typ.modes.length} Typography modes, want 2`);
+    const tVars2 = typ ? F.variables.filter((v) => v.variableCollectionId === typ.id).length : 0;
+    if (tVars2 !== modeApplyPlan(typeIx)[0].variables.length) FAIL("floatidem", `re-apply left ${tVars2} Typography vars (duplicates)`);
+
+    // BREAKPOINT REMOVED ⇒ the stale mode is pruned (re-apply with no breakpoints ⇒ Base only).
+    await applyFloatPlans(modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), [])));
+    if (typ && typ.modes.map((m) => m.name).join() !== "Base") FAIL("floatprune", `after removing the breakpoint, Typography modes = ${typ && typ.modes.map((m) => m.name)}, want Base`);
+
+    // ORPHAN VAR pruned — a synthetic collection: apply {a,b} then {a} ⇒ b removed, a updated to 9.
+    const synthVar = (name, value) => ({ name, type: "FLOAT", values: [{ mode: "Base", value }] });
+    await applyFloatPlans([{ collection: "Synth", modes: ["Base"], defaultMode: "Base", addModes: [], variables: [synthVar("a", 1), synthVar("b", 2)] }]);
+    await applyFloatPlans([{ collection: "Synth", modes: ["Base"], defaultMode: "Base", addModes: [], variables: [synthVar("a", 9)] }]);
+    const synth = F.collections.find((c) => c.name === "Synth");
+    const sVars = synth ? F.variables.filter((v) => v.variableCollectionId === synth.id) : [];
+    if (sVars.some((v) => v.name === "b")) FAIL("floatprune", "orphan variable 'b' not pruned on re-apply");
+    const aVar = sVars.find((v) => v.name === "a");
+    if (!aVar) FAIL("floatprune", "variable 'a' missing after re-apply");
+    else if (aVar.valuesByMode[synth.modes[0].modeId] !== 9) FAIL("floatprune", "variable 'a' not updated to 9 on re-apply");
+  } catch (e) { FAIL("floatapply", "applyFloatPlans threw: " + e.message); }
+} else {
+  FAIL("floatapply", "code.js exported no applyFloatPlans");
+}
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "config", "read"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "floatapply", "floatidem", "floatprune", "config", "read"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
 if (fails.length) { console.error(`\nFAIL: ${fails.length} gate failure(s)`); process.exit(1); }
-console.log("\nPASS: figma-plugin-app — manifest + offline code.js + bridged ui.html + the figmaBundle→variables cascade");
+console.log("\nPASS: figma-plugin-app — manifest + offline code.js + bridged ui.html + the figmaBundle→variables cascade + the Type/Geometry breakpoint-mode apply");
 process.exit(0);
