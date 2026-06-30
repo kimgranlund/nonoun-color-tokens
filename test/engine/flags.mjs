@@ -116,6 +116,12 @@ ok(F.lemonEntitlement({ valid: true, license_key: { status: "expired" } }).revok
 ok(F.lemonEntitlement({}).ok === false && F.lemonEntitlement({}).revoked === undefined, "lemonEntitlement: ambiguous/empty body → NOT revoked (transient — caller keeps cached)");
 ok(F.lemonEntitlement(null).revoked === undefined, "lemonEntitlement: null body → NOT revoked (transient)");
 ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" }, meta: { store_id: 42 } }, { storeId: 7 }).revoked === undefined, "lemonEntitlement: a store mismatch is an anomaly, not a revocation (NOT revoked)");
+// product pinning (layered on the store pin): only OUR products' keys validate; fail-closed; an anomaly, not revoked.
+ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" }, meta: { store_id: 7, product_id: 1182548 } }, { storeId: 7, productIds: [1182548, 1182535] }).ok === true, "lemonEntitlement: productId in the allowed set → ok");
+ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" }, meta: { store_id: 7, product_id: 999 } }, { storeId: 7, productIds: [1182548, 1182535] }).ok === false, "lemonEntitlement: productId NOT in the set → rejected");
+ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" }, meta: { store_id: 7 } }, { storeId: 7, productIds: [1182548] }).ok === false, "lemonEntitlement: productIds set but response carries no meta.product_id → rejected (fail-closed)");
+ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" }, meta: { store_id: 7, product_id: 999 } }, { storeId: 7, productIds: [1182548] }).revoked === undefined, "lemonEntitlement: a product mismatch is an anomaly, not a revocation (NOT revoked)");
+ok(F.lemonEntitlement({ valid: true, license_key: { status: "active" }, meta: { store_id: 7, product_id: 999 } }, { storeId: 7 }).ok === true, "lemonEntitlement: productIds UNset → product check skipped (only the store pin applies)");
 
 // ── Layer 2 (seats): lemonActivation — the seat-consuming POST /v1/licenses/activate path ──
 {
@@ -131,6 +137,8 @@ ok(F.lemonActivation({ activated: true, license_key: { status: "active" } }).ins
 ok(/\b1 seat\b/.test(F.lemonActivation({ activated: false, license_key: { status: "active", activation_limit: 1, activation_usage: 1 } }).error), "lemonActivation: singular 'seat' at a 1-seat limit");
 ok(/expired/i.test(F.lemonActivation({ activated: false, license_key: { status: "expired", activation_limit: 5, activation_usage: 1 } }).error), "lemonActivation: NOT at limit + an expired key → the key-status message (not a seat message)");
 ok(F.lemonActivation({ activated: true, license_key: { status: "active" }, meta: { store_id: 42 } }, { storeId: 7 }).ok === false, "lemonActivation: store mismatch → rejected (fail-closed, shared with validate)");
+ok(F.lemonActivation({ activated: true, license_key: { status: "active" }, meta: { store_id: 7, product_id: 1182535 } }, { storeId: 7, productIds: [1182548, 1182535] }).ok === true, "lemonActivation: productId in the allowed set → ok");
+ok(F.lemonActivation({ activated: true, license_key: { status: "active" }, meta: { store_id: 7, product_id: 999 } }, { storeId: 7, productIds: [1182548, 1182535] }).ok === false, "lemonActivation: productId NOT in the set → rejected (fail-closed, shared with validate)");
 ok(F.lemonActivation(null).ok === false && typeof F.lemonActivation(null).error === "string", "lemonActivation: null/garbage JSON → friendly error (no throw)");
 
 // ── Layer 2 (seats): seat COUNT surfaced for the Account display (activation_limit/usage → seats) ──

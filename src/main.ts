@@ -30,6 +30,9 @@ type LicensedElement = HTMLElement & { _licenseService?: LicenseService; revalid
 // PIN activation to the NONOUN Lemon Squeezy store (id 420293) — the mappers are FAIL-CLOSED on this, so a
 // valid key issued by any OTHER store is rejected. null would accept any active key from any store.
 const LEMON_STORE_ID: number | null = 420293;
+// PIN to OUR products too (Pro 1182548 · Studio 1182535) — layered on the store pin, so even a key for a
+// DIFFERENT product in the same store is rejected (FAIL-CLOSED). null/[] would accept any product's key.
+const LEMON_PRODUCT_IDS: number[] | null = [1182548, 1182535];
 const LEMON_LICENSE_API = "https://api.lemonsqueezy.com/v1/licenses";
 
 async function lsPost(path: string, params: Record<string, string>): Promise<unknown> {
@@ -51,12 +54,12 @@ async function lsPost(path: string, params: Record<string, string>): Promise<unk
 
 const lemonSqueezyLicenseService: LicenseService = {
   async activate(key, instanceName) {
-    return lemonActivation(await lsPost("activate", { license_key: key, instance_name: instanceName }), { storeId: LEMON_STORE_ID });
+    return lemonActivation(await lsPost("activate", { license_key: key, instance_name: instanceName }), { storeId: LEMON_STORE_ID, productIds: LEMON_PRODUCT_IDS });
   },
   async validate(key, instanceId) {
     const params: Record<string, string> = { license_key: key };
     if (instanceId) params.instance_id = instanceId;
-    return lemonEntitlement(await lsPost("validate", params), { storeId: LEMON_STORE_ID });
+    return lemonEntitlement(await lsPost("validate", params), { storeId: LEMON_STORE_ID, productIds: LEMON_PRODUCT_IDS });
   },
   async deactivate(key, instanceId) {
     return lemonDeactivation(await lsPost("deactivate", { license_key: key, instance_id: instanceId }));

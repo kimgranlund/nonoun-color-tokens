@@ -133,6 +133,17 @@ function storePinFails(json, storeId) {
   return null;
 }
 
+// productPinFails(json, productIds) → an error string when the response's product isn't one of the pinned
+// ones (FAIL-CLOSED: a missing meta.product_id also fails), else null. `productIds` null/empty = no check.
+// Layered ON TOP of the store pin: even within our own store, only the Pro/Studio products' keys validate.
+// Like the store pin, a mismatch is an ANOMALY (a key for a different product), NOT a revocation.
+function productPinFails(json, productIds) {
+  if (!Array.isArray(productIds) || productIds.length === 0) return null;
+  const respProduct = json && json.meta && json.meta.product_id;
+  if (respProduct == null || !productIds.some((id) => String(id) === String(respProduct))) return "That license key is for a different product.";
+  return null;
+}
+
 // licenseKeyResult(lk) → { entitlement } when the key object is `active`, else { error } (friendly per status).
 function licenseKeyResult(lk) {
   const key = lk && typeof lk === "object" ? lk : {};
@@ -169,9 +180,9 @@ function seatsOf(lk) {
 // `{ ok:false }` WITHOUT `revoked`, so a caller re-validating on boot keeps the cached license (a flaky
 // 200/4xx body or a proxy page must never strip a paying user of Pro). A store mismatch is an anomaly, not
 // a revocation, so it is also NOT marked revoked.
-export function lemonEntitlement(json, { storeId = null } = {}) {
+export function lemonEntitlement(json, { storeId = null, productIds = null } = {}) {
   if (!json || typeof json !== "object") return { ok: false, error: LICENSE_GENERIC_ERROR };
-  const pin = storePinFails(json, storeId);
+  const pin = storePinFails(json, storeId) || productPinFails(json, productIds);
   if (pin) return { ok: false, error: pin };
   const lk = json.license_key && typeof json.license_key === "object" ? json.license_key : null;
   const status = lk && typeof lk.status === "string" ? lk.status : null;
@@ -193,9 +204,9 @@ export function lemonEntitlement(json, { storeId = null } = {}) {
 // response — the SEAT-CONSUMING path. activated:true means a seat was taken AND instance.id is the handle to
 // release it later (deactivate). activated:false is the rejection: a seat-limit hit becomes a friendly
 // message that names the seat count; otherwise the key's own status (expired/disabled) or LS's error message.
-export function lemonActivation(json, { storeId = null } = {}) {
+export function lemonActivation(json, { storeId = null, productIds = null } = {}) {
   if (!json || typeof json !== "object") return { ok: false, error: LICENSE_GENERIC_ERROR };
-  const pin = storePinFails(json, storeId);
+  const pin = storePinFails(json, storeId) || productPinFails(json, productIds);
   if (pin) return { ok: false, error: pin };
   if (json.activated !== true) {
     const lk = json.license_key || {};
