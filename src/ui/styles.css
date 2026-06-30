@@ -885,7 +885,10 @@ input[type="range"]::-moz-range-thumb {
 .story-color { display: flex; gap: 10px; }
 .story-swatch { flex: none; width: 40px; height: 40px; border-radius: var(--r-sm); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .story-color-meta { min-width: 0; }
-.story-color-name { font-size: 12px; font-weight: 600; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.story-color-name { font-size: 12px; font-weight: 600; }
+/* the role eyebrow ALWAYS on its own line above the name → consistent item rhythm (it was an inline,
+   baseline-aligned flex child that wrapped only for long names, so some items stacked and some didn't). */
+.story-color-name .color-role { display: block; margin-bottom: 1px; }
 .story-color-note { margin: 2px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--ink-dim); }
 .story-groups { display: flex; flex-direction: column; gap: 9px; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
 .story-group-head { display: flex; align-items: baseline; gap: 8px; }
@@ -1146,7 +1149,9 @@ dialog.settings::backdrop { background: rgba(10,14,22,.34); }
 .settings-pagehead p { margin: 0; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
 .settings-sections { max-width: 620px; }
 .settings-group { margin-bottom: 26px; }
-.settings-group-title { font-size: 12px; font-weight: 600; color: var(--ink); margin: 0 0 4px; }
+/* settings section header — the SAME caps eyebrow as the nav group label (.settings-nav-grouplabel),
+   for one consistent eyebrow treatment across the nav + the panels. */
+.settings-group-title { font-size: 10.5px; font-weight: 600; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 8px; }
 .settings-row {
   display: flex; align-items: center; gap: 16px; justify-content: space-between;
   padding: 14px 0; border-bottom: 1px solid var(--line);

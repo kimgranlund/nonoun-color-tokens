@@ -1346,6 +1346,11 @@ ok((txtOfSet(app.querySelector(".settings-pagehead")) || "").includes("Token map
 app.settingsSection = "appearance"; app.render(); flushRaf();
 ok((txtOfSet(app.querySelector(".settings-pagehead")) || "").includes("Appearance") && app.querySelectorAll(".settings-row").length >= 2, "(set) switching nav to Appearance swaps the panel (theme + canvas rows)");
 app.settingsSection = "mapping"; app.render(); flushRaf(); // restore for the assertions below
+// (set) mapping segments use SHORT labels — the 550/450 · 050/200 · WCAG detail moved into the descriptions;
+// the section header is the (caps eyebrow) settings-group-title, consistent with the nav group label.
+const setMapTxt = txtOfSet(app.querySelector(".settings")) || "";
+ok(!/Mode · 550/.test(setMapTxt) && !/Fixed · 050/.test(setMapTxt) && !/WCAG contrast/.test(setMapTxt), "(set) mapping segments use short labels (the stop detail moved to the descriptions)");
+ok(!!app.querySelector(".settings-group-title"), "(set) the mapping panel renders a section eyebrow (settings-group-title)");
 const { projectView: pvSet } = await import("../../src/ui/model.mjs");
 const primeRefs = (doc) => { const vp = pvSet(doc).palettes[0]; const prime = vp.roles.find((r) => r.suffix === ""); const at = (st) => vp.ramp.find((s) => s.stop === st).hex; return { prime, h550: at(550), h450: at(450), h500: at(500) }; };
 app.commit((d) => { d.accentRef = "mode"; }); flushRaf();
@@ -1387,11 +1392,6 @@ ok(app.querySelectorAll(".tok-group").length === 7, `(ty-tok) the rows are group
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}).startsWith("--type-display-xl"), `(ty-tok) the first (sticky) token name is the --type-display-xl step (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setTypeSpecMode("specimen"); flushRaf();
 ok(!!app.querySelector(".type-spec") && !app.querySelector(".tok-table"), "(ty-tok) toggling back to Specimen restores the live specimen (token table gone)");
-let typeZip = null; const realDBty = app.downloadBytes.bind(app);
-app.downloadBytes = (bytes, name) => { typeZip = { bytes, name }; };
-app.downloadTypeTokens();
-ok(typeZip && /type-tokens\.zip$/.test(typeZip.name) && typeZip.bytes && typeZip.bytes.length > 200, `(ty) downloadTypeTokens emits a .zip (${typeZip && typeZip.name})`);
-app.downloadBytes = realDBty;
 // ── (ty-bp) Typography breakpoint MODES (Phase 5) — add/switch/edit/delete a named bodyBase variant ──
 app.commit((d) => { d.type = { treatment: "product", bodyBase: 16 }; }); flushRaf();
 app.addTypeMode(); flushRaf();
@@ -1524,11 +1524,6 @@ ok(app.querySelectorAll(".tok-row").length === 6, `(geo-tok) one row per control
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}) === "--size-2xl", `(geo-tok) the first (sticky) token name is --size-2xl (largest→smallest) (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setGeomSpecMode("controls"); flushRaf();
 ok(!!app.querySelector(".geom-spec") && !app.querySelector(".tok-table"), "(geo-tok) toggling back to Controls restores the live controls scene (token table gone)");
-let geomZip = null; const realDBgeo = app.downloadBytes.bind(app);
-app.downloadBytes = (bytes, name) => { geomZip = { bytes, name }; };
-app.downloadGeomTokens();
-ok(geomZip && /geometry-tokens\.zip$/.test(geomZip.name) && geomZip.bytes && geomZip.bytes.length > 200, `(geo) downloadGeomTokens emits a .zip (${geomZip && geomZip.name})`);
-app.downloadBytes = realDBgeo;
 // ── (geo-bp) Geometry breakpoint MODES (Phase 5) — mirror of (ty-bp): add/switch/edit/delete a baseHeight variant ──
 app.commit((d) => { d.geometry = { treatment: "comfortable", baseHeight: 28 }; }); flushRaf();
 app.addGeomMode(); flushRaf();
