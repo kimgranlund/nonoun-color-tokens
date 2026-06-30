@@ -889,7 +889,10 @@ input[type="range"]::-moz-range-thumb {
 .story-color { display: flex; gap: 10px; }
 .story-swatch { flex: none; width: 40px; height: 40px; border-radius: var(--r-sm); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .story-color-meta { min-width: 0; }
-.story-color-name { font-size: 12px; font-weight: 600; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.story-color-name { font-size: 12px; font-weight: 600; }
+/* the role eyebrow ALWAYS on its own line above the name → consistent item rhythm (it was an inline,
+   baseline-aligned flex child that wrapped only for long names, so some items stacked and some didn't). */
+.story-color-name .color-role { display: block; margin-bottom: 1px; }
 .story-color-note { margin: 2px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--ink-dim); }
 .story-groups { display: flex; flex-direction: column; gap: 9px; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
 .story-group-head { display: flex; align-items: baseline; gap: 8px; }
@@ -1150,7 +1153,9 @@ dialog.settings::backdrop { background: rgba(10,14,22,.34); }
 .settings-pagehead p { margin: 0; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
 .settings-sections { max-width: 620px; }
 .settings-group { margin-bottom: 26px; }
-.settings-group-title { font-size: 12px; font-weight: 600; color: var(--ink); margin: 0 0 4px; }
+/* settings section header — the SAME caps eyebrow as the nav group label (.settings-nav-grouplabel),
+   for one consistent eyebrow treatment across the nav + the panels. */
+.settings-group-title { font-size: 10.5px; font-weight: 600; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 8px; }
 .settings-row {
   display: flex; align-items: center; gap: 16px; justify-content: space-between;
   padding: 14px 0; border-bottom: 1px solid var(--line);
@@ -9563,13 +9568,7 @@ class HctApp extends HTMLElement {
           );
         }),
       ),
-      h("p", { class: "insp-sub tyi-future" }, "Per-voice tuning (ratio · leading · weight · tracking) is coming. Today these come from the treatment."),
-      h(
-        "div",
-        { class: "insp-actions" },
-        btn([icon("download"), "Download type tokens"], { title: "CSS utility classes + DTCG typography tokens, as a .zip", onclick: () => this.downloadTypeTokens() }),
-      ),
-    );
+      h("p", { class: "insp-sub tyi-future" }, "Per-voice tuning (ratio · leading · weight · tracking) is coming. Today these come from the treatment."),    );
   }
 
   // typeFontsTab — the 5 role→family bindings the treatment resolves to (read-only; custom fonts later).
@@ -9595,13 +9594,7 @@ class HctApp extends HTMLElement {
           );
         }),
       ),
-      h("p", { class: "insp-sub tyi-future" }, "Custom font families are a future step. Today fonts come bundled with the treatment."),
-      h(
-        "div",
-        { class: "insp-actions" },
-        btn([icon("download"), "Download type tokens"], { title: "CSS utility classes + DTCG typography tokens, as a .zip", onclick: () => this.downloadTypeTokens() }),
-      ),
-    );
+      h("p", { class: "insp-sub tyi-future" }, "Custom font families are a future step. Today fonts come bundled with the treatment."),    );
   }
 
   // typeSpecimenTab — a compact in-pane specimen: each of the seven voices at its MD step. The full
@@ -10716,14 +10709,14 @@ class HctApp extends HTMLElement {
         this._settingsGroup("Accent", [
           this._settingRow(
             "Primary accent",
-            "How the prime accent role exports. Mode-specific picks the better-contrast stop per scheme; Single uses one mode-agnostic token.",
-            [{ id: "mode", label: "Mode · 550 / 450" }, { id: "single", label: "Single · 500" }],
+            "How the prime accent role exports. Mode picks the better-contrast stop per scheme (550 light / 450 dark); Single uses one mode-agnostic token (500).",
+            [{ id: "mode", label: "Mode" }, { id: "single", label: "Single" }],
             accentRef, (id) => this.commit((doc) => { doc.accentRef = id; }), "setaccent",
           ),
           this._settingRow(
             "On-colors",
             "Text/icon colors on accent fills. Fixed pins the light tint (050 / 200); Contrast flips to the WCAG-safer end per mode.",
-            [{ id: "fixed", label: "Fixed · 050 / 200" }, { id: "contrast", label: "WCAG contrast" }],
+            [{ id: "fixed", label: "Fixed" }, { id: "contrast", label: "Contrast" }],
             onColorMode, (id) => this.commit((doc) => { doc.onColorMode = id; }), "setoncolor",
           ),
         ]),
@@ -10870,17 +10863,6 @@ class HctApp extends HTMLElement {
   }
 
   // ── Typography token helpers (the section lives in renderTypeInspector / renderTypographyScene) ──
-  // download the resolved type tokens (CSS utility classes + DTCG typography tokens) as one .zip.
-  downloadTypeTokens() {
-    const scale = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
-    const files = [
-      { name: "type.css", data: typeTokensResponsiveCSS(scale, this._typeModeScales()) },
-      { name: "type.tokens.json", data: JSON.stringify(typeTokensDTCG(scale), null, 2) },
-      ...this._typeModeDTCGFiles(),
-    ];
-    this.downloadBytes(zipStore(files), "type-tokens.zip", "application/zip");
-    this.toast("Type tokens downloaded");
-  }
   // a sample line rendered in the resolved style for one category/step (font falls back gracefully).
   _typeSample(scale, cat, step, text) {
     const s = scale.categories[cat] && scale.categories[cat][step];
@@ -11050,20 +11032,6 @@ class HctApp extends HTMLElement {
         return mm;
       }) };
     });
-  }
-  // download the resolved geometry tokens — CSS custom props + utility classes, DTCG dimension tokens, and
-  // a Figma NUMBER-variable file (the "Geometry" collection). The scale is composed with the type scale so
-  // the per-step `font` is the brand's UI text size.
-  downloadGeomTokens() {
-    const scale = this._geomScaleFor("base"); // override-aware base scale (Phase 3)
-    const files = [
-      { name: "geometry.css", data: geomTokensResponsiveCSS(scale, this._geomModeScales()) },
-      { name: "geometry.tokens.json", data: JSON.stringify(geomTokensDTCG(scale), null, 2) },
-      ...this._geomModeDTCGFiles(),
-      { name: "dimension.variables.json", data: JSON.stringify(geomTokensFigma(scale), null, 2) },
-    ];
-    this.downloadBytes(zipStore(files), "geometry-tokens.zip", "application/zip");
-    this.toast("Geometry tokens downloaded");
   }
   // renderGeomCanvasHeader — the Geometry section's canvas header: pane toggles + the Controls·Tokens mode
   // segment + the reused fit/scheme/zoom controls (mirrors renderTypeCanvasHeader).
@@ -11403,13 +11371,7 @@ class HctApp extends HTMLElement {
           );
         }),
       ),
-      scale.typed ? h("p", { class: "insp-sub tyi-future" }, "Text size (font) per step comes from the Typography UI scale — one source of truth.") : false,
-      h(
-        "div",
-        { class: "insp-actions" },
-        btn([icon("download"), "Download geometry tokens"], { title: "CSS custom props + utility classes + DTCG dimension tokens + Figma number variables, as a .zip", onclick: () => this.downloadGeomTokens() }),
-      ),
-    );
+      scale.typed ? h("p", { class: "insp-sub tyi-future" }, "Text size (font) per step comes from the Typography UI scale — one source of truth.") : false,    );
   }
 
   // geomRadiusTab — the corner ladder the treatment resolves to (none·sm·md·lg·full). The radius STYLE is
@@ -11436,9 +11398,7 @@ class HctApp extends HTMLElement {
           ),
         ),
       ),
-      h("p", { class: "insp-sub tyi-future" }, "The radius style is set by the treatment. Per-token radius overrides are a future step."),
-      h("div", { class: "insp-actions" }, btn([icon("download"), "Download geometry tokens"], { title: "CSS + DTCG + Figma number variables, as a .zip", onclick: () => this.downloadGeomTokens() })),
-    );
+      h("p", { class: "insp-sub tyi-future" }, "The radius style is set by the treatment. Per-token radius overrides are a future step."),    );
   }
 
   // geomSpaceTab — the layout-spacing scale (--space-*): the rhythm BETWEEN components (gutters, gaps,
@@ -11465,9 +11425,7 @@ class HctApp extends HTMLElement {
             h("span", { class: "geom-lad-v" }, `${v}px`),
           ),
         ),
-      ),
-      h("div", { class: "insp-actions" }, btn([icon("download"), "Download geometry tokens"], { title: "CSS + DTCG + Figma number variables, as a .zip", onclick: () => this.downloadGeomTokens() })),
-    );
+      ),    );
   }
 
   // geomExampleCard — the pinned live card: a real MD control built from the resolved geometry AND painted
