@@ -51,7 +51,11 @@ const PROFILE_KEY = STORAGE_KEY + "-profile";
 // The Lemon Squeezy storefront — where a Free user buys a Pro license; the key then activates through the
 // web license SEAM (src/main.ts → Lemon Squeezy validate API). An outward LINK only (no network from this
 // file, so the offline Figma bundle stays network-free); the Account panel surfaces it in the WEB build only.
-const CHECKOUT_URL = "https://ultimate-tokens.lemonsqueezy.com";
+// Deep-link to each plan's hosted checkout by VARIANT id (Pro 1849393 · Studio 1849376) — the storefront
+// root still lists both, but the CTAs land the buyer straight on the right plan.
+const CHECKOUT_STORE = "https://ultimate-tokens.lemonsqueezy.com";
+const PRO_CHECKOUT_URL = CHECKOUT_STORE + "/checkout/buy/1849393";    // Pro (single-user)
+const STUDIO_CHECKOUT_URL = CHECKOUT_STORE + "/checkout/buy/1849376"; // Studio (teams · 5 seats)
 
 // Pro-gated export formats (the proExport flag). Free = CSS (css/oklch) + the Figma/JSON interchange; Pro =
 // DTCG + the framework configs. flagOf("proExport") is true (unlocked) while TIERS_ENFORCED is off, so these
@@ -5508,6 +5512,9 @@ class HctApp extends HTMLElement {
   _settingsGroup(title, rows) {
     return h("div", { class: "settings-group" }, title ? h("div", { class: "settings-group-title" }, title) : false, ...rows.filter(Boolean));
   }
+  // _openCheckout(url) — open a Lemon Squeezy hosted-checkout deep-link in a new tab (web only; the outward
+  // link keeps this file network-free). noopener/noreferrer; a blocked popup fails silently.
+  _openCheckout(url) { try { window.open(url, "_blank", "noopener,noreferrer"); } catch (e) { /* popup blocked */ } }
 
   // The Settings nav model: grouped, labeled sections (the left rail). Each item id → a panel.
   _settingsNav() {
@@ -5594,8 +5601,9 @@ class HctApp extends HTMLElement {
       planRows.push(h("div", { class: "settings-row" },
         h("div", { class: "settings-row-text" },
           h("b", {}, "Upgrade to Pro"),
-          h("small", {}, "Unlimited brand kits, the Pro export formats, advanced treatments, and hosted MCP.")),
-        btn("Get Pro →", { variant: "primary", cls: "account-upgrade", title: "Buy a Pro license", onclick: () => { try { window.open(CHECKOUT_URL, "_blank", "noopener,noreferrer"); } catch {} } })));
+          h("small", {}, "Unlimited brand kits, the Pro export formats, advanced treatments, and hosted MCP. ",
+            h("button", { type: "button", class: "linklike account-studio-link", onclick: () => this._openCheckout(STUDIO_CHECKOUT_URL) }, "Studio for teams →"))),
+        btn("Get Pro →", { variant: "primary", cls: "account-upgrade", title: "Buy a Pro license", onclick: () => this._openCheckout(PRO_CHECKOUT_URL) })));
     }
     body.push(this._settingsGroup("Plan", planRows));
 
@@ -5627,7 +5635,7 @@ class HctApp extends HTMLElement {
             }),
             btn("Validate", { variant: "primary", cls: "account-validate", onclick: () => this.enterLicense((this.querySelector(".account-license-input") || {}).value ?? this._licenseDraft) }))));
         rows.push(h("p", { class: "settings-note account-buy-note" }, "Don't have a key? ",
-          h("button", { type: "button", class: "linklike", onclick: () => { try { window.open(CHECKOUT_URL, "_blank", "noopener,noreferrer"); } catch {} } }, "Get a Pro license →")));
+          h("button", { type: "button", class: "linklike", onclick: () => this._openCheckout(PRO_CHECKOUT_URL) }, "Get a Pro license →")));
       }
       if (this._licenseError) rows.push(h("p", { class: "account-error settings-note" }, this._licenseError));
       body.push(this._settingsGroup("License", rows));

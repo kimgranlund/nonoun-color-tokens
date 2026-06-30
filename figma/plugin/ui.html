@@ -3186,6 +3186,17 @@ function storePinFails(json, storeId) {
   return null;
 }
 
+// productPinFails(json, productIds) → an error string when the response's product isn't one of the pinned
+// ones (FAIL-CLOSED: a missing meta.product_id also fails), else null. `productIds` null/empty = no check.
+// Layered ON TOP of the store pin: even within our own store, only the Pro/Studio products' keys validate.
+// Like the store pin, a mismatch is an ANOMALY (a key for a different product), NOT a revocation.
+function productPinFails(json, productIds) {
+  if (!Array.isArray(productIds) || productIds.length === 0) return null;
+  const respProduct = json && json.meta && json.meta.product_id;
+  if (respProduct == null || !productIds.some((id) => String(id) === String(respProduct))) return "That license key is for a different product.";
+  return null;
+}
+
 // licenseKeyResult(lk) → { entitlement } when the key object is `active`, else { error } (friendly per status).
 function licenseKeyResult(lk) {
   const key = lk && typeof lk === "object" ? lk : {};
@@ -3222,9 +3233,9 @@ function seatsOf(lk) {
 // `{ ok:false }` WITHOUT `revoked`, so a caller re-validating on boot keeps the cached license (a flaky
 // 200/4xx body or a proxy page must never strip a paying user of Pro). A store mismatch is an anomaly, not
 // a revocation, so it is also NOT marked revoked.
-function lemonEntitlement(json, { storeId = null } = {}) {
+function lemonEntitlement(json, { storeId = null, productIds = null } = {}) {
   if (!json || typeof json !== "object") return { ok: false, error: LICENSE_GENERIC_ERROR };
-  const pin = storePinFails(json, storeId);
+  const pin = storePinFails(json, storeId) || productPinFails(json, productIds);
   if (pin) return { ok: false, error: pin };
   const lk = json.license_key && typeof json.license_key === "object" ? json.license_key : null;
   const status = lk && typeof lk.status === "string" ? lk.status : null;
@@ -3246,9 +3257,9 @@ function lemonEntitlement(json, { storeId = null } = {}) {
 // response — the SEAT-CONSUMING path. activated:true means a seat was taken AND instance.id is the handle to
 // release it later (deactivate). activated:false is the rejection: a seat-limit hit becomes a friendly
 // message that names the seat count; otherwise the key's own status (expired/disabled) or LS's error message.
-function lemonActivation(json, { storeId = null } = {}) {
+function lemonActivation(json, { storeId = null, productIds = null } = {}) {
   if (!json || typeof json !== "object") return { ok: false, error: LICENSE_GENERIC_ERROR };
-  const pin = storePinFails(json, storeId);
+  const pin = storePinFails(json, storeId) || productPinFails(json, productIds);
   if (pin) return { ok: false, error: pin };
   if (json.activated !== true) {
     const lk = json.license_key || {};
@@ -5529,7 +5540,11 @@ const PROFILE_KEY = STORAGE_KEY + "-profile";
 // The Lemon Squeezy storefront — where a Free user buys a Pro license; the key then activates through the
 // web license SEAM (src/main.ts → Lemon Squeezy validate API). An outward LINK only (no network from this
 // file, so the offline Figma bundle stays network-free); the Account panel surfaces it in the WEB build only.
-const CHECKOUT_URL = "https://ultimate-tokens.lemonsqueezy.com";
+// Deep-link to each plan's hosted checkout by VARIANT id (Pro 1849393 · Studio 1849376) — the storefront
+// root still lists both, but the CTAs land the buyer straight on the right plan.
+const CHECKOUT_STORE = "https://ultimate-tokens.lemonsqueezy.com";
+const PRO_CHECKOUT_URL = CHECKOUT_STORE + "/checkout/buy/1849393";    // Pro (single-user)
+const STUDIO_CHECKOUT_URL = CHECKOUT_STORE + "/checkout/buy/1849376"; // Studio (teams · 5 seats)
 
 // Pro-gated export formats (the proExport flag). Free = CSS (css/oklch) + the Figma/JSON interchange; Pro =
 // DTCG + the framework configs. flagOf("proExport") is true (unlocked) while TIERS_ENFORCED is off, so these
@@ -10986,6 +11001,9 @@ class HctApp extends HTMLElement {
   _settingsGroup(title, rows) {
     return h("div", { class: "settings-group" }, title ? h("div", { class: "settings-group-title" }, title) : false, ...rows.filter(Boolean));
   }
+  // _openCheckout(url) — open a Lemon Squeezy hosted-checkout deep-link in a new tab (web only; the outward
+  // link keeps this file network-free). noopener/noreferrer; a blocked popup fails silently.
+  _openCheckout(url) { try { window.open(url, "_blank", "noopener,noreferrer"); } catch (e) { /* popup blocked */ } }
 
   // The Settings nav model: grouped, labeled sections (the left rail). Each item id → a panel.
   _settingsNav() {
@@ -11072,8 +11090,9 @@ class HctApp extends HTMLElement {
       planRows.push(h("div", { class: "settings-row" },
         h("div", { class: "settings-row-text" },
           h("b", {}, "Upgrade to Pro"),
-          h("small", {}, "Unlimited brand kits, the Pro export formats, advanced treatments, and hosted MCP.")),
-        btn("Get Pro →", { variant: "primary", cls: "account-upgrade", title: "Buy a Pro license", onclick: () => { try { window.open(CHECKOUT_URL, "_blank", "noopener,noreferrer"); } catch {} } })));
+          h("small", {}, "Unlimited brand kits, the Pro export formats, advanced treatments, and hosted MCP. ",
+            h("button", { type: "button", class: "linklike account-studio-link", onclick: () => this._openCheckout(STUDIO_CHECKOUT_URL) }, "Studio for teams →"))),
+        btn("Get Pro →", { variant: "primary", cls: "account-upgrade", title: "Buy a Pro license", onclick: () => this._openCheckout(PRO_CHECKOUT_URL) })));
     }
     body.push(this._settingsGroup("Plan", planRows));
 
@@ -11105,7 +11124,7 @@ class HctApp extends HTMLElement {
             }),
             btn("Validate", { variant: "primary", cls: "account-validate", onclick: () => this.enterLicense((this.querySelector(".account-license-input") || {}).value ?? this._licenseDraft) }))));
         rows.push(h("p", { class: "settings-note account-buy-note" }, "Don't have a key? ",
-          h("button", { type: "button", class: "linklike", onclick: () => { try { window.open(CHECKOUT_URL, "_blank", "noopener,noreferrer"); } catch {} } }, "Get a Pro license →")));
+          h("button", { type: "button", class: "linklike", onclick: () => this._openCheckout(PRO_CHECKOUT_URL) }, "Get a Pro license →")));
       }
       if (this._licenseError) rows.push(h("p", { class: "account-error settings-note" }, this._licenseError));
       body.push(this._settingsGroup("License", rows));

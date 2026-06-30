@@ -1726,6 +1726,7 @@ ok(app.tier() === "free" && acctTier() === "Free", `(acct) the Account section r
 ok(!!app.querySelector(".account-license-input") && !!app.querySelector(".account-validate"), "(acct) the web app shows the license-key entry + Validate");
 ok(!!app.querySelector(".account-manage"), "(acct) a Manage-subscription link is present");
 ok(!!app.querySelector(".account-upgrade") && !!app.querySelector(".account-buy-note"), "(acct) the web app (Free) shows the Get-Pro checkout CTA + buy-a-license link");
+ok(!!app.querySelector(".account-studio-link"), "(acct) the Upgrade row also surfaces the Studio (teams) checkout link");
 
 // the pluggable license SEAM (no network): a MANUAL service — activate CONSUMES a seat (returns an instance
 // id), deactivate frees it. We spy on deactivate to prove clearLicense releases the Studio seat.
@@ -1796,7 +1797,7 @@ ok(acctRevokeReleased === "inst-reval", "(acct) a revocation downgrade also rele
 
 // the license entry is ABSENT inside the offline Figma plugin (the plugin stays free)
 app.inFigma = true; app.render(); flushRaf();
-ok(!app.querySelector(".account-license-input") && !app.querySelector(".account-validate") && !app.querySelector(".account-upgrade") && !app.querySelector(".account-buy-note"), "(acct) the license entry + checkout CTA/buy-link are all hidden when running inside Figma (offline plugin)");
+ok(!app.querySelector(".account-license-input") && !app.querySelector(".account-validate") && !app.querySelector(".account-upgrade") && !app.querySelector(".account-buy-note") && !app.querySelector(".account-studio-link"), "(acct) the license entry + checkout CTA/buy-link/studio-link are all hidden when running inside Figma (offline plugin)");
 app.inFigma = false; app.render(); flushRaf();
 app.closeSettings(); flushRaf();
 
