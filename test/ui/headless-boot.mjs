@@ -1609,6 +1609,26 @@ ok(app.flagOf("proExport") === false && app.flagOf("maxSets") === 1, "(fl) setPr
 ok(app.flagOf("nope") === false, "(fl) an unknown flag resolves false (restrictive default)");
 app.setProfile({ flagOverrides: {} }); flushRaf(); // restore unlocked
 
+// ── (cap) maxSets gate — creating a brand kit past the plan cap is BLOCKED + routes a web user to Pro.
+// A NO-OP until TIERS_ENFORCED flips (flagOf("maxSets") is Infinity), so we simulate the enforced free cap
+// with a dev flag override. The project/Figma RESTORE path is intentionally NOT capped (only New / Import).
+const capBefore = app.sets.length;
+app.createSet(); flushRaf();
+ok(app.sets.length === capBefore + 1, "(cap) with the default (unlimited) cap, createSet adds a kit — current behavior preserved");
+const atCap = app.sets.length;
+app.setProfile({ flagOverrides: { maxSets: atCap } }); flushRaf(); // pin the cap to the current count → at the cap
+app.createSet(); flushRaf();
+ok(app.sets.length === atCap, "(cap) at the maxSets cap, createSet is blocked (no new kit added)");
+ok(app.settingsOpen === true && app.settingsSection === "account", "(cap) hitting the cap routes a web user to Settings « Account » (the upgrade surface)");
+app.closeSettings(); flushRaf();
+app.importSet(); // gated by the same cap → early-returns before opening a file dialog
+ok(app.sets.length === atCap, "(cap) importSet is gated by the same cap");
+app.closeSettings(); flushRaf();
+app.setProfile({ flagOverrides: { maxSets: atCap + 5 } }); flushRaf(); // raise the cap
+app.createSet(); flushRaf();
+ok(app.sets.length === atCap + 1, "(cap) raising the cap re-enables createSet");
+app.setProfile({ flagOverrides: {} }); flushRaf(); // restore unlimited
+
 // ── (acct) Settings « Account » (item 7, Layer 3) — plan badge · license seam · offline-hidden entry ──
 app.openSet(app.sets[0].id); flushRaf(); // guarantee editor view (where renderSettings lives)
 app.openSettings(); app.settingsSection = "account"; app.render(); flushRaf();
