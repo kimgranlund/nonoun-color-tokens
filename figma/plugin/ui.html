@@ -6743,7 +6743,20 @@ class HctApp extends HTMLElement {
     this.openConfigAsSet(config, "Read approximate palette from variables");
   }
 
+  // _blockedBySetCap() — true when the plan's maxSets cap is reached; also notifies + routes a web user to
+  // the Account upgrade surface. The cap is flagOf("maxSets") — Infinity while TIERS_ENFORCED is off, so this
+  // is a NO-OP until go-live. Gates the user-initiated "new brand kit" actions (New / Import); a project or
+  // Figma RESTORE (openConfigAsSet) is intentionally NOT capped — reloading your own work must never block.
+  _blockedBySetCap() {
+    const cap = this.flagOf("maxSets");
+    if (!Number.isFinite(cap) || this.sets.length < cap) return false;
+    this.toast(`Free is limited to ${cap} brand kit${cap === 1 ? "" : "s"} — upgrade to Pro for unlimited.`);
+    if (!this.inFigma) { this.settingsSection = "account"; this.openSettings(); }
+    return true;
+  }
+
   createSet() {
+    if (this._blockedBySetCap()) return;
     const name = "Set " + (this.sets.length + 1);
     const rec = newSet(name);
     this.sets.push(rec);
@@ -6755,6 +6768,7 @@ class HctApp extends HTMLElement {
   // is UNTRUSTED data: JSON.parse (never eval), require a real palettes[] shape, then
   // hydrate() domain-clamps every field. A junk/empty file is rejected, not opened.
   importSet() {
+    if (this._blockedBySetCap()) return;
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "application/json,.json";
