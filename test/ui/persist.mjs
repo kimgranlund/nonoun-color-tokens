@@ -86,6 +86,12 @@ if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "cl
   if (!deepEq(Rf.type.fonts, { body: "Custom Sans", ui: "My Mono" })) FAIL("type-fonts", `type.fonts did not round-trip / didn't drop junk: ${JSON.stringify(Rf.type.fonts)}`);
   const Rf0 = U.hydrate(U.serialize({ ...inDomainState(), type: { treatment: "product", bodyBase: 16 } }));
   if ("fonts" in Rf0.type) FAIL("type-fonts", "an absent fonts override must NOT materialize a fonts key (round-trip identity)");
+  // per-voice shaping overrides round-trip; unknown voices drop; out-of-range fields clamp.
+  const Rv = U.hydrate(U.serialize({ ...inDomainState(), type: { treatment: "product", bodyBase: 16, voices: { Body: { weight: 600, leading: 1.8, ratio: 1.3, tracking: 0.01 }, Bogus: { weight: 500 }, Display: { weight: 99999 } } } }));
+  if (!deepEq(Rv.type.voices.Body, { weight: 600, leading: 1.8, ratio: 1.3, tracking: 0.01 })) FAIL("type-voices", `type.voices.Body did not round-trip: ${JSON.stringify(Rv.type.voices.Body)}`);
+  if ("Bogus" in Rv.type.voices) FAIL("type-voices", "an unknown voice name must drop");
+  if (Rv.type.voices.Display.weight !== 1000) FAIL("type-voices", `weight 99999 should clamp to 1000, got ${Rv.type.voices.Display.weight}`);
+  if ("voices" in Rf0.type) FAIL("type-voices", "an absent voices override must NOT materialize a voices key (round-trip identity)");
 
   // OUT-OF-RANGE values clamp to the nearest bound (type size [1,512], geom height [8,256]).
   const C = U.hydrate(U.serialize({ ...inDomainState(),

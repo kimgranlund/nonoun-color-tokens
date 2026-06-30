@@ -1267,7 +1267,14 @@ a.account-manage:hover { text-decoration: underline; }
 .tyi-voices-head { display: flex; align-items: baseline; justify-content: space-between; }
 .tyi-voices-head small { color: var(--ink-dim); font-size: 11px; }
 .tyi-voice { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--panel); }
-.tyi-voice-name { display: flex; align-items: baseline; justify-content: space-between; font-weight: 650; font-size: 13px; }
+.tyi-voice.is-sel { border-color: var(--accent, #5b9dff); }
+/* the voice header is a select-to-expand button */
+.tyi-voice-name { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; width: 100%; border: 0; background: transparent; color: inherit; padding: 0; cursor: pointer; font-weight: 650; font-size: 13px; text-align: left; }
+.tyi-voice-name:hover .tyi-voice-label { color: var(--accent, #5b9dff); }
+.tyi-voice-name:focus-visible { outline: 2px solid var(--accent, #5b9dff); outline-offset: 2px; border-radius: 4px; }
+.tyi-voice-dot { color: var(--accent, #5b9dff); }
+.tyi-voice-edit { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.tyi-voice-reset { align-self: flex-start; }
 .tyi-voice-font { color: var(--ink-dim); font-weight: 400; font-size: 11px; }
 .tyi-voice-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 16px; margin: 8px 0 0; }
 .tyi-voice-stats > div { display: flex; align-items: baseline; justify-content: space-between; }
