@@ -1021,6 +1021,25 @@ ok(zipText.includes('"Typography"') && zipText.includes('"FLOAT"') && /"modes":\
 // the aliased variant carries com.figma.aliasData (the cascade); the default figma/ does not (ADR-002 resolved).
 ok(zipText.includes("com.figma.aliasData") && zipText.includes("Color Primitives"), "(ee) figma-aliased/ carries com.figma.aliasData targeting Color Primitives (the OD-004 cascade variant)");
 
+// ── (pe) proExport gate — DTCG/Tailwind/shadcn are Pro formats: a gated single-format preview (upsell) +
+// Download-All exclusion. NO-OP until TIERS_ENFORCED (flagOf("proExport") unlocked); the enforced free plan
+// is simulated with a dev override. (At (ee) above, proExport is unlocked, so all 3 folders were present.) ──
+app.openSet(app.sets[0].id); flushRaf(); // editor view (the drawer lives here)
+app.exportOpen = true; app.exportTab = "dtcg"; app.render(); flushRaf();
+ok(!!app.querySelector(".drawer-pre") && !app.querySelector(".pro-upsell"), "(pe) proExport unlocked → the DTCG preview shows code (no upsell)");
+app.setProfile({ flagOverrides: { proExport: false } }); app.render(); flushRaf();
+ok(!app.querySelector(".drawer-pre") && !!app.querySelector(".pro-upsell"), "(pe) Free → a Pro format (DTCG) shows the upsell instead of its code");
+app.exportTab = "css"; app.render(); flushRaf();
+ok(!!app.querySelector(".drawer-pre") && !app.querySelector(".pro-upsell"), "(pe) CSS (free) still shows its code at Free");
+app.exportOpen = false; app.render(); flushRaf();
+const dlZipText = () => { let z = null; const real = app.downloadBytes.bind(app); app.downloadBytes = (b) => { z = b; }; app.downloadAllZip(projectViewZ(app.doc)); app.downloadBytes = real; return z ? Buffer.from(z).toString("latin1") : ""; };
+const peFreeZip = dlZipText();
+ok(!/tailwind\//.test(peFreeZip) && !/shadcn\//.test(peFreeZip) && !/dtcg\//.test(peFreeZip), "(pe) Download-All at Free omits the dtcg/tailwind/shadcn folders");
+ok(/css-hex\//.test(peFreeZip), "(pe) Download-All at Free still includes the free CSS folder");
+app.setProfile({ flagOverrides: {} }); flushRaf(); // restore unlocked
+const peProZip = dlZipText();
+ok(/tailwind\//.test(peProZip) && /shadcn\//.test(peProZip) && /dtcg\//.test(peProZip), "(pe) Download-All unlocked includes the dtcg/tailwind/shadcn folders");
+
 // ── (ff) the HCT brand doubles as "back to gallery"; the ◀ Gallery button is removed ──
 app.openSet(app.sets[0].id);                         // into the editor
 ok(app.view === "editor", "(ff) opened the editor");

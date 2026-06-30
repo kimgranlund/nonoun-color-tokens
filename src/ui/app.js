@@ -52,6 +52,11 @@ const PROFILE_KEY = STORAGE_KEY + "-profile";
 // file, so the offline Figma bundle stays network-free); the Account panel surfaces it in the WEB build only.
 const CHECKOUT_URL = "https://ultimate-tokens.lemonsqueezy.com";
 
+// Pro-gated export formats (the proExport flag). Free = CSS (css/oklch) + the Figma/JSON interchange; Pro =
+// DTCG + the framework configs. flagOf("proExport") is true (unlocked) while TIERS_ENFORCED is off, so these
+// only actually gate after go-live. The single-format preview shows an upsell; Download-All omits them.
+const PRO_EXPORT_FORMATS = new Set(["dtcg", "tailwind", "shadcn"]);
+
 // README shipped inside the Download-All zip's experimental figma-aliased/ folder (OD-004).
 const ALIASED_README = `figma-aliased/ — EXPERIMENTAL plugin-free cascade (OD-004)
 ==========================================================
@@ -1459,6 +1464,22 @@ class HctApp extends HTMLElement {
     this.toast(`Free is limited to ${cap} brand kit${cap === 1 ? "" : "s"} — upgrade to Pro for unlimited.`);
     if (!this.inFigma) { this.settingsSection = "account"; this.openSettings(); }
     return true;
+  }
+
+  // _proExportLocked(id) — true when an export format is Pro-gated AND the plan doesn't unlock it. A NO-OP
+  // until go-live (flagOf("proExport") is true while TIERS_ENFORCED is off).
+  _proExportLocked(id) {
+    return PRO_EXPORT_FORMATS.has(id) && !this.flagOf("proExport");
+  }
+
+  // _proUpsell(message) — a small inline Pro upsell block (web routes to Settings « Account »; Figma, where
+  // Pro lives in the web app, just notes it). Reused by the gated export preview + the gated treatments.
+  _proUpsell(message) {
+    return h("div", { class: "pro-upsell" },
+      h("p", { class: "pro-upsell-msg" }, message),
+      this.inFigma
+        ? h("span", { class: "settings-meta" }, "Pro · in the web app")
+        : btn("Get Pro →", { variant: "primary", cls: "pro-upsell-cta", onclick: () => { this.settingsSection = "account"; this.openSettings(); } }));
   }
 
   createSet() {
@@ -4849,13 +4870,19 @@ class HctApp extends HTMLElement {
     const isFigma = this.exportTab === "figma";
     const isConfig = this.exportTab === "config";
     const figCur = FIGMA.find((f) => f[0] === this.figmaFile) || FIGMA[0];
-    const code = isConfig
-      ? JSON.stringify(serialize(this.doc), null, 2) // the parametric doc — re-importable via the gallery's ⬆ Import
-      : isFigma
-        ? view.exports.figma[this.figmaFile]
-        : SYSTEM_CODE[this.exportTab]
-          ? SYSTEM_CODE[this.exportTab]()
-          : view.exports[this.exportTab];
+    // proExport gate: a Pro format the plan doesn't unlock shows an upsell instead of its code (NO-OP until
+    // go-live). PRO_LABEL names the upsell; the format <select> tags the option " · Pro".
+    const proLocked = this._proExportLocked(this.exportTab);
+    const PRO_LABEL = { dtcg: "DTCG", tailwind: "Tailwind v4", shadcn: "shadcn/ui" };
+    const code = proLocked
+      ? ""
+      : isConfig
+        ? JSON.stringify(serialize(this.doc), null, 2) // the parametric doc — re-importable via the gallery's ⬆ Import
+        : isFigma
+          ? view.exports.figma[this.figmaFile]
+          : SYSTEM_CODE[this.exportTab]
+            ? SYSTEM_CODE[this.exportTab]()
+            : view.exports[this.exportTab];
     const bytes = new Blob([code]).size;
 
     // A native <dialog>: showModal() (see _syncDrawer) promotes it to the browser TOP LAYER —
@@ -4917,7 +4944,7 @@ class HctApp extends HTMLElement {
                 "optgroup",
                 { label },
                 ...items.map(([id, lab]) =>
-                  h("option", id === this.exportTab ? { value: id, selected: "selected" } : { value: id }, lab),
+                  h("option", id === this.exportTab ? { value: id, selected: "selected" } : { value: id }, this._proExportLocked(id) ? lab + " · Pro" : lab),
                 ),
               ),
             ),
@@ -4977,13 +5004,17 @@ class HctApp extends HTMLElement {
           "div",
           // the output for the format chosen in the drawer-format <select> above.
           { class: "drawer-code", role: "region", "aria-label": "Export output" },
-          btn([icon("copy"), "Copy"], { variant: "bare", cls: "copy-float", title: "Copy to clipboard", ariaLabel: "Copy", onclick: () => this.copy(code) }),
-          h("pre", { class: "drawer-pre" }, code),
+          ...(proLocked
+            ? [this._proUpsell(`${PRO_LABEL[this.exportTab] || "This"} export is a Pro format — upgrade to export it.`)]
+            : [
+                btn([icon("copy"), "Copy"], { variant: "bare", cls: "copy-float", title: "Copy to clipboard", ariaLabel: "Copy", onclick: () => this.copy(code) }),
+                h("pre", { class: "drawer-pre" }, code),
+              ]),
         ),
         h(
           "div",
           { class: "drawer-foot" },
-          h("span", { class: "meta" }, `${(bytes / 1024).toFixed(1)} KB · ${isFigma ? figCur[2] : isConfig ? "re-importable config" : SYSTEM_LABEL[this.exportTab] || tokenCount(this.doc) + " tokens"} · Download-All: ${included}`),
+          h("span", { class: "meta" }, proLocked ? `${PRO_LABEL[this.exportTab] || "Pro"} · Pro format · Download-All: ${included}` : `${(bytes / 1024).toFixed(1)} KB · ${isFigma ? figCur[2] : isConfig ? "re-importable config" : SYSTEM_LABEL[this.exportTab] || tokenCount(this.doc) + " tokens"} · Download-All: ${included}`),
           // Footer actions kept in ONE group so they never split across rows: the foot is
           // flex-wrap and .meta has flex:1, so as separate children Download all wrapped below
           // Apply. As a single .foot-actions child they stay together (Apply left, Download right).
@@ -5034,11 +5065,15 @@ class HctApp extends HTMLElement {
         { name: `css-hex/${s}.css`, data: ex.css },
         { name: `css-oklch/${s}.css`, data: ex.oklch },
         { name: `json/${s}.json`, data: ex.json },
-        { name: `dtcg/${s}.tokens.json`, data: ex.dtcg },
         { name: "figma/Light_tokens.json", data: ex.figma.light },
         { name: "figma/Dark_tokens.json", data: ex.figma.dark },
         { name: "figma/palette.tokens.json", data: ex.figma.raw },
         { name: `ui3/${s}.json`, data: ex.ui3 },
+      );
+      // proExport-gated formats (DTCG + the framework configs) — omitted from the bundle until the plan
+      // unlocks them (NO-OP while TIERS_ENFORCED is off; flagOf("proExport") is true).
+      if (this.flagOf("proExport")) files.push(
+        { name: `dtcg/${s}.tokens.json`, data: ex.dtcg },
         { name: `tailwind/${s}.css`, data: ex.tailwind },
         { name: `shadcn/${s}.css`, data: ex.shadcn },
       );

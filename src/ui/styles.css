@@ -963,6 +963,13 @@ dialog.drawer::backdrop { background: rgba(10,14,22,.34); }
   background: var(--panel-2); white-space: pre; tab-size: 2;
   color: var(--ink);
 }
+/* Pro upsell — shown in place of a gated export's code (and inline on gated treatments). */
+.pro-upsell {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  padding: 24px; text-align: center; background: var(--panel-2);
+}
+.pro-upsell-msg { margin: 0; max-width: 32ch; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
 .drawer-foot {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 16px; border-top: 1px solid var(--line);
