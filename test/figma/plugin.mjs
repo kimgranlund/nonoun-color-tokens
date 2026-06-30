@@ -305,8 +305,22 @@ if (applyFloatPlans) {
   FAIL("floatapply", "code.js exported no applyFloatPlans");
 }
 
+// ── apply RESPECTS the export-system toggles: a message with NO dtcg (Color toggled off) skips the color
+//    collections entirely while still applying the Type/Geometry float plans. Driven through the real handler. ──
+{
+  const F3 = mockFigma();
+  new Function("figma", "__html__", "module", code)(F3.figma, "<html>", undefined); // run code.js → registers onmessage on F3
+  if (typeof F3.figma.ui._h !== "function") FAIL("applysys", "code.js registered no onmessage handler on the fresh mock");
+  else {
+    const typePlan = modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), []));
+    await F3.figma.ui._h({ type: "apply", floatPlans: typePlan, config: { name: "x" } }); // Color OFF → no dtcg
+    if (F3.collections.some((c) => c.name === "Color Primitives" || c.name === "Color Modes")) FAIL("applysys", "apply with no dtcg still created a Color collection (the Color toggle was ignored)");
+    if (!F3.collections.some((c) => c.name === "Typography")) FAIL("applysys", "apply with no dtcg did not apply the Typography float plan");
+  }
+}
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "floatapply", "floatidem", "floatprune", "floatprov", "config", "read"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "floatapply", "floatidem", "floatprune", "floatprov", "applysys", "config", "read"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

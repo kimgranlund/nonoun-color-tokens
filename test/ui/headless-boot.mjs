@@ -1442,6 +1442,12 @@ ok(!!_typlan && !!_geolan, "(ty-fig) _figmaFloatPlans yields a Typography + a Ge
 ok(_typlan && _typlan.modes[0] === "Base" && _typlan.modes.length === 2, `(ty-fig) the Typography plan has Base + the 768 breakpoint mode (got ${_typlan && _typlan.modes.join()})`);
 ok(_geolan && _geolan.modes.length === 1 && _geolan.modes[0] === "Base", `(ty-fig) the Geometry plan is Base-only with no geometry breakpoints (got ${_geolan && _geolan.modes.join()})`);
 ok(_fplans.every((p) => p.variables.length > 0 && p.variables.every((v) => v.type === "FLOAT" && v.values.length === p.modes.length && v.values.every((x) => Number.isFinite(x.value)))), "(ty-fig) every emitted plan is value-complete (FLOAT, one finite value per mode) — the validateModeInterchange gate held");
+// the apply payload RESPECTS the export-system toggles: a toggled-off system is not in floatPlans (the bug).
+app.exportSystems = { color: true, type: false, geometry: true };
+ok(app._figmaFloatPlans().every((p) => p.collection !== "Typography") && app._figmaFloatPlans().some((p) => p.collection === "Geometry"), "(ty-fig) Typography OFF → its plan is omitted, Geometry stays");
+app.exportSystems = { color: true, type: false, geometry: false };
+ok(app._figmaFloatPlans().length === 0, "(ty-fig) Type + Geometry OFF → no float plans applied");
+app.exportSystems = { color: true, type: true, geometry: true }; // restore
 // Phase 2: common-breakpoint quick-pick chips flank the min-width field (the number field stays for custom).
 const tPresets = () => walk(app, (e) => e.classList && e.classList.contains("mode-preset"));
 ok(tPresets().length === 6, `(ty-bp) the breakpoint editor offers 6 width quick-picks (got ${tPresets().length})`);
