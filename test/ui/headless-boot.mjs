@@ -470,7 +470,9 @@ app.colorMode = "light"; app.render(); flushRaf();
 for (const seg of ["palette", "global", "roles"]) {
   app.setSegment(seg); flushRaf();
   ok(!!app.querySelector(".seg-example") && !!app.querySelector(".example-card"), `(k1:${seg}) example card present on the ${seg} tab`);
-  ok(app.querySelectorAll(".example-card").length === 1, `(k1b:${seg}) exactly ONE card (no top+bottom duplicate) on the ${seg} tab`);
+  // the pinned preview is now a 3-artifact gallery: the role card + the native slider + the native form set
+  // (one group, not duplicated top+bottom). The slider/form are .ex-artifact .example-cards.
+  ok(app.querySelectorAll(".example-card").length === 3 && app.querySelectorAll(".ex-artifact").length === 2 && !!app.querySelector(".ex-range"), `(k1b:${seg}) the preview shows the 3 artifacts (card + native slider + form) on the ${seg} tab (got ${app.querySelectorAll(".example-card").length})`);
 }
 ok(app.querySelectorAll(".sem-mini").length === 0, "(k1c) the old top-of-Roles preview (.sem-mini) is gone");
 const kp = _pv(app.doc).palettes[app.selectedIndex()];

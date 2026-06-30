@@ -785,7 +785,7 @@ button.chip:hover { background: var(--line-2); color: var(--ink); }
 .seg-body { flex: 1; overflow: auto; padding: 14px; }
 /* live component preview — pinned below the panel on every tab, painted from the
    selected palette's semantic roles (surface / onSurface / onSurfaceVariant / primary). */
-.seg-example { flex: none; border-top: 1px solid var(--line); padding: 14px; background: var(--panel); }
+.seg-example { flex: none; border-top: 1px solid var(--line); padding: 14px; background: var(--panel); display: flex; flex-direction: column; gap: 10px; }
 .example-card { border-radius: 14px; padding: 16px 18px; }
 .ex-title { font-weight: 700; font-size: 15px; line-height: 1.2; }
 .ex-sub { font-size: 13px; margin-top: 3px; }
@@ -793,6 +793,14 @@ button.chip:hover { background: var(--line-2); color: var(--ink); }
   margin-top: 14px; border: none; border-radius: 10px;
   padding: 9px 18px; font-weight: 650; font-size: 14px; cursor: default;
 }
+/* the extra preview artifacts (native slider + form controls) — compact cards with an eyebrow title */
+.ex-artifact { padding: 12px 14px; }
+.ex-artifact-title { font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; opacity: .8; margin-bottom: 7px; }
+.ex-range { width: 100%; margin: 0; }
+.ex-input { width: 100%; box-sizing: border-box; padding: 5px 8px; border-radius: var(--r-sm); border: 1px solid var(--line); font: inherit; font-size: 12px; }
+.ex-form-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; font-size: 12px; }
+.ex-form-row label { display: inline-flex; align-items: center; gap: 5px; }
+.ex-select { width: auto; }
 /* the palette/global inspector bodies own spacing via a column gap, so no child sets its
    own outer margin (the "components don't own outer margin" rule). Uniform 14px rhythm. */
 .insp-body { display: flex; flex-direction: column; gap: 14px; }
