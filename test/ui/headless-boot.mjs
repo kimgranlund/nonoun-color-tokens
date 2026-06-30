@@ -470,10 +470,15 @@ app.colorMode = "light"; app.render(); flushRaf();
 for (const seg of ["palette", "global", "roles"]) {
   app.setSegment(seg); flushRaf();
   ok(!!app.querySelector(".seg-example") && !!app.querySelector(".example-card"), `(k1:${seg}) example card present on the ${seg} tab`);
-  // the pinned preview is now a 3-artifact gallery: the role card + the native slider + the native form set
-  // (one group, not duplicated top+bottom). The slider/form are .ex-artifact .example-cards.
-  ok(app.querySelectorAll(".example-card").length === 3 && app.querySelectorAll(".ex-artifact").length === 2 && !!app.querySelector(".ex-range"), `(k1b:${seg}) the preview shows the 3 artifacts (card + native slider + form) on the ${seg} tab (got ${app.querySelectorAll(".example-card").length})`);
+  // the pinned preview is COLLAPSED to the first artifact (the role card) by default — the native slider +
+  // form (.ex-artifact, the .ex-range) are hidden behind the .ex-collapse-toggle until expanded.
+  ok(app.querySelectorAll(".example-card").length === 1 && app.querySelectorAll(".ex-artifact").length === 0 && !app.querySelector(".ex-range") && !!app.querySelector(".ex-collapse-toggle"), `(k1b:${seg}) the preview is collapsed to the first artifact + an expand toggle on the ${seg} tab (got ${app.querySelectorAll(".example-card").length})`);
 }
+// the toggle EXPANDS the gallery to all 3 artifacts (card + native slider + form), then collapses back.
+app.querySelector(".ex-collapse-toggle").click(); flushRaf();
+ok(app.querySelectorAll(".example-card").length === 3 && app.querySelectorAll(".ex-artifact").length === 2 && !!app.querySelector(".ex-range"), `(k1d) expand toggle reveals all 3 artifacts (got ${app.querySelectorAll(".example-card").length})`);
+app.querySelector(".ex-collapse-toggle").click(); flushRaf();
+ok(app.querySelectorAll(".example-card").length === 1, "(k1e) the toggle collapses back to the first artifact");
 ok(app.querySelectorAll(".sem-mini").length === 0, "(k1c) the old top-of-Roles preview (.sem-mini) is gone");
 const kp = _pv(app.doc).palettes[app.selectedIndex()];
 const kMain = kp.roles.find((r) => r.suffix === "").lightHex;
