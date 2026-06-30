@@ -637,7 +637,7 @@ class HctApp extends HTMLElement {
     // right-pane example card — repaint its role colors live (no inputs inside it,
     // so this never touches the dragged slider sitting in .seg-body above it).
     const ex = this.querySelector(".seg-example");
-    if (ex) ex.replaceChildren(this.exampleCard(view));
+    if (ex) ex.replaceChildren(...this.exampleArtifacts(view));
 
     // damping-curve graph (Global tab) — redraw m(stop) live as Falloff/Amplify/Bias
     // drag; it's input-free, so refreshing it doesn't disturb the dragged slider.
@@ -4181,7 +4181,7 @@ class HctApp extends HTMLElement {
       h("div", { class: "seg-body", "data-scroll": "seg-body", role: "tabpanel", id: "seg-panel", "aria-labelledby": "tab-" + seg }, body),
       // Pinned below the panel on EVERY tab: a live component preview wired to the
       // selected palette's roles (surface / onSurface / onSurfaceVariant + primary).
-      h("div", { class: "seg-example" }, this.exampleCard(view)),
+      h("div", { class: "seg-example" }, ...this.exampleArtifacts(view)),
     );
   }
 
@@ -4386,7 +4386,9 @@ class HctApp extends HTMLElement {
   // painted from the SELECTED palette's semantic roles, in the canvas light/dark
   // ref. It demonstrates the roles in situ; it has no inputs, so liveRefresh can
   // re-render it as controls drag without disturbing the panel above.
-  exampleCard(view) {
+  // _exampleRoles — resolve the SELECTED palette's roles for the pinned artifacts (in the canvas
+  // light/dark ref). Shared by exampleCard / exampleSlider / exampleForm so they paint identically.
+  _exampleRoles(view) {
     const p = view.palettes[this.selectedIndex()];
     const roles = p?.roles || [];
     const dark = this.resolvedCanvasScheme() === "dark";
@@ -4394,8 +4396,11 @@ class HctApp extends HTMLElement {
     const byKey = {};
     for (const r of roles) byKey[r.key] = r;
     const pick = (role) => (role ? (dark ? role.darkHex : role.lightHex) : "transparent");
-    const main = roles.find((r) => r.suffix === "");
-    const onMain = roles.find((r) => r.suffix === "-on-" + sl);
+    return { byKey, pick, sl, main: roles.find((r) => r.suffix === ""), onMain: roles.find((r) => r.suffix === "-on-" + sl) };
+  }
+
+  exampleCard(view) {
+    const { byKey, pick, main, onMain } = this._exampleRoles(view);
     return h(
       "div",
       { class: "example-card", style: "background:" + pick(byKey.surface) },
@@ -4415,6 +4420,48 @@ class HctApp extends HTMLElement {
         "primary",
       ),
     );
+  }
+
+  // exampleSlider — a native <input type=range> themed by the tokens via CSS accent-color (the prime
+  // accent fills the track + thumb). A static demo (tabindex -1, aria-hidden) so liveRefresh can repaint it.
+  exampleSlider(view) {
+    const { byKey, pick, main } = this._exampleRoles(view);
+    return h(
+      "div",
+      { class: "example-card ex-artifact", style: "background:" + pick(byKey.surface) },
+      h("div", { class: "ex-title ex-artifact-title", style: "color:" + pick(byKey.onSurface) }, "Slider"),
+      h("input", {
+        type: "range", min: "0", max: "100", value: "65", tabindex: "-1", "aria-hidden": "true",
+        class: "ex-range", style: "accent-color:" + pick(main),
+      }),
+    );
+  }
+
+  // exampleForm — native form controls themed by the tokens: a text field (surface/onSurface/outline) +
+  // checkbox · radio · select with accent-color = the prime accent. Static demos (tabindex -1, aria-hidden).
+  exampleForm(view) {
+    const { byKey, pick, main } = this._exampleRoles(view);
+    const accent = pick(main);
+    const fieldStyle = "background:" + pick(byKey.surfaceLow || byKey.surface) + ";color:" + pick(byKey.onSurface) + ";border-color:" + pick(byKey.outline);
+    return h(
+      "div",
+      { class: "example-card ex-artifact", style: "background:" + pick(byKey.surface) },
+      h("div", { class: "ex-title ex-artifact-title", style: "color:" + pick(byKey.onSurface) }, "Form controls"),
+      h("input", { type: "text", value: "Text field", tabindex: "-1", "aria-hidden": "true", class: "ex-input", style: fieldStyle }),
+      h(
+        "div",
+        { class: "ex-form-row", style: "color:" + pick(byKey.onSurfaceVariant) },
+        h("label", {}, h("input", { type: "checkbox", checked: "checked", tabindex: "-1", "aria-hidden": "true", style: "accent-color:" + accent }), "Checkbox"),
+        h("label", {}, h("input", { type: "radio", checked: "checked", tabindex: "-1", "aria-hidden": "true", style: "accent-color:" + accent }), "Radio"),
+        h("select", { tabindex: "-1", "aria-hidden": "true", class: "ex-input ex-select", style: fieldStyle }, h("option", {}, "Select")),
+      ),
+    );
+  }
+
+  // exampleArtifacts — the pinned preview gallery: the role card + the native slider + the native form set,
+  // each painted from the selected palette's roles. All input-free demos, so liveRefresh can replaceChildren.
+  exampleArtifacts(view) {
+    return [this.exampleCard(view), this.exampleSlider(view), this.exampleForm(view)];
   }
 
   // slider — a range control. `onInput(v)` mutates live (through editDrag, which
