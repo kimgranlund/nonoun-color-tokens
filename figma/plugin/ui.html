@@ -1205,9 +1205,11 @@ a.account-manage:hover { text-decoration: underline; }
 .typo-cat-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
 .typo-cat-head b { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-dim); }
 .typo-cat-head small { color: var(--ink-faint); font-size: 11px; }
-.typo-line { display: flex; gap: 14px; align-items: baseline; padding: 5px 0; }
-.typo-step { flex: none; width: 92px; color: var(--ink-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
-.typo-sample { color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* STACKED in the narrow right pane: the step label sits ABOVE a full-width sample (was side-by-side with a
+   fixed 92px meta, which squeezed the sample into a truncated "A…" / "Three nigh…"). */
+.typo-line { display: flex; flex-direction: column; gap: 3px; padding: 6px 0; }
+.typo-step { color: var(--ink-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.typo-sample { color: var(--ink); min-width: 0; overflow: hidden; white-space: nowrap; }
 .typo-cat:nth-child(3) .typo-sample { white-space: normal; }
 
 /* ── Typography SECTION (the editor section: switcher · specimen canvas · analysis · inspector) ── */
