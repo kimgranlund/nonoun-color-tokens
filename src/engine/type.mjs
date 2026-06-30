@@ -92,18 +92,26 @@ export const BUNDLED_FONTS = ["Inter", "Inter Tight", "Source Serif 4", "JetBrai
 // the line-height RE-DERIVES from it (lineHeight = round(size · leading)); tracking + weight stay as the
 // scale computes them (the ratified "size lever; line re-derives; tracking/weight unchanged"). Absent /
 // non-positive ⇒ no effect, so the scale is byte-identical to the un-overridden one (the identity gate).
-function buildCategory(name, p, factor, overrides) {
+function buildCategory(name, p, factor, overrides, vp) {
+  // per-VOICE shaping overrides (vp): ratio · weight · leading · tracking(em) REPLACE the treatment's for the
+  // WHOLE voice (the "select a voice, retune it" lever — like a per-palette Hue). Absent ⇒ the treatment
+  // values, so a voice with no override is byte-identical (the identity gate). The per-cell size `overrides`
+  // are a separate, finer layer that still moves an individual step's size.
+  const ratio = vp && Number.isFinite(vp.ratio) ? vp.ratio : p.ratio;
+  const weight = vp && Number.isFinite(vp.weight) ? vp.weight : p.weight;
+  const leading = vp && Number.isFinite(vp.leading) ? vp.leading : p.leading;
+  const trackingEm = vp && Number.isFinite(vp.tracking) ? vp.tracking : p.trackingEm;
   const out = {};
   for (const [step, n] of p.steps) {
-    const derived = Math.max(8, Math.round(p.base * factor * p.ratio ** n)); // the modular-scale size — the lever for tracking + weight (they STAY on the scale)
+    const derived = Math.max(8, Math.round(p.base * factor * ratio ** n)); // the modular-scale size — the lever for tracking + weight (they STAY on the scale)
     let size = derived;
     const ov = overrides && overrides[name + "|" + step];
     if (typeof ov === "number" && Number.isFinite(ov) && ov > 0) size = Math.round(ov); // the override moves SIZE (and line re-derives from it) — tracking/weight do NOT track it
     out[step] = {
       size,
-      lineHeight: Math.round(size * p.leading), // line-height TRACKS the override (re-derives from the resolved size)
-      letterSpacing: round(derived * p.trackingEm, 2), // tracking STAYS on the modular-scale size (ratified "size lever; tracking/weight unchanged")
-      weight: p.weight,
+      lineHeight: Math.round(size * leading), // line-height TRACKS the override (re-derives from the resolved size)
+      letterSpacing: round(derived * trackingEm, 2), // tracking STAYS on the modular-scale size (ratified "size lever; tracking/weight unchanged")
+      weight,
       textTransform: p.transform || "none",
       paragraphSpacing: size, // paragraph rhythm intentionally tracks the resolved size (like lineHeight), not the derived scale
       paragraphIndent: 0,
@@ -120,8 +128,9 @@ export function typeScale(config = {}) {
   const bodyBase = Number(config.bodyBase) || t.categories.Body.base;
   const factor = bodyBase / t.categories.Body.base;
   const overrides = config.overrides && typeof config.overrides === "object" ? config.overrides : null;
+  const voices = config.voices && typeof config.voices === "object" ? config.voices : null; // per-voice shaping overrides
   const categories = {};
-  for (const [name, p] of Object.entries(t.categories)) categories[name] = buildCategory(name, p, factor, overrides);
+  for (const [name, p] of Object.entries(t.categories)) categories[name] = buildCategory(name, p, factor, overrides, voices ? voices[name] : null);
   // fonts: the treatment's families, with optional per-role CUSTOM overrides (config.fonts). A custom family
   // exports as-is + renders if installed/bundled; the specimen falls back to a generic otherwise.
   const fonts = { ...t.fonts };

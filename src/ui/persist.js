@@ -295,6 +295,24 @@ function clampType(t) {
     for (const r of ["display", "heading", "body", "ui", "mono"]) if (typeof t.fonts[r] === "string" && t.fonts[r].trim()) fonts[r] = t.fonts[r].trim();
     if (Object.keys(fonts).length) out.fonts = fonts;
   }
+  // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading, ratio } } for the 7 known
+  // voices; each field clamped to a sane range, kept only when finite, attached only when non-empty.
+  if (t.voices && typeof t.voices === "object") {
+    const VOICES = ["Display", "Heading Editorial", "Heading Context", "Heading Eyebrow", "Body", "UI", "Code"];
+    const num = (x, lo, hi, round) => { const n = Number(x); if (!Number.isFinite(n)) return undefined; const c = Math.max(lo, Math.min(hi, n)); return round ? Math.round(c) : c; };
+    const voices = {};
+    for (const name of VOICES) {
+      const v = t.voices[name];
+      if (!v || typeof v !== "object") continue;
+      const o = {};
+      const w = num(v.weight, 100, 1000, true); if (w !== undefined) o.weight = w;
+      const tr = num(v.tracking, -0.5, 1, false); if (tr !== undefined) o.tracking = tr;
+      const le = num(v.leading, 0.8, 3, false); if (le !== undefined) o.leading = le;
+      const ra = num(v.ratio, 1, 2, false); if (ra !== undefined) o.ratio = ra;
+      if (Object.keys(o).length) voices[name] = o;
+    }
+    if (Object.keys(voices).length) out.voices = voices;
+  }
   // breakpoint MODES (Phase 5) — each a named bodyBase override. OPTIONAL: only attach when present, so a
   // config without modes round-trips identically (the hydrate identity gate). Each mode = { id, name, bodyBase }.
   if (Array.isArray(t.modes) && t.modes.length) {

@@ -1391,6 +1391,18 @@ ok(hydSet(serSet(app.doc)).type.fonts.body === "Custom Sans", "(tyf) the custom 
 app._setTypeFont("body", ""); flushRaf();
 ok(!app.doc.type.fonts, "(tyf) clearing the only override removes doc.type.fonts (reverts to the treatment)");
 app.typeSegment = "scale"; app.render(); flushRaf();
+// (tyv) Scale tab — per-voice tuning: select a voice → its shaping sliders expand; _setTypeVoice writes
+// doc.type.voices + flows to the scale + persist; reset clears. (Voices are mode-independent → the base.)
+app.typeVoice = null; app.render(); flushRaf();
+ok(app.querySelectorAll(".tyi-voice").length === 7 && !app.querySelector(".tyi-voice-edit"), `(tyv) the Scale tab lists the 7 voices, none expanded by default (got ${app.querySelectorAll(".tyi-voice").length})`);
+app.typeVoice = "Body"; app.render(); flushRaf();
+ok(!!app.querySelector(".tyi-voice-edit") && !!app.querySelector(".is-sel"), "(tyv) selecting a voice expands its tuning sliders");
+app._setTypeVoice("Body", "weight", 600); flushRaf();
+ok(app.doc.type.voices && app.doc.type.voices.Body.weight === 600 && app._activeTypeScale().categories.Body.MD.weight === 600, "(tyv) a per-voice weight override writes to doc.type.voices and flows into the resolved scale");
+ok(hydSet(serSet(app.doc)).type.voices.Body.weight === 600, "(tyv) the per-voice override round-trips through persist");
+app._resetTypeVoice("Body"); flushRaf();
+ok(!app.doc.type.voices, "(tyv) reset clears the only voice override (back to the treatment)");
+app.typeVoice = null; app.render(); flushRaf();
 // the canvas Specimen·Tokens toggle flips the canvas to the READ-ONLY token MATRIX (a real <table>) in the
 // scrolling .is-table shell — rows = the 41 steps, columns = Base (+ each breakpoint), sticky token names.
 app.setTypeSpecMode("tokens"); flushRaf();

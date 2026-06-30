@@ -77,6 +77,19 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(Array.isArray(T.BUNDLED_FONTS) && T.BUNDLED_FONTS.includes("Inter"), "BUNDLED_FONTS lists the bundled families");
 }
 
+// ── per-voice shaping: config.voices overrides a voice's weight/leading/ratio/tracking for the WHOLE voice;
+// other voices untouched; absent / empty ⇒ byte-identical (the identity gate) ──
+{
+  const baseV = T.typeScale({ treatment: "product" });
+  const ovV = T.typeScale({ treatment: "product", voices: { Body: { weight: 600, leading: 1.8 } } });
+  ok(ovV.categories.Body.MD.weight === 600, "typeScale: a per-voice weight override applies to every step of that voice");
+  ok(ovV.categories.Body.MD.lineHeight === Math.round(ovV.categories.Body.MD.size * 1.8), "typeScale: a per-voice leading override re-derives line-height");
+  ok(ovV.categories.Display.MD.weight === baseV.categories.Display.MD.weight, "typeScale: a voice override doesn't touch OTHER voices");
+  const ovR = T.typeScale({ treatment: "product", voices: { Display: { ratio: 1.5 } } });
+  ok(ovR.categories.Display.XL.size !== baseV.categories.Display.XL.size, "typeScale: a per-voice ratio override re-scales that voice");
+  ok(JSON.stringify(T.typeScale({ treatment: "product", voices: {} }).categories) === JSON.stringify(baseV.categories), "typeScale: an empty voices map is identity (byte-identical to the un-tuned scale)");
+}
+
 // ── CSS emit: custom props + a utility class per step ──
 {
   const css = T.typeTokensCSS(T.typeScale({ treatment: "product" }));

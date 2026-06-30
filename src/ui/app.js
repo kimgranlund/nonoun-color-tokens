@@ -513,6 +513,7 @@ class HctApp extends HTMLElement {
     this._geomModeOverride = null; // a Compare column forces its breakpoint mode ("base"|id) while its scene builds (mirrors _schemeOverride) — transient
     this.geomSegment = "ramp"; // right-pane Geometry inspector tab: ramp | radius | space (ui-session)
     this.typeSegment = "scale"; // right-pane Typography inspector tab: scale | fonts | specimen (ui-session)
+    this.typeVoice = null; // the selected voice in the Scale tab (null = none expanded) — drives per-voice tuning
     this.figmaFile = "light"; // which Figma mode file the Figma tab previews/downloads
     this.hover = null; // hovered swatch info for footers
     this.search = "";
@@ -4232,27 +4233,47 @@ class HctApp extends HTMLElement {
       h(
         "div",
         { class: "tyi-voices" },
-        h("div", { class: "tyi-voices-head" }, h("b", {}, "Per-voice"), h("small", {}, "from treatment · read-only")),
+        h("div", { class: "tyi-voices-head" }, h("b", {}, "Per-voice"), h("small", {}, "select a voice to tune")),
         ...Object.keys(scale.categories).map((cName) => {
           const p = t.categories[cName];
           const md = scale.categories[cName] && scale.categories[cName].MD;
+          const sel = this.typeVoice === cName;
+          const vp = (cfg.voices && cfg.voices[cName]) || {};
+          const tuned = Object.keys(vp).length > 0;
+          const val = (param, def) => (Number.isFinite(vp[param]) ? vp[param] : def);
           return h(
             "div",
-            { class: "tyi-voice" },
-            h("div", { class: "tyi-voice-name" }, cName, h("span", { class: "tyi-voice-font" }, scale.fonts[scale.roleOf[cName]])),
+            { class: "tyi-voice" + (sel ? " is-sel" : "") + (tuned ? " is-tuned" : "") },
             h(
-              "dl",
-              { class: "tyi-voice-stats" },
-              h("div", {}, h("dt", {}, "Ratio"), h("dd", {}, fmt(p.ratio, 3))),
-              h("div", {}, h("dt", {}, "Leading"), h("dd", {}, fmt(p.leading, 2))),
-              h("div", {}, h("dt", {}, "Weight"), h("dd", {}, String(p.weight))),
-              h("div", {}, h("dt", {}, "Tracking"), h("dd", {}, (p.trackingEm > 0 ? "+" : "") + fmt(p.trackingEm, 3) + "em")),
-              md ? h("div", {}, h("dt", {}, "MD"), h("dd", {}, `${md.size}/${md.lineHeight}`)) : false,
+              "button",
+              { type: "button", class: "tyi-voice-name", "data-fk": "tyvoice:" + cName, "aria-expanded": sel ? "true" : "false",
+                onclick: () => { this.typeVoice = sel ? null : cName; this.render(); } },
+              h("span", { class: "tyi-voice-label" }, cName, tuned ? h("span", { class: "tyi-voice-dot", title: "Tuned off the treatment" }, " ●") : false),
+              h("span", { class: "tyi-voice-font" }, scale.fonts[scale.roleOf[cName]]),
             ),
+            sel
+              ? h(
+                  "div",
+                  { class: "tyi-voice-edit" },
+                  this.slider("Weight", val("weight", p.weight), 100, 900, 10, (v) => String(v), (v) => this._setTypeVoice(cName, "weight", v)),
+                  this.slider("Tracking", val("tracking", p.trackingEm), -0.05, 0.3, 0.001, (v) => (v >= 0 ? "+" : "") + fmt(v, 3) + "em", (v) => this._setTypeVoice(cName, "tracking", v)),
+                  this.slider("Leading", val("leading", p.leading), 0.9, 2, 0.01, (v) => fmt(v, 2), (v) => this._setTypeVoice(cName, "leading", v)),
+                  this.slider("Ratio", val("ratio", p.ratio), 1, 1.7, 0.005, (v) => fmt(v, 3), (v) => this._setTypeVoice(cName, "ratio", v)),
+                  tuned ? btn("Reset voice", { variant: "ghost", cls: "tyi-voice-reset", onclick: () => this._resetTypeVoice(cName) }) : false,
+                )
+              : h(
+                  "dl",
+                  { class: "tyi-voice-stats" },
+                  h("div", {}, h("dt", {}, "Ratio"), h("dd", {}, fmt(val("ratio", p.ratio), 3))),
+                  h("div", {}, h("dt", {}, "Leading"), h("dd", {}, fmt(val("leading", p.leading), 2))),
+                  h("div", {}, h("dt", {}, "Weight"), h("dd", {}, String(val("weight", p.weight)))),
+                  h("div", {}, h("dt", {}, "Tracking"), h("dd", {}, (val("tracking", p.trackingEm) > 0 ? "+" : "") + fmt(val("tracking", p.trackingEm), 3) + "em")),
+                  md ? h("div", {}, h("dt", {}, "MD"), h("dd", {}, `${md.size}/${md.lineHeight}`)) : false,
+                ),
           );
         }),
       ),
-      h("p", { class: "insp-sub tyi-future" }, "Per-voice tuning (ratio · leading · weight · tracking) is coming. Today these come from the treatment."),    );
+    );
   }
 
   // typeFontsTab — an editable combobox per role: pick a bundled font or TYPE any custom family. The value
@@ -4311,6 +4332,39 @@ class HctApp extends HTMLElement {
       const next = { ...t };
       if (Object.keys(fonts).length) next.fonts = fonts; else delete next.fonts;
       doc.type = next;
+    });
+  }
+
+  // _setTypeVoice(voice, param, value) — per-VOICE shaping override on doc.type.voices (weight·tracking·
+  // leading·ratio). Live via editDrag (coalesces a slider drag into one undo step). A value equal to the
+  // treatment default clears that param; an emptied voice / voices map is removed (so a default round-trips).
+  // Voices are mode-independent → always written to the base doc.type.
+  _setTypeVoice(voice, param, value) {
+    this.editDrag((doc) => {
+      const t = { ...(doc.type || DEFAULT_TYPE) };
+      const treatment = TYPE_TREATMENTS.find((x) => x.id === t.treatment) || TYPE_TREATMENTS[0];
+      const pCat = treatment.categories[voice];
+      if (!pCat) return;
+      const defaults = { weight: pCat.weight, tracking: pCat.trackingEm, leading: pCat.leading, ratio: pCat.ratio };
+      const num = param === "weight" ? Math.round(value) : value;
+      const voices = { ...(t.voices || {}) };
+      const v = { ...(voices[voice] || {}) };
+      if (!Number.isFinite(num) || num === defaults[param]) delete v[param]; else v[param] = num;
+      if (Object.keys(v).length) voices[voice] = v; else delete voices[voice];
+      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
+      doc.type = t;
+    });
+  }
+
+  // _resetTypeVoice(voice) — drop all per-voice overrides for one voice (back to the treatment).
+  _resetTypeVoice(voice) {
+    this.commit((doc) => {
+      const t = { ...(doc.type || DEFAULT_TYPE) };
+      if (!t.voices || !t.voices[voice]) return;
+      const voices = { ...t.voices };
+      delete voices[voice];
+      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
+      doc.type = t;
     });
   }
 

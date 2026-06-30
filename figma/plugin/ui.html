@@ -1271,7 +1271,14 @@ a.account-manage:hover { text-decoration: underline; }
 .tyi-voices-head { display: flex; align-items: baseline; justify-content: space-between; }
 .tyi-voices-head small { color: var(--ink-dim); font-size: 11px; }
 .tyi-voice { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--panel); }
-.tyi-voice-name { display: flex; align-items: baseline; justify-content: space-between; font-weight: 650; font-size: 13px; }
+.tyi-voice.is-sel { border-color: var(--accent, #5b9dff); }
+/* the voice header is a select-to-expand button */
+.tyi-voice-name { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; width: 100%; border: 0; background: transparent; color: inherit; padding: 0; cursor: pointer; font-weight: 650; font-size: 13px; text-align: left; }
+.tyi-voice-name:hover .tyi-voice-label { color: var(--accent, #5b9dff); }
+.tyi-voice-name:focus-visible { outline: 2px solid var(--accent, #5b9dff); outline-offset: 2px; border-radius: 4px; }
+.tyi-voice-dot { color: var(--accent, #5b9dff); }
+.tyi-voice-edit { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.tyi-voice-reset { align-self: flex-start; }
 .tyi-voice-font { color: var(--ink-dim); font-weight: 400; font-size: 11px; }
 .tyi-voice-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 16px; margin: 8px 0 0; }
 .tyi-voice-stats > div { display: flex; align-items: baseline; justify-content: space-between; }
@@ -2625,18 +2632,26 @@ const BUNDLED_FONTS = ["Inter", "Inter Tight", "Source Serif 4", "JetBrains Mono
 // the line-height RE-DERIVES from it (lineHeight = round(size · leading)); tracking + weight stay as the
 // scale computes them (the ratified "size lever; line re-derives; tracking/weight unchanged"). Absent /
 // non-positive ⇒ no effect, so the scale is byte-identical to the un-overridden one (the identity gate).
-function buildCategory(name, p, factor, overrides) {
+function buildCategory(name, p, factor, overrides, vp) {
+  // per-VOICE shaping overrides (vp): ratio · weight · leading · tracking(em) REPLACE the treatment's for the
+  // WHOLE voice (the "select a voice, retune it" lever — like a per-palette Hue). Absent ⇒ the treatment
+  // values, so a voice with no override is byte-identical (the identity gate). The per-cell size `overrides`
+  // are a separate, finer layer that still moves an individual step's size.
+  const ratio = vp && Number.isFinite(vp.ratio) ? vp.ratio : p.ratio;
+  const weight = vp && Number.isFinite(vp.weight) ? vp.weight : p.weight;
+  const leading = vp && Number.isFinite(vp.leading) ? vp.leading : p.leading;
+  const trackingEm = vp && Number.isFinite(vp.tracking) ? vp.tracking : p.trackingEm;
   const out = {};
   for (const [step, n] of p.steps) {
-    const derived = Math.max(8, Math.round(p.base * factor * p.ratio ** n)); // the modular-scale size — the lever for tracking + weight (they STAY on the scale)
+    const derived = Math.max(8, Math.round(p.base * factor * ratio ** n)); // the modular-scale size — the lever for tracking + weight (they STAY on the scale)
     let size = derived;
     const ov = overrides && overrides[name + "|" + step];
     if (typeof ov === "number" && Number.isFinite(ov) && ov > 0) size = Math.round(ov); // the override moves SIZE (and line re-derives from it) — tracking/weight do NOT track it
     out[step] = {
       size,
-      lineHeight: Math.round(size * p.leading), // line-height TRACKS the override (re-derives from the resolved size)
-      letterSpacing: round(derived * p.trackingEm, 2), // tracking STAYS on the modular-scale size (ratified "size lever; tracking/weight unchanged")
-      weight: p.weight,
+      lineHeight: Math.round(size * leading), // line-height TRACKS the override (re-derives from the resolved size)
+      letterSpacing: round(derived * trackingEm, 2), // tracking STAYS on the modular-scale size (ratified "size lever; tracking/weight unchanged")
+      weight,
       textTransform: p.transform || "none",
       paragraphSpacing: size, // paragraph rhythm intentionally tracks the resolved size (like lineHeight), not the derived scale
       paragraphIndent: 0,
@@ -2653,8 +2668,9 @@ function typeScale(config = {}) {
   const bodyBase = Number(config.bodyBase) || t.categories.Body.base;
   const factor = bodyBase / t.categories.Body.base;
   const overrides = config.overrides && typeof config.overrides === "object" ? config.overrides : null;
+  const voices = config.voices && typeof config.voices === "object" ? config.voices : null; // per-voice shaping overrides
   const categories = {};
-  for (const [name, p] of Object.entries(t.categories)) categories[name] = buildCategory(name, p, factor, overrides);
+  for (const [name, p] of Object.entries(t.categories)) categories[name] = buildCategory(name, p, factor, overrides, voices ? voices[name] : null);
   // fonts: the treatment's families, with optional per-role CUSTOM overrides (config.fonts). A custom family
   // exports as-is + renders if installed/bundled; the specimen falls back to a generic otherwise.
   const fonts = { ...t.fonts };
@@ -3551,6 +3567,24 @@ function clampType(t) {
     const fonts = {};
     for (const r of ["display", "heading", "body", "ui", "mono"]) if (typeof t.fonts[r] === "string" && t.fonts[r].trim()) fonts[r] = t.fonts[r].trim();
     if (Object.keys(fonts).length) out.fonts = fonts;
+  }
+  // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading, ratio } } for the 7 known
+  // voices; each field clamped to a sane range, kept only when finite, attached only when non-empty.
+  if (t.voices && typeof t.voices === "object") {
+    const VOICES = ["Display", "Heading Editorial", "Heading Context", "Heading Eyebrow", "Body", "UI", "Code"];
+    const num = (x, lo, hi, round) => { const n = Number(x); if (!Number.isFinite(n)) return undefined; const c = Math.max(lo, Math.min(hi, n)); return round ? Math.round(c) : c; };
+    const voices = {};
+    for (const name of VOICES) {
+      const v = t.voices[name];
+      if (!v || typeof v !== "object") continue;
+      const o = {};
+      const w = num(v.weight, 100, 1000, true); if (w !== undefined) o.weight = w;
+      const tr = num(v.tracking, -0.5, 1, false); if (tr !== undefined) o.tracking = tr;
+      const le = num(v.leading, 0.8, 3, false); if (le !== undefined) o.leading = le;
+      const ra = num(v.ratio, 1, 2, false); if (ra !== undefined) o.ratio = ra;
+      if (Object.keys(o).length) voices[name] = o;
+    }
+    if (Object.keys(voices).length) out.voices = voices;
   }
   // breakpoint MODES (Phase 5) — each a named bodyBase override. OPTIONAL: only attach when present, so a
   // config without modes round-trips identically (the hydrate identity gate). Each mode = { id, name, bodyBase }.
@@ -5858,6 +5892,7 @@ class HctApp extends HTMLElement {
     this._geomModeOverride = null; // a Compare column forces its breakpoint mode ("base"|id) while its scene builds (mirrors _schemeOverride) — transient
     this.geomSegment = "ramp"; // right-pane Geometry inspector tab: ramp | radius | space (ui-session)
     this.typeSegment = "scale"; // right-pane Typography inspector tab: scale | fonts | specimen (ui-session)
+    this.typeVoice = null; // the selected voice in the Scale tab (null = none expanded) — drives per-voice tuning
     this.figmaFile = "light"; // which Figma mode file the Figma tab previews/downloads
     this.hover = null; // hovered swatch info for footers
     this.search = "";
@@ -9577,27 +9612,47 @@ class HctApp extends HTMLElement {
       h(
         "div",
         { class: "tyi-voices" },
-        h("div", { class: "tyi-voices-head" }, h("b", {}, "Per-voice"), h("small", {}, "from treatment · read-only")),
+        h("div", { class: "tyi-voices-head" }, h("b", {}, "Per-voice"), h("small", {}, "select a voice to tune")),
         ...Object.keys(scale.categories).map((cName) => {
           const p = t.categories[cName];
           const md = scale.categories[cName] && scale.categories[cName].MD;
+          const sel = this.typeVoice === cName;
+          const vp = (cfg.voices && cfg.voices[cName]) || {};
+          const tuned = Object.keys(vp).length > 0;
+          const val = (param, def) => (Number.isFinite(vp[param]) ? vp[param] : def);
           return h(
             "div",
-            { class: "tyi-voice" },
-            h("div", { class: "tyi-voice-name" }, cName, h("span", { class: "tyi-voice-font" }, scale.fonts[scale.roleOf[cName]])),
+            { class: "tyi-voice" + (sel ? " is-sel" : "") + (tuned ? " is-tuned" : "") },
             h(
-              "dl",
-              { class: "tyi-voice-stats" },
-              h("div", {}, h("dt", {}, "Ratio"), h("dd", {}, fmt(p.ratio, 3))),
-              h("div", {}, h("dt", {}, "Leading"), h("dd", {}, fmt(p.leading, 2))),
-              h("div", {}, h("dt", {}, "Weight"), h("dd", {}, String(p.weight))),
-              h("div", {}, h("dt", {}, "Tracking"), h("dd", {}, (p.trackingEm > 0 ? "+" : "") + fmt(p.trackingEm, 3) + "em")),
-              md ? h("div", {}, h("dt", {}, "MD"), h("dd", {}, `${md.size}/${md.lineHeight}`)) : false,
+              "button",
+              { type: "button", class: "tyi-voice-name", "data-fk": "tyvoice:" + cName, "aria-expanded": sel ? "true" : "false",
+                onclick: () => { this.typeVoice = sel ? null : cName; this.render(); } },
+              h("span", { class: "tyi-voice-label" }, cName, tuned ? h("span", { class: "tyi-voice-dot", title: "Tuned off the treatment" }, " ●") : false),
+              h("span", { class: "tyi-voice-font" }, scale.fonts[scale.roleOf[cName]]),
             ),
+            sel
+              ? h(
+                  "div",
+                  { class: "tyi-voice-edit" },
+                  this.slider("Weight", val("weight", p.weight), 100, 900, 10, (v) => String(v), (v) => this._setTypeVoice(cName, "weight", v)),
+                  this.slider("Tracking", val("tracking", p.trackingEm), -0.05, 0.3, 0.001, (v) => (v >= 0 ? "+" : "") + fmt(v, 3) + "em", (v) => this._setTypeVoice(cName, "tracking", v)),
+                  this.slider("Leading", val("leading", p.leading), 0.9, 2, 0.01, (v) => fmt(v, 2), (v) => this._setTypeVoice(cName, "leading", v)),
+                  this.slider("Ratio", val("ratio", p.ratio), 1, 1.7, 0.005, (v) => fmt(v, 3), (v) => this._setTypeVoice(cName, "ratio", v)),
+                  tuned ? btn("Reset voice", { variant: "ghost", cls: "tyi-voice-reset", onclick: () => this._resetTypeVoice(cName) }) : false,
+                )
+              : h(
+                  "dl",
+                  { class: "tyi-voice-stats" },
+                  h("div", {}, h("dt", {}, "Ratio"), h("dd", {}, fmt(val("ratio", p.ratio), 3))),
+                  h("div", {}, h("dt", {}, "Leading"), h("dd", {}, fmt(val("leading", p.leading), 2))),
+                  h("div", {}, h("dt", {}, "Weight"), h("dd", {}, String(val("weight", p.weight)))),
+                  h("div", {}, h("dt", {}, "Tracking"), h("dd", {}, (val("tracking", p.trackingEm) > 0 ? "+" : "") + fmt(val("tracking", p.trackingEm), 3) + "em")),
+                  md ? h("div", {}, h("dt", {}, "MD"), h("dd", {}, `${md.size}/${md.lineHeight}`)) : false,
+                ),
           );
         }),
       ),
-      h("p", { class: "insp-sub tyi-future" }, "Per-voice tuning (ratio · leading · weight · tracking) is coming. Today these come from the treatment."),    );
+    );
   }
 
   // typeFontsTab — an editable combobox per role: pick a bundled font or TYPE any custom family. The value
@@ -9656,6 +9711,39 @@ class HctApp extends HTMLElement {
       const next = { ...t };
       if (Object.keys(fonts).length) next.fonts = fonts; else delete next.fonts;
       doc.type = next;
+    });
+  }
+
+  // _setTypeVoice(voice, param, value) — per-VOICE shaping override on doc.type.voices (weight·tracking·
+  // leading·ratio). Live via editDrag (coalesces a slider drag into one undo step). A value equal to the
+  // treatment default clears that param; an emptied voice / voices map is removed (so a default round-trips).
+  // Voices are mode-independent → always written to the base doc.type.
+  _setTypeVoice(voice, param, value) {
+    this.editDrag((doc) => {
+      const t = { ...(doc.type || DEFAULT_TYPE) };
+      const treatment = TYPE_TREATMENTS.find((x) => x.id === t.treatment) || TYPE_TREATMENTS[0];
+      const pCat = treatment.categories[voice];
+      if (!pCat) return;
+      const defaults = { weight: pCat.weight, tracking: pCat.trackingEm, leading: pCat.leading, ratio: pCat.ratio };
+      const num = param === "weight" ? Math.round(value) : value;
+      const voices = { ...(t.voices || {}) };
+      const v = { ...(voices[voice] || {}) };
+      if (!Number.isFinite(num) || num === defaults[param]) delete v[param]; else v[param] = num;
+      if (Object.keys(v).length) voices[voice] = v; else delete voices[voice];
+      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
+      doc.type = t;
+    });
+  }
+
+  // _resetTypeVoice(voice) — drop all per-voice overrides for one voice (back to the treatment).
+  _resetTypeVoice(voice) {
+    this.commit((doc) => {
+      const t = { ...(doc.type || DEFAULT_TYPE) };
+      if (!t.voices || !t.voices[voice]) return;
+      const voices = { ...t.voices };
+      delete voices[voice];
+      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
+      doc.type = t;
     });
   }
 
