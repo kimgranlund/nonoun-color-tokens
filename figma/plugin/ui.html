@@ -2641,6 +2641,15 @@ const BUNDLED_FONTS = ["Inter", "Inter Tight", "Source Serif 4", "JetBrains Mono
 // the line-height RE-DERIVES from it (lineHeight = round(size · leading)); tracking + weight stay as the
 // scale computes them (the ratified "size lever; line re-derives; tracking/weight unchanged"). Absent /
 // non-positive ⇒ no effect, so the scale is byte-identical to the un-overridden one (the identity gate).
+// ── the "nice number" size ladder ────────────────────────────────────────────────────────────────────
+// Emitted font sizes read as FAMILIAR values (…12,13,14,15,16,18,20,22,24,28,32,36,40,44,48…) instead of
+// arbitrary modular-scale outputs, at every base + breakpoint. Granularity COARSENS as size grows (step
+// 1 ≤16, 2 ≤24, 4 ≤48, 8 ≤96, else 16). nextNice breaks a rare adjacent-step collision so the quantized
+// ramp stays strictly increasing. Per-cell overrides bypass it (they're the exact manual escape).
+const niceStep = (v) => (v <= 16 ? 1 : v <= 24 ? 2 : v <= 48 ? 4 : v <= 96 ? 8 : 16);
+const niceSize = (v) => { const s = niceStep(v); return Math.max(8, Math.round(v / s) * s); };
+const nextNice = (v) => { let n = v + 1; while (niceSize(n) <= v) n += 1; return niceSize(n); };
+
 function buildCategory(name, p, factor, overrides, vp) {
   // per-VOICE shaping overrides (vp): ratio · weight · leading · tracking(em) REPLACE the treatment's for the
   // WHOLE voice (the "select a voice, retune it" lever — like a per-palette Hue). Absent ⇒ the treatment
@@ -2651,11 +2660,19 @@ function buildCategory(name, p, factor, overrides, vp) {
   const leading = vp && Number.isFinite(vp.leading) ? vp.leading : p.leading;
   const trackingEm = vp && Number.isFinite(vp.tracking) ? vp.tracking : p.trackingEm;
   const out = {};
+  let prevSize = 0; // running max, for the monotonic bump (quantization can collide adjacent steps)
   for (const [step, n] of p.steps) {
-    const derived = Math.max(8, Math.round(p.base * factor * ratio ** n)); // the modular-scale size — the lever for tracking + weight (they STAY on the scale)
-    let size = derived;
+    const rawModular = p.base * factor * ratio ** n;
+    const derived = Math.max(8, Math.round(rawModular)); // the modular-scale size — letterSpacing STAYS on this
     const ov = overrides && overrides[name + "|" + step];
-    if (typeof ov === "number" && Number.isFinite(ov) && ov > 0) size = Math.round(ov); // the override moves SIZE (and line re-derives from it) — tracking/weight do NOT track it
+    const overridden = typeof ov === "number" && Number.isFinite(ov) && ov > 0;
+    // The DERIVED nice size drives the monotonic ramp (so a per-cell override never nudges its neighbours —
+    // the bump rides the underlying ladder, not the override). SIZE snaps the ROUNDED modular px to the ladder
+    // (smoother than snapping the raw float at .5 boundaries); an override is exact.
+    let nice = niceSize(derived);
+    if (nice <= prevSize) nice = nextNice(prevSize);
+    prevSize = nice;
+    const size = overridden ? Math.round(ov) : nice;
     out[step] = {
       size,
       lineHeight: Math.round(size * leading), // line-height TRACKS the override (re-derives from the resolved size)

@@ -46,6 +46,26 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
   ok(["3XS", "2XS", "XS", "SM", "MD", "LG", "XL", "2XL"].every((k) => s.categories.UI[k]), "UI has the 8-step ramp 3XS..2XL");
 }
 
+// ── the "nice number" ladder: every emitted size is a familiar value, at every base/breakpoint ──
+{
+  // a value is ON the ladder iff it equals its own band-step snap (step 1 ≤16, 2 ≤24, 4 ≤48, 8 ≤96, 16 else)
+  const step = (v) => (v <= 16 ? 1 : v <= 24 ? 2 : v <= 48 ? 4 : v <= 96 ? 8 : 16);
+  const onLadder = (v) => v === Math.round(v / step(v)) * step(v);
+  for (const t of ["product", "luxury", "editorial", "technical", "statement"]) {
+    for (const base of [13, 16, 20]) {
+      const sc = T.typeScale({ treatment: t, bodyBase: base });
+      for (const [voice, steps] of Object.entries(sc.categories)) {
+        const sizes = Object.values(steps).map((x) => x.size);
+        ok(sizes.every(onLadder), `${t} @${base} ${voice}: every size is on the ladder (${sizes})`);
+        ok(sizes.every((v, i) => i === 0 || v > sizes[i - 1]), `${t} @${base} ${voice}: strictly increases (${sizes})`);
+      }
+    }
+  }
+  // a concrete example (product Display) reads as familiar numbers, not arbitrary modular outputs
+  const disp = T.typeScale({ treatment: "product", bodyBase: 16 }).categories.Display;
+  ok(["XS", "SM", "MD", "LG", "XL"].map((k) => disp[k].size).join(",") === "36,44,56,72,88", `product Display snaps to 36,44,56,72,88 (got ${["XS", "SM", "MD", "LG", "XL"].map((k) => disp[k].size)})`);
+}
+
 // ── optical tracking: Display tightens (negative), UI loosens (positive) in the product treatment ──
 {
   const s = T.typeScale({ treatment: "product" });
