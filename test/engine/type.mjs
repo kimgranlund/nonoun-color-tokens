@@ -121,6 +121,17 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(lux.includes("--font-display: 'Source Serif 4'"), "CSS quotes font family names (digit names like 'Source Serif 4' are invalid unquoted in Safari)");
 }
 
+// ── CSS export unit (px/rem/em): rem = px÷16, clean thanks to the nice-number ladder ──
+{
+  const s = T.typeScale({ treatment: "product", bodyBase: 16 }); // Body MD = 16
+  ok(/--type-body-md-size: 16px;/.test(T.typeTokensCSS(s)), "typeTokensCSS defaults to px (no unit)");
+  ok(/--type-body-md-size: 1rem;/.test(T.typeTokensCSS(s, { unit: "rem" })), "unit:rem → 16px = 1rem");
+  ok(/--type-body-md-size: 1em;/.test(T.typeTokensCSS(s, { unit: "em" })), "unit:em → 16px = 1em");
+  ok(T.dimUnit(24, "rem") === "1.5rem" && T.dimUnit(18, "rem") === "1.125rem" && T.dimUnit(2, "rem") === "0.125rem", "dimUnit: 24→1.5rem · 18→1.125rem · 2→0.125rem (rem-clean)");
+  ok(T.typeTokensDTCG(s, { unit: "rem" }).typography.Body.MD.$value.fontSize === "1rem" && T.typeTokensDTCG(s).typography.Body.MD.$value.fontSize === "16px", "DTCG carries the unit (fontSize 1rem) + defaults to px");
+  ok(T.typeTokensResponsiveCSS(s, [{ name: "M", minWidth: 768, scale: T.typeScale({ treatment: "product", bodyBase: 13 }) }], { unit: "rem" }).includes("--type-body-md-size: 0.8125rem;"), "the @media breakpoint block honors the unit (13px = 0.8125rem)");
+}
+
 // ── responsive CSS: per-breakpoint @media blocks re-declaring the size vars (Phase 5.4) ──
 {
   const base = T.typeScale({ treatment: "product", bodyBase: 16 });

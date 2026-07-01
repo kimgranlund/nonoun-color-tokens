@@ -126,17 +126,21 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 // block-size off the ramp, padding-block 0, inline padding = the slotless h/2, the pill radius.
 // the per-size `--size-*` custom-property lines (no :root) — shared by the base export + the @media
 // overrides; only these scale with baseHeight (density/radii/space are treatment-derived, mode-independent).
-function geomSizeVarLines(scale, indent = "  ") {
+// dimUnit(px, unit) — a px dimension in the chosen CSS export unit. rem/em = px÷16 (root-relative), stripped
+// of trailing zeros (clean thanks to the even-grid geometry); absent / "px" ⇒ `${px}px`. Mirrors type.mjs.
+const dimUnit = (px, unit) => (unit === "rem" || unit === "em" ? `${parseFloat((px / 16).toFixed(4))}${unit}` : `${px}px`);
+
+function geomSizeVarLines(scale, indent = "  ", unit = "px") {
   return Object.entries(scale.sizes).map(([name, s]) => {
     const p = `--size-${kebab(name)}`;
-    return `${indent}${p}-height: ${s.height}px; ${p}-icon: ${s.icon}px; ${p}-caret: ${s.caret}px; ${p}-font: ${s.font}px; ${p}-gap: ${s.gap}px; ${p}-pad: ${s.padding}px; ${p}-pad-edge: ${s.edgePadding}px; ${p}-radius: ${s.radiusPill}px; ${p}-min: ${s.minWidth}px;`;
+    return `${indent}${p}-height: ${dimUnit(s.height, unit)}; ${p}-icon: ${dimUnit(s.icon, unit)}; ${p}-caret: ${dimUnit(s.caret, unit)}; ${p}-font: ${dimUnit(s.font, unit)}; ${p}-gap: ${dimUnit(s.gap, unit)}; ${p}-pad: ${dimUnit(s.padding, unit)}; ${p}-pad-edge: ${dimUnit(s.edgePadding, unit)}; ${p}-radius: ${dimUnit(s.radiusPill, unit)}; ${p}-min: ${dimUnit(s.minWidth, unit)};`;
   }).join("\n");
 }
 
-export function geomTokensCSS(scale) {
-  const lines = [":root {", `  --density: ${scale.density};`, geomSizeVarLines(scale)];
-  for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --radius-${k}: ${v}px;`);
-  for (const [k, v] of Object.entries(scale.space)) lines.push(`  --space-${k}: ${v}px;`);
+export function geomTokensCSS(scale, { unit = "px" } = {}) {
+  const lines = [":root {", `  --density: ${scale.density};`, geomSizeVarLines(scale, "  ", unit)];
+  for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --radius-${k}: ${dimUnit(v, unit)};`);
+  for (const [k, v] of Object.entries(scale.space)) lines.push(`  --space-${k}: ${dimUnit(v, unit)};`);
   lines.push("}");
   for (const name of Object.keys(scale.sizes)) {
     const s = kebab(name);
@@ -148,19 +152,19 @@ export function geomTokensCSS(scale) {
 // geomTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
 // re-declares the per-size vars at that mode's scale (radii/space/density + the .control-* utilities are
 // mode-independent, so they auto-track). `modes` = [{ name, minWidth, scale }]; no-minWidth modes skipped.
-export function geomTokensResponsiveCSS(scale, modes = []) {
-  let css = geomTokensCSS(scale);
+export function geomTokensResponsiveCSS(scale, modes = [], { unit = "px" } = {}) {
+  let css = geomTokensCSS(scale, { unit });
   for (const m of modes) {
     if (!(Number(m.minWidth) > 0) || !m.scale) continue;
-    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ")}\n  }\n}\n`;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit)}\n  }\n}\n`;
   }
   return css;
 }
 
 // geomTokensDTCG — the geometry as DTCG dimension tokens: a `size` group (one composite of dimensions per
 // ramp step), a `radius` ladder group, and a `space` scale group — all the W3C-DTCG `dimension` $type.
-export function geomTokensDTCG(scale) {
-  const dim = (px) => ({ $type: "dimension", $value: `${px}px` });
+export function geomTokensDTCG(scale, { unit = "px" } = {}) {
+  const dim = (px) => ({ $type: "dimension", $value: dimUnit(px, unit) });
   const size = {};
   for (const [name, s] of Object.entries(scale.sizes)) {
     size[name] = {

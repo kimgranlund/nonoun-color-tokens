@@ -5102,11 +5102,12 @@ class HctApp extends HTMLElement {
     // view.exports). Computed from the same engines the modals + the Brand-Kit MCP use.
     const typeSc = this._typeScaleFor("base"); // override-aware base scale (Phase 3) — same as the matrix Base column
     const geomSc = this._geomScaleFor("base");
+    const u = { unit: this._exportUnit() }; // the CSS unit preference (Settings › Export); Figma stays px
     const SYSTEM_CODE = {
-      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales()),
-      "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc), null, 2),
-      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales()),
-      "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc), null, 2),
+      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales(), u),
+      "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
+      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), u),
+      "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
     };
     const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG" };
     // the systems currently opted into the Download-All + MCP bundle (for the footer summary).
@@ -5309,6 +5310,7 @@ class HctApp extends HTMLElement {
   downloadAllZip(view) {
     const s = slug(this.doc.name || "palette");
     const sys = this.exportSystems;
+    const u = { unit: this._exportUnit() }; // the CSS unit preference; the figma/ folder stays px (Figma is numeric)
     const ex = view.exports;
     const files = [];
     if (sys.color) {
@@ -5342,12 +5344,12 @@ class HctApp extends HTMLElement {
     }
     if (sys.type) {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
-      const tDtcg = JSON.stringify(typeTokensDTCG(tsc), null, 2);
+      const tDtcg = JSON.stringify(typeTokensDTCG(tsc, u), null, 2); // the chosen unit — for the typography/ folder
       files.push(
-        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales()) },
+        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales(), u) },
         { name: "typography/type.tokens.json", data: tDtcg },
-        ...this._typeModeDTCGFiles("typography/type"),
-        { name: "figma/type.tokens.json", data: tDtcg }, // importable as Figma text styles (via a tokens plugin)
+        ...this._typeModeDTCGFiles("typography/type", u),
+        { name: "figma/type.tokens.json", data: JSON.stringify(typeTokensDTCG(tsc), null, 2) }, // ALWAYS px — Figma import (a tokens plugin)
         // a single "Typography" collection with a MODE per breakpoint (Base + each) — one moded Figma-variable
         // file instead of N per-width DTCG files. Always emitted (Base-only when there are no breakpoints).
         { name: "figma/typography.modes.variables.json", data: JSON.stringify(typeTokensFigmaModes(tsc, this._typeModeScales()), null, 2) },
@@ -5355,11 +5357,11 @@ class HctApp extends HTMLElement {
     }
     if (sys.geometry) {
       const gsc = this._geomScaleFor("base"); // composed with the type scale (the per-step `font` is shared); override-aware (Phase 3)
-      const gDtcg = JSON.stringify(geomTokensDTCG(gsc), null, 2);
+      const gDtcg = JSON.stringify(geomTokensDTCG(gsc, u), null, 2); // the chosen unit — for the geometry/ folder
       files.push(
-        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales()) },
+        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales(), u) },
         { name: "geometry/geometry.tokens.json", data: gDtcg },
-        ...this._geomModeDTCGFiles("geometry/geometry"),
+        ...this._geomModeDTCGFiles("geometry/geometry", u),
         { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
         // a single "Geometry" collection with a MODE per breakpoint (Base + each) — one moded Figma-variable
         // file instead of N per-width DTCG files. Always emitted (Base-only when there are no breakpoints).
@@ -5609,12 +5611,16 @@ class HctApp extends HTMLElement {
   // The Settings nav model: grouped, labeled sections (the left rail). Each item id → a panel.
   _settingsNav() {
     return [
-      { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }] },
+      { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }, { id: "export", label: "Export" }] },
       { group: "App", items: [{ id: "appearance", label: "Appearance" }] },
       { group: "Account", items: [{ id: "account", label: "Account" }] },
       { group: "About", items: [{ id: "about", label: "About" }] },
     ];
   }
+  // _exportUnit — the CSS unit for the type/geometry exports (Settings › Export). Doc-bound + persisted so it
+  // travels with the kit; defaults to "px" (the pre-setting output). Figma exports ignore it (they're numeric).
+  _exportUnit() { return this.doc.export && ["px", "rem", "em"].includes(this.doc.export.unit) ? this.doc.export.unit : "px"; }
+  _setExportUnit(unit) { this.commit((d) => { d.export = { ...(d.export || {}), unit }; }); }
 
   // _settingsPanel — the right-content for a nav section: { title, desc, body[] }.
   _settingsPanel(sec) {
@@ -5628,6 +5634,16 @@ class HctApp extends HTMLElement {
             (id) => { this.theme = id; this.dataset.theme = id; setColorScheme(id); this.render(); }, "setapptheme"),
           this._settingRow("Canvas preview", "The scheme the canvas previews in — independent of the chrome.", schemes, this.canvasTheme,
             (id) => { this.canvasTheme = id; this.render(); }, "setcanvastheme"),
+        ])],
+      };
+    }
+    if (sec === "export") {
+      const units = [{ id: "px", label: "px" }, { id: "rem", label: "rem" }, { id: "em", label: "em" }];
+      return {
+        title: "Export", desc: "How the CSS + DTCG exports render. Figma variables are always numeric (px).",
+        body: [this._settingsGroup(null, [
+          this._settingRow("CSS units", "The unit the Typography + Geometry CSS/DTCG use. rem = px ÷ 16 (clean, thanks to the nice-number sizes). Figma stays px.", units, this._exportUnit(),
+            (id) => this._setExportUnit(id), "setexportunit"),
         ])],
       };
     }
@@ -5863,13 +5879,13 @@ class HctApp extends HTMLElement {
   }
   // per-breakpoint DTCG files — one valid standalone DTCG per mode that has a minWidth, keyed by the width
   // (self-documenting + collision-free). No-width modes are preview-only, so they don't export (mirrors CSS).
-  _typeModeDTCGFiles(prefix = "type") {
+  _typeModeDTCGFiles(prefix = "type", opts = {}) {
     return this._typeModeScales().filter((m) => Number(m.minWidth) > 0)
-      .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(typeTokensDTCG(m.scale), null, 2) }));
+      .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(typeTokensDTCG(m.scale, opts), null, 2) }));
   }
-  _geomModeDTCGFiles(prefix = "geometry") {
+  _geomModeDTCGFiles(prefix = "geometry", opts = {}) {
     return this._geomModeScales().filter((m) => Number(m.minWidth) > 0)
-      .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(geomTokensDTCG(m.scale), null, 2) }));
+      .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(geomTokensDTCG(m.scale, opts), null, 2) }));
   }
   geomModeControl() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;

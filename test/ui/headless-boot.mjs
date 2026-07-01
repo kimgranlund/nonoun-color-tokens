@@ -1069,6 +1069,16 @@ app.setProfile({ flagOverrides: {} }); flushRaf(); // restore unlocked
 const peProZip = dlZipText();
 ok(/tailwind\//.test(peProZip) && /shadcn\//.test(peProZip) && /dtcg\//.test(peProZip), "(pe) Download-All unlocked includes the dtcg/tailwind/shadcn folders");
 
+// ── (exu) CSS export unit (Settings › Export): _setExportUnit writes doc.export.unit; type/geom CSS+DTCG
+// honor it (px→rem), the figma/ folder + Figma variables stay px; the choice persists. ──
+ok(app._exportUnit() === "px", "(exu) the default export unit is px");
+app._setExportUnit("rem"); flushRaf();
+ok(app.doc.export.unit === "rem" && app._exportUnit() === "rem", "(exu) _setExportUnit writes doc.export.unit (read back by _exportUnit)");
+const remZip = dlZipText();
+ok(remZip.includes("-size: 1rem") && remZip.includes('"fontSize": "1rem"'), "(exu) Download-All type CSS + typography/ DTCG use rem when the unit is rem");
+ok(remZip.includes('"fontSize": "16px"'), "(exu) the figma/ DTCG folder stays px even when the CSS unit is rem");
+app._setExportUnit("px"); flushRaf();
+
 // ── (ff) the HCT brand doubles as "back to gallery"; the ◀ Gallery button is removed ──
 app.openSet(app.sets[0].id);                         // into the editor
 ok(app.view === "editor", "(ff) opened the editor");

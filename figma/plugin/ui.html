@@ -2713,21 +2713,28 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 // utility class per step. Drop-in: `class="type-display-xl"`.
 // the per-step `--type-*` custom-property lines for a scale (no :root wrapper) — shared by the base export
 // and the per-breakpoint @media overrides, since bodyBase scales these and only these.
-function typeVarLines(scale, indent = "  ") {
+// dimUnit(px, unit) — format a px dimension in the chosen CSS export unit. rem/em = px ÷ 16 (root-relative),
+// stripped of trailing zeros; the nice-number quantization keeps these CLEAN (16px→1rem, 24px→1.5rem,
+// 2px→0.125rem, 11px→0.6875rem). Absent / "px" ⇒ `${px}px` (identity — the pre-setting default).
+function dimUnit(px, unit) {
+  return unit === "rem" || unit === "em" ? `${parseFloat((px / 16).toFixed(4))}${unit}` : `${px}px`;
+}
+
+function typeVarLines(scale, indent = "  ", unit = "px") {
   const out = [];
   for (const [cName, steps] of Object.entries(scale.categories)) {
     for (const [sName, s] of Object.entries(steps)) {
       const p = `--type-${kebab(cName)}-${kebab(sName)}`;
-      out.push(`${indent}${p}-size: ${s.size}px; ${p}-line: ${s.lineHeight}px; ${p}-tracking: ${s.letterSpacing}px; ${p}-weight: ${s.weight};`);
+      out.push(`${indent}${p}-size: ${dimUnit(s.size, unit)}; ${p}-line: ${dimUnit(s.lineHeight, unit)}; ${p}-tracking: ${dimUnit(s.letterSpacing, unit)}; ${p}-weight: ${s.weight};`);
     }
   }
   return out.join("\n");
 }
 
-function typeTokensCSS(scale) {
+function typeTokensCSS(scale, { unit = "px" } = {}) {
   const lines = [":root {"];
   for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
-  lines.push(typeVarLines(scale));
+  lines.push(typeVarLines(scale, "  ", unit));
   lines.push("}");
   for (const [cName, steps] of Object.entries(scale.categories)) {
     const role = scale.roleOf[cName] || "body";
@@ -2743,18 +2750,18 @@ function typeTokensCSS(scale) {
 // typeTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
 // re-declares the per-step size vars at that mode's scale (the utilities + font vars are unchanged, so they
 // auto-track). `modes` = [{ name, minWidth, scale }]; a mode without a positive minWidth is skipped.
-function typeTokensResponsiveCSS(scale, modes = []) {
-  let css = typeTokensCSS(scale);
+function typeTokensResponsiveCSS(scale, modes = [], { unit = "px" } = {}) {
+  let css = typeTokensCSS(scale, { unit });
   for (const m of modes) {
     if (!(Number(m.minWidth) > 0) || !m.scale) continue;
-    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ")}\n  }\n}\n`;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ", unit)}\n  }\n}\n`;
   }
   return css;
 }
 
 // typeTokensDTCG — the type scale as DTCG tokens: a fontFamily group + a typography group per
 // category/step (composite `typography` $type, the W3C-DTCG shape).
-function typeTokensDTCG(scale) {
+function typeTokensDTCG(scale, { unit = "px" } = {}) {
   const fontFamily = {};
   for (const [role, family] of Object.entries(scale.fonts)) fontFamily[role] = { $type: "fontFamily", $value: family };
   const typography = {};
@@ -2764,7 +2771,7 @@ function typeTokensDTCG(scale) {
     for (const [sName, s] of Object.entries(steps)) {
       typography[cName][sName] = {
         $type: "typography",
-        $value: { fontFamily: scale.fonts[role], fontSize: `${s.size}px`, lineHeight: `${s.lineHeight}px`, letterSpacing: `${s.letterSpacing}px`, fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: `${s.paragraphSpacing}px`, paragraphIndent: `${s.paragraphIndent}px` },
+        $value: { fontFamily: scale.fonts[role], fontSize: dimUnit(s.size, unit), lineHeight: dimUnit(s.lineHeight, unit), letterSpacing: dimUnit(s.letterSpacing, unit), fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: dimUnit(s.paragraphSpacing, unit), paragraphIndent: dimUnit(s.paragraphIndent, unit) },
       };
     }
   }
@@ -2818,7 +2825,7 @@ function typeTokensFigmaModes(baseScale, modes = []) {
   };
 }
 
-return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes };
+return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, typeScale, dimUnit, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes };
 })();
 __M.geometry = (function(){
 // geometry.mjs — the GEOMETRY / dimensional engine: the spatial analog of the color & type engines.
@@ -2949,17 +2956,21 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 // block-size off the ramp, padding-block 0, inline padding = the slotless h/2, the pill radius.
 // the per-size `--size-*` custom-property lines (no :root) — shared by the base export + the @media
 // overrides; only these scale with baseHeight (density/radii/space are treatment-derived, mode-independent).
-function geomSizeVarLines(scale, indent = "  ") {
+// dimUnit(px, unit) — a px dimension in the chosen CSS export unit. rem/em = px÷16 (root-relative), stripped
+// of trailing zeros (clean thanks to the even-grid geometry); absent / "px" ⇒ `${px}px`. Mirrors type.mjs.
+const dimUnit = (px, unit) => (unit === "rem" || unit === "em" ? `${parseFloat((px / 16).toFixed(4))}${unit}` : `${px}px`);
+
+function geomSizeVarLines(scale, indent = "  ", unit = "px") {
   return Object.entries(scale.sizes).map(([name, s]) => {
     const p = `--size-${kebab(name)}`;
-    return `${indent}${p}-height: ${s.height}px; ${p}-icon: ${s.icon}px; ${p}-caret: ${s.caret}px; ${p}-font: ${s.font}px; ${p}-gap: ${s.gap}px; ${p}-pad: ${s.padding}px; ${p}-pad-edge: ${s.edgePadding}px; ${p}-radius: ${s.radiusPill}px; ${p}-min: ${s.minWidth}px;`;
+    return `${indent}${p}-height: ${dimUnit(s.height, unit)}; ${p}-icon: ${dimUnit(s.icon, unit)}; ${p}-caret: ${dimUnit(s.caret, unit)}; ${p}-font: ${dimUnit(s.font, unit)}; ${p}-gap: ${dimUnit(s.gap, unit)}; ${p}-pad: ${dimUnit(s.padding, unit)}; ${p}-pad-edge: ${dimUnit(s.edgePadding, unit)}; ${p}-radius: ${dimUnit(s.radiusPill, unit)}; ${p}-min: ${dimUnit(s.minWidth, unit)};`;
   }).join("\n");
 }
 
-function geomTokensCSS(scale) {
-  const lines = [":root {", `  --density: ${scale.density};`, geomSizeVarLines(scale)];
-  for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --radius-${k}: ${v}px;`);
-  for (const [k, v] of Object.entries(scale.space)) lines.push(`  --space-${k}: ${v}px;`);
+function geomTokensCSS(scale, { unit = "px" } = {}) {
+  const lines = [":root {", `  --density: ${scale.density};`, geomSizeVarLines(scale, "  ", unit)];
+  for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --radius-${k}: ${dimUnit(v, unit)};`);
+  for (const [k, v] of Object.entries(scale.space)) lines.push(`  --space-${k}: ${dimUnit(v, unit)};`);
   lines.push("}");
   for (const name of Object.keys(scale.sizes)) {
     const s = kebab(name);
@@ -2971,19 +2982,19 @@ function geomTokensCSS(scale) {
 // geomTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
 // re-declares the per-size vars at that mode's scale (radii/space/density + the .control-* utilities are
 // mode-independent, so they auto-track). `modes` = [{ name, minWidth, scale }]; no-minWidth modes skipped.
-function geomTokensResponsiveCSS(scale, modes = []) {
-  let css = geomTokensCSS(scale);
+function geomTokensResponsiveCSS(scale, modes = [], { unit = "px" } = {}) {
+  let css = geomTokensCSS(scale, { unit });
   for (const m of modes) {
     if (!(Number(m.minWidth) > 0) || !m.scale) continue;
-    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ")}\n  }\n}\n`;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit)}\n  }\n}\n`;
   }
   return css;
 }
 
 // geomTokensDTCG — the geometry as DTCG dimension tokens: a `size` group (one composite of dimensions per
 // ramp step), a `radius` ladder group, and a `space` scale group — all the W3C-DTCG `dimension` $type.
-function geomTokensDTCG(scale) {
-  const dim = (px) => ({ $type: "dimension", $value: `${px}px` });
+function geomTokensDTCG(scale, { unit = "px" } = {}) {
+  const dim = (px) => ({ $type: "dimension", $value: dimUnit(px, unit) });
   const size = {};
   for (const [name, s] of Object.entries(scale.sizes)) {
     size[name] = {
@@ -3555,9 +3566,18 @@ function hydrate(snapshot) {
     type: clampType(s.type),
     geometry: clampGeometry(s.geometry),
     palettes,
+    ...clampExport(s.export),
     ...(typeof s.vol === "string" && s.vol ? { vol: s.vol } : {}),
     ...(story ? { story } : {}),
   };
+}
+
+// clampExport — the OPTIONAL export-format prefs { unit } (Settings › Export; the CSS unit). Attached only
+// when a valid unit is present, so the hydrate identity gate holds (absent stays absent; invalid drops).
+function clampExport(e) {
+  if (!e || typeof e !== "object") return {};
+  const unit = clampEnum(e.unit, ["px", "rem", "em"], null);
+  return unit ? { export: { unit } } : {};
 }
 
 // a breakpoint mode's @media min-width (px) — OPTIONAL: {} when absent/invalid (no media query), or
@@ -10614,11 +10634,12 @@ class HctApp extends HTMLElement {
     // view.exports). Computed from the same engines the modals + the Brand-Kit MCP use.
     const typeSc = this._typeScaleFor("base"); // override-aware base scale (Phase 3) — same as the matrix Base column
     const geomSc = this._geomScaleFor("base");
+    const u = { unit: this._exportUnit() }; // the CSS unit preference (Settings › Export); Figma stays px
     const SYSTEM_CODE = {
-      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales()),
-      "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc), null, 2),
-      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales()),
-      "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc), null, 2),
+      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales(), u),
+      "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
+      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), u),
+      "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
     };
     const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG" };
     // the systems currently opted into the Download-All + MCP bundle (for the footer summary).
@@ -10821,6 +10842,7 @@ class HctApp extends HTMLElement {
   downloadAllZip(view) {
     const s = slug(this.doc.name || "palette");
     const sys = this.exportSystems;
+    const u = { unit: this._exportUnit() }; // the CSS unit preference; the figma/ folder stays px (Figma is numeric)
     const ex = view.exports;
     const files = [];
     if (sys.color) {
@@ -10854,12 +10876,12 @@ class HctApp extends HTMLElement {
     }
     if (sys.type) {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
-      const tDtcg = JSON.stringify(typeTokensDTCG(tsc), null, 2);
+      const tDtcg = JSON.stringify(typeTokensDTCG(tsc, u), null, 2); // the chosen unit — for the typography/ folder
       files.push(
-        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales()) },
+        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales(), u) },
         { name: "typography/type.tokens.json", data: tDtcg },
-        ...this._typeModeDTCGFiles("typography/type"),
-        { name: "figma/type.tokens.json", data: tDtcg }, // importable as Figma text styles (via a tokens plugin)
+        ...this._typeModeDTCGFiles("typography/type", u),
+        { name: "figma/type.tokens.json", data: JSON.stringify(typeTokensDTCG(tsc), null, 2) }, // ALWAYS px — Figma import (a tokens plugin)
         // a single "Typography" collection with a MODE per breakpoint (Base + each) — one moded Figma-variable
         // file instead of N per-width DTCG files. Always emitted (Base-only when there are no breakpoints).
         { name: "figma/typography.modes.variables.json", data: JSON.stringify(typeTokensFigmaModes(tsc, this._typeModeScales()), null, 2) },
@@ -10867,11 +10889,11 @@ class HctApp extends HTMLElement {
     }
     if (sys.geometry) {
       const gsc = this._geomScaleFor("base"); // composed with the type scale (the per-step `font` is shared); override-aware (Phase 3)
-      const gDtcg = JSON.stringify(geomTokensDTCG(gsc), null, 2);
+      const gDtcg = JSON.stringify(geomTokensDTCG(gsc, u), null, 2); // the chosen unit — for the geometry/ folder
       files.push(
-        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales()) },
+        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales(), u) },
         { name: "geometry/geometry.tokens.json", data: gDtcg },
-        ...this._geomModeDTCGFiles("geometry/geometry"),
+        ...this._geomModeDTCGFiles("geometry/geometry", u),
         { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
         // a single "Geometry" collection with a MODE per breakpoint (Base + each) — one moded Figma-variable
         // file instead of N per-width DTCG files. Always emitted (Base-only when there are no breakpoints).
@@ -11121,12 +11143,16 @@ class HctApp extends HTMLElement {
   // The Settings nav model: grouped, labeled sections (the left rail). Each item id → a panel.
   _settingsNav() {
     return [
-      { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }] },
+      { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }, { id: "export", label: "Export" }] },
       { group: "App", items: [{ id: "appearance", label: "Appearance" }] },
       { group: "Account", items: [{ id: "account", label: "Account" }] },
       { group: "About", items: [{ id: "about", label: "About" }] },
     ];
   }
+  // _exportUnit — the CSS unit for the type/geometry exports (Settings › Export). Doc-bound + persisted so it
+  // travels with the kit; defaults to "px" (the pre-setting output). Figma exports ignore it (they're numeric).
+  _exportUnit() { return this.doc.export && ["px", "rem", "em"].includes(this.doc.export.unit) ? this.doc.export.unit : "px"; }
+  _setExportUnit(unit) { this.commit((d) => { d.export = { ...(d.export || {}), unit }; }); }
 
   // _settingsPanel — the right-content for a nav section: { title, desc, body[] }.
   _settingsPanel(sec) {
@@ -11140,6 +11166,16 @@ class HctApp extends HTMLElement {
             (id) => { this.theme = id; this.dataset.theme = id; setColorScheme(id); this.render(); }, "setapptheme"),
           this._settingRow("Canvas preview", "The scheme the canvas previews in — independent of the chrome.", schemes, this.canvasTheme,
             (id) => { this.canvasTheme = id; this.render(); }, "setcanvastheme"),
+        ])],
+      };
+    }
+    if (sec === "export") {
+      const units = [{ id: "px", label: "px" }, { id: "rem", label: "rem" }, { id: "em", label: "em" }];
+      return {
+        title: "Export", desc: "How the CSS + DTCG exports render. Figma variables are always numeric (px).",
+        body: [this._settingsGroup(null, [
+          this._settingRow("CSS units", "The unit the Typography + Geometry CSS/DTCG use. rem = px ÷ 16 (clean, thanks to the nice-number sizes). Figma stays px.", units, this._exportUnit(),
+            (id) => this._setExportUnit(id), "setexportunit"),
         ])],
       };
     }
@@ -11375,13 +11411,13 @@ class HctApp extends HTMLElement {
   }
   // per-breakpoint DTCG files — one valid standalone DTCG per mode that has a minWidth, keyed by the width
   // (self-documenting + collision-free). No-width modes are preview-only, so they don't export (mirrors CSS).
-  _typeModeDTCGFiles(prefix = "type") {
+  _typeModeDTCGFiles(prefix = "type", opts = {}) {
     return this._typeModeScales().filter((m) => Number(m.minWidth) > 0)
-      .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(typeTokensDTCG(m.scale), null, 2) }));
+      .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(typeTokensDTCG(m.scale, opts), null, 2) }));
   }
-  _geomModeDTCGFiles(prefix = "geometry") {
+  _geomModeDTCGFiles(prefix = "geometry", opts = {}) {
     return this._geomModeScales().filter((m) => Number(m.minWidth) > 0)
-      .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(geomTokensDTCG(m.scale), null, 2) }));
+      .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(geomTokensDTCG(m.scale, opts), null, 2) }));
   }
   geomModeControl() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;

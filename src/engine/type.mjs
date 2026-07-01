@@ -164,21 +164,28 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 // utility class per step. Drop-in: `class="type-display-xl"`.
 // the per-step `--type-*` custom-property lines for a scale (no :root wrapper) — shared by the base export
 // and the per-breakpoint @media overrides, since bodyBase scales these and only these.
-function typeVarLines(scale, indent = "  ") {
+// dimUnit(px, unit) — format a px dimension in the chosen CSS export unit. rem/em = px ÷ 16 (root-relative),
+// stripped of trailing zeros; the nice-number quantization keeps these CLEAN (16px→1rem, 24px→1.5rem,
+// 2px→0.125rem, 11px→0.6875rem). Absent / "px" ⇒ `${px}px` (identity — the pre-setting default).
+export function dimUnit(px, unit) {
+  return unit === "rem" || unit === "em" ? `${parseFloat((px / 16).toFixed(4))}${unit}` : `${px}px`;
+}
+
+function typeVarLines(scale, indent = "  ", unit = "px") {
   const out = [];
   for (const [cName, steps] of Object.entries(scale.categories)) {
     for (const [sName, s] of Object.entries(steps)) {
       const p = `--type-${kebab(cName)}-${kebab(sName)}`;
-      out.push(`${indent}${p}-size: ${s.size}px; ${p}-line: ${s.lineHeight}px; ${p}-tracking: ${s.letterSpacing}px; ${p}-weight: ${s.weight};`);
+      out.push(`${indent}${p}-size: ${dimUnit(s.size, unit)}; ${p}-line: ${dimUnit(s.lineHeight, unit)}; ${p}-tracking: ${dimUnit(s.letterSpacing, unit)}; ${p}-weight: ${s.weight};`);
     }
   }
   return out.join("\n");
 }
 
-export function typeTokensCSS(scale) {
+export function typeTokensCSS(scale, { unit = "px" } = {}) {
   const lines = [":root {"];
   for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
-  lines.push(typeVarLines(scale));
+  lines.push(typeVarLines(scale, "  ", unit));
   lines.push("}");
   for (const [cName, steps] of Object.entries(scale.categories)) {
     const role = scale.roleOf[cName] || "body";
@@ -194,18 +201,18 @@ export function typeTokensCSS(scale) {
 // typeTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
 // re-declares the per-step size vars at that mode's scale (the utilities + font vars are unchanged, so they
 // auto-track). `modes` = [{ name, minWidth, scale }]; a mode without a positive minWidth is skipped.
-export function typeTokensResponsiveCSS(scale, modes = []) {
-  let css = typeTokensCSS(scale);
+export function typeTokensResponsiveCSS(scale, modes = [], { unit = "px" } = {}) {
+  let css = typeTokensCSS(scale, { unit });
   for (const m of modes) {
     if (!(Number(m.minWidth) > 0) || !m.scale) continue;
-    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ")}\n  }\n}\n`;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ", unit)}\n  }\n}\n`;
   }
   return css;
 }
 
 // typeTokensDTCG — the type scale as DTCG tokens: a fontFamily group + a typography group per
 // category/step (composite `typography` $type, the W3C-DTCG shape).
-export function typeTokensDTCG(scale) {
+export function typeTokensDTCG(scale, { unit = "px" } = {}) {
   const fontFamily = {};
   for (const [role, family] of Object.entries(scale.fonts)) fontFamily[role] = { $type: "fontFamily", $value: family };
   const typography = {};
@@ -215,7 +222,7 @@ export function typeTokensDTCG(scale) {
     for (const [sName, s] of Object.entries(steps)) {
       typography[cName][sName] = {
         $type: "typography",
-        $value: { fontFamily: scale.fonts[role], fontSize: `${s.size}px`, lineHeight: `${s.lineHeight}px`, letterSpacing: `${s.letterSpacing}px`, fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: `${s.paragraphSpacing}px`, paragraphIndent: `${s.paragraphIndent}px` },
+        $value: { fontFamily: scale.fonts[role], fontSize: dimUnit(s.size, unit), lineHeight: dimUnit(s.lineHeight, unit), letterSpacing: dimUnit(s.letterSpacing, unit), fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: dimUnit(s.paragraphSpacing, unit), paragraphIndent: dimUnit(s.paragraphIndent, unit) },
       };
     }
   }

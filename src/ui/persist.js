@@ -245,9 +245,18 @@ export function hydrate(snapshot) {
     type: clampType(s.type),
     geometry: clampGeometry(s.geometry),
     palettes,
+    ...clampExport(s.export),
     ...(typeof s.vol === "string" && s.vol ? { vol: s.vol } : {}),
     ...(story ? { story } : {}),
   };
+}
+
+// clampExport — the OPTIONAL export-format prefs { unit } (Settings › Export; the CSS unit). Attached only
+// when a valid unit is present, so the hydrate identity gate holds (absent stays absent; invalid drops).
+function clampExport(e) {
+  if (!e || typeof e !== "object") return {};
+  const unit = clampEnum(e.unit, ["px", "rem", "em"], null);
+  return unit ? { export: { unit } } : {};
 }
 
 // a breakpoint mode's @media min-width (px) — OPTIONAL: {} when absent/invalid (no media query), or
