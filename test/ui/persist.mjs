@@ -47,6 +47,15 @@ const mut2 = JSON.parse(JSON.stringify(base)); mut2.palettes[0].hue = 410;   // 
 const hyd2 = U.hydrate(U.serialize(mut2));
 if (hyd2.palettes[0].hue !== 360) FAIL("clamp", `palette hue 410 -> ${hyd2.palettes[0].hue}, want 360`);
 if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "clamping palette hue disturbed sibling chroma");
+// export-format prefs (doc.export.unit) — round-trips when valid; absent stays absent; invalid drops.
+{
+  const withUnit = JSON.parse(JSON.stringify(base)); withUnit.export = { unit: "rem" };
+  if (U.hydrate(U.serialize(withUnit)).export?.unit !== "rem") FAIL("export", "doc.export.unit=rem did not round-trip");
+  if ("export" in U.hydrate(U.serialize(base))) FAIL("export", "absent export must stay absent (identity gate)");
+  const bad = JSON.parse(JSON.stringify(base)); bad.export = { unit: "furlong" };
+  if ("export" in U.hydrate(U.serialize(bad))) FAIL("export", "an invalid unit must drop the export field");
+}
+
 // clamp-to-default hydrator would fail the above (it discards in-domain values) — that's the anti-hack
 
 // ── hpg-persistence-field-default: a doc PREDATING the differential-damping fields hydrates

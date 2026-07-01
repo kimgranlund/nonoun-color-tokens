@@ -79,6 +79,14 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(/\.control-md\s*\{[^}]*block-size: var\(--size-md-height\)[^}]*padding-block: 0/.test(css), "CSS emits a .control-md utility class (block-size lever, padding-block 0)");
 }
 
+// ── CSS export unit (px/rem/em): even-grid geometry converts clean to rem ──
+{
+  const g = G.geomScale({ treatment: "comfortable", baseHeight: 32 }); // MD height = 32
+  ok(/--size-md-height: 32px;/.test(G.geomTokensCSS(g)), "geomTokensCSS defaults to px");
+  ok(/--size-md-height: 2rem;/.test(G.geomTokensCSS(g, { unit: "rem" })), "unit:rem → 32px = 2rem (radii/space convert too)");
+  ok(G.geomTokensDTCG(g, { unit: "rem" }).size.MD.height.$value === "2rem" && G.geomTokensDTCG(g).size.MD.height.$value === "32px", "geometry DTCG carries the unit + defaults to px");
+}
+
 // ── responsive CSS: per-breakpoint @media blocks re-declaring the per-size vars (Phase 5.4) ──
 {
   const base = G.geomScale({ treatment: "comfortable", baseHeight: 28 });
