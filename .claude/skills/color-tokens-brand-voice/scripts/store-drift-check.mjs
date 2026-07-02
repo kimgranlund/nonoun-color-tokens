@@ -22,10 +22,14 @@ const STORE_ID = 420293;
 const PINNED_PRODUCTS = { 1182548: "Pro", 1182535: "Studio" }; // app's LEMON_PRODUCT_IDS
 const PINNED_VARIANTS = { 1849393: 1182548, 1849376: 1182535 };
 // Copy the live store must carry once the §10 dashboard walk is done. Presence probes, not diffs —
-// robust to LS's HTML formatting.
+// robust to LS's HTML formatting. Per product: the thesis heading lives only in Pro's body (§2.1);
+// "59 semantic roles" reaches both via the shared §2.3 blocks appended to each description.
 const PRODUCT_NAME = { 1182548: "Ultimate Tokens — Pro", 1182535: "Ultimate Tokens — Studio" };
 const VARIANT_NAME = { 1849393: "Annual, per user", 1849376: "Annual, 5 seats" };
-const DESC_PROBES = ["59 semantic roles", "derived — not guessed"]; // the long-form's fingerprints
+const DESC_PROBES = {
+  1182548: ["59 semantic roles", "derived — not guessed"],
+  1182535: ["59 semantic roles", "Everything in Pro"],
+};
 
 let failed = false;
 const err = (m) => { console.log("✗ ERROR: " + m); failed = true; };
@@ -65,7 +69,7 @@ for (const p of products.filter((q) => PINNED_PRODUCTS[Number(q.id)])) {
   const id = Number(p.id), a = p.attributes, desc = strip(a.description);
   if (PRODUCT_NAME[id] && a.name !== PRODUCT_NAME[id])
     warn(`product ${id} name is "${a.name}" — corpus says "${PRODUCT_NAME[id]}" (store-copy §2)`);
-  for (const probe of DESC_PROBES)
+  for (const probe of DESC_PROBES[id] || [])
     if (!desc.includes(probe))
       warn(`product ${id} description lacks the corpus fingerprint "${probe}" — the §10 re-paste hasn't landed (desc is ${desc.length} chars)`);
   liveTexts.push({ label: `product-${id}`, text: `${a.name}\n${desc}` });
