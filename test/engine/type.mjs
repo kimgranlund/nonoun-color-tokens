@@ -209,6 +209,25 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(dup.variables["Body/MD/size"].values["Base 2"] === mobile.categories.Body.MD.size, "the breakpoint renamed off \"Base\" keeps its own value (didn't overwrite the synthetic Base)");
 }
 
+// ── Figma "Font Primitives" companion collection: deduped family primitives + per-voice aliases (5.4c) ──
+{
+  const base = T.typeScale({ treatment: "product", bodyBase: 16 });
+  const out = T.typeTokensFigmaPrimitives(base);
+  const col = out.collections["Font Primitives"];
+  ok(col && JSON.stringify(col.modes) === JSON.stringify(["Value"]), "one \"Value\" mode (families/weights don't vary by breakpoint)");
+  // product: display+heading are BOTH Inter Tight → deduped into ONE family primitive (first role wins).
+  ok(col.variables["family/display"] && col.variables["family/display"].type === "STRING" && col.variables["family/display"].values.Value === "Inter Tight", "family/display is a STRING primitive carrying the family");
+  ok(!col.variables["family/heading"], "a duplicate family dedupes into one primitive (no family/heading — Inter Tight is owned by display)");
+  // every voice gets a font/<voice> ALIAS to its family primitive + a weight/<voice> FLOAT primitive.
+  const voices = Object.keys(base.categories);
+  ok(voices.every((v) => col.variables[`font/${v}`] && col.variables[`font/${v}`].type === "ALIAS"), "every voice emits a font/<voice> ALIAS");
+  ok(voices.every((v) => col.variables[`weight/${v}`] && col.variables[`weight/${v}`].type === "FLOAT" && Number.isFinite(col.variables[`weight/${v}`].values.Value)), "every voice emits a weight/<voice> FLOAT primitive");
+  ok(voices.every((v) => col.variables[col.variables[`font/${v}`].target]), "every alias target resolves to a primitive in the same collection");
+  ok(col.variables["font/Heading Editorial"].target === "family/display", "Heading Editorial aliases the deduped Inter Tight primitive (family/display)");
+  ok(col.variables["font/Heading Eyebrow"].target === col.variables["font/Code"].target, "Eyebrow and Code alias the SAME mono primitive (roleOf → mono)");
+  ok(col.variables["weight/Display"].values.Value === base.categories.Display.MD.weight, "weight/Display carries the voice's uniform weight");
+}
+
 if (fails.length) { console.error(`type FAIL (${fails.length}):\n  ` + fails.join("\n  ")); process.exit(1); }
 console.log("type PASS — modular scale, optical tracking, treatments, CSS + DTCG + Figma-modes emit");
 process.exit(0);
