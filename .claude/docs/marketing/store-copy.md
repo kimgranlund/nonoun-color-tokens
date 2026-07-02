@@ -186,6 +186,11 @@ links the variant deep-link `…/checkout/buy/1849376` instead (§4.2).
 
 ### 2.3 · Shared product-page blocks — appended to both `products[*].attributes.description`
 
+**Pasteability:** LS's description editor is rich text — the **bullets and the FAQ paste** (as list +
+paragraphs); the **comparison table does NOT** (markdown tables render as pipe-text there). The table
+is for table-rendering surfaces (the landing page's pricing section); in the LS dashboard, append
+bullets + FAQ only.
+
 **Feature / benefit bullets (shared spec block)**
 
 ```
