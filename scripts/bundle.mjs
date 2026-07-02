@@ -66,10 +66,25 @@ const css = readFileSync(`${ROOT}/src/ui/styles.css`, "utf8");
 // external request (same reason icons.js inlines its SVGs). The favicon SVG's own prefers-color-scheme
 // invert <style> is scoped to the icon's render context, not the page, so it's safe as rel=icon.
 const favHref = "data:image/svg+xml;base64," + Buffer.from(readFileSync(`${ROOT}/public/favicon/favicon.svg`)).toString("base64");
+// The GitHub Pages demo origin — og:image/og:url must be ABSOLUTE for scrapers, and the pages
+// workflow ships public/icons/ + public/favicon/ alongside the single-file demo so they resolve.
+const SITE = "https://kimgranlund.github.io/nonoun-color-tokens/";
+const DESC = "Perceptual design tokens — color ramps with 59 semantic roles, typography and geometry, exported to CSS, Tailwind v4, shadcn/ui, Figma and DTCG.";
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="${favHref}">
 <title>Ultimate Tokens by NONOUN</title>
+<meta name="description" content="${DESC}">
+<meta name="theme-color" content="#000000">
+<meta property="og:title" content="Ultimate Tokens by NONOUN">
+<meta property="og:description" content="${DESC}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="${SITE}">
+<meta property="og:image" content="${SITE}icons/ico-nonoun-black.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:image:alt" content="The NONOUN monogram — a white N on a black square">
+<meta name="twitter:card" content="summary">
 <style>${css}</style></head>
 <body><nonoun-color-tokens></nonoun-color-tokens>
 <script type="module">

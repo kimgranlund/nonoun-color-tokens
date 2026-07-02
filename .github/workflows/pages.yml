@@ -34,10 +34,14 @@ jobs:
       - run: npm run build
       # The offline single-file build IS the demo — copy it to the site root as index.html.
       # It has no external assets, so no base-path juggling is needed under the project subpath.
+      # The brand icons + favicon files ride along so the head's absolute og:image URL (and any
+      # direct /favicon/ request) resolves on the deployed origin; the page itself never loads them.
       - name: Assemble site
         run: |
           mkdir -p _site
           cp dist/nonoun-color-tokens.html _site/index.html
+          cp -R dist/icons _site/icons
+          cp -R dist/favicon _site/favicon
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
