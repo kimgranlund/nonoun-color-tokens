@@ -64,3 +64,10 @@ When the product changes anything the corpus states — a count, a price, a form
 update `fact-sheet.md` **in the same change**, then sweep: `grep -rn "<old value>"
 .claude/docs/marketing/` and fix every hit. A drifted marketing fact is a defect of the same severity
 as a failing test (`CLAUDE.md` · "Context is memory").
+
+**The deployed store doesn't grep — audit it:** `node .claude/skills/color-tokens-brand-voice/
+scripts/store-drift-check.mjs` (needs `LEMONSQUEEZY_API_KEY`, a live-mode key, in
+`.claude/settings.local.json`). Read-only: it checks the live product set against the app's product
+pin (a published product outside the pin sells keys the app rejects — a blocking error), the live
+names/descriptions against the corpus's schema-keyed blocks, and runs the live text through
+voice-check. Products/variants have no write API — fixes are the store-copy.md §10 dashboard walk.
