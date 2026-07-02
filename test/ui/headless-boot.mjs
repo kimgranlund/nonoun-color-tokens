@@ -1852,6 +1852,26 @@ ok(!app.querySelector(".account-license-input") && !app.querySelector(".account-
 app.inFigma = false; app.render(); flushRaf();
 app.closeSettings(); flushRaf();
 
+// ── (std) the one-click STANDARD breakpoint sets (Typography + Geometry) ─────────────
+// Clear any modes accumulated above, then create each standard set and pin its shape: four modes at
+// min-widths 768/992/1280/1540 named by width; type bodyBase steps +1/rung, geometry seeds FLAT.
+app.commit((d) => { if (d.type) { d.type = { ...d.type }; delete d.type.modes; } if (d.geometry) { d.geometry = { ...d.geometry }; delete d.geometry.modes; } }); flushRaf();
+const stdBB = (app.doc.type && app.doc.type.bodyBase) ?? 16;
+app.addStandardTypeModes(); flushRaf();
+{
+  const ms = (app.doc.type.modes || []);
+  ok(ms.length === 4 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([768, 992, 1280, 1540]), `(std) Standard set creates the four type modes at 768/992/1280/1540 (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
+  ok(ms.every((m, i) => m.name === String(m.minWidth) && m.bodyBase === stdBB + i + 1), "(std) type modes are named by width and step bodyBase +1 per rung");
+  ok(app.typeMode === ms[0].id, "(std) the control lands on the first new type mode");
+}
+const stdBH = (app.doc.geometry && app.doc.geometry.baseHeight) ?? 28;
+app.addStandardGeomModes(); flushRaf();
+{
+  const ms = (app.doc.geometry.modes || []);
+  ok(ms.length === 4 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([768, 992, 1280, 1540]), `(std) Standard set creates the four geometry modes at 768/992/1280/1540 (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
+  ok(ms.every((m) => m.name === String(m.minWidth) && m.baseHeight === stdBH), "(std) geometry modes are named by width and seed FLAT from the Base height");
+}
+
 // ── report ──────────────────────────────────────────────────────────────────────────
 if (fails.length) {
   console.error("HEADLESS BOOT FAIL:");

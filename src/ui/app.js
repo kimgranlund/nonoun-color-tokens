@@ -5929,7 +5929,25 @@ class HctApp extends HTMLElement {
       this.segmented(items, this.geomMode, (id) => { this.geomMode = id; this.render(); },
         { cls: "canvas-seg", ariaLabel: "Geometry breakpoint mode", role: "group", idPrefix: "gmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named ramp with its own base control height", onclick: () => this.addGeomMode() }),
+      // one-click standard web set — only while no modes exist (mirrors the Typography control).
+      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard web breakpoints — 768 · 992 · 1280 · 1540, each seeded from the Base height (control geometry has no growth law; tune per breakpoint)", onclick: () => this.addStandardGeomModes() })] : []),
     );
+  }
+  // addStandardGeomModes — the standard web breakpoint set in one click: four modes at min-widths
+  // 768/992/1280/1540, each SEEDED FLAT from the Base height (unlike type's +1px rungs, control
+  // geometry has no monotonic convention — mobile wants taller touch targets, desktop wants density —
+  // so the columns exist to be tuned, not pre-opinionated). Names are the widths; Base stays ≤476.
+  addStandardGeomModes() {
+    const bh = (this.doc.geometry && this.doc.geometry.baseHeight) ?? 28;
+    const seed = Date.now().toString(36);
+    const rungs = [768, 992, 1280, 1540];
+    this.geomMode = "gm-" + seed + "-0";
+    this.commit((d) => {
+      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
+      const modes = d.geometry.modes ? [...d.geometry.modes] : [];
+      rungs.forEach((w, i) => modes.push({ id: `gm-${seed}-${i}`, name: String(w), baseHeight: bh, minWidth: w }));
+      d.geometry.modes = modes;
+    });
   }
   addGeomMode() {
     const id = "gm-" + Date.now().toString(36);
