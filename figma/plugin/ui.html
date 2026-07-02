@@ -2836,7 +2836,35 @@ function typeTokensFigmaModes(baseScale, modes = []) {
   };
 }
 
-return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, typeScale, dimUnit, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes };
+// typeTokensFigmaPrimitives — the "Font Primitives" COMPANION collection to typeTokensFigmaModes: the
+// distinct font families deduped into `family/<role>` STRING primitives, a `font/<voice>` ALIAS per
+// voice pointing at its family primitive (edit the primitive; every voice follows), and a
+// `weight/<voice>` FLOAT primitive (the voice's uniform weight — one edit point per voice). Alias
+// entries carry `{ type:"ALIAS", target:"<variable key>" }` INSTEAD of `values` — a consumer resolves
+// them within the same collection. Single "Value" mode (families/weights don't vary by breakpoint;
+// breakpoints live in the Typography collection). This file is an IMPORT artifact only — the in-Figma
+// apply path (`_figmaFloatPlans`) never consumes it, so the plugin executor stays float-only.
+function typeTokensFigmaPrimitives(scale) {
+  const variables = {};
+  const famKey = {}; // family string → the primitive key that owns it (first role wins = dedupe)
+  for (const [role, fam] of Object.entries(scale.fonts || {})) {
+    if (!fam || famKey[fam]) continue;
+    famKey[fam] = `family/${role}`;
+    variables[famKey[fam]] = { type: "STRING", values: { Value: fam } };
+  }
+  for (const [voice, steps] of Object.entries(scale.categories || {})) {
+    const fam = (scale.fonts || {})[(scale.roleOf || {})[voice]];
+    if (fam && famKey[fam]) variables[`font/${voice}`] = { type: "ALIAS", target: famKey[fam] };
+    const first = Object.values(steps)[0];
+    if (first && Number.isFinite(first.weight)) variables[`weight/${voice}`] = { type: "FLOAT", values: { Value: first.weight } };
+  }
+  return {
+    $schema: "figma-ui3-variables.primitives.schema.v1",
+    collections: { "Font Primitives": { modes: ["Value"], variables } },
+  };
+}
+
+return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, typeScale, dimUnit, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes, typeTokensFigmaPrimitives };
 })();
 __M.geometry = (function(){
 // geometry.mjs — the GEOMETRY / dimensional engine: the spatial analog of the color & type engines.
@@ -5595,7 +5623,7 @@ const { MCP_BRAND_KIT } = __M.mcpAssets;
 const { TYPE_FONTS_CSS } = __M.typeFonts;
 const { CATEGORY_INDEX, loadCategory } = __M.categoryIndex;
 const { deriveNeutral, deriveRelative, RELATIONSHIPS } = __M.derive;
-const { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, typeTokensFigmaModes, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS } = __M.type;
+const { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS } = __M.type;
 const { geomScale, geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } = __M.geometry;
 const { zipStore } = __M.zip;
 const { modeApplyPlan, validateModeInterchange } = __M.modeApplyPlan;
@@ -6001,7 +6029,7 @@ const chip = (label, { mode = "status", on = false, tone = "", cls = "", title, 
 // the common responsive breakpoint widths offered as one-click quick-picks beside the breakpoint-mode
 // min-width field (Phase 2 — chips, not a native <datalist>: the app owns its UI + Safari's datalist on
 // number inputs is unreliable). The number field stays for any custom width.
-const MODE_WIDTH_PRESETS = [480, 768, 992, 1024, 1280, 1440];
+const MODE_WIDTH_PRESETS = [476, 768, 992, 1280, 1540];
 
 // field — a labeled control row. ASSOCIATES the <label> with the control (label[for] +
 // control[id]) so the visible label IS the control's accessible name and clicking it
@@ -8531,7 +8559,24 @@ class HctApp extends HTMLElement {
       this.segmented(items, this.typeMode, (id) => { this.typeMode = id; this.render(); },
         { cls: "canvas-seg", ariaLabel: "Typography breakpoint mode", role: "group", idPrefix: "tmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named scale with its own body size", onclick: () => this.addTypeMode() }),
+      // one-click standard web set — only while no modes exist (it would duplicate names otherwise).
+      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard web breakpoints — 768 · 992 · 1280 · 1540, each with a stepped body size (Base stays your ≤476 mobile scale)", onclick: () => this.addStandardTypeModes() })] : []),
     );
+  }
+  // addStandardTypeModes — the standard web breakpoint set in one click: four modes at min-widths
+  // 768/992/1280/1540, bodyBase stepping +1px per rung from the current Base (Base itself stays the
+  // mobile ≤476 scale — that's why 476 has no mode of its own). Names are the widths.
+  addStandardTypeModes() {
+    const bb = (this.doc.type && this.doc.type.bodyBase) ?? 16;
+    const seed = Date.now().toString(36);
+    const rungs = [768, 992, 1280, 1540];
+    this.typeMode = "tm-" + seed + "-0"; // land on the first new mode
+    this.commit((d) => {
+      d.type = { ...(d.type || DEFAULT_TYPE) };
+      const modes = d.type.modes ? [...d.type.modes] : [];
+      rungs.forEach((w, i) => modes.push({ id: `tm-${seed}-${i}`, name: String(w), bodyBase: bb + i + 1, minWidth: w }));
+      d.type.modes = modes;
+    });
   }
   addTypeMode() {
     const id = "tm-" + Date.now().toString(36);
@@ -10917,6 +10962,9 @@ class HctApp extends HTMLElement {
         // a single "Typography" collection with a MODE per breakpoint (Base + each) — one moded Figma-variable
         // file instead of N per-width DTCG files. Always emitted (Base-only when there are no breakpoints).
         { name: "figma/typography.modes.variables.json", data: JSON.stringify(typeTokensFigmaModes(tsc, this._typeModeScales()), null, 2) },
+        // the companion "Font Primitives" collection — deduped family STRING primitives + per-voice
+        // font aliases + per-voice weight primitives (import artifact; never enters the apply path).
+        { name: "figma/typography.primitives.variables.json", data: JSON.stringify(typeTokensFigmaPrimitives(tsc), null, 2) },
       );
     }
     if (sys.geometry) {

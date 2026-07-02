@@ -1036,12 +1036,13 @@ const eocd = zb.length - 22; // EOCD has no trailing comment → it's the final 
 const eocdSig = zb[eocd] === 0x50 && zb[eocd + 1] === 0x4b && zb[eocd + 2] === 0x05 && zb[eocd + 3] === 0x06;
 const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
 // default opt-in = all three systems on: 9 colour files (ONE css/ folder — the chosen colour format, hex by
-// default) + 4 figma-aliased + 4 typography (incl. figma/ + figma/ moded) + 4 geometry + the config = 22.
-ok(eocdSig && entries === 22, `(ee) the EOCD reports 22 entries — colour (9) + figma-aliased (4) + typography (4) + geometry (4) + config (got ${entries})`);
+// default) + 4 figma-aliased + 5 typography (incl. figma/ + figma/ moded + figma/ primitives) + 4 geometry
+// + the config = 23.
+ok(eocdSig && entries === 23, `(ee) the EOCD reports 23 entries — colour (9) + figma-aliased (4) + typography (5) + geometry (4) + config (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
 const wantPaths = ["css-hex/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "nonoun-color-tokens-my-set-config.json",
   "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt",
-  "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "figma/typography.modes.variables.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.variables.json", "figma/dimension.modes.variables.json"];
+  "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "figma/typography.modes.variables.json", "figma/typography.primitives.variables.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.variables.json", "figma/dimension.modes.variables.json"];
 ok(wantPaths.every((p) => zipText.includes(p)), "(ee) every colour format + typography/ + geometry/ + the moded Figma-variable files + the config + the figma-aliased/ cascade variant is present in the archive");
 // the Figma dimension file is NUMBER-typed (FLOAT variables), not the px dimension strings — so Figma imports it as number variables
 ok(zipText.includes("dimension.variables.json") && /"\$type":\s*"number"/.test(zipText) && zipText.includes('"Geometry"'), "(ee) figma/dimension.variables.json is a Geometry collection of number ($type number) variables");
@@ -1482,7 +1483,7 @@ ok(app._figmaFloatPlans().length === 0, "(ty-fig) Type + Geometry OFF → no flo
 app.exportSystems = { color: true, type: true, geometry: true }; // restore
 // Phase 2: common-breakpoint quick-pick chips flank the min-width field (the number field stays for custom).
 const tPresets = () => walk(app, (e) => e.classList && e.classList.contains("mode-preset"));
-ok(tPresets().length === 6, `(ty-bp) the breakpoint editor offers 6 width quick-picks (got ${tPresets().length})`);
+ok(tPresets().length === 5, `(ty-bp) the breakpoint editor offers the 5 standard width quick-picks (got ${tPresets().length})`);
 const tOn = tPresets().filter((e) => e.classList.contains("on"));
 ok(tOn.length === 1 && txtOf(tOn[0]) === "768", "(ty-bp) the active quick-pick chip matches the current min-width (768)");
 const t992 = tPresets().find((e) => txtOf(e) === "992");
@@ -1626,11 +1627,11 @@ ok(app.doc.geometry.modes[0].minWidth === 600 && app._geomModeScales()[0].minWid
 ok(app._geomModeDTCGFiles().length === 1 && app._geomModeDTCGFiles()[0].name === "geometry.600.tokens.json" && JSON.parse(app._geomModeDTCGFiles()[0].data).size, "(geo-bp) the breakpoint emits a per-mode DTCG file keyed by width");
 // Phase 2: the same common-breakpoint quick-picks under the geom min-width field. 600 is custom → none active.
 const gPresets = () => walk(app, (e) => e.classList && e.classList.contains("mode-preset"));
-ok(gPresets().length === 6, `(geo-bp) the breakpoint editor offers 6 width quick-picks (got ${gPresets().length})`);
+ok(gPresets().length === 5, `(geo-bp) the breakpoint editor offers the 5 standard width quick-picks (got ${gPresets().length})`);
 ok(gPresets().filter((e) => e.classList.contains("on")).length === 0, "(geo-bp) no quick-pick is active when the width (600) is custom");
-const g1024 = gPresets().find((e) => txtOf(e) === "1024");
-if (g1024) g1024.click(); flushRaf();
-ok(app.doc.geometry.modes[0].minWidth === 1024, "(geo-bp) clicking a quick-pick chip sets the active mode's min-width");
+const g1280 = gPresets().find((e) => txtOf(e) === "1280");
+if (g1280) g1280.click(); flushRaf();
+ok(app.doc.geometry.modes[0].minWidth === 1280, "(geo-bp) clicking a quick-pick chip sets the active mode's min-width");
 app.setGeomModeMinWidth(_gbpId, 600); flushRaf(); // restore for the matrix assertion below
 // the token MATRIX gains a column for the new breakpoint (Base + the ≥600px mode = 2 value columns)
 app.setGeomSpecMode("tokens"); flushRaf();

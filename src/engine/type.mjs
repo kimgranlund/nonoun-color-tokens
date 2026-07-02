@@ -275,3 +275,31 @@ export function typeTokensFigmaModes(baseScale, modes = []) {
     collections: { "Typography": { modes: modeNames, variables } },
   };
 }
+
+// typeTokensFigmaPrimitives — the "Font Primitives" COMPANION collection to typeTokensFigmaModes: the
+// distinct font families deduped into `family/<role>` STRING primitives, a `font/<voice>` ALIAS per
+// voice pointing at its family primitive (edit the primitive; every voice follows), and a
+// `weight/<voice>` FLOAT primitive (the voice's uniform weight — one edit point per voice). Alias
+// entries carry `{ type:"ALIAS", target:"<variable key>" }` INSTEAD of `values` — a consumer resolves
+// them within the same collection. Single "Value" mode (families/weights don't vary by breakpoint;
+// breakpoints live in the Typography collection). This file is an IMPORT artifact only — the in-Figma
+// apply path (`_figmaFloatPlans`) never consumes it, so the plugin executor stays float-only.
+export function typeTokensFigmaPrimitives(scale) {
+  const variables = {};
+  const famKey = {}; // family string → the primitive key that owns it (first role wins = dedupe)
+  for (const [role, fam] of Object.entries(scale.fonts || {})) {
+    if (!fam || famKey[fam]) continue;
+    famKey[fam] = `family/${role}`;
+    variables[famKey[fam]] = { type: "STRING", values: { Value: fam } };
+  }
+  for (const [voice, steps] of Object.entries(scale.categories || {})) {
+    const fam = (scale.fonts || {})[(scale.roleOf || {})[voice]];
+    if (fam && famKey[fam]) variables[`font/${voice}`] = { type: "ALIAS", target: famKey[fam] };
+    const first = Object.values(steps)[0];
+    if (first && Number.isFinite(first.weight)) variables[`weight/${voice}`] = { type: "FLOAT", values: { Value: first.weight } };
+  }
+  return {
+    $schema: "figma-ui3-variables.primitives.schema.v1",
+    collections: { "Font Primitives": { modes: ["Value"], variables } },
+  };
+}

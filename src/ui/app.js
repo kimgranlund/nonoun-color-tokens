@@ -30,7 +30,7 @@ import { MCP_BRAND_KIT } from "./mcp-assets.js";
 import { TYPE_FONTS_CSS } from "./type-fonts.js";
 import { CATEGORY_INDEX, loadCategory } from "./categories/index.js";
 import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.mjs";
-import { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, typeTokensFigmaModes, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS } from "../engine/type.mjs";
+import { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS } from "../engine/type.mjs";
 import { geomScale, geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
 import { modeApplyPlan, validateModeInterchange } from "../../figma/binder/mode-apply-plan.mjs";
@@ -436,7 +436,7 @@ const chip = (label, { mode = "status", on = false, tone = "", cls = "", title, 
 // the common responsive breakpoint widths offered as one-click quick-picks beside the breakpoint-mode
 // min-width field (Phase 2 — chips, not a native <datalist>: the app owns its UI + Safari's datalist on
 // number inputs is unreliable). The number field stays for any custom width.
-const MODE_WIDTH_PRESETS = [480, 768, 992, 1024, 1280, 1440];
+const MODE_WIDTH_PRESETS = [476, 768, 992, 1280, 1540];
 
 // field — a labeled control row. ASSOCIATES the <label> with the control (label[for] +
 // control[id]) so the visible label IS the control's accessible name and clicking it
@@ -2966,7 +2966,24 @@ class HctApp extends HTMLElement {
       this.segmented(items, this.typeMode, (id) => { this.typeMode = id; this.render(); },
         { cls: "canvas-seg", ariaLabel: "Typography breakpoint mode", role: "group", idPrefix: "tmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named scale with its own body size", onclick: () => this.addTypeMode() }),
+      // one-click standard web set — only while no modes exist (it would duplicate names otherwise).
+      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard web breakpoints — 768 · 992 · 1280 · 1540, each with a stepped body size (Base stays your ≤476 mobile scale)", onclick: () => this.addStandardTypeModes() })] : []),
     );
+  }
+  // addStandardTypeModes — the standard web breakpoint set in one click: four modes at min-widths
+  // 768/992/1280/1540, bodyBase stepping +1px per rung from the current Base (Base itself stays the
+  // mobile ≤476 scale — that's why 476 has no mode of its own). Names are the widths.
+  addStandardTypeModes() {
+    const bb = (this.doc.type && this.doc.type.bodyBase) ?? 16;
+    const seed = Date.now().toString(36);
+    const rungs = [768, 992, 1280, 1540];
+    this.typeMode = "tm-" + seed + "-0"; // land on the first new mode
+    this.commit((d) => {
+      d.type = { ...(d.type || DEFAULT_TYPE) };
+      const modes = d.type.modes ? [...d.type.modes] : [];
+      rungs.forEach((w, i) => modes.push({ id: `tm-${seed}-${i}`, name: String(w), bodyBase: bb + i + 1, minWidth: w }));
+      d.type.modes = modes;
+    });
   }
   addTypeMode() {
     const id = "tm-" + Date.now().toString(36);
@@ -5352,6 +5369,9 @@ class HctApp extends HTMLElement {
         // a single "Typography" collection with a MODE per breakpoint (Base + each) — one moded Figma-variable
         // file instead of N per-width DTCG files. Always emitted (Base-only when there are no breakpoints).
         { name: "figma/typography.modes.variables.json", data: JSON.stringify(typeTokensFigmaModes(tsc, this._typeModeScales()), null, 2) },
+        // the companion "Font Primitives" collection — deduped family STRING primitives + per-voice
+        // font aliases + per-voice weight primitives (import artifact; never enters the apply path).
+        { name: "figma/typography.primitives.variables.json", data: JSON.stringify(typeTokensFigmaPrimitives(tsc), null, 2) },
       );
     }
     if (sys.geometry) {
