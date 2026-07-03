@@ -3688,7 +3688,14 @@ function clampExport(e) {
   if (!e || typeof e !== "object") return {};
   const unit = clampEnum(e.unit, ["px", "rem", "em"], null);
   const colorFormat = clampEnum(e.colorFormat, ["hex", "oklch"], null);
-  const out = { ...(unit ? { unit } : {}), ...(colorFormat ? { colorFormat } : {}) };
+  // colorPrefix — the CSS custom-property prefix core (the `c` in `--c-*`). OPTIONAL: attach only a
+  // sanitized non-empty value that ISN'T the default "c" (so the default round-trips as absent — the
+  // identity gate). Sanitized to a legal ident core; capped; a bare/edge-hyphen/all-junk value drops.
+  const cp = typeof e.colorPrefix === "string"
+    ? e.colorPrefix.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1").slice(0, 40)
+    : "";
+  const colorPrefix = cp && cp !== "c" ? cp : null;
+  const out = { ...(unit ? { unit } : {}), ...(colorFormat ? { colorFormat } : {}), ...(colorPrefix ? { colorPrefix } : {}) };
   return Object.keys(out).length ? { export: out } : {};
 }
 
@@ -4057,7 +4064,17 @@ function colorLeaf(rgb, frac, alias) {
 // :root { flat raw vars (solids + scrim hex8) + --c-* semantic via light-dark() }.
 // Every --c-* references TWO raw vars that are themselves emitted in :root (ADR-005).
 function exportCSS(state) {
-  return cssFrom(derivedAll(state), false);
+  return cssFrom(derivedAll(state), false, cssPrefixOf(state));
+}
+
+// cssPrefixOf — the configurable CSS custom-property prefix (the `c` in `--c-*`). Lets a kit emit
+// Material-flavoured names (`--md-sys-color-*`) or any custom namespace, extended with our roles.
+// Sanitized to a legal CSS ident core: lowercased, non-[a-z0-9-] stripped, edge/leading-digit hyphens
+// trimmed. Empty / default "c" ⇒ the historical `--c-*` (identity — existing kits byte-identical).
+function cssPrefixOf(state) {
+  const raw = state && state.export && typeof state.export.colorPrefix === "string" ? state.export.colorPrefix : "";
+  const clean = raw.toLowerCase().replace(/^-+/, "").replace(/[^a-z0-9-]+/g, "-").replace(/^(\d)/, "c$1").replace(/-+$/, "").replace(/^-+/, "");
+  return clean || "c";
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -4066,45 +4083,46 @@ function exportCSS(state) {
 // Identical structure; raw values are oklch(L C H) / oklch(L C H / a%). The
 // semantic --c-* layer is unchanged (var() refs), so the two-layer flip holds.
 function exportOKLCH(state) {
-  return cssFrom(derivedAll(state), true);
+  return cssFrom(derivedAll(state), true, cssPrefixOf(state));
 }
 
-// cssFrom — shared CSS body for both variants. oklch=false -> hex raw values.
-function cssFrom(palettes, oklch) {
+// cssFrom — shared CSS body for both variants. oklch=false -> hex raw values. `pfx` is the
+// custom-property prefix core (the `c` in `--c-*`); defaults to "c" for the historical output.
+function cssFrom(palettes, oklch, pfx = "c") {
   const lines = [];
   lines.push(":root {");
   lines.push("  color-scheme: light dark;");
   for (const p of palettes) {
     lines.push("");
     lines.push(`  /* ${p.name} — flat mode-independent primitives */`);
-    // solid RAW vars: --c-{n}-050 .. --c-{n}-950 (raw stop names end in digits; semantic role names
-    // end in a word, so the two never collide despite sharing the --c- prefix).
+    // solid RAW vars: --{pfx}-{n}-050 .. -950 (raw stop names end in digits; semantic role names end
+    // in a word, so the two never collide despite sharing the prefix).
     for (const key of Object.keys(p.stops)) {
       const { rgb } = p.stops[key];
       const val = oklch ? oklchStr(rgbToOklch(rgb)) : hexOf(rgb);
-      lines.push(`  --c-${p.n}-${key}: ${val};`);
+      lines.push(`  --${pfx}-${p.n}-${key}: ${val};`);
     }
-    // scrim RAW vars: --c-{n}-500-{step}  (the 500 color at alpha% = step/10)
+    // scrim RAW vars: --{pfx}-{n}-500-{step}  (the 500 color at alpha% = step/10)
     for (const base of SCRIM_BASES) {
       for (const step of SCRIM_STEPS) {
         const sc = p.scrims[base][step];
         const val = oklch ? oklchStrA(rgbToOklch(sc.rgb), sc.alphaPct) : sc.hex;
-        lines.push(`  --c-${p.n}-${pad3(base)}-${pad3(step)}: ${val};`);
+        lines.push(`  --${pfx}-${p.n}-${pad3(base)}-${pad3(step)}: ${val};`);
       }
     }
-    // SEMANTIC --c-{n}-{role} vars: light-dark(var(light raw), var(dark raw)) (ADR-005)
+    // SEMANTIC --{pfx}-{n}-{role} vars: light-dark(var(light raw), var(dark raw)) (ADR-005)
     lines.push(`  /* ${p.name} — semantic roles */`);
     for (const r of p.roles) {
-      const lv = `var(--c-${p.n}-${refKey(r.lightRef)})`;
-      const dv = `var(--c-${p.n}-${refKey(r.darkRef)})`;
-      lines.push(`  --c-${p.n}${r.suffix}: light-dark(${lv}, ${dv});`);
+      const lv = `var(--${pfx}-${p.n}-${refKey(r.lightRef)})`;
+      const dv = `var(--${pfx}-${p.n}-${refKey(r.darkRef)})`;
+      lines.push(`  --${pfx}-${p.n}${r.suffix}: light-dark(${lv}, ${dv});`);
     }
     // KEY COLORS — retained brand values by expression (dominant/supportive), exact in OKLCH
     // (NOT mode-flipped; they are source colors, lossless from the OKLCH source).
     if (p.keyColors.length) {
       lines.push(`  /* ${p.name} — retained key colors (exact, OKLCH) */`);
       for (const kc of p.keyColors) {
-        lines.push(`  --c-${p.n}-key-${kc.role}: ${oklchStr({ L: kc.oklch[0], C: kc.oklch[1], H: kc.oklch[2] })};`);
+        lines.push(`  --${pfx}-${p.n}-key-${kc.role}: ${oklchStr({ L: kc.oklch[0], C: kc.oklch[1], H: kc.oklch[2] })};`);
       }
     }
   }
@@ -4408,7 +4426,7 @@ function exportAll(state, opts) {
   };
 }
 
-return { SCRIM_BASES, SCRIM_STEPS, exportCSS, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, exportAll };
+return { SCRIM_BASES, SCRIM_STEPS, exportCSS, cssPrefixOf, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, exportAll };
 })();
 __M.figmaPlugin = (function(){
 // GENERATED by gen-figma-assets.mjs from figma/binder/figma-semantic-binder/ — DO NOT EDIT.
@@ -5352,6 +5370,9 @@ function stateOf(doc) {
     vibrancy: c.vibrancy,
     onColorMode: c.onColorMode,
     accentRef: c.accentRef,
+    // export prefs (the CSS prefix is read by exportCSS/exportOKLCH via cssPrefixOf); pass through
+    // when present so the configurable --{prefix}-* naming reaches the emitter. Absent ⇒ default "c".
+    ...(doc.export && typeof doc.export === "object" ? { export: doc.export } : {}),
   };
 }
 
@@ -11336,6 +11357,25 @@ class HctApp extends HTMLElement {
   _colorFormat() { return this.doc.export && this.doc.export.colorFormat === "oklch" ? "oklch" : "hex"; }
   _setColorFormat(colorFormat) { this.commit((d) => { d.export = { ...(d.export || {}), colorFormat }; }); }
 
+  // _colorPrefix — the CSS custom-property prefix core for the colour export (the `c` in `--c-*`).
+  // Default "c" (the historical Ultimate naming); a user may set "md-sys-color" (Material-flavoured)
+  // or any custom namespace, extended with our roles. Sanitized so the preview matches the export.
+  _colorPrefix() {
+    const raw = this.doc.export && typeof this.doc.export.colorPrefix === "string" ? this.doc.export.colorPrefix : "";
+    const clean = raw.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1");
+    return clean || "c";
+  }
+  // preset id for the segmented control: "c" | "md-sys-color" | "custom" (anything else).
+  _colorPrefixPreset() { const p = this._colorPrefix(); return p === "c" ? "c" : p === "md-sys-color" ? "md-sys-color" : "custom"; }
+  _setColorPrefix(v) {
+    const clean = String(v || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1").slice(0, 40);
+    this.commit((d) => {
+      const ex = { ...(d.export || {}) };
+      if (!clean || clean === "c") delete ex.colorPrefix; else ex.colorPrefix = clean; // default ⇒ absent (identity)
+      if (Object.keys(ex).length) d.export = ex; else delete d.export;
+    });
+  }
+
   // _settingsPanel — the right-content for a nav section: { title, desc, body[] }.
   _settingsPanel(sec) {
     const d = this.doc;
@@ -11354,6 +11394,9 @@ class HctApp extends HTMLElement {
     if (sec === "export") {
       const units = [{ id: "px", label: "px" }, { id: "rem", label: "rem" }, { id: "em", label: "em" }];
       const colors = [{ id: "hex", label: "HEX" }, { id: "oklch", label: "OKLCH" }];
+      const prefixPresets = [{ id: "c", label: "Ultimate" }, { id: "md-sys-color", label: "Material" }, { id: "custom", label: "Custom" }];
+      const pfx = this._colorPrefix();
+      const preset = this._colorPrefixPreset();
       return {
         title: "Export", desc: "How the CSS + DTCG exports render. Figma variables are always numeric (px).",
         body: [this._settingsGroup(null, [
@@ -11361,6 +11404,15 @@ class HctApp extends HTMLElement {
             (id) => this._setColorFormat(id), "setcolorformat"),
           this._settingRow("CSS units", "The unit the Typography + Geometry CSS/DTCG use. rem = px ÷ 16 (clean, thanks to the nice-number sizes). Figma stays px.", units, this._exportUnit(),
             (id) => this._setExportUnit(id), "setexportunit"),
+          // Colour token prefix — the `c` in `--c-*`. Ultimate (default) · Material (--md-sys-color-*) ·
+          // Custom (a text field). Live example shows the resulting variable name. App chrome is
+          // unaffected (it dogfoods a fixed --c-* theme); only the colour EXPORT names change.
+          this._settingRow("Token prefix", "The prefix of the colour CSS variables the export emits. Material uses M3-style naming, extended with our roles. The app's own UI is unaffected.", prefixPresets, preset,
+            (id) => this._setColorPrefix(id === "custom" ? (pfx === "c" || pfx === "md-sys-color" ? "brand" : pfx) : id), "setcolorprefix"),
+          h("div", { class: "settings-row" },
+            h("div", { class: "settings-row-text" }, h("b", {}, "Custom prefix"), h("small", {}, ["Example: ", h("code", {}, `--${pfx}-primary-on-surface`)])),
+            h("input", { class: "settings-input", type: "text", value: pfx === "c" ? "" : pfx, placeholder: "c", "aria-label": "Custom colour token prefix",
+              onchange: (e) => this._setColorPrefix(e.target.value) })),
         ])],
       };
     }

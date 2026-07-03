@@ -5667,6 +5667,25 @@ class HctApp extends HTMLElement {
   _colorFormat() { return this.doc.export && this.doc.export.colorFormat === "oklch" ? "oklch" : "hex"; }
   _setColorFormat(colorFormat) { this.commit((d) => { d.export = { ...(d.export || {}), colorFormat }; }); }
 
+  // _colorPrefix — the CSS custom-property prefix core for the colour export (the `c` in `--c-*`).
+  // Default "c" (the historical Ultimate naming); a user may set "md-sys-color" (Material-flavoured)
+  // or any custom namespace, extended with our roles. Sanitized so the preview matches the export.
+  _colorPrefix() {
+    const raw = this.doc.export && typeof this.doc.export.colorPrefix === "string" ? this.doc.export.colorPrefix : "";
+    const clean = raw.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1");
+    return clean || "c";
+  }
+  // preset id for the segmented control: "c" | "md-sys-color" | "custom" (anything else).
+  _colorPrefixPreset() { const p = this._colorPrefix(); return p === "c" ? "c" : p === "md-sys-color" ? "md-sys-color" : "custom"; }
+  _setColorPrefix(v) {
+    const clean = String(v || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1").slice(0, 40);
+    this.commit((d) => {
+      const ex = { ...(d.export || {}) };
+      if (!clean || clean === "c") delete ex.colorPrefix; else ex.colorPrefix = clean; // default ⇒ absent (identity)
+      if (Object.keys(ex).length) d.export = ex; else delete d.export;
+    });
+  }
+
   // _settingsPanel — the right-content for a nav section: { title, desc, body[] }.
   _settingsPanel(sec) {
     const d = this.doc;
@@ -5685,6 +5704,9 @@ class HctApp extends HTMLElement {
     if (sec === "export") {
       const units = [{ id: "px", label: "px" }, { id: "rem", label: "rem" }, { id: "em", label: "em" }];
       const colors = [{ id: "hex", label: "HEX" }, { id: "oklch", label: "OKLCH" }];
+      const prefixPresets = [{ id: "c", label: "Ultimate" }, { id: "md-sys-color", label: "Material" }, { id: "custom", label: "Custom" }];
+      const pfx = this._colorPrefix();
+      const preset = this._colorPrefixPreset();
       return {
         title: "Export", desc: "How the CSS + DTCG exports render. Figma variables are always numeric (px).",
         body: [this._settingsGroup(null, [
@@ -5692,6 +5714,15 @@ class HctApp extends HTMLElement {
             (id) => this._setColorFormat(id), "setcolorformat"),
           this._settingRow("CSS units", "The unit the Typography + Geometry CSS/DTCG use. rem = px ÷ 16 (clean, thanks to the nice-number sizes). Figma stays px.", units, this._exportUnit(),
             (id) => this._setExportUnit(id), "setexportunit"),
+          // Colour token prefix — the `c` in `--c-*`. Ultimate (default) · Material (--md-sys-color-*) ·
+          // Custom (a text field). Live example shows the resulting variable name. App chrome is
+          // unaffected (it dogfoods a fixed --c-* theme); only the colour EXPORT names change.
+          this._settingRow("Token prefix", "The prefix of the colour CSS variables the export emits. Material uses M3-style naming, extended with our roles. The app's own UI is unaffected.", prefixPresets, preset,
+            (id) => this._setColorPrefix(id === "custom" ? (pfx === "c" || pfx === "md-sys-color" ? "brand" : pfx) : id), "setcolorprefix"),
+          h("div", { class: "settings-row" },
+            h("div", { class: "settings-row-text" }, h("b", {}, "Custom prefix"), h("small", {}, ["Example: ", h("code", {}, `--${pfx}-primary-on-surface`)])),
+            h("input", { class: "settings-input", type: "text", value: pfx === "c" ? "" : pfx, placeholder: "c", "aria-label": "Custom colour token prefix",
+              onchange: (e) => this._setColorPrefix(e.target.value) })),
         ])],
       };
     }

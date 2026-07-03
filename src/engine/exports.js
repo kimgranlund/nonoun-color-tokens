@@ -256,7 +256,17 @@ function colorLeaf(rgb, frac, alias) {
 // :root { flat raw vars (solids + scrim hex8) + --c-* semantic via light-dark() }.
 // Every --c-* references TWO raw vars that are themselves emitted in :root (ADR-005).
 export function exportCSS(state) {
-  return cssFrom(derivedAll(state), false);
+  return cssFrom(derivedAll(state), false, cssPrefixOf(state));
+}
+
+// cssPrefixOf — the configurable CSS custom-property prefix (the `c` in `--c-*`). Lets a kit emit
+// Material-flavoured names (`--md-sys-color-*`) or any custom namespace, extended with our roles.
+// Sanitized to a legal CSS ident core: lowercased, non-[a-z0-9-] stripped, edge/leading-digit hyphens
+// trimmed. Empty / default "c" ⇒ the historical `--c-*` (identity — existing kits byte-identical).
+export function cssPrefixOf(state) {
+  const raw = state && state.export && typeof state.export.colorPrefix === "string" ? state.export.colorPrefix : "";
+  const clean = raw.toLowerCase().replace(/^-+/, "").replace(/[^a-z0-9-]+/g, "-").replace(/^(\d)/, "c$1").replace(/-+$/, "").replace(/^-+/, "");
+  return clean || "c";
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -265,45 +275,46 @@ export function exportCSS(state) {
 // Identical structure; raw values are oklch(L C H) / oklch(L C H / a%). The
 // semantic --c-* layer is unchanged (var() refs), so the two-layer flip holds.
 export function exportOKLCH(state) {
-  return cssFrom(derivedAll(state), true);
+  return cssFrom(derivedAll(state), true, cssPrefixOf(state));
 }
 
-// cssFrom — shared CSS body for both variants. oklch=false -> hex raw values.
-function cssFrom(palettes, oklch) {
+// cssFrom — shared CSS body for both variants. oklch=false -> hex raw values. `pfx` is the
+// custom-property prefix core (the `c` in `--c-*`); defaults to "c" for the historical output.
+function cssFrom(palettes, oklch, pfx = "c") {
   const lines = [];
   lines.push(":root {");
   lines.push("  color-scheme: light dark;");
   for (const p of palettes) {
     lines.push("");
     lines.push(`  /* ${p.name} — flat mode-independent primitives */`);
-    // solid RAW vars: --c-{n}-050 .. --c-{n}-950 (raw stop names end in digits; semantic role names
-    // end in a word, so the two never collide despite sharing the --c- prefix).
+    // solid RAW vars: --{pfx}-{n}-050 .. -950 (raw stop names end in digits; semantic role names end
+    // in a word, so the two never collide despite sharing the prefix).
     for (const key of Object.keys(p.stops)) {
       const { rgb } = p.stops[key];
       const val = oklch ? oklchStr(rgbToOklch(rgb)) : hexOf(rgb);
-      lines.push(`  --c-${p.n}-${key}: ${val};`);
+      lines.push(`  --${pfx}-${p.n}-${key}: ${val};`);
     }
-    // scrim RAW vars: --c-{n}-500-{step}  (the 500 color at alpha% = step/10)
+    // scrim RAW vars: --{pfx}-{n}-500-{step}  (the 500 color at alpha% = step/10)
     for (const base of SCRIM_BASES) {
       for (const step of SCRIM_STEPS) {
         const sc = p.scrims[base][step];
         const val = oklch ? oklchStrA(rgbToOklch(sc.rgb), sc.alphaPct) : sc.hex;
-        lines.push(`  --c-${p.n}-${pad3(base)}-${pad3(step)}: ${val};`);
+        lines.push(`  --${pfx}-${p.n}-${pad3(base)}-${pad3(step)}: ${val};`);
       }
     }
-    // SEMANTIC --c-{n}-{role} vars: light-dark(var(light raw), var(dark raw)) (ADR-005)
+    // SEMANTIC --{pfx}-{n}-{role} vars: light-dark(var(light raw), var(dark raw)) (ADR-005)
     lines.push(`  /* ${p.name} — semantic roles */`);
     for (const r of p.roles) {
-      const lv = `var(--c-${p.n}-${refKey(r.lightRef)})`;
-      const dv = `var(--c-${p.n}-${refKey(r.darkRef)})`;
-      lines.push(`  --c-${p.n}${r.suffix}: light-dark(${lv}, ${dv});`);
+      const lv = `var(--${pfx}-${p.n}-${refKey(r.lightRef)})`;
+      const dv = `var(--${pfx}-${p.n}-${refKey(r.darkRef)})`;
+      lines.push(`  --${pfx}-${p.n}${r.suffix}: light-dark(${lv}, ${dv});`);
     }
     // KEY COLORS — retained brand values by expression (dominant/supportive), exact in OKLCH
     // (NOT mode-flipped; they are source colors, lossless from the OKLCH source).
     if (p.keyColors.length) {
       lines.push(`  /* ${p.name} — retained key colors (exact, OKLCH) */`);
       for (const kc of p.keyColors) {
-        lines.push(`  --c-${p.n}-key-${kc.role}: ${oklchStr({ L: kc.oklch[0], C: kc.oklch[1], H: kc.oklch[2] })};`);
+        lines.push(`  --${pfx}-${p.n}-key-${kc.role}: ${oklchStr({ L: kc.oklch[0], C: kc.oklch[1], H: kc.oklch[2] })};`);
       }
     }
   }

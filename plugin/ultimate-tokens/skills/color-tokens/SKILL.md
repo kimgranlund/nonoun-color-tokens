@@ -20,11 +20,14 @@ properties. Your job is never to invent a color — it is to pick the right **ro
 
 ## Bind to the project first (always step 1)
 
-1. **Find the export.** A CSS file whose `:root` sets `color-scheme: light dark` and defines
-   `--c-*` variables via `light-dark(...)` (often `palette.css` / `tokens.css`; a DTCG
+1. **Find the export.** A CSS file whose `:root` sets `color-scheme: light dark` and defines the
+   colour variables via `light-dark(...)` (often `palette.css` / `tokens.css`; a DTCG
    `*.tokens.json` may sit beside it). If none exists, stop and ask — do not fabricate tokens.
-   *This guide is for the `--c-*` CSS export;* the Tailwind (`--color-*`) and shadcn exports use
-   different grammars — the role SEMANTICS below still hold, but the variable names differ.
+   **The prefix is configurable:** the default is `--c-*`, but a kit may export a Material-flavoured
+   `--md-sys-color-*` or a custom `--{brand}-*` prefix — **read the actual prefix from the file** and
+   use it throughout; the examples below use `--c-` as the default, but the role grammar after the
+   prefix (`-{palette}-{role}`) is identical. *This guide is for the CSS export;* the Tailwind
+   (`--color-*`) and shadcn exports use different grammars — the role SEMANTICS still hold.
 2. **Enumerate the palettes.** Every `--c-<slug>-050` line marks a palette. The default kit ships
    a neutral plus a brand accent and the four intents (currently eight palettes) — but kits vary;
    read what's actually there rather than assuming the default set.
