@@ -16,9 +16,11 @@ treatment/specimen history.
 - **Keep tracking optical (an em coefficient).** `trackingEm` × size — so the tracking grows with the step.
   Don't switch to a flat px value; the `Display.XL < Display.XS` ("tracking scales with size") assert
   enforces it. Display stays negative, UI / the caps Headings stay positive.
-- **Stay inside the leading bands** (display 1.05–1.2, heading 1.05–1.3, prose 1.45–1.65, UI 1.25–1.5, mono
-  ~1.5). They come from `.claude/docs/spec/typography/README.md` + ui-compose-typography; a Body leading of 1.2
-  would render cramped prose and silently leave the prose band.
+- **Use the fixed leading constants** (display **0.8** · heading · sub-heading **1.125** · prose **1.5** ·
+  Kicker **1.4** · code **~1.5** · UI **~1.4**). They're the `font.modes.json` design intent, held uniform
+  across treatments (only UI keeps a small `1.35–1.45` lever) and owned by
+  `.claude/docs/spec/typography/README.md`. Display is deliberately **< 1** (large type sets tight); a Body
+  leading of 1.2 would render cramped prose. Retune a `*Lead` knob only for a deliberate character exception.
 
 ### The font-family QUOTING guard (the Safari trap)
 
@@ -72,12 +74,13 @@ treatment/specimen history.
 The pattern behind the 5-treatment set + the per-voice character knobs (and the quoting fix in its lineage):
 
 1. **Decided the voice, not the font.** A treatment is a *voice* — case + weight contrast + tracking +
-   leading + scale. e.g. `luxury` = restraint: a high-contrast serif set LIGHT (`dWeight 400`) and large
-   (`dBase 76`), airy prose (`bLead 1.65`), wide-tracked caps labels (`hcTrack 0.18`, `eyeTrack 0.26`). The
-   font palette (`Source Serif 4` display/heading, `Inter` body/ui) serves the voice.
+   leading + scale (NOT leading — that's now the fixed per-role intent). e.g. `luxury` = restraint: a
+   high-contrast serif set LIGHT (`dWeight 400`) and large (`dBase 76`), generous prose (`bBase 17`,
+   `bRatio 1.25`), wide-tracked caps labels (`hcTrack 0.18`, `eyeTrack 0.26`). The font palette
+   (`Source Serif 4` display/heading, `Inter` body/ui) serves the voice.
 2. **Expressed it as `make7` knob overrides**, not hand-authored sizes — every override is a `base`/`ratio`/
    `leading`/`weight`/`trackingEm`/`transform` value; `buildCategory` derives the 41 steps. Kept leadings
-   inside the bands and tracking optical.
+   at the per-role leading constants and tracking optical.
 3. **Made Brutalist the ONLY ALL-CAPS Display** (`dTransform:"uppercase"`), leaving the other four
    title/sentence. The "exactly one uppercase Display" gate locks this in.
 4. **Confirmed the Safari quoting guard.** Because `luxury` + `editorial` use `Source Serif 4` (a digit

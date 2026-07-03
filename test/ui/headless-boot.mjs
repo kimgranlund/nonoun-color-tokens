@@ -1501,10 +1501,10 @@ ok(app._typeTokenColumns()[0].scale.categories.Body.MD.size === 16 && app._typeT
 // re-derives the line, persists, reflects in the column + every export, and a ↺ resets it. ──
 const tCellInput = (fk) => walk(app, (e) => e.tagName === "INPUT" && e.getAttribute && e.getAttribute("data-fk") === fk)[0];
 ok(!!tCellInput("tytok:Body:MD:base"), "(ty-tok-ov) each value cell is an editable size input (data-fk = voice:step:modeKey)");
-// edit the Base Body·MD size → 40. (Body MD leading 1.55 ⇒ line re-derives to round(40·1.55)=62.)
+// edit the Base Body·MD size → 40. (Body MD leading 1.5 ⇒ line re-derives to round(40·1.5)=60.)
 const tIn = tCellInput("tytok:Body:MD:base"); tIn.value = "40"; tIn.dispatch("change", {}); flushRaf();
 ok(app.doc.type.tokenOverrides && app.doc.type.tokenOverrides["Body|MD|base"] === 40, "(ty-tok-ov) editing a cell writes doc.type.tokenOverrides[<voice>|<step>|<modeKey>]");
-ok(app._typeScaleFor("base").categories.Body.MD.size === 40 && app._typeScaleFor("base").categories.Body.MD.lineHeight === Math.round(40 * 1.55), "(ty-tok-ov) the override re-derives the scale (size = the override, line = round(size·leading))");
+ok(app._typeScaleFor("base").categories.Body.MD.size === 40 && app._typeScaleFor("base").categories.Body.MD.lineHeight === Math.round(40 * 1.5), "(ty-tok-ov) the override re-derives the scale (size = the override, line = round(size·leading))");
 ok(app._typeTokenColumns()[0].scale.categories.Body.MD.size === 40, "(ty-tok-ov) the matrix Base column reflects the override");
 ok(hydSet(serSet(app.doc)).type.tokenOverrides["Body|MD|base"] === 40, "(ty-tok-ov) the override survives serialize → hydrate (persists)");
 // (ty-tok-clamp) MAJOR 4 — the live setter CLAMPS to [1,512] (the input min/max + persist range), so an

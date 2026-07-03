@@ -40,8 +40,12 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
   ok(sizes.every((v, i) => i === 0 || v > sizes[i - 1]), `Body sizes strictly increase XS→XL (${sizes})`);
   // ratio check: LG/MD ≈ the treatment ratio (1.2 for product Body) within rounding
   ok(Math.abs(body.LG.size / body.MD.size - 1.2) < 0.08, `Body LG/MD ≈ 1.2 (got ${(body.LG.size / body.MD.size).toFixed(3)})`);
-  // line-height = size × leading (Body prose leading 1.55, inside the 1.45–1.65 band)
-  ok(body.MD.lineHeight === Math.round(16 * 1.55), `Body MD line-height = size×1.55 (got ${body.MD.lineHeight})`);
+  // line-height = size × leading (Body prose leading 1.5 — the font.modes.json design intent, uniform across treatments)
+  ok(body.MD.lineHeight === Math.round(16 * 1.5), `Body MD line-height = size×1.5 (got ${body.MD.lineHeight})`);
+  // Display leading is TIGHT (< 1 — large type sets sub-single); the design-intent retune. Every Display step.
+  ok(Object.values(s.categories.Display).every((c) => c.lineHeight < c.size), `Display line-height < size on every step (leading < 1)`);
+  // Heading + Body land on the intent ratios (1.125 · 1.5)
+  ok(s.categories.Heading.MD.lineHeight === Math.round(s.categories.Heading.MD.size * 1.125), `Heading MD line-height = size×1.125`);
   // UI has 8 steps incl. 3XS..2XL
   ok(["3XS", "2XS", "XS", "SM", "MD", "LG", "XL", "2XL"].every((k) => s.categories.UI[k]), "UI has the 8-step ramp 3XS..2XL");
 }
@@ -157,7 +161,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(JSON.stringify(T.typeScale({ treatment: "product", bodyBase: 16, overrides: undefined })) === JSON.stringify(baseline), "no overrides ⇒ scale is byte-identical (identity gate)");
   ok(JSON.stringify(T.typeScale({ treatment: "product", bodyBase: 16, overrides: {} })) === JSON.stringify(baseline), "empty overrides ⇒ scale is byte-identical (identity gate)");
   // an override REPLACES the size and the line-height RE-DERIVES (round(size · leading)); tracking + weight stay.
-  const bodyP = T.TYPE_TREATMENTS.find((x) => x.id === "product").categories.Body; // the Body treatment params (leading 1.55)
+  const bodyP = T.TYPE_TREATMENTS.find((x) => x.id === "product").categories.Body; // the Body treatment params (leading 1.5)
   const ov = T.typeScale({ treatment: "product", bodyBase: 16, overrides: { "Body|MD": 40 } });
   ok(ov.categories.Body.MD.size === 40, `override sets the size (got ${ov.categories.Body.MD.size}, want 40)`);
   ok(ov.categories.Body.MD.lineHeight === Math.round(40 * bodyP.leading), `line-height re-derives from the override (got ${ov.categories.Body.MD.lineHeight}, want ${Math.round(40 * bodyP.leading)})`);
@@ -169,7 +173,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // NON-ZERO-TRACKING pin (Body|MD has trackingEm 0 → 0===0 masks the bug). Display tracks NEGATIVE, so
   // overriding a Display step's SIZE must NOT move tracking (it stays on the modular-scale size) or weight —
   // only size changes and line-height re-derives. This pins the "size lever; tracking/weight stay" rule.
-  const displayP = T.TYPE_TREATMENTS.find((x) => x.id === "product").categories.Display; // leading 1.1, trackingEm -0.02 (non-zero)
+  const displayP = T.TYPE_TREATMENTS.find((x) => x.id === "product").categories.Display; // leading 0.8 (< 1), trackingEm -0.02 (non-zero)
   const ovD = T.typeScale({ treatment: "product", bodyBase: 16, overrides: { "Display|MD": 88 } });
   ok(displayP.trackingEm !== 0, `Display tracking is non-zero (got ${displayP.trackingEm}) — the assertion below is meaningful`);
   ok(ovD.categories.Display.MD.size === 88, `Display override sets the size (got ${ovD.categories.Display.MD.size}, want 88)`);

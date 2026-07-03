@@ -41,10 +41,21 @@ Mirroring color (`{hue, chroma, distribution}` → even tonal ramp), type derive
 `{ base size, modular ratio per category, leading per category, weight ramp, optical tracking
 coefficient, font roles }`:
 
-- **Size** = a **modular scale** (e.g. 1.2 Minor Third for UI, 1.333 Perfect Fourth for editorial, 1.5–1.618 for display).
+- **Size** = a **modular scale** `base × ratio^step`, then snapped to a nice-number ladder. The ratio is
+  per-role/per-treatment: `1.125` (UI · Code) through `1.2–1.25` (most voices) up to `1.5` (the Brutalist
+  display) — not one global ratio.
 - **Letter Spacing** = `f(size)` — negative to *tighten* large display, positive to *loosen* small UI text (optical).
-- **Multi-line Height** = `size × leading` (~1.5 for body/UI, ~1.1–1.25 for display/headings); **Single-line Height** = `size × 1.0`.
-- **Weight** ramps by role — heavy Display (800–900), medium Heading, regular Body/UI (~450).
+- **Multi-line Height** = `size × leading`, where **leading is a per-role constant** (the
+  `font.modes.json` design intent). The reading/display voices are held *uniform across all treatments* —
+  treatments express voice through font, weight, tracking, and scale, not leading:
+  - **display — 0.8** (large type sets *tight*, leading < 1)
+  - **heading · sub-heading — 1.125**
+  - **body — 1.5**
+  - **Kicker — 1.4** · **code — ~1.5**
+  - **UI — ~1.4** (the one voice that keeps a small per-treatment lever, `1.35–1.45`)
+- **Single-line Height** = `size × 1.0` — the control-text height, emitted on the box voices **UI · Code · Kicker**.
+- **Weight** ramps by role — Display `700` (`900` Brutalist), Heading `620–800`, Sub-heading · Kicker `~600`,
+  Body `440`, UI `480`, Code `460`.
 
 A set of **treatments** (Product/Lifestyle, Luxury, Editorial, Technical/Data, Brutalist) seed these
 params, exactly as the color "Color Categories" presets seed palette params.
