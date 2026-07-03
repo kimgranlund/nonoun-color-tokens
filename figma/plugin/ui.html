@@ -3709,13 +3709,14 @@ function hydrate(snapshot) {
   };
 }
 
-// clampExport — the OPTIONAL export-format prefs { unit?, colorFormat? } (Settings › Export: CSS unit +
-// colour CSS format). Each key attaches only when valid, and the whole `export` only when ≥1 valid key —
-// so the hydrate identity gate holds (absent stays absent; invalid keys drop; an all-invalid object drops).
+// clampExport — the OPTIONAL export-format prefs { unit?, colorPrefix?, typePrefix?, geomPrefix? }
+// (Settings › Export: CSS unit + the naming-scheme prefixes). Each key attaches only when valid, and the
+// whole `export` only when ≥1 valid key — so the hydrate identity gate holds (absent stays absent; invalid
+// keys drop; an all-invalid object drops). (The old `colorFormat` pref was removed — Download-All now
+// always emits BOTH css-hex/ and css-oklch/, so there is nothing to choose.)
 function clampExport(e) {
   if (!e || typeof e !== "object") return {};
   const unit = clampEnum(e.unit, ["px", "rem", "em"], null);
-  const colorFormat = clampEnum(e.colorFormat, ["hex", "oklch"], null);
   // colorPrefix — the CSS custom-property prefix core (the `c` in `--c-*`). OPTIONAL: attach only a
   // sanitized non-empty value that ISN'T the default "c" (so the default round-trips as absent — the
   // identity gate). Sanitized to a legal ident core; capped; a bare/edge-hyphen/all-junk value drops.
@@ -3726,7 +3727,7 @@ function clampExport(e) {
   const cp = clean(e.colorPrefix, "c"); const colorPrefix = cp && cp !== "c" ? cp : null;
   const tp = clean(e.typePrefix, "t"); const typePrefix = tp && tp !== "type" ? tp : null;
   const gp = clean(e.geomPrefix, "g"); const geomPrefix = gp || null;
-  const out = { ...(unit ? { unit } : {}), ...(colorFormat ? { colorFormat } : {}), ...(colorPrefix ? { colorPrefix } : {}), ...(typePrefix ? { typePrefix } : {}), ...(geomPrefix ? { geomPrefix } : {}) };
+  const out = { ...(unit ? { unit } : {}), ...(colorPrefix ? { colorPrefix } : {}), ...(typePrefix ? { typePrefix } : {}), ...(geomPrefix ? { geomPrefix } : {}) };
   return Object.keys(out).length ? { export: out } : {};
 }
 
@@ -11077,9 +11078,11 @@ class HctApp extends HTMLElement {
     const ex = view.exports;
     const files = [];
     if (sys.color) {
-      const cf = this._colorFormat(); // hex | oklch (Settings › Export) — the chosen colour CSS is emitted (one folder)
       files.push(
-        { name: `css-${cf}/${s}.css`, data: cf === "oklch" ? ex.oklch : ex.css },
+        // BOTH raw-colour CSS variants — hex and oklch are two co-equal formats (like tailwind + shadcn),
+        // and this is the comprehensive bundle. The export drawer's Hex/OKLCH tabs pick one individually.
+        { name: `css-hex/${s}.css`, data: ex.css },
+        { name: `css-oklch/${s}.css`, data: ex.oklch },
         { name: `json/${s}.json`, data: ex.json },
         { name: "figma/Light_tokens.json", data: ex.figma.light },
         { name: "figma/Dark_tokens.json", data: ex.figma.dark },
@@ -11387,9 +11390,6 @@ class HctApp extends HTMLElement {
   // travels with the kit; defaults to "px" (the pre-setting output). Figma exports ignore it (they're numeric).
   _exportUnit() { return this.doc.export && ["px", "rem", "em"].includes(this.doc.export.unit) ? this.doc.export.unit : "px"; }
   _setExportUnit(unit) { this.commit((d) => { d.export = { ...(d.export || {}), unit }; }); }
-  // _colorFormat — the colour CSS format the Download-All emits (Settings › Export). hex | oklch, default hex.
-  _colorFormat() { return this.doc.export && this.doc.export.colorFormat === "oklch" ? "oklch" : "hex"; }
-  _setColorFormat(colorFormat) { this.commit((d) => { d.export = { ...(d.export || {}), colorFormat }; }); }
 
   // _colorPrefix — the CSS custom-property prefix core for the colour export (the `c` in `--c-*`).
   // Default "c" (the historical Ultimate naming); a user may set "md-sys-color" (Material-flavoured)
@@ -11451,7 +11451,6 @@ class HctApp extends HTMLElement {
     }
     if (sec === "export") {
       const units = [{ id: "px", label: "px" }, { id: "rem", label: "rem" }, { id: "em", label: "em" }];
-      const colors = [{ id: "hex", label: "HEX" }, { id: "oklch", label: "OKLCH" }];
       const schemePresets = [{ id: "ultimate", label: "Ultimate" }, { id: "material", label: "Material" }, { id: "custom", label: "Custom" }];
       const scheme = this._namingScheme();
       const brand = this._customBrand();
@@ -11462,8 +11461,6 @@ class HctApp extends HTMLElement {
       return {
         title: "Export", desc: "How the CSS + DTCG exports render. Figma variables are always numeric (px).",
         body: [this._settingsGroup(null, [
-          this._settingRow("Colour format", "The raw-colour CSS the Download-All emits — sRGB HEX or wide-gamut OKLCH. (Preview either in the export drawer's CSS tabs.)", colors, this._colorFormat(),
-            (id) => this._setColorFormat(id), "setcolorformat"),
           this._settingRow("CSS units", "The unit the Typography + Geometry CSS/DTCG use. rem = px ÷ 16 (clean, thanks to the nice-number sizes). Figma stays px.", units, this._exportUnit(),
             (id) => this._setExportUnit(id), "setexportunit"),
           // Naming convention — one coherent scheme across colour · type · geometry. Ultimate = native

@@ -251,13 +251,14 @@ export function hydrate(snapshot) {
   };
 }
 
-// clampExport — the OPTIONAL export-format prefs { unit?, colorFormat? } (Settings › Export: CSS unit +
-// colour CSS format). Each key attaches only when valid, and the whole `export` only when ≥1 valid key —
-// so the hydrate identity gate holds (absent stays absent; invalid keys drop; an all-invalid object drops).
+// clampExport — the OPTIONAL export-format prefs { unit?, colorPrefix?, typePrefix?, geomPrefix? }
+// (Settings › Export: CSS unit + the naming-scheme prefixes). Each key attaches only when valid, and the
+// whole `export` only when ≥1 valid key — so the hydrate identity gate holds (absent stays absent; invalid
+// keys drop; an all-invalid object drops). (The old `colorFormat` pref was removed — Download-All now
+// always emits BOTH css-hex/ and css-oklch/, so there is nothing to choose.)
 function clampExport(e) {
   if (!e || typeof e !== "object") return {};
   const unit = clampEnum(e.unit, ["px", "rem", "em"], null);
-  const colorFormat = clampEnum(e.colorFormat, ["hex", "oklch"], null);
   // colorPrefix — the CSS custom-property prefix core (the `c` in `--c-*`). OPTIONAL: attach only a
   // sanitized non-empty value that ISN'T the default "c" (so the default round-trips as absent — the
   // identity gate). Sanitized to a legal ident core; capped; a bare/edge-hyphen/all-junk value drops.
@@ -268,7 +269,7 @@ function clampExport(e) {
   const cp = clean(e.colorPrefix, "c"); const colorPrefix = cp && cp !== "c" ? cp : null;
   const tp = clean(e.typePrefix, "t"); const typePrefix = tp && tp !== "type" ? tp : null;
   const gp = clean(e.geomPrefix, "g"); const geomPrefix = gp || null;
-  const out = { ...(unit ? { unit } : {}), ...(colorFormat ? { colorFormat } : {}), ...(colorPrefix ? { colorPrefix } : {}), ...(typePrefix ? { typePrefix } : {}), ...(geomPrefix ? { geomPrefix } : {}) };
+  const out = { ...(unit ? { unit } : {}), ...(colorPrefix ? { colorPrefix } : {}), ...(typePrefix ? { typePrefix } : {}), ...(geomPrefix ? { geomPrefix } : {}) };
   return Object.keys(out).length ? { export: out } : {};
 }
 

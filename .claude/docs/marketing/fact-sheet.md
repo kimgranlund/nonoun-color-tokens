@@ -24,7 +24,7 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 | Geometry treatments | **5** — Comfortable · Compact / Dense · Spacious / Airy · Touch / Mobile · Pill / Rounded | `src/engine/geometry.mjs` `GEOMETRY_TREATMENTS` |
 | Color Categories | **7** categories (Architecture · Cuisine · Film · Literature · Music · Nature · Travel), 12 volumes × 4 = **48 palettes each, 336 total**, each sourced + storied | `src/ui/categories/` |
 | Export formats | CSS custom properties (HEX or OKLCH) · Tailwind v4 · shadcn/ui · DTCG · JSON · Figma variables · Figma UI3 (Material) · re-importable Config · Download-all `.zip` | `src/engine/exports.js` |
-| Export settings | CSS units px / rem / em · color format HEX / OKLCH · per-system Include toggles | Settings → Export |
+| Export settings | CSS units px / rem / em · naming scheme (Ultimate / Material / Custom) · per-system Include toggles | Settings → Export |
 | Figma plugin | **free, fully offline** (`networkAccess: none`); binds semantic variables with a raw→semantic cascade + breakpoint modes | `figma/plugin/manifest.json` |
 | Brand-Kit MCP | zero-dependency stdio server download, pre-filled with your tokens, for Claude Code / Cursor / any MCP agent; **hosted** endpoint is a Pro feature (not yet live — never market it as live) | `mcp/` |
 | Dependencies | **zero** runtime dependencies; ships as one self-contained file that runs offline | `package.json`, `dist/nonoun-color-tokens.html` |

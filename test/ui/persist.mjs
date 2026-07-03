@@ -47,15 +47,20 @@ const mut2 = JSON.parse(JSON.stringify(base)); mut2.palettes[0].hue = 410;   // 
 const hyd2 = U.hydrate(U.serialize(mut2));
 if (hyd2.palettes[0].hue !== 360) FAIL("clamp", `palette hue 410 -> ${hyd2.palettes[0].hue}, want 360`);
 if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "clamping palette hue disturbed sibling chroma");
-// export-format prefs (doc.export = { unit, colorFormat }) — each valid key round-trips; absent stays
-// absent; invalid keys drop; an all-invalid object drops the whole `export`.
+// export-format prefs (doc.export = { unit, colorPrefix, … }) — each valid key round-trips; absent stays
+// absent; invalid keys drop; an all-invalid object drops the whole `export`. (colorFormat was REMOVED —
+// Download-All now emits BOTH css-hex/ and css-oklch/, so a legacy colorFormat key is simply dropped.)
 {
-  const both = JSON.parse(JSON.stringify(base)); both.export = { unit: "rem", colorFormat: "oklch" };
+  const both = JSON.parse(JSON.stringify(base)); both.export = { unit: "rem", colorPrefix: "brand" };
   const r = U.hydrate(U.serialize(both)).export;
-  if (!r || r.unit !== "rem" || r.colorFormat !== "oklch") FAIL("export", `doc.export {unit,colorFormat} did not round-trip (got ${JSON.stringify(r)})`);
+  if (!r || r.unit !== "rem" || r.colorPrefix !== "brand") FAIL("export", `doc.export {unit,colorPrefix} did not round-trip (got ${JSON.stringify(r)})`);
   if ("export" in U.hydrate(U.serialize(base))) FAIL("export", "absent export must stay absent (identity gate)");
-  const mixed = JSON.parse(JSON.stringify(base)); mixed.export = { unit: "furlong", colorFormat: "oklch" };
-  if (JSON.stringify(U.hydrate(U.serialize(mixed)).export) !== JSON.stringify({ colorFormat: "oklch" })) FAIL("export", "an invalid unit must drop only that key, keeping the valid colorFormat");
+  // a legacy/unknown colorFormat key is ignored — never re-appears; the valid `unit` is kept.
+  const legacy = JSON.parse(JSON.stringify(base)); legacy.export = { unit: "rem", colorFormat: "oklch" };
+  const lr = U.hydrate(U.serialize(legacy)).export;
+  if (!lr || lr.unit !== "rem" || "colorFormat" in lr) FAIL("export", `a legacy colorFormat key must drop, keeping unit (got ${JSON.stringify(lr)})`);
+  const mixed = JSON.parse(JSON.stringify(base)); mixed.export = { unit: "furlong", colorPrefix: "brand" };
+  if (JSON.stringify(U.hydrate(U.serialize(mixed)).export) !== JSON.stringify({ colorPrefix: "brand" })) FAIL("export", "an invalid unit must drop only that key, keeping the valid colorPrefix");
   const bad = JSON.parse(JSON.stringify(base)); bad.export = { unit: "furlong", colorFormat: "cmyk" };
   if ("export" in U.hydrate(U.serialize(bad))) FAIL("export", "an all-invalid export object must drop entirely");
   // colorPrefix (the configurable --{prefix}-* colour naming): a sanitized non-default value persists;

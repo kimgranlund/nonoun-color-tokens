@@ -42,6 +42,17 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   "big text." (#195, #197)
 - **Radius ladder aligned to Material 3's shape-corner scale** — `none/xs/sm/md/lg/xl/full =
   0/4/8/12/16/28/9999`, fixed across the geometry treatments. (#190)
+- **Type leadings retuned to the design intent** — line-height:size is now a fixed per-role constant,
+  uniform across treatments: **Display 0.8** (< 1 — large type sets tight, was ~1.1), heading/sub-heading
+  **1.125**, body **1.5**. Treatments express voice through font/weight/tracking/scale, not leading. Every
+  type export's `line-height` shifts accordingly. (#199)
+
+#### Fixed
+- **Download-All now includes BOTH colour-CSS formats.** The bundle emitted only one CSS folder
+  (`css-hex/` *or* `css-oklch/`) based on a `Colour format` setting; it now always ships **both**
+  `css-hex/` and `css-oklch/`, matching how it already ships both Tailwind and shadcn and the export
+  drawer's two co-equal Hex/OKLCH tabs. The redundant `Colour format` setting is **removed** (pick a
+  single format from the drawer's tabs; the mega-bundle is comprehensive). (#200)
 
 ### 2026-07-02
 
