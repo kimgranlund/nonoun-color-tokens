@@ -5142,10 +5142,12 @@ class HctApp extends HTMLElement {
     const typeSc = this._typeScaleFor("base"); // override-aware base scale (Phase 3) — same as the matrix Base column
     const geomSc = this._geomScaleFor("base");
     const u = { unit: this._exportUnit() }; // the CSS unit preference (Settings › Export); Figma stays px
+    const ut = { ...u, prefix: this._typePrefix() }; // + the naming-scheme prefix for the type CSS
+    const ug = { ...u, prefix: this._geomPrefix() }; // + the naming-scheme prefix for the geometry CSS
     const SYSTEM_CODE = {
-      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales(), u),
+      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales(), ut),
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
-      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), u),
+      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), ug),
       "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
     };
     const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG" };
@@ -5385,7 +5387,7 @@ class HctApp extends HTMLElement {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
       const tDtcg = JSON.stringify(typeTokensDTCG(tsc, u), null, 2); // the chosen unit — for the typography/ folder
       files.push(
-        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales(), u) },
+        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales(), { ...u, prefix: this._typePrefix() }) },
         { name: "typography/type.tokens.json", data: tDtcg },
         ...this._typeModeDTCGFiles("typography/type", u),
         { name: "figma/type.tokens.json", data: JSON.stringify(typeTokensDTCG(tsc), null, 2) }, // ALWAYS px — Figma import (a tokens plugin)
@@ -5401,7 +5403,7 @@ class HctApp extends HTMLElement {
       const gsc = this._geomScaleFor("base"); // composed with the type scale (the per-step `font` is shared); override-aware (Phase 3)
       const gDtcg = JSON.stringify(geomTokensDTCG(gsc, u), null, 2); // the chosen unit — for the geometry/ folder
       files.push(
-        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales(), u) },
+        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales(), { ...u, prefix: this._geomPrefix() }) },
         { name: "geometry/geometry.tokens.json", data: gDtcg },
         ...this._geomModeDTCGFiles("geometry/geometry", u),
         { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
@@ -5675,16 +5677,40 @@ class HctApp extends HTMLElement {
     const clean = raw.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1");
     return clean || "c";
   }
-  // preset id for the segmented control: "c" | "md-sys-color" | "custom" (anything else).
-  _colorPrefixPreset() { const p = this._colorPrefix(); return p === "c" ? "c" : p === "md-sys-color" ? "md-sys-color" : "custom"; }
-  _setColorPrefix(v) {
-    const clean = String(v || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1").slice(0, 40);
+  // _typePrefix / _geomPrefix — the naming-scheme prefixes for the type + geometry CSS exports.
+  // Type default "type" (--type-*); geometry default "" (native --size-/--radius-/…). A Material scheme
+  // sets them to "md-sys-typescale" and "md-sys" so the whole system exports under one root.
+  _typePrefix() { const p = this.doc.export && typeof this.doc.export.typePrefix === "string" ? this.doc.export.typePrefix.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "t$1") : ""; return p || "type"; }
+  _geomPrefix() { const p = this.doc.export && typeof this.doc.export.geomPrefix === "string" ? this.doc.export.geomPrefix.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "g$1") : ""; return p; }
+
+  // _namingScheme — the coherent naming convention across all three systems (colour · type · geometry).
+  // "ultimate" = the native names (--c-* · --type-* · --size-*); "material" = one --md-sys-* root
+  // (--md-sys-color-* · --md-sys-typescale-* · --md-sys-*); "custom" = a --{brand}-* root the user types.
+  _namingScheme() {
+    const cp = this._colorPrefix();
+    if (cp === "c" && this._typePrefix() === "type" && !this._geomPrefix()) return "ultimate";
+    if (cp === "md-sys-color" && this._typePrefix() === "md-sys-typescale" && this._geomPrefix() === "md-sys") return "material";
+    return "custom";
+  }
+  // set all three prefixes coherently. id "ultimate"|"material" use the presets; else a custom root brand.
+  _setNamingScheme(idOrBrand) {
+    let color, type, geom;
+    if (idOrBrand === "ultimate") { color = ""; type = ""; geom = ""; } // "" ⇒ defaults drop (identity)
+    else if (idOrBrand === "material") { color = "md-sys-color"; type = "md-sys-typescale"; geom = "md-sys"; }
+    else {
+      const brand = String(idOrBrand || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "b$1").slice(0, 24);
+      if (!brand) { color = ""; type = ""; geom = ""; } else { color = `${brand}-color`; type = `${brand}-type`; geom = brand; }
+    }
     this.commit((d) => {
       const ex = { ...(d.export || {}) };
-      if (!clean || clean === "c") delete ex.colorPrefix; else ex.colorPrefix = clean; // default ⇒ absent (identity)
+      if (!color || color === "c") delete ex.colorPrefix; else ex.colorPrefix = color;
+      if (!type || type === "type") delete ex.typePrefix; else ex.typePrefix = type;
+      if (!geom) delete ex.geomPrefix; else ex.geomPrefix = geom;
       if (Object.keys(ex).length) d.export = ex; else delete d.export;
     });
   }
+  // the current custom brand root (strip the -color/-type suffixes back to the brand stem), for the field.
+  _customBrand() { const c = this._colorPrefix(); return c.endsWith("-color") ? c.slice(0, -6) : c === "c" ? "" : c; }
 
   // _settingsPanel — the right-content for a nav section: { title, desc, body[] }.
   _settingsPanel(sec) {
@@ -5704,9 +5730,13 @@ class HctApp extends HTMLElement {
     if (sec === "export") {
       const units = [{ id: "px", label: "px" }, { id: "rem", label: "rem" }, { id: "em", label: "em" }];
       const colors = [{ id: "hex", label: "HEX" }, { id: "oklch", label: "OKLCH" }];
-      const prefixPresets = [{ id: "c", label: "Ultimate" }, { id: "md-sys-color", label: "Material" }, { id: "custom", label: "Custom" }];
-      const pfx = this._colorPrefix();
-      const preset = this._colorPrefixPreset();
+      const schemePresets = [{ id: "ultimate", label: "Ultimate" }, { id: "material", label: "Material" }, { id: "custom", label: "Custom" }];
+      const scheme = this._namingScheme();
+      const brand = this._customBrand();
+      // the resolved example var names under the current scheme (colour · type · geometry).
+      const exColor = `--${this._colorPrefix()}-primary-on-surface`;
+      const exType = `--${this._typePrefix()}-body-md-size`;
+      const exGeom = `--${this._geomPrefix() ? this._geomPrefix() + "-radius" : "radius"}-md`;
       return {
         title: "Export", desc: "How the CSS + DTCG exports render. Figma variables are always numeric (px).",
         body: [this._settingsGroup(null, [
@@ -5714,15 +5744,16 @@ class HctApp extends HTMLElement {
             (id) => this._setColorFormat(id), "setcolorformat"),
           this._settingRow("CSS units", "The unit the Typography + Geometry CSS/DTCG use. rem = px ÷ 16 (clean, thanks to the nice-number sizes). Figma stays px.", units, this._exportUnit(),
             (id) => this._setExportUnit(id), "setexportunit"),
-          // Colour token prefix — the `c` in `--c-*`. Ultimate (default) · Material (--md-sys-color-*) ·
-          // Custom (a text field). Live example shows the resulting variable name. App chrome is
-          // unaffected (it dogfoods a fixed --c-* theme); only the colour EXPORT names change.
-          this._settingRow("Token prefix", "The prefix of the colour CSS variables the export emits. Material uses M3-style naming, extended with our roles. The app's own UI is unaffected.", prefixPresets, preset,
-            (id) => this._setColorPrefix(id === "custom" ? (pfx === "c" || pfx === "md-sys-color" ? "brand" : pfx) : id), "setcolorprefix"),
+          // Naming convention — one coherent scheme across colour · type · geometry. Ultimate = native
+          // names; Material = the --md-sys-* root; Custom = a --{brand}-* root. The app chrome is
+          // unaffected (it dogfoods a fixed --c-* theme); only the CSS EXPORT names change.
+          this._settingRow("Naming convention", "The naming of the CSS variables the export emits, across colour, type, and geometry. Material uses M3-style --md-sys-* naming, extended with our roles. The app's own UI is unaffected.", schemePresets, scheme,
+            (id) => this._setNamingScheme(id === "custom" ? (brand || "brand") : id), "setnaming"),
           h("div", { class: "settings-row" },
-            h("div", { class: "settings-row-text" }, h("b", {}, "Custom prefix"), h("small", {}, ["Example: ", h("code", {}, `--${pfx}-primary-on-surface`)])),
-            h("input", { class: "settings-input", type: "text", value: pfx === "c" ? "" : pfx, placeholder: "c", "aria-label": "Custom colour token prefix",
-              onchange: (e) => this._setColorPrefix(e.target.value) })),
+            h("div", { class: "settings-row-text" }, h("b", {}, "Custom brand root"),
+              h("small", {}, ["e.g. ", h("code", {}, exColor), " · ", h("code", {}, exType), " · ", h("code", {}, exGeom)])),
+            h("input", { class: "settings-input", type: "text", value: scheme === "custom" ? brand : "", placeholder: "brand", "aria-label": "Custom naming brand root",
+              onchange: (e) => this._setNamingScheme(e.target.value || "ultimate") })),
         ])],
       };
     }

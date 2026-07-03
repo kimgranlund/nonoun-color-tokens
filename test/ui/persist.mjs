@@ -68,6 +68,12 @@ if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "cl
   if (U.hydrate(U.serialize(junk)).export.colorPrefix !== "md-sys") FAIL("export", `colorPrefix must sanitize to a legal ident core (got ${JSON.stringify(U.hydrate(U.serialize(junk)).export)})`);
   const dig = JSON.parse(JSON.stringify(base)); dig.export = { colorPrefix: "3x" };
   if (U.hydrate(U.serialize(dig)).export.colorPrefix !== "c3x") FAIL("export", "a leading-digit colorPrefix must be repaired (CSS idents can't start with a digit)");
+  // typePrefix (default "type" drops) + geomPrefix (default "" absent) — the type/geometry naming scheme.
+  const sch = JSON.parse(JSON.stringify(base)); sch.export = { typePrefix: "md-sys-typescale", geomPrefix: "md-sys" };
+  const rs = U.hydrate(U.serialize(sch)).export;
+  if (rs.typePrefix !== "md-sys-typescale" || rs.geomPrefix !== "md-sys") FAIL("export", `type/geom prefixes must round-trip (got ${JSON.stringify(rs)})`);
+  const dflt = JSON.parse(JSON.stringify(base)); dflt.export = { typePrefix: "type", geomPrefix: "" };
+  if ("export" in U.hydrate(U.serialize(dflt))) FAIL("export", "default typePrefix 'type' + empty geomPrefix must drop (identity gate)");
 }
 
 // clamp-to-default hydrator would fail the above (it discards in-domain values) — that's the anti-hack

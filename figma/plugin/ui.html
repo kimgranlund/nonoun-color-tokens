@@ -2750,11 +2750,14 @@ function dimUnit(px, unit) {
   return unit === "rem" || unit === "em" ? `${parseFloat((px / 16).toFixed(4))}${unit}` : `${px}px`;
 }
 
-function typeVarLines(scale, indent = "  ", unit = "px") {
+// `pfx` — the type-scale custom-property prefix (the `type` in `--type-*` and the `.type-*` class).
+// Default "type" (historical); a Material scheme sets "md-sys-typescale". Font families stay `--font-*`
+// (the typeface-primitive layer — the M3-ref analog — shared regardless of the scale prefix).
+function typeVarLines(scale, indent = "  ", unit = "px", pfx = "type") {
   const out = [];
   for (const [cName, steps] of Object.entries(scale.categories)) {
     for (const [sName, s] of Object.entries(steps)) {
-      const p = `--type-${kebab(cName)}-${kebab(sName)}`;
+      const p = `--${pfx}-${kebab(cName)}-${kebab(sName)}`;
       const single = s.singleLineHeight != null ? ` ${p}-line-single: ${dimUnit(s.singleLineHeight, unit)};` : "";
       out.push(`${indent}${p}-size: ${dimUnit(s.size, unit)}; ${p}-line: ${dimUnit(s.lineHeight, unit)}; ${p}-tracking: ${dimUnit(s.letterSpacing, unit)}; ${p}-weight: ${s.weight}; ${p}-para: ${dimUnit(s.paragraphSpacing, unit)};${single}`);
     }
@@ -2762,17 +2765,17 @@ function typeVarLines(scale, indent = "  ", unit = "px") {
   return out.join("\n");
 }
 
-function typeTokensCSS(scale, { unit = "px" } = {}) {
+function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   const lines = [":root {"];
   for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
-  lines.push(typeVarLines(scale, "  ", unit));
+  lines.push(typeVarLines(scale, "  ", unit, prefix));
   lines.push("}");
   for (const [cName, steps] of Object.entries(scale.categories)) {
     const role = scale.roleOf[cName] || "body";
     for (const [sName, s] of Object.entries(steps)) {
       const c = kebab(cName), sk = kebab(sName);
       const tt = s.textTransform && s.textTransform !== "none" ? ` text-transform: ${s.textTransform};` : "";
-      lines.push(`.type-${c}-${sk} { font-family: var(--font-${role}); font-size: var(--type-${c}-${sk}-size); line-height: var(--type-${c}-${sk}-line); letter-spacing: var(--type-${c}-${sk}-tracking); font-weight: var(--type-${c}-${sk}-weight);${tt} }`);
+      lines.push(`.${prefix}-${c}-${sk} { font-family: var(--font-${role}); font-size: var(--${prefix}-${c}-${sk}-size); line-height: var(--${prefix}-${c}-${sk}-line); letter-spacing: var(--${prefix}-${c}-${sk}-tracking); font-weight: var(--${prefix}-${c}-${sk}-weight);${tt} }`);
     }
   }
   return lines.join("\n") + "\n";
@@ -2781,11 +2784,11 @@ function typeTokensCSS(scale, { unit = "px" } = {}) {
 // typeTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
 // re-declares the per-step size vars at that mode's scale (the utilities + font vars are unchanged, so they
 // auto-track). `modes` = [{ name, minWidth, scale }]; a mode without a positive minWidth is skipped.
-function typeTokensResponsiveCSS(scale, modes = [], { unit = "px" } = {}) {
-  let css = typeTokensCSS(scale, { unit });
+function typeTokensResponsiveCSS(scale, modes = [], { unit = "px", prefix = "type" } = {}) {
+  let css = typeTokensCSS(scale, { unit, prefix });
   for (const m of modes) {
     if (!(Number(m.minWidth) > 0) || !m.scale) continue;
-    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ", unit)}\n  }\n}\n`;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`;
   }
   return css;
 }
@@ -3055,9 +3058,15 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 // of trailing zeros (clean thanks to the even-grid geometry); absent / "px" ⇒ `${px}px`. Mirrors type.mjs.
 const dimUnit = (px, unit) => (unit === "rem" || unit === "em" ? `${parseFloat((px / 16).toFixed(4))}${unit}` : `${px}px`);
 
-function geomSizeVarLines(scale, indent = "  ", unit = "px") {
+// ns(pfx, name) — a geometry namespace token core: native `size`/`radius`/… by default, or
+// `{pfx}-size`/`{pfx}-radius`/… when a scheme prefix is set (so a Material scheme namespaces the whole
+// dimensional system under one root: `--md-sys-size-*`, `--md-sys-radius-*`, …). Empty pfx ⇒ native.
+const ns = (pfx, name) => (pfx ? `${pfx}-${name}` : name);
+
+function geomSizeVarLines(scale, indent = "  ", unit = "px", pfx = "") {
+  const size = ns(pfx, "size");
   return Object.entries(scale.sizes).map(([name, s]) => {
-    const p = `--size-${kebab(name)}`;
+    const p = `--${size}-${kebab(name)}`;
     return `${indent}${p}-height: ${dimUnit(s.height, unit)}; ${p}-icon: ${dimUnit(s.icon, unit)}; ${p}-caret: ${dimUnit(s.caret, unit)}; ${p}-font: ${dimUnit(s.font, unit)}; ${p}-gap: ${dimUnit(s.gap, unit)}; ${p}-pad: ${dimUnit(s.padding, unit)}; ${p}-pad-edge: ${dimUnit(s.edgePadding, unit)}; ${p}-radius: ${dimUnit(s.radiusPill, unit)}; ${p}-min: ${dimUnit(s.minWidth, unit)};`;
   }).join("\n");
 }
@@ -3065,22 +3074,24 @@ function geomSizeVarLines(scale, indent = "  ", unit = "px") {
 // camelCase → kebab-case for the container-tier token names (controlGroup → control-group).
 const camelKebab = (s) => s.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 
-function geomTokensCSS(scale, { unit = "px" } = {}) {
-  const lines = [":root {", `  --density: ${scale.density};`, geomSizeVarLines(scale, "  ", unit)];
-  for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --radius-${k}: ${dimUnit(v, unit)};`);
+function geomTokensCSS(scale, { unit = "px", prefix = "" } = {}) {
+  const p = prefix; // "" ⇒ native --size-/--radius-/… ; else --{p}-size-/…
+  const lines = [":root {", `  --${ns(p, "density")}: ${scale.density};`, geomSizeVarLines(scale, "  ", unit, p)];
+  for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --${ns(p, "radius")}-${k}: ${dimUnit(v, unit)};`);
   // the treatment's favoured corner level, aliased so a consumer can use one name and let the
   // treatment decide (sharp→sm, soft→md, round→lg, pill→full) — the M3 "pick a level" model.
-  if (scale.radiusDefault) lines.push(`  --radius-default: var(--radius-${scale.radiusDefault});`);
-  for (const [k, v] of Object.entries(scale.space)) lines.push(`  --space-${k}: ${dimUnit(v, unit)};`);
+  if (scale.radiusDefault) lines.push(`  --${ns(p, "radius")}-default: var(--${ns(p, "radius")}-${scale.radiusDefault});`);
+  for (const [k, v] of Object.entries(scale.space)) lines.push(`  --${ns(p, "space")}-${k}: ${dimUnit(v, unit)};`);
   // the container tier + strokes (semantic names — see geomScale). Absent on a pre-tier scale.
-  for (const [k, v] of Object.entries(scale.insets || {})) lines.push(`  --inset-${camelKebab(k)}: ${dimUnit(v, unit)};`);
-  for (const [k, v] of Object.entries(scale.gaps || {})) lines.push(`  --gap-${camelKebab(k)}: ${dimUnit(v, unit)};`);
-  for (const [k, v] of Object.entries(scale.borders || {})) lines.push(`  --border-${camelKebab(k)}: ${dimUnit(v, unit)};`);
-  for (const [k, v] of Object.entries(scale.focus || {})) lines.push(`  --focus-${camelKebab(k)}: ${dimUnit(v, unit)};`);
+  for (const [k, v] of Object.entries(scale.insets || {})) lines.push(`  --${ns(p, "inset")}-${camelKebab(k)}: ${dimUnit(v, unit)};`);
+  for (const [k, v] of Object.entries(scale.gaps || {})) lines.push(`  --${ns(p, "gap")}-${camelKebab(k)}: ${dimUnit(v, unit)};`);
+  for (const [k, v] of Object.entries(scale.borders || {})) lines.push(`  --${ns(p, "border")}-${camelKebab(k)}: ${dimUnit(v, unit)};`);
+  for (const [k, v] of Object.entries(scale.focus || {})) lines.push(`  --${ns(p, "focus")}-${camelKebab(k)}: ${dimUnit(v, unit)};`);
   lines.push("}");
+  const size = ns(p, "size"), control = ns(p, "control");
   for (const name of Object.keys(scale.sizes)) {
     const s = kebab(name);
-    lines.push(`.control-${s} { box-sizing: border-box; block-size: var(--size-${s}-height); min-inline-size: var(--size-${s}-min); font-size: var(--size-${s}-font); padding-inline: var(--size-${s}-pad-edge); padding-block: 0; gap: var(--size-${s}-gap); border-radius: var(--size-${s}-radius); }`);
+    lines.push(`.${control}-${s} { box-sizing: border-box; block-size: var(--${size}-${s}-height); min-inline-size: var(--${size}-${s}-min); font-size: var(--${size}-${s}-font); padding-inline: var(--${size}-${s}-pad-edge); padding-block: 0; gap: var(--${size}-${s}-gap); border-radius: var(--${size}-${s}-radius); }`);
   }
   return lines.join("\n") + "\n";
 }
@@ -3088,11 +3099,11 @@ function geomTokensCSS(scale, { unit = "px" } = {}) {
 // geomTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
 // re-declares the per-size vars at that mode's scale (radii/space/density + the .control-* utilities are
 // mode-independent, so they auto-track). `modes` = [{ name, minWidth, scale }]; no-minWidth modes skipped.
-function geomTokensResponsiveCSS(scale, modes = [], { unit = "px" } = {}) {
-  let css = geomTokensCSS(scale, { unit });
+function geomTokensResponsiveCSS(scale, modes = [], { unit = "px", prefix = "" } = {}) {
+  let css = geomTokensCSS(scale, { unit, prefix });
   for (const m of modes) {
     if (!(Number(m.minWidth) > 0) || !m.scale) continue;
-    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit)}\n  }\n}\n`;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`;
   }
   return css;
 }
@@ -3694,11 +3705,14 @@ function clampExport(e) {
   // colorPrefix — the CSS custom-property prefix core (the `c` in `--c-*`). OPTIONAL: attach only a
   // sanitized non-empty value that ISN'T the default "c" (so the default round-trips as absent — the
   // identity gate). Sanitized to a legal ident core; capped; a bare/edge-hyphen/all-junk value drops.
-  const cp = typeof e.colorPrefix === "string"
-    ? e.colorPrefix.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1").slice(0, 40)
-    : "";
-  const colorPrefix = cp && cp !== "c" ? cp : null;
-  const out = { ...(unit ? { unit } : {}), ...(colorFormat ? { colorFormat } : {}), ...(colorPrefix ? { colorPrefix } : {}) };
+  // The naming-scheme prefixes (colour · type · geometry). Each: sanitized to a legal ident core,
+  // attached only when non-empty AND not the system's DEFAULT (so a default round-trips as absent —
+  // the identity gate). Defaults: colour "c", type "type", geometry "" (native).
+  const clean = (s, repair) => typeof s === "string" ? s.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, repair + "$1").slice(0, 40) : "";
+  const cp = clean(e.colorPrefix, "c"); const colorPrefix = cp && cp !== "c" ? cp : null;
+  const tp = clean(e.typePrefix, "t"); const typePrefix = tp && tp !== "type" ? tp : null;
+  const gp = clean(e.geomPrefix, "g"); const geomPrefix = gp || null;
+  const out = { ...(unit ? { unit } : {}), ...(colorFormat ? { colorFormat } : {}), ...(colorPrefix ? { colorPrefix } : {}), ...(typePrefix ? { typePrefix } : {}), ...(geomPrefix ? { geomPrefix } : {}) };
   return Object.keys(out).length ? { export: out } : {};
 }
 
@@ -10836,10 +10850,12 @@ class HctApp extends HTMLElement {
     const typeSc = this._typeScaleFor("base"); // override-aware base scale (Phase 3) — same as the matrix Base column
     const geomSc = this._geomScaleFor("base");
     const u = { unit: this._exportUnit() }; // the CSS unit preference (Settings › Export); Figma stays px
+    const ut = { ...u, prefix: this._typePrefix() }; // + the naming-scheme prefix for the type CSS
+    const ug = { ...u, prefix: this._geomPrefix() }; // + the naming-scheme prefix for the geometry CSS
     const SYSTEM_CODE = {
-      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales(), u),
+      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales(), ut),
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
-      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), u),
+      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), ug),
       "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
     };
     const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG" };
@@ -11079,7 +11095,7 @@ class HctApp extends HTMLElement {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
       const tDtcg = JSON.stringify(typeTokensDTCG(tsc, u), null, 2); // the chosen unit — for the typography/ folder
       files.push(
-        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales(), u) },
+        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales(), { ...u, prefix: this._typePrefix() }) },
         { name: "typography/type.tokens.json", data: tDtcg },
         ...this._typeModeDTCGFiles("typography/type", u),
         { name: "figma/type.tokens.json", data: JSON.stringify(typeTokensDTCG(tsc), null, 2) }, // ALWAYS px — Figma import (a tokens plugin)
@@ -11095,7 +11111,7 @@ class HctApp extends HTMLElement {
       const gsc = this._geomScaleFor("base"); // composed with the type scale (the per-step `font` is shared); override-aware (Phase 3)
       const gDtcg = JSON.stringify(geomTokensDTCG(gsc, u), null, 2); // the chosen unit — for the geometry/ folder
       files.push(
-        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales(), u) },
+        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales(), { ...u, prefix: this._geomPrefix() }) },
         { name: "geometry/geometry.tokens.json", data: gDtcg },
         ...this._geomModeDTCGFiles("geometry/geometry", u),
         { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
@@ -11369,16 +11385,40 @@ class HctApp extends HTMLElement {
     const clean = raw.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1");
     return clean || "c";
   }
-  // preset id for the segmented control: "c" | "md-sys-color" | "custom" (anything else).
-  _colorPrefixPreset() { const p = this._colorPrefix(); return p === "c" ? "c" : p === "md-sys-color" ? "md-sys-color" : "custom"; }
-  _setColorPrefix(v) {
-    const clean = String(v || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1").slice(0, 40);
+  // _typePrefix / _geomPrefix — the naming-scheme prefixes for the type + geometry CSS exports.
+  // Type default "type" (--type-*); geometry default "" (native --size-/--radius-/…). A Material scheme
+  // sets them to "md-sys-typescale" and "md-sys" so the whole system exports under one root.
+  _typePrefix() { const p = this.doc.export && typeof this.doc.export.typePrefix === "string" ? this.doc.export.typePrefix.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "t$1") : ""; return p || "type"; }
+  _geomPrefix() { const p = this.doc.export && typeof this.doc.export.geomPrefix === "string" ? this.doc.export.geomPrefix.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "g$1") : ""; return p; }
+
+  // _namingScheme — the coherent naming convention across all three systems (colour · type · geometry).
+  // "ultimate" = the native names (--c-* · --type-* · --size-*); "material" = one --md-sys-* root
+  // (--md-sys-color-* · --md-sys-typescale-* · --md-sys-*); "custom" = a --{brand}-* root the user types.
+  _namingScheme() {
+    const cp = this._colorPrefix();
+    if (cp === "c" && this._typePrefix() === "type" && !this._geomPrefix()) return "ultimate";
+    if (cp === "md-sys-color" && this._typePrefix() === "md-sys-typescale" && this._geomPrefix() === "md-sys") return "material";
+    return "custom";
+  }
+  // set all three prefixes coherently. id "ultimate"|"material" use the presets; else a custom root brand.
+  _setNamingScheme(idOrBrand) {
+    let color, type, geom;
+    if (idOrBrand === "ultimate") { color = ""; type = ""; geom = ""; } // "" ⇒ defaults drop (identity)
+    else if (idOrBrand === "material") { color = "md-sys-color"; type = "md-sys-typescale"; geom = "md-sys"; }
+    else {
+      const brand = String(idOrBrand || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "b$1").slice(0, 24);
+      if (!brand) { color = ""; type = ""; geom = ""; } else { color = `${brand}-color`; type = `${brand}-type`; geom = brand; }
+    }
     this.commit((d) => {
       const ex = { ...(d.export || {}) };
-      if (!clean || clean === "c") delete ex.colorPrefix; else ex.colorPrefix = clean; // default ⇒ absent (identity)
+      if (!color || color === "c") delete ex.colorPrefix; else ex.colorPrefix = color;
+      if (!type || type === "type") delete ex.typePrefix; else ex.typePrefix = type;
+      if (!geom) delete ex.geomPrefix; else ex.geomPrefix = geom;
       if (Object.keys(ex).length) d.export = ex; else delete d.export;
     });
   }
+  // the current custom brand root (strip the -color/-type suffixes back to the brand stem), for the field.
+  _customBrand() { const c = this._colorPrefix(); return c.endsWith("-color") ? c.slice(0, -6) : c === "c" ? "" : c; }
 
   // _settingsPanel — the right-content for a nav section: { title, desc, body[] }.
   _settingsPanel(sec) {
@@ -11398,9 +11438,13 @@ class HctApp extends HTMLElement {
     if (sec === "export") {
       const units = [{ id: "px", label: "px" }, { id: "rem", label: "rem" }, { id: "em", label: "em" }];
       const colors = [{ id: "hex", label: "HEX" }, { id: "oklch", label: "OKLCH" }];
-      const prefixPresets = [{ id: "c", label: "Ultimate" }, { id: "md-sys-color", label: "Material" }, { id: "custom", label: "Custom" }];
-      const pfx = this._colorPrefix();
-      const preset = this._colorPrefixPreset();
+      const schemePresets = [{ id: "ultimate", label: "Ultimate" }, { id: "material", label: "Material" }, { id: "custom", label: "Custom" }];
+      const scheme = this._namingScheme();
+      const brand = this._customBrand();
+      // the resolved example var names under the current scheme (colour · type · geometry).
+      const exColor = `--${this._colorPrefix()}-primary-on-surface`;
+      const exType = `--${this._typePrefix()}-body-md-size`;
+      const exGeom = `--${this._geomPrefix() ? this._geomPrefix() + "-radius" : "radius"}-md`;
       return {
         title: "Export", desc: "How the CSS + DTCG exports render. Figma variables are always numeric (px).",
         body: [this._settingsGroup(null, [
@@ -11408,15 +11452,16 @@ class HctApp extends HTMLElement {
             (id) => this._setColorFormat(id), "setcolorformat"),
           this._settingRow("CSS units", "The unit the Typography + Geometry CSS/DTCG use. rem = px ÷ 16 (clean, thanks to the nice-number sizes). Figma stays px.", units, this._exportUnit(),
             (id) => this._setExportUnit(id), "setexportunit"),
-          // Colour token prefix — the `c` in `--c-*`. Ultimate (default) · Material (--md-sys-color-*) ·
-          // Custom (a text field). Live example shows the resulting variable name. App chrome is
-          // unaffected (it dogfoods a fixed --c-* theme); only the colour EXPORT names change.
-          this._settingRow("Token prefix", "The prefix of the colour CSS variables the export emits. Material uses M3-style naming, extended with our roles. The app's own UI is unaffected.", prefixPresets, preset,
-            (id) => this._setColorPrefix(id === "custom" ? (pfx === "c" || pfx === "md-sys-color" ? "brand" : pfx) : id), "setcolorprefix"),
+          // Naming convention — one coherent scheme across colour · type · geometry. Ultimate = native
+          // names; Material = the --md-sys-* root; Custom = a --{brand}-* root. The app chrome is
+          // unaffected (it dogfoods a fixed --c-* theme); only the CSS EXPORT names change.
+          this._settingRow("Naming convention", "The naming of the CSS variables the export emits, across colour, type, and geometry. Material uses M3-style --md-sys-* naming, extended with our roles. The app's own UI is unaffected.", schemePresets, scheme,
+            (id) => this._setNamingScheme(id === "custom" ? (brand || "brand") : id), "setnaming"),
           h("div", { class: "settings-row" },
-            h("div", { class: "settings-row-text" }, h("b", {}, "Custom prefix"), h("small", {}, ["Example: ", h("code", {}, `--${pfx}-primary-on-surface`)])),
-            h("input", { class: "settings-input", type: "text", value: pfx === "c" ? "" : pfx, placeholder: "c", "aria-label": "Custom colour token prefix",
-              onchange: (e) => this._setColorPrefix(e.target.value) })),
+            h("div", { class: "settings-row-text" }, h("b", {}, "Custom brand root"),
+              h("small", {}, ["e.g. ", h("code", {}, exColor), " · ", h("code", {}, exType), " · ", h("code", {}, exGeom)])),
+            h("input", { class: "settings-input", type: "text", value: scheme === "custom" ? brand : "", placeholder: "brand", "aria-label": "Custom naming brand root",
+              onchange: (e) => this._setNamingScheme(e.target.value || "ultimate") })),
         ])],
       };
     }

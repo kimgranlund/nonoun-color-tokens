@@ -21,10 +21,13 @@ and around components). Your job is never to type a px value — it's to pick th
 
 ## Bind to the project first (always step 1)
 
-1. **Find the export.** A CSS file defining `--size-*`, `--space-*`, `--radius-*` variables (often
-   `geometry.css` / `tokens.css`; a DTCG `*.tokens.json` and `.control-*` utility classes may sit
-   beside it). This guide is for the `--*` CSS export; the Figma number variables carry the same
-   values. If none exists, stop and ask — do not hardcode dimensions.
+1. **Find the export.** A CSS file defining the dimensional variables (often `geometry.css` /
+   `tokens.css`; a DTCG `*.tokens.json` and utility classes may sit beside it). **The prefix is
+   configurable:** the default is the native `--size-*` / `--radius-*` / `--space-*` (class
+   `.control-*`), but a Material scheme namespaces the whole system under one root —
+   `--md-sys-size-*` / `--md-sys-radius-*` / `.md-sys-control-*` (or a custom `--{brand}-*`). **Read
+   the actual prefix from the file**; the token grammar after it is identical. If none exists, stop
+   and ask — do not hardcode dimensions.
 2. **Know the two tiers.** *Control* geometry is per-size (`--size-{step}-*`, steps XS–2XL) and
    scales with the control height. *Container* geometry (`--inset-*`, `--gap-*`, and the raw
    `--space-*` ladder) is treatment-derived and mode-independent. Don't cross them — a control's

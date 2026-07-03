@@ -261,11 +261,14 @@ function clampExport(e) {
   // colorPrefix — the CSS custom-property prefix core (the `c` in `--c-*`). OPTIONAL: attach only a
   // sanitized non-empty value that ISN'T the default "c" (so the default round-trips as absent — the
   // identity gate). Sanitized to a legal ident core; capped; a bare/edge-hyphen/all-junk value drops.
-  const cp = typeof e.colorPrefix === "string"
-    ? e.colorPrefix.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1").slice(0, 40)
-    : "";
-  const colorPrefix = cp && cp !== "c" ? cp : null;
-  const out = { ...(unit ? { unit } : {}), ...(colorFormat ? { colorFormat } : {}), ...(colorPrefix ? { colorPrefix } : {}) };
+  // The naming-scheme prefixes (colour · type · geometry). Each: sanitized to a legal ident core,
+  // attached only when non-empty AND not the system's DEFAULT (so a default round-trips as absent —
+  // the identity gate). Defaults: colour "c", type "type", geometry "" (native).
+  const clean = (s, repair) => typeof s === "string" ? s.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, repair + "$1").slice(0, 40) : "";
+  const cp = clean(e.colorPrefix, "c"); const colorPrefix = cp && cp !== "c" ? cp : null;
+  const tp = clean(e.typePrefix, "t"); const typePrefix = tp && tp !== "type" ? tp : null;
+  const gp = clean(e.geomPrefix, "g"); const geomPrefix = gp || null;
+  const out = { ...(unit ? { unit } : {}), ...(colorFormat ? { colorFormat } : {}), ...(colorPrefix ? { colorPrefix } : {}), ...(typePrefix ? { typePrefix } : {}), ...(geomPrefix ? { geomPrefix } : {}) };
   return Object.keys(out).length ? { export: out } : {};
 }
 

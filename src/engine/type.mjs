@@ -190,11 +190,14 @@ export function dimUnit(px, unit) {
   return unit === "rem" || unit === "em" ? `${parseFloat((px / 16).toFixed(4))}${unit}` : `${px}px`;
 }
 
-function typeVarLines(scale, indent = "  ", unit = "px") {
+// `pfx` — the type-scale custom-property prefix (the `type` in `--type-*` and the `.type-*` class).
+// Default "type" (historical); a Material scheme sets "md-sys-typescale". Font families stay `--font-*`
+// (the typeface-primitive layer — the M3-ref analog — shared regardless of the scale prefix).
+function typeVarLines(scale, indent = "  ", unit = "px", pfx = "type") {
   const out = [];
   for (const [cName, steps] of Object.entries(scale.categories)) {
     for (const [sName, s] of Object.entries(steps)) {
-      const p = `--type-${kebab(cName)}-${kebab(sName)}`;
+      const p = `--${pfx}-${kebab(cName)}-${kebab(sName)}`;
       const single = s.singleLineHeight != null ? ` ${p}-line-single: ${dimUnit(s.singleLineHeight, unit)};` : "";
       out.push(`${indent}${p}-size: ${dimUnit(s.size, unit)}; ${p}-line: ${dimUnit(s.lineHeight, unit)}; ${p}-tracking: ${dimUnit(s.letterSpacing, unit)}; ${p}-weight: ${s.weight}; ${p}-para: ${dimUnit(s.paragraphSpacing, unit)};${single}`);
     }
@@ -202,17 +205,17 @@ function typeVarLines(scale, indent = "  ", unit = "px") {
   return out.join("\n");
 }
 
-export function typeTokensCSS(scale, { unit = "px" } = {}) {
+export function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   const lines = [":root {"];
   for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
-  lines.push(typeVarLines(scale, "  ", unit));
+  lines.push(typeVarLines(scale, "  ", unit, prefix));
   lines.push("}");
   for (const [cName, steps] of Object.entries(scale.categories)) {
     const role = scale.roleOf[cName] || "body";
     for (const [sName, s] of Object.entries(steps)) {
       const c = kebab(cName), sk = kebab(sName);
       const tt = s.textTransform && s.textTransform !== "none" ? ` text-transform: ${s.textTransform};` : "";
-      lines.push(`.type-${c}-${sk} { font-family: var(--font-${role}); font-size: var(--type-${c}-${sk}-size); line-height: var(--type-${c}-${sk}-line); letter-spacing: var(--type-${c}-${sk}-tracking); font-weight: var(--type-${c}-${sk}-weight);${tt} }`);
+      lines.push(`.${prefix}-${c}-${sk} { font-family: var(--font-${role}); font-size: var(--${prefix}-${c}-${sk}-size); line-height: var(--${prefix}-${c}-${sk}-line); letter-spacing: var(--${prefix}-${c}-${sk}-tracking); font-weight: var(--${prefix}-${c}-${sk}-weight);${tt} }`);
     }
   }
   return lines.join("\n") + "\n";
@@ -221,11 +224,11 @@ export function typeTokensCSS(scale, { unit = "px" } = {}) {
 // typeTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
 // re-declares the per-step size vars at that mode's scale (the utilities + font vars are unchanged, so they
 // auto-track). `modes` = [{ name, minWidth, scale }]; a mode without a positive minWidth is skipped.
-export function typeTokensResponsiveCSS(scale, modes = [], { unit = "px" } = {}) {
-  let css = typeTokensCSS(scale, { unit });
+export function typeTokensResponsiveCSS(scale, modes = [], { unit = "px", prefix = "type" } = {}) {
+  let css = typeTokensCSS(scale, { unit, prefix });
   for (const m of modes) {
     if (!(Number(m.minWidth) > 0) || !m.scale) continue;
-    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ", unit)}\n  }\n}\n`;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`;
   }
   return css;
 }

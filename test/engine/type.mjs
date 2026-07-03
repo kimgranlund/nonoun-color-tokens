@@ -128,6 +128,13 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(/--type-body-md-size: 1rem;/.test(T.typeTokensCSS(s, { unit: "rem" })), "unit:rem → 16px = 1rem");
   ok(/--type-body-md-size: 1em;/.test(T.typeTokensCSS(s, { unit: "em" })), "unit:em → 16px = 1em");
   ok(T.dimUnit(24, "rem") === "1.5rem" && T.dimUnit(18, "rem") === "1.125rem" && T.dimUnit(2, "rem") === "0.125rem", "dimUnit: 24→1.5rem · 18→1.125rem · 2→0.125rem (rem-clean)");
+  // naming-scheme PREFIX (the `type` in --type-*/.type-*): a Material scheme namespaces the scale; fonts
+  // stay --font-* (the family layer). Default "type" ⇒ byte-identical (identity gate). Responsive too.
+  const md = T.typeTokensCSS(s, { prefix: "md-sys-typescale" });
+  ok(md.includes("--md-sys-typescale-body-md-size:") && md.includes(".md-sys-typescale-body-md {") && !md.includes("--type-body-md"), "prefix rewrites --type-*/.type-* to the scheme prefix (no stray --type-*)");
+  ok(md.includes("--font-body:") && md.includes("var(--font-body)"), "font families stay --font-* under a scale prefix");
+  ok(T.typeTokensCSS(s, { prefix: "type" }) === T.typeTokensCSS(s), "prefix 'type' is byte-identical to the default (identity gate)");
+  ok(T.typeTokensResponsiveCSS(s, [{ name: "M", minWidth: 768, scale: s }], { prefix: "md-sys-typescale" }).includes("--md-sys-typescale-body-md-size:"), "responsive CSS threads the prefix into the @media blocks");
   ok(T.typeTokensDTCG(s, { unit: "rem" }).typography.Body.MD.$value.fontSize === "1rem" && T.typeTokensDTCG(s).typography.Body.MD.$value.fontSize === "16px", "DTCG carries the unit (fontSize 1rem) + defaults to px");
   ok(T.typeTokensResponsiveCSS(s, [{ name: "M", minWidth: 768, scale: T.typeScale({ treatment: "product", bodyBase: 13 }) }], { unit: "rem" }).includes("--type-body-md-size: 0.8125rem;"), "the @media breakpoint block honors the unit (13px = 0.8125rem)");
 }

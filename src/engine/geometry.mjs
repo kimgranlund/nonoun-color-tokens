@@ -156,9 +156,15 @@ const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace
 // of trailing zeros (clean thanks to the even-grid geometry); absent / "px" ⇒ `${px}px`. Mirrors type.mjs.
 const dimUnit = (px, unit) => (unit === "rem" || unit === "em" ? `${parseFloat((px / 16).toFixed(4))}${unit}` : `${px}px`);
 
-function geomSizeVarLines(scale, indent = "  ", unit = "px") {
+// ns(pfx, name) — a geometry namespace token core: native `size`/`radius`/… by default, or
+// `{pfx}-size`/`{pfx}-radius`/… when a scheme prefix is set (so a Material scheme namespaces the whole
+// dimensional system under one root: `--md-sys-size-*`, `--md-sys-radius-*`, …). Empty pfx ⇒ native.
+const ns = (pfx, name) => (pfx ? `${pfx}-${name}` : name);
+
+function geomSizeVarLines(scale, indent = "  ", unit = "px", pfx = "") {
+  const size = ns(pfx, "size");
   return Object.entries(scale.sizes).map(([name, s]) => {
-    const p = `--size-${kebab(name)}`;
+    const p = `--${size}-${kebab(name)}`;
     return `${indent}${p}-height: ${dimUnit(s.height, unit)}; ${p}-icon: ${dimUnit(s.icon, unit)}; ${p}-caret: ${dimUnit(s.caret, unit)}; ${p}-font: ${dimUnit(s.font, unit)}; ${p}-gap: ${dimUnit(s.gap, unit)}; ${p}-pad: ${dimUnit(s.padding, unit)}; ${p}-pad-edge: ${dimUnit(s.edgePadding, unit)}; ${p}-radius: ${dimUnit(s.radiusPill, unit)}; ${p}-min: ${dimUnit(s.minWidth, unit)};`;
   }).join("\n");
 }
@@ -166,22 +172,24 @@ function geomSizeVarLines(scale, indent = "  ", unit = "px") {
 // camelCase → kebab-case for the container-tier token names (controlGroup → control-group).
 const camelKebab = (s) => s.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 
-export function geomTokensCSS(scale, { unit = "px" } = {}) {
-  const lines = [":root {", `  --density: ${scale.density};`, geomSizeVarLines(scale, "  ", unit)];
-  for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --radius-${k}: ${dimUnit(v, unit)};`);
+export function geomTokensCSS(scale, { unit = "px", prefix = "" } = {}) {
+  const p = prefix; // "" ⇒ native --size-/--radius-/… ; else --{p}-size-/…
+  const lines = [":root {", `  --${ns(p, "density")}: ${scale.density};`, geomSizeVarLines(scale, "  ", unit, p)];
+  for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --${ns(p, "radius")}-${k}: ${dimUnit(v, unit)};`);
   // the treatment's favoured corner level, aliased so a consumer can use one name and let the
   // treatment decide (sharp→sm, soft→md, round→lg, pill→full) — the M3 "pick a level" model.
-  if (scale.radiusDefault) lines.push(`  --radius-default: var(--radius-${scale.radiusDefault});`);
-  for (const [k, v] of Object.entries(scale.space)) lines.push(`  --space-${k}: ${dimUnit(v, unit)};`);
+  if (scale.radiusDefault) lines.push(`  --${ns(p, "radius")}-default: var(--${ns(p, "radius")}-${scale.radiusDefault});`);
+  for (const [k, v] of Object.entries(scale.space)) lines.push(`  --${ns(p, "space")}-${k}: ${dimUnit(v, unit)};`);
   // the container tier + strokes (semantic names — see geomScale). Absent on a pre-tier scale.
-  for (const [k, v] of Object.entries(scale.insets || {})) lines.push(`  --inset-${camelKebab(k)}: ${dimUnit(v, unit)};`);
-  for (const [k, v] of Object.entries(scale.gaps || {})) lines.push(`  --gap-${camelKebab(k)}: ${dimUnit(v, unit)};`);
-  for (const [k, v] of Object.entries(scale.borders || {})) lines.push(`  --border-${camelKebab(k)}: ${dimUnit(v, unit)};`);
-  for (const [k, v] of Object.entries(scale.focus || {})) lines.push(`  --focus-${camelKebab(k)}: ${dimUnit(v, unit)};`);
+  for (const [k, v] of Object.entries(scale.insets || {})) lines.push(`  --${ns(p, "inset")}-${camelKebab(k)}: ${dimUnit(v, unit)};`);
+  for (const [k, v] of Object.entries(scale.gaps || {})) lines.push(`  --${ns(p, "gap")}-${camelKebab(k)}: ${dimUnit(v, unit)};`);
+  for (const [k, v] of Object.entries(scale.borders || {})) lines.push(`  --${ns(p, "border")}-${camelKebab(k)}: ${dimUnit(v, unit)};`);
+  for (const [k, v] of Object.entries(scale.focus || {})) lines.push(`  --${ns(p, "focus")}-${camelKebab(k)}: ${dimUnit(v, unit)};`);
   lines.push("}");
+  const size = ns(p, "size"), control = ns(p, "control");
   for (const name of Object.keys(scale.sizes)) {
     const s = kebab(name);
-    lines.push(`.control-${s} { box-sizing: border-box; block-size: var(--size-${s}-height); min-inline-size: var(--size-${s}-min); font-size: var(--size-${s}-font); padding-inline: var(--size-${s}-pad-edge); padding-block: 0; gap: var(--size-${s}-gap); border-radius: var(--size-${s}-radius); }`);
+    lines.push(`.${control}-${s} { box-sizing: border-box; block-size: var(--${size}-${s}-height); min-inline-size: var(--${size}-${s}-min); font-size: var(--${size}-${s}-font); padding-inline: var(--${size}-${s}-pad-edge); padding-block: 0; gap: var(--${size}-${s}-gap); border-radius: var(--${size}-${s}-radius); }`);
   }
   return lines.join("\n") + "\n";
 }
@@ -189,11 +197,11 @@ export function geomTokensCSS(scale, { unit = "px" } = {}) {
 // geomTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
 // re-declares the per-size vars at that mode's scale (radii/space/density + the .control-* utilities are
 // mode-independent, so they auto-track). `modes` = [{ name, minWidth, scale }]; no-minWidth modes skipped.
-export function geomTokensResponsiveCSS(scale, modes = [], { unit = "px" } = {}) {
-  let css = geomTokensCSS(scale, { unit });
+export function geomTokensResponsiveCSS(scale, modes = [], { unit = "px", prefix = "" } = {}) {
+  let css = geomTokensCSS(scale, { unit, prefix });
   for (const m of modes) {
     if (!(Number(m.minWidth) > 0) || !m.scale) continue;
-    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit)}\n  }\n}\n`;
+    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`;
   }
   return css;
 }

@@ -84,6 +84,16 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(css.includes("--size-md-height:") && css.includes("--radius-xs: 4px;") && css.includes("--radius-xl: 28px;") && css.includes("--space-4:"), "CSS has size + the M3 radius scale (xs 4 … xl 28) + space custom props");
   ok(css.includes("--radius-default: var(--radius-md);"), "CSS aliases --radius-default to the treatment's favoured corner (comfortable → md)");
   ok(/\.control-md\s*\{[^}]*block-size: var\(--size-md-height\)[^}]*padding-block: 0/.test(css), "CSS emits a .control-md utility class (block-size lever, padding-block 0)");
+  // naming-scheme PREFIX: a Material scheme namespaces the WHOLE dimensional system under one root
+  // (--md-sys-size-* · --md-sys-radius-* · --md-sys-inset-* · --md-sys-focus-* · .md-sys-control-*);
+  // the --radius-default alias + the .control-* refs thread the prefix. Empty ⇒ native (identity gate).
+  const g = G.geomScale({ treatment: "comfortable" });
+  const md = G.geomTokensCSS(g, { prefix: "md-sys" });
+  ok(md.includes("--md-sys-size-md-height:") && md.includes("--md-sys-radius-md:") && md.includes("--md-sys-space-4:") && md.includes("--md-sys-inset-card:") && md.includes("--md-sys-focus-ring-width:"), "prefix namespaces every geometry family under the scheme root");
+  ok(md.includes("--md-sys-radius-default: var(--md-sys-radius-md);"), "the radius-default alias threads the prefix on both sides");
+  ok(md.includes(".md-sys-control-md {") && md.includes("var(--md-sys-size-md-height)") && !md.includes("--size-md-height"), "the .control-* class + its refs thread the prefix (no stray --size-*)");
+  ok(G.geomTokensCSS(g, { prefix: "" }) === css, "empty prefix is byte-identical to the native default (identity gate)");
+  ok(G.geomTokensResponsiveCSS(g, [{ name: "M", minWidth: 768, scale: g }], { prefix: "md-sys" }).includes("--md-sys-size-md-height:"), "responsive CSS threads the prefix into the @media blocks");
 }
 
 // ── CSS export unit (px/rem/em): even-grid geometry converts clean to rem ──
