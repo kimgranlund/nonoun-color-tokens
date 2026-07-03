@@ -44,6 +44,15 @@ if (existsSync(skillsDir)) {
   for (const d of dirs) ok(existsSync(join(skillsDir, d.name, "SKILL.md")), `skill "${d.name}" has a SKILL.md`);
 }
 
+// any bundled agents must carry a name + description frontmatter (a broken agent shouldn't ship).
+const agentsDir = join(ROOT, "plugin/ultimate-tokens/agents");
+if (existsSync(agentsDir)) {
+  for (const f of readdirSync(agentsDir).filter((n) => n.endsWith(".md"))) {
+    const src = readFileSync(join(agentsDir, f), "utf8");
+    ok(/^---[\s\S]*?\nname:\s*\S/.test(src) && /\ndescription:\s*\S|\ndescription:\s*>/.test(src), `agent "${f}" has name + description frontmatter`);
+  }
+}
+
 if (fails.length) { console.error("plugin FAIL:\n  ✗ " + fails.join("\n  ✗ ")); process.exit(1); }
-console.log("plugin PASS — ultimate-tokens manifest + marketplace coherent with the skills on disk");
+console.log("plugin PASS — ultimate-tokens manifest + marketplace coherent with the skills (+ agents) on disk");
 process.exit(0);

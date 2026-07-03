@@ -11,12 +11,21 @@ font size, or a pixel value.
 | **typography-tokens** | the type of any UI | the seven-voice scale — the voice=job / step=size rule, the body-vs-ui split, single-line vs multi-line, per-role paragraph rhythm, responsive breakpoint modes. |
 | **geometry-tokens** | the size or spacing of any UI | the two-tier dimensional system — control geometry (the centering law) and container geometry (insets/gaps), the Material-3-aligned radius scale, borders, focus rings. |
 
+## The agent
+
+**`token-integrator`** is the seat you invoke to actually *do the wiring* — "use our design tokens
+here", "wire the theme", "migrate this UI to our kit". It binds to your project's real exported
+variables, applies the three skills' laws (adapting past them for frameworks they don't cover), and
+for large work orchestrates scoped planning → execution → verification sub-agents (the verifier a
+separate seat from the executors). If you're already running your own loop or orchestrator, it slots
+in as a seat and hands back cleanly rather than starting a competing one.
+
 ## How it works
 
 Each skill **binds to your project first**: it finds the exported CSS/DTCG, reads the actual variable
 prefix (default `--c-*` / `--type-*` / `--size-*`, or a Material `--md-sys-*` / custom `--{brand}-*`
 scheme), enumerates what the kit exports, then applies the usage laws with your real token names. It
-never invents a value — it names the semantic token for the job, or stops and asks.
+names the semantic token for the job rather than inventing a value — or stops and asks.
 
 ## Install
 
