@@ -4,7 +4,7 @@ description: >
   Use when a change touches src/engine/type.mjs or any typography in
   nonoun-color-tokens — the modular scale, a voice or treatment,
   tracking/leading/weight/case, a font swap, a fallback-font render, or a red
-  type gate. Covers the seven named roles (Display · Heading · Kicker · Eyebrow · Body · UI ·
+  type gate. Covers the seven named roles (Display · Heading · Sub-heading · Kicker · Body · UI ·
   Code), the five treatments, and the self-hosted fonts. TYPE sibling of
   color-math (COLOR only).
 ---
@@ -23,7 +23,7 @@ this skill never touches color.
 | Layer | What it is | The contract |
 |---|---|---|
 | **`cat(role, base, ratio, leading, weight, trackingEm, steps, transform)`** | builds ONE voice's param record | `{role, base, ratio, leading, weight, trackingEm, steps, transform}` — no resolved sizes yet; `steps` defaults `STEPS_5`, `transform` `"none"` |
-| **`make7(o={})`** | the FACTORY — returns the SEVEN named voices, sharing structure, reading per-voice knobs from `o` | `Display · Heading · Kicker · Eyebrow · Body · UI · Code` |
+| **`make7(o={})`** | the FACTORY — returns the SEVEN named voices, sharing structure, reading per-voice knobs from `o` | `Display · Heading · Sub-heading · Kicker · Body · UI · Code` |
 | **`TYPE_TREATMENTS`** (5) | each = `{id,label,note,fonts,categories:make7({...})}` | ids `product · luxury · editorial · technical · statement` (`statement` = Brutalist) |
 | **`typeScale(config={treatment,bodyBase,overrides?,voices?,fonts?})`** | resolves a treatment → `{treatment,label,fonts,roleOf,categories}` | `roleOf` maps each voice→font role; `categories[voice][step]` = the resolved step. The three optional channels are **per-kit overrides** layered over the treatment, each **identity-gated** (absent/empty/non-finite ⇒ byte-identical output): `overrides` = flat per-cell `"<voice>\|<step>"`→size map (moves SIZE only); `voices` = `{<voice>:{weight,tracking,leading,ratio}}` reshaping a whole voice; `fonts` = `{<role>:family}` per-role font swap |
 | **`typeTokensCSS` / `typeTokensResponsiveCSS` / `typeTokensDTCG` / `typeTokensFigmaModes`** | the emitters (operate on a resolved `scale`; px/rem/em via `dimUnit`) | CSS custom props + a utility class per step (+ per-breakpoint `@media` blocks) · DTCG composite `typography` tokens · a breakpoint-moded Figma collection |
@@ -32,7 +32,7 @@ this skill never touches color.
 
 One-line pointers; this body does not restate them:
 
-- **Voice taxonomy** — the seven voices × two step ramps (`STEPS_5` 5 / `STEPS_UI` 8; 41 steps), the `roleOf` mapping (Eyebrow + Code → `mono`), the caps voices, the per-treatment case rules → foundations §2 + §4.
+- **Voice taxonomy** — the seven voices × two step ramps (`STEPS_5` 5 / `STEPS_UI` 8; 41 steps), the `roleOf` mapping (Kicker + Code → `mono`), the caps voices, the per-treatment case rules → foundations §2 + §4.
 - **The math** — `buildCategory(name, p, factor, overrides, vp)` in type.mjs: modular scale → 8px floor → the nice-number ladder (with the monotonic bump) → per-cell/per-voice overrides; tracking stays OPTICAL on the modular size; `bodyBase` is the ONE global resize lever (`factor = bodyBase / Body.base` in `typeScale`) → foundations §3.
 - **Emitter shapes** — the four emitters + the `dimUnit` px/rem/em option → foundations §6.
 - **Leading bands** (display 1.05–1.2 · heading 1.05–1.3 · prose 1.45–1.65 · UI 1.25–1.5 · mono ~1.5) — stay inside them → foundations §3.
@@ -68,7 +68,7 @@ outside the current treatment flashes the fallback without the eager load).
    - A wrong/missing rendered face → `src/ui/type-fonts.js` (regenerate) + the treatment's `fonts`.
    - A **per-kit, user-tuned** size/shaping/font (NOT a treatment-wide change) → the `typeScale` override channels, never the treatment: a single cell → `config.overrides`; a whole voice's weight/tracking/leading/ratio → `config.voices`; a per-role font swap → `config.fonts` (each MUST stay identity-gated — see the `typeScale` row).
 2. **Edit only `type.mjs`** (+ `scripts/gen-type-fonts.mjs` for a font change). Keep the math in `buildCategory` — never bake a resolved px size into a treatment; pass a `base`/`ratio`/`trackingEm` knob and let the engine derive it. Case is a per-treatment decision via the `transform` arg, not a blanket rule.
-3. **Respect the invariants** (the tests assert these): Body MD = `bodyBase`; every size sits on the nice-number ladder and strictly increases XS→XL; Display tracks negative + scales with size; Context/Eyebrow uppercase + positive tracking; Eyebrow + Code map to `mono`; Code/UI carry the 8-step `STEPS_UI` ramp; exactly ONE treatment (Brutalist/`statement`) sets an uppercase Display; CSS families stay QUOTED; leadings inside the bands.
+3. **Respect the invariants** (the tests assert these): Body MD = `bodyBase`; every size sits on the nice-number ladder and strictly increases XS→XL; Display tracks negative + scales with size; Sub-heading/Kicker uppercase + positive tracking; Kicker + Code map to `mono`; Code/UI carry the 8-step `STEPS_UI` ramp; exactly ONE treatment (Brutalist/`statement`) sets an uppercase Display; CSS families stay QUOTED; leadings inside the bands.
 4. **New treatment? — add the SEVEN groups by passing the full `fonts` palette** (`display/heading/body/ui/mono` — five roles) so `roleOf` resolves every voice, and supply `note` (the UI specimen copy reads it). The test asserts every treatment has all seven groups + `fonts`.
 5. **New font? — wire BOTH ends.** `TYPE_TREATMENTS.fonts` (so a voice uses it) AND `scripts/gen-type-fonts.mjs#FAMILIES` (so it's embedded), then `npm run gen:type-fonts` and commit `src/ui/type-fonts.js`.
 
@@ -77,7 +77,7 @@ outside the current treatment flashes the fallback without the eager load).
 Run the pure verifier first (prints `type PASS` / `type FAIL (n)`; exit 1 fails), then the suite:
 
 ```
-node test/engine/type.mjs    # 5 treatments × 7 groups · roleOf (Eyebrow+Code→mono) · the caps voices ·
+node test/engine/type.mjs    # 5 treatments × 7 groups · roleOf (Kicker+Code→mono) · the caps voices ·
                              # exactly ONE uppercase Display (Brutalist) · Body MD=bodyBase · monotonic XS→XL ·
                              # the nice-number ladder · LG/MD≈ratio · lineHeight=size·leading · optical tracking
                              # (Display neg / UI pos) · Code 8-step ramp · bodyBase scales uniformly ·

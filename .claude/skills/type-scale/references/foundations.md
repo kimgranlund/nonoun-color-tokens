@@ -16,7 +16,7 @@ layer.
 - **`make7(o={})`** is the FACTORY: it returns the seven voices as a `{name: catRecord}`
   object, every voice sharing the same STRUCTURE while reading its knobs from `o` (with a default per knob,
   e.g. `o.dRatio ?? 1.25`). The knobs are prefixed by voice: Display `d-` (`dBase/dRatio/dLead/dWeight/
-  dTrack/dTransform`), Heading `he-`, Kicker `hc-`, Eyebrow `eye-`, Body `b-`, UI `ui-`,
+  dTrack/dTransform`), Heading `he-`, Sub-heading `hc-`, Kicker `eye-`, Body `b-`, UI `ui-`,
   Code `code-`/`codeWeight`/`codeTrack`. A knob a treatment doesn't pass falls to the `make7` default.
 - **A treatment** is `{id, label, note, fonts, categories: make7({...})}`. It supplies
   the **font palette** (`{display, heading, body, ui, mono}` — five roles) and a few character knobs; the
@@ -35,10 +35,10 @@ layer.
 
 ### 2. The seven named voices + the two step sets
 
-The canonical taxonomy (.claude/docs/spec/typography): **Display · Heading · Kicker · Heading
-Eyebrow · Body · UI · Code** — Kicker + Eyebrow are LABELS (not headings), which is why they lost the "Heading" prefix. Two step ramps (`STEPS_5`/`STEPS_UI` in type.mjs):
+The canonical taxonomy (.claude/docs/spec/typography): **Display · Heading · Sub-heading · Heading
+Kicker · Body · UI · Code** — Sub-heading + Kicker are LABELS (not headings), which is why they lost the "Heading" prefix. Two step ramps (`STEPS_5`/`STEPS_UI` in type.mjs):
 
-- **`STEPS_5`** = `[["XS",−2],["SM",−1],["MD",0],["LG",1],["XL",2]]` — Display, Heading, Kicker, Eyebrow, Body.
+- **`STEPS_5`** = `[["XS",−2],["SM",−1],["MD",0],["LG",1],["XL",2]]` — Display, Heading, Sub-heading, Kicker, Body.
 - **`STEPS_UI`** = `[["3XS",−4],["2XS",−3],["XS",−2],["SM",−1],["MD",0],["LG",1],["XL",2],["2XL",3]]` (8) —
   UI and Code. (41 steps across the seven groups in all.)
 
@@ -46,8 +46,8 @@ Eyebrow · Body · UI · Code** — Kicker + Eyebrow are LABELS (not headings), 
 base, so the same modular ratio governs both directions.
 
 **The role map (`roleOf`)** comes straight from each `cat`'s first arg: Display→`display`, both editorial
-Heading + Kicker → `heading`, Body→`body`, UI→`ui`, and the two mono voices — **Eyebrow and Code — →`mono`**
-(both `cat("mono", …)`). That mono pairing is deliberate: the eyebrow overline and code both want the
+Heading + Sub-heading → `heading`, Body→`body`, UI→`ui`, and the two mono voices — **Kicker and Code — →`mono`**
+(both `cat("mono", …)`). That mono pairing is deliberate: the kicker overline and code both want the
 monospaced face. The emitters use `roleOf` to point each voice's CSS/DTCG at the right `--font-{role}`.
 
 ### 3. The math — `buildCategory(name, p, factor, overrides, vp)`
@@ -97,13 +97,13 @@ paragraphSpacing = size; paragraphIndent = 0          # rhythm tracks the resolv
 
 `textTransform` comes from each voice's `transform` arg. The standing rules:
 
-- **Kicker** and **Eyebrow** are the two genuine UPPERCASE "caps voices" — `"uppercase"`
+- **Sub-heading** and **Kicker** are the two genuine UPPERCASE "caps voices" — `"uppercase"`
   is hardcoded in `make7` for both. They track POSITIVE so small caps open up.
 - **Display** defaults to title/sentence case (`o.dTransform ?? "none"`). Only the **Brutalist/`statement`**
   treatment passes `dTransform:"uppercase"` — the one earned ALL-CAPS display. The test
   asserts *exactly one* treatment sets an uppercase Display (the exactly-one-uppercase-Display assert), and
   that Display tracks NEGATIVE (big caps tighten).
-- Everything else (Editorial, Body, UI, Code) is sentence case.
+- Everything else (Heading, Body, UI, Code) is sentence case.
 
 ### 5. The five treatments — voice, not just a font swap
 

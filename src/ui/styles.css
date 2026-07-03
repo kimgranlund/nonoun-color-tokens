@@ -1249,9 +1249,9 @@ a.account-manage:hover { text-decoration: underline; }
 .an-svg .ty-line { fill: none; stroke-width: 1.5; }
 .ty-dot { stroke: none; }
 .ty-s0 { stroke: var(--accent); fill: var(--accent); }                                                      /* Display */
-.ty-s1 { stroke: color-mix(in srgb, var(--accent) 70%, #e0e0e0); fill: color-mix(in srgb, var(--accent) 70%, #e0e0e0); } /* H·Editorial */
-.ty-s2 { stroke: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); fill: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); } /* H·Context */
-.ty-s3 { stroke: var(--ink-dim); fill: var(--ink-dim); stroke-dasharray: 3 3; }                              /* H·Eyebrow (mono) */
+.ty-s1 { stroke: color-mix(in srgb, var(--accent) 70%, #e0e0e0); fill: color-mix(in srgb, var(--accent) 70%, #e0e0e0); } /* Heading */
+.ty-s2 { stroke: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); fill: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); } /* Sub-heading */
+.ty-s3 { stroke: var(--ink-dim); fill: var(--ink-dim); stroke-dasharray: 3 3; }                              /* Kicker (mono) */
 .ty-s4 { stroke: color-mix(in srgb, var(--ink) 60%, var(--accent)); fill: color-mix(in srgb, var(--ink) 60%, var(--accent)); } /* Body */
 .ty-s5 { stroke: var(--ink-faint); fill: var(--ink-faint); }                                                /* UI */
 .ty-s6 { stroke: var(--ink-faint); fill: var(--ink-faint); stroke-dasharray: 3 3; }                         /* Code (mono) */

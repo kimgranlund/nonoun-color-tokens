@@ -18,22 +18,22 @@ generic (no brand/foundry specifics).
 
 ### `Font Specs` — the seven named groups
 
-The engine implements this as **seven groups** (Kicker + Eyebrow are labels, not headings): each is a size ramp,
+The engine implements this as **seven groups** (Sub-heading + Kicker are labels, not headings): each is a size ramp,
 each step carrying `Size · Line Height · Letter Spacing · Weight · Case · Paragraph Spacing · Indent`.
 
 | Group | Steps | Font role | Case | Letter-spacing character |
 |---|---|---|---|---|
 | **Display** | `XS … XL` (5) | display | sentence/title (UPPERCASE only in Brutalist) | negative, tightens with size |
-| **Heading · Editorial** | `XS … XL` (5) | heading | sentence | ~0 |
-| **Heading · Context** | `XS … XL` (5) | heading | **UPPERCASE** | wide positive (caps open up) |
-| **Heading · Eyebrow** | `XS … XL` (5) | **mono** | **UPPERCASE** | very wide positive |
+| **Heading** | `XS … XL` (5) | heading | sentence | ~0 |
+| **Sub-heading** | `XS … XL` (5) | heading | **UPPERCASE** | wide positive (caps open up) |
+| **Kicker** | `XS … XL` (5) | **mono** | **UPPERCASE** | very wide positive |
 | **Body** | `XS … XL` (5) | body | sentence | 0 |
 | **UI** | `3XS … 2XL` (8) | ui | sentence | small positive (optical) |
 | **Code** | `3XS … 2XL` (8) | **mono** | sentence | 0 |
 
 41 steps in all. Each treatment supplies the font palette + a few character knobs (a shared `make7()`
 factory); the engine generates every step's size (modular scale), leading, optical tracking, weight, and
-case. Heading-Eyebrow + Code use the mono role; Heading-Context + Heading-Eyebrow are the uppercase caps voices (Display is uppercase only in the Brutalist treatment).
+case. Kicker + Code use the mono role; Sub-heading + Kicker are the uppercase caps voices (Display is uppercase only in the Brutalist treatment).
 
 ## The system relationships (what the generator derives)
 

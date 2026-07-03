@@ -15,7 +15,7 @@ if (!existsSync(ENGINE)) { console.log("voice-parity: type engine not found (out
 const { typeScale } = await import(ENGINE);
 const scale = typeScale({ treatment: "product" });
 const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-const VOICES = new Set(Object.keys(scale.categories).map(kebab)); // display, heading, kicker, eyebrow, …
+const VOICES = new Set(Object.keys(scale.categories).map(kebab)); // display, heading, sub-heading, kicker, …
 const STEPS = new Set(Object.values(scale.categories).flatMap((c) => Object.keys(c).map(kebab))); // 3xs..2xl
 const FONT_ROLES = new Set(Object.keys(scale.fonts)); // display heading body ui mono
 const PROPS = new Set(["size", "line", "tracking", "weight", "para", "line-single"]);
@@ -69,7 +69,7 @@ for (const f of files) {
 // SEMANTIC parity (not just token existence): the set of voices the skill says carry -line-single
 // must EQUAL the set the engine actually emits it for. Token-existence checks can't catch a false
 // NEGATIVE ("line-single exists only on ui/code") — this closes that drift class. The engine emits
-// singleLineHeight for the ui + mono roles; mono backs Code AND Heading-Eyebrow.
+// singleLineHeight for the ui + mono roles; mono backs Code AND Heading-Kicker.
 {
   const engineSingleLine = new Set(Object.entries(scale.categories)
     .filter(([, steps]) => Object.values(steps).some((s) => s.singleLineHeight != null))
@@ -77,7 +77,7 @@ for (const f of files) {
   const blob = files.map((f) => readFileSync(join(SKILL_DIR, f), "utf8")).join("\n");
   // Every engine single-line voice must be POSITIVELY ASSOCIATED with -line-single: its name must
   // appear within ~240 chars of a "line-single" mention at least once. This catches the exact
-  // false-negative class the reviewer found (a single-line voice — Heading-Eyebrow — that the skill
+  // false-negative class the reviewer found (a single-line voice — Heading-Kicker — that the skill
   // omits from every single-line statement), which a plain name-anywhere check would miss (the
   // voice's name also shows up in class tables for unrelated reasons).
   const near = (voice) => {
