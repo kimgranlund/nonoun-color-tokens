@@ -2968,23 +2968,37 @@ function buildSize(rawHeight, density, fontOverride) {
 // by the caller. When a positive number exists for a size, it REPLACES the scaled rawHeight fed to buildSize,
 // so icon/font/pad/radius/caret/gap ALL re-derive via the laws (and the type-composition `fontOverride` still
 // applies on top). Absent / non-positive ⇒ no effect, so the scale is byte-identical (the identity gate).
+// `config.rampContrast` (optional, 0…1, default 1) — the RESPONSIVE ramp knob: how hard the expressive
+// band (LG·XL·2XL) changes gear at the MD|LG seam. At 1 (or absent — the identity gate) the band is
+// today's ×4/3 geometric ramp. At 0 the gear change disappears: the band continues the compact band's
+// +4px linear step past MD (LG = bh+4, XL = bh+8, 2XL = bh+12) — the compressed ramp small screens
+// want (at bh 24 that's exactly 18·20·24·28·32·36; at bh 28 + contrast 1, the canonical
+// 20·24·28·36·48·64). Between, the band blends linearly, so per-breakpoint modes can step contrast
+// with width. The compact band (XS·SM·MD) never changes — small controls have no gear to lose.
 function geomScale(config = {}, opts = {}) {
   const t = GEOMETRY_TREATMENTS.find((x) => x.id === config.treatment) || GEOMETRY_TREATMENTS[0];
   const baseHeight = Number(config.baseHeight) || t.baseHeight;
   const factor = baseHeight / CANON_MD;
+  const c = Number(config.rampContrast);
+  const rampContrast = Number.isFinite(c) ? Math.max(0, Math.min(1, c)) : 1;
   const uiSteps = opts.typeScale && opts.typeScale.categories && opts.typeScale.categories.UI;
   const overrides = opts.overrides && typeof opts.overrides === "object" ? opts.overrides : null;
   const sizes = {};
+  let expr = 0; // 0 for the compact band, then 1·2·3 across LG·XL·2XL (the expressive band)
   for (const [name, h] of SIZES) {
     const ovH = overrides && overrides[name];
-    const rawHeight = (typeof ovH === "number" && Number.isFinite(ovH) && ovH > 0) ? ovH : h * factor;
+    const geoRaw = h * factor;
+    if (h > CANON_MD) expr += 1;
+    // full contrast (the default) takes the geometric path EXACTLY — no float blend on the identity path.
+    const blended = rampContrast >= 1 || expr === 0 ? geoRaw : (baseHeight + 4 * expr) * (1 - rampContrast) + geoRaw * rampContrast;
+    const rawHeight = (typeof ovH === "number" && Number.isFinite(ovH) && ovH > 0) ? ovH : blended;
     sizes[name] = buildSize(rawHeight, t.density, uiSteps && uiSteps[name] ? uiSteps[name].size : null);
   }
   const ladder = RADIUS_LADDERS[t.radiusStyle] || RADIUS_LADDERS.soft;
   const radii = { none: ladder[0], sm: ladder[1], md: ladder[2], lg: ladder[3], full: 9999 };
   const space = {};
   SPACE_STEPS.forEach((m, i) => { space[i] = m * t.spaceBase; });
-  return { treatment: t.id, label: t.label, density: t.density, radiusStyle: t.radiusStyle, baseHeight, typed: !!uiSteps, sizes, radii, space };
+  return { treatment: t.id, label: t.label, density: t.density, radiusStyle: t.radiusStyle, baseHeight, rampContrast, typed: !!uiSteps, sizes, radii, space };
 }
 
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
@@ -3705,16 +3719,20 @@ function clampGeometry(g) {
   const clampH = (v) => { const n = Number(v); return Math.max(20, Math.min(48, Number.isFinite(n) ? Math.round(n) : 28)); };
   const baseHeight = clampH(g.baseHeight);
   const out = { treatment, baseHeight };
+  // rampContrast (the responsive-ramp knob) — OPTIONAL: attach only when a finite value < 1 is set
+  // (1 is the engine default, so absent stays absent and a full-contrast kit round-trips identical).
+  const clampContrast = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n < 1 ? { rampContrast: Math.round(n * 100) / 100 } : {}; };
+  Object.assign(out, clampContrast(g.rampContrast));
   // tokenOverrides (Phase 3) — per-cell control-HEIGHT overrides. OPTIONAL, like type.tokenOverrides (the
   // identity gate holds when absent). Geom heights clamp into [8, 256] px.
   const gov = clampTokenOverrides(g.tokenOverrides, 8, 256, 2); // geom keys: "<size>|<modeKey>" (2 segments)
   if (Object.keys(gov).length) out.tokenOverrides = gov;
-  // breakpoint MODES (Phase 5) — each a named baseHeight override. OPTIONAL, like type.modes (the identity
-  // gate holds when absent). Each mode = { id, name, baseHeight }.
+  // breakpoint MODES (Phase 5) — each a named baseHeight override (+ optional per-mode rampContrast).
+  // OPTIONAL, like type.modes (the identity gate holds when absent).
   if (Array.isArray(g.modes) && g.modes.length) {
     const modes = g.modes
       .filter((m) => m && typeof m === "object" && typeof m.id === "string")
-      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", baseHeight: clampH(m.baseHeight), ...clampMinWidth(m.minWidth) }));
+      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", baseHeight: clampH(m.baseHeight), ...clampMinWidth(m.minWidth), ...clampContrast(m.rampContrast) }));
     if (modes.length) out.modes = modes;
   }
   return out;
@@ -8824,7 +8842,9 @@ class HctApp extends HTMLElement {
   // overrides applied, COMPOSED with the type scale at the SAME mode (so the shared `font` tracks too).
   _geomScaleFor(modeKey) {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const cfg = modeKey === "base" ? g : (() => { const m = (g.modes || []).find((x) => x.id === modeKey); return m ? { ...g, baseHeight: m.baseHeight } : g; })();
+    // a mode's rampContrast is EXPLICIT (default 1 = the full ramp) — it never inherits Base's, so a
+    // compressed Base can't silently flatten a desktop breakpoint.
+    const cfg = modeKey === "base" ? g : (() => { const m = (g.modes || []).find((x) => x.id === modeKey); return m ? { ...g, baseHeight: m.baseHeight, rampContrast: typeof m.rampContrast === "number" ? m.rampContrast : 1 } : g; })();
     return geomScale(cfg, { typeScale: this._typeScaleFor(modeKey), overrides: this._geomOverridesFor(modeKey) });
   }
 
@@ -11523,22 +11543,24 @@ class HctApp extends HTMLElement {
         { cls: "canvas-seg", ariaLabel: "Geometry breakpoint mode", role: "group", idPrefix: "gmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named ramp with its own base control height", onclick: () => this.addGeomMode() }),
       // one-click standard web set — only while no modes exist (mirrors the Typography control).
-      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard web breakpoints — 768 · 992 · 1280 · 1540, each seeded from the Base height (control geometry has no growth law; tune per breakpoint)", onclick: () => this.addStandardGeomModes() })] : []),
+      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard web breakpoints — 768 · 992 · 1280 · 1540. Base becomes the compressed ≤476 ramp (−4px base, linear gear); your current full ramp lands at 1540. One undo step.", onclick: () => this.addStandardGeomModes() })] : []),
     );
   }
-  // addStandardGeomModes — the standard web breakpoint set in one click: four modes at min-widths
-  // 768/992/1280/1540, each SEEDED FLAT from the Base height (unlike type's +1px rungs, control
-  // geometry has no monotonic convention — mobile wants taller touch targets, desktop wants density —
-  // so the columns exist to be tuned, not pre-opinionated). Names are the widths; Base stays ≤476.
+  // addStandardGeomModes — the standard web breakpoint set in one click, RESPONSIVE by construction:
+  // the current design (full geometric ramp) becomes the 1540 desktop column, Base becomes the
+  // compressed ≤476 mobile ramp (baseHeight −4, rampContrast 0 — the expressive band loses its gear:
+  // at bh 24 that's 18·20·24·28·32·36), and the rungs between interpolate height +1px and contrast
+  // +0.25 per step. One commit = one undo step restores the flat pre-click design.
   addStandardGeomModes() {
     const bh = (this.doc.geometry && this.doc.geometry.baseHeight) ?? 28;
+    const mob = Math.max(20, bh - 4);
     const seed = Date.now().toString(36);
     const rungs = [768, 992, 1280, 1540];
-    this.geomMode = "gm-" + seed + "-0";
+    this.geomMode = "base"; // land on Base so the compression is the first thing seen (and undoable)
     this.commit((d) => {
-      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
+      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), baseHeight: mob, rampContrast: 0 };
       const modes = d.geometry.modes ? [...d.geometry.modes] : [];
-      rungs.forEach((w, i) => modes.push({ id: `gm-${seed}-${i}`, name: String(w), baseHeight: bh, minWidth: w }));
+      rungs.forEach((w, i) => modes.push({ id: `gm-${seed}-${i}`, name: String(w), baseHeight: Math.min(48, mob + i + 1), rampContrast: (i + 1) / 4, minWidth: w }));
       d.geometry.modes = modes;
     });
   }
@@ -11581,6 +11603,15 @@ class HctApp extends HTMLElement {
       // Compare shows the Base scale in the inspector, so its slider edits Base (not a per-mode no-op).
       if (this.geomMode === "base" || this.geomMode === "compare") d.geometry.baseHeight = bh;
       else d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, baseHeight: bh } : m));
+    });
+  }
+  // the Ramp-contrast slider edits the ACTIVE mode, exactly like the base-height slider above.
+  _setActiveGeomRampContrast(v) {
+    const c = Math.max(0, Math.min(1, Math.round(Number(v) * 20) / 20)); // 5% steps
+    this.editDrag((d) => {
+      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
+      if (this.geomMode === "base" || this.geomMode === "compare") d.geometry.rampContrast = c;
+      else d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, rampContrast: c } : m));
     });
   }
   _geomModeEditor() {
@@ -11943,6 +11974,9 @@ class HctApp extends HTMLElement {
         ),
       ),
       this.slider(this.geomMode === "base" || this.geomMode === "compare" ? "Base height" : "Base height · this breakpoint", scale.baseHeight, 20, 48, 2, (v) => fmt(v) + "px", (v) => this._setActiveGeomBaseHeight(v)),
+      // the responsive-ramp knob: 100% = the full ×4/3 expressive gear; 0% = the band goes linear
+      // (+4 past MD) — the compressed ramp small screens want. Per-mode, like the height slider.
+      this.slider(this.geomMode === "base" || this.geomMode === "compare" ? "Ramp contrast" : "Ramp contrast · this breakpoint", scale.rampContrast ?? 1, 0, 1, 0.05, (v) => Math.round(v * 100) + "%", (v) => this._setActiveGeomRampContrast(v)),
       this._geomModeEditor(),
       h("p", { class: "insp-sub tyi-note" }, t.note),
       h(

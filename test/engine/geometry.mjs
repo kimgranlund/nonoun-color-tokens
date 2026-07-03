@@ -178,6 +178,24 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(idCol.variables["size/MD/height"].values.Base === base.sizes.MD.height && idCol.variables["radius/full"].values.Base === base.radii.full, "no-modes Base values equal the base scale");
 }
 
+// ── rampContrast — the responsive-ramp knob (expressive band: geometric ×4/3 ⇄ linear +4) ──
+{
+  const col = (cfg) => ["XS", "SM", "MD", "LG", "XL", "2XL"].map((n) => G.geomScale(cfg).sizes[n].height);
+  // the two reference columns (the responsive geometry spec): full desktop ramp + compressed ≤476 ramp.
+  ok(JSON.stringify(col({ baseHeight: 28 })) === JSON.stringify([20, 24, 28, 36, 48, 64]), `contrast 1 (default) at bh28 = the canonical ramp (got ${col({ baseHeight: 28 })})`);
+  ok(JSON.stringify(col({ baseHeight: 24, rampContrast: 0 })) === JSON.stringify([18, 20, 24, 28, 32, 36]), `contrast 0 at bh24 = the compressed mobile ramp 18·20·24·28·32·36 (got ${col({ baseHeight: 24, rampContrast: 0 })})`);
+  // a mid rung interpolates (the 992 column) — 2XL passes through 48 on its way from 36 to 64.
+  ok(G.geomScale({ baseHeight: 26, rampContrast: 0.5 }).sizes["2XL"].height === 48, `bh26 · contrast .5 puts 2XL at 48 (got ${G.geomScale({ baseHeight: 26, rampContrast: 0.5 }).sizes["2XL"].height})`);
+  // IDENTITY: absent === 1 === clamped-above-1, byte-identical (existing kits untouched).
+  const a = JSON.stringify(G.geomScale({ baseHeight: 28 })), b = JSON.stringify(G.geomScale({ baseHeight: 28, rampContrast: 1 })), c = JSON.stringify(G.geomScale({ baseHeight: 28, rampContrast: 7 }));
+  ok(a === b && a === c, "rampContrast absent / 1 / clamped-above-1 are byte-identical (the identity gate)");
+  // the compact band (XS·SM·MD) never moves with contrast — only the expressive band changes gear.
+  const c0 = col({ baseHeight: 28, rampContrast: 0 }), c1 = col({ baseHeight: 28 });
+  ok(c0[0] === c1[0] && c0[1] === c1[1] && c0[2] === c1[2] && c0[5] < c1[5], "contrast moves ONLY the expressive band (compact XS/SM/MD identical; 2XL compresses)");
+  // monotone: the ramp still strictly increases at zero contrast.
+  ok(c0.every((v, i) => i === 0 || v > c0[i - 1]), `zero-contrast ramp stays strictly increasing (got ${c0})`);
+}
+
 if (fails.length) { console.error(`geometry FAIL (${fails.length}):\n  ` + fails.join("\n  ")); process.exit(1); }
 console.log("geometry PASS — the ramp, the centering law, the two families, treatments, CSS + DTCG + Figma-modes emit");
 process.exit(0);

@@ -99,23 +99,37 @@ function buildSize(rawHeight, density, fontOverride) {
 // by the caller. When a positive number exists for a size, it REPLACES the scaled rawHeight fed to buildSize,
 // so icon/font/pad/radius/caret/gap ALL re-derive via the laws (and the type-composition `fontOverride` still
 // applies on top). Absent / non-positive ⇒ no effect, so the scale is byte-identical (the identity gate).
+// `config.rampContrast` (optional, 0…1, default 1) — the RESPONSIVE ramp knob: how hard the expressive
+// band (LG·XL·2XL) changes gear at the MD|LG seam. At 1 (or absent — the identity gate) the band is
+// today's ×4/3 geometric ramp. At 0 the gear change disappears: the band continues the compact band's
+// +4px linear step past MD (LG = bh+4, XL = bh+8, 2XL = bh+12) — the compressed ramp small screens
+// want (at bh 24 that's exactly 18·20·24·28·32·36; at bh 28 + contrast 1, the canonical
+// 20·24·28·36·48·64). Between, the band blends linearly, so per-breakpoint modes can step contrast
+// with width. The compact band (XS·SM·MD) never changes — small controls have no gear to lose.
 export function geomScale(config = {}, opts = {}) {
   const t = GEOMETRY_TREATMENTS.find((x) => x.id === config.treatment) || GEOMETRY_TREATMENTS[0];
   const baseHeight = Number(config.baseHeight) || t.baseHeight;
   const factor = baseHeight / CANON_MD;
+  const c = Number(config.rampContrast);
+  const rampContrast = Number.isFinite(c) ? Math.max(0, Math.min(1, c)) : 1;
   const uiSteps = opts.typeScale && opts.typeScale.categories && opts.typeScale.categories.UI;
   const overrides = opts.overrides && typeof opts.overrides === "object" ? opts.overrides : null;
   const sizes = {};
+  let expr = 0; // 0 for the compact band, then 1·2·3 across LG·XL·2XL (the expressive band)
   for (const [name, h] of SIZES) {
     const ovH = overrides && overrides[name];
-    const rawHeight = (typeof ovH === "number" && Number.isFinite(ovH) && ovH > 0) ? ovH : h * factor;
+    const geoRaw = h * factor;
+    if (h > CANON_MD) expr += 1;
+    // full contrast (the default) takes the geometric path EXACTLY — no float blend on the identity path.
+    const blended = rampContrast >= 1 || expr === 0 ? geoRaw : (baseHeight + 4 * expr) * (1 - rampContrast) + geoRaw * rampContrast;
+    const rawHeight = (typeof ovH === "number" && Number.isFinite(ovH) && ovH > 0) ? ovH : blended;
     sizes[name] = buildSize(rawHeight, t.density, uiSteps && uiSteps[name] ? uiSteps[name].size : null);
   }
   const ladder = RADIUS_LADDERS[t.radiusStyle] || RADIUS_LADDERS.soft;
   const radii = { none: ladder[0], sm: ladder[1], md: ladder[2], lg: ladder[3], full: 9999 };
   const space = {};
   SPACE_STEPS.forEach((m, i) => { space[i] = m * t.spaceBase; });
-  return { treatment: t.id, label: t.label, density: t.density, radiusStyle: t.radiusStyle, baseHeight, typed: !!uiSteps, sizes, radii, space };
+  return { treatment: t.id, label: t.label, density: t.density, radiusStyle: t.radiusStyle, baseHeight, rampContrast, typed: !!uiSteps, sizes, radii, space };
 }
 
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────

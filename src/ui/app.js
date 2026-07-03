@@ -3231,7 +3231,9 @@ class HctApp extends HTMLElement {
   // overrides applied, COMPOSED with the type scale at the SAME mode (so the shared `font` tracks too).
   _geomScaleFor(modeKey) {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const cfg = modeKey === "base" ? g : (() => { const m = (g.modes || []).find((x) => x.id === modeKey); return m ? { ...g, baseHeight: m.baseHeight } : g; })();
+    // a mode's rampContrast is EXPLICIT (default 1 = the full ramp) — it never inherits Base's, so a
+    // compressed Base can't silently flatten a desktop breakpoint.
+    const cfg = modeKey === "base" ? g : (() => { const m = (g.modes || []).find((x) => x.id === modeKey); return m ? { ...g, baseHeight: m.baseHeight, rampContrast: typeof m.rampContrast === "number" ? m.rampContrast : 1 } : g; })();
     return geomScale(cfg, { typeScale: this._typeScaleFor(modeKey), overrides: this._geomOverridesFor(modeKey) });
   }
 
@@ -5930,22 +5932,24 @@ class HctApp extends HTMLElement {
         { cls: "canvas-seg", ariaLabel: "Geometry breakpoint mode", role: "group", idPrefix: "gmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named ramp with its own base control height", onclick: () => this.addGeomMode() }),
       // one-click standard web set — only while no modes exist (mirrors the Typography control).
-      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard web breakpoints — 768 · 992 · 1280 · 1540, each seeded from the Base height (control geometry has no growth law; tune per breakpoint)", onclick: () => this.addStandardGeomModes() })] : []),
+      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard web breakpoints — 768 · 992 · 1280 · 1540. Base becomes the compressed ≤476 ramp (−4px base, linear gear); your current full ramp lands at 1540. One undo step.", onclick: () => this.addStandardGeomModes() })] : []),
     );
   }
-  // addStandardGeomModes — the standard web breakpoint set in one click: four modes at min-widths
-  // 768/992/1280/1540, each SEEDED FLAT from the Base height (unlike type's +1px rungs, control
-  // geometry has no monotonic convention — mobile wants taller touch targets, desktop wants density —
-  // so the columns exist to be tuned, not pre-opinionated). Names are the widths; Base stays ≤476.
+  // addStandardGeomModes — the standard web breakpoint set in one click, RESPONSIVE by construction:
+  // the current design (full geometric ramp) becomes the 1540 desktop column, Base becomes the
+  // compressed ≤476 mobile ramp (baseHeight −4, rampContrast 0 — the expressive band loses its gear:
+  // at bh 24 that's 18·20·24·28·32·36), and the rungs between interpolate height +1px and contrast
+  // +0.25 per step. One commit = one undo step restores the flat pre-click design.
   addStandardGeomModes() {
     const bh = (this.doc.geometry && this.doc.geometry.baseHeight) ?? 28;
+    const mob = Math.max(20, bh - 4);
     const seed = Date.now().toString(36);
     const rungs = [768, 992, 1280, 1540];
-    this.geomMode = "gm-" + seed + "-0";
+    this.geomMode = "base"; // land on Base so the compression is the first thing seen (and undoable)
     this.commit((d) => {
-      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
+      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), baseHeight: mob, rampContrast: 0 };
       const modes = d.geometry.modes ? [...d.geometry.modes] : [];
-      rungs.forEach((w, i) => modes.push({ id: `gm-${seed}-${i}`, name: String(w), baseHeight: bh, minWidth: w }));
+      rungs.forEach((w, i) => modes.push({ id: `gm-${seed}-${i}`, name: String(w), baseHeight: Math.min(48, mob + i + 1), rampContrast: (i + 1) / 4, minWidth: w }));
       d.geometry.modes = modes;
     });
   }
@@ -5988,6 +5992,15 @@ class HctApp extends HTMLElement {
       // Compare shows the Base scale in the inspector, so its slider edits Base (not a per-mode no-op).
       if (this.geomMode === "base" || this.geomMode === "compare") d.geometry.baseHeight = bh;
       else d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, baseHeight: bh } : m));
+    });
+  }
+  // the Ramp-contrast slider edits the ACTIVE mode, exactly like the base-height slider above.
+  _setActiveGeomRampContrast(v) {
+    const c = Math.max(0, Math.min(1, Math.round(Number(v) * 20) / 20)); // 5% steps
+    this.editDrag((d) => {
+      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
+      if (this.geomMode === "base" || this.geomMode === "compare") d.geometry.rampContrast = c;
+      else d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, rampContrast: c } : m));
     });
   }
   _geomModeEditor() {
@@ -6350,6 +6363,9 @@ class HctApp extends HTMLElement {
         ),
       ),
       this.slider(this.geomMode === "base" || this.geomMode === "compare" ? "Base height" : "Base height · this breakpoint", scale.baseHeight, 20, 48, 2, (v) => fmt(v) + "px", (v) => this._setActiveGeomBaseHeight(v)),
+      // the responsive-ramp knob: 100% = the full ×4/3 expressive gear; 0% = the band goes linear
+      // (+4 past MD) — the compressed ramp small screens want. Per-mode, like the height slider.
+      this.slider(this.geomMode === "base" || this.geomMode === "compare" ? "Ramp contrast" : "Ramp contrast · this breakpoint", scale.rampContrast ?? 1, 0, 1, 0.05, (v) => Math.round(v * 100) + "%", (v) => this._setActiveGeomRampContrast(v)),
       this._geomModeEditor(),
       h("p", { class: "insp-sub tyi-note" }, t.note),
       h(

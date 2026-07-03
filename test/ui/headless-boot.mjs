@@ -1867,9 +1867,15 @@ app.addStandardTypeModes(); flushRaf();
 const stdBH = (app.doc.geometry && app.doc.geometry.baseHeight) ?? 28;
 app.addStandardGeomModes(); flushRaf();
 {
-  const ms = (app.doc.geometry.modes || []);
+  const g = app.doc.geometry, ms = (g.modes || []), mob = Math.max(20, stdBH - 4);
   ok(ms.length === 4 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([768, 992, 1280, 1540]), `(std) Standard set creates the four geometry modes at 768/992/1280/1540 (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
-  ok(ms.every((m) => m.name === String(m.minWidth) && m.baseHeight === stdBH), "(std) geometry modes are named by width and seed FLAT from the Base height");
+  // Base becomes the compressed ≤476 mobile ramp (−4px base, zero contrast = the linear gear).
+  ok(g.baseHeight === mob && g.rampContrast === 0, `(std) Base compresses to the mobile ramp (baseHeight ${mob}, rampContrast 0 — got ${g.baseHeight}, ${g.rampContrast})`);
+  ok(ms.every((m, i) => m.name === String(m.minWidth) && m.baseHeight === Math.min(48, mob + i + 1) && m.rampContrast === (i + 1) / 4), "(std) geometry rungs step height +1px and contrast +0.25 up to the full ramp at 1540");
+  ok(app.geomMode === "base", "(std) the control lands on Base (the compression is the visible change)");
+  // the resolved columns: Base = the compressed reference ramp; 1540 = the original full ramp.
+  const hcol = (k) => ["XS", "SM", "MD", "LG", "XL", "2XL"].map((n) => app._geomScaleFor(k).sizes[n].height);
+  if (stdBH === 28) ok(JSON.stringify(hcol("base")) === JSON.stringify([18, 20, 24, 28, 32, 36]) && JSON.stringify(hcol(ms[3].id)) === JSON.stringify([20, 24, 28, 36, 48, 64]), `(std) resolved columns match the responsive spec (base ${hcol("base")} · 1540 ${hcol(ms[3].id)})`);
 }
 
 // ── report ──────────────────────────────────────────────────────────────────────────

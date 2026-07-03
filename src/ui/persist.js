@@ -345,16 +345,20 @@ function clampGeometry(g) {
   const clampH = (v) => { const n = Number(v); return Math.max(20, Math.min(48, Number.isFinite(n) ? Math.round(n) : 28)); };
   const baseHeight = clampH(g.baseHeight);
   const out = { treatment, baseHeight };
+  // rampContrast (the responsive-ramp knob) — OPTIONAL: attach only when a finite value < 1 is set
+  // (1 is the engine default, so absent stays absent and a full-contrast kit round-trips identical).
+  const clampContrast = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n < 1 ? { rampContrast: Math.round(n * 100) / 100 } : {}; };
+  Object.assign(out, clampContrast(g.rampContrast));
   // tokenOverrides (Phase 3) — per-cell control-HEIGHT overrides. OPTIONAL, like type.tokenOverrides (the
   // identity gate holds when absent). Geom heights clamp into [8, 256] px.
   const gov = clampTokenOverrides(g.tokenOverrides, 8, 256, 2); // geom keys: "<size>|<modeKey>" (2 segments)
   if (Object.keys(gov).length) out.tokenOverrides = gov;
-  // breakpoint MODES (Phase 5) — each a named baseHeight override. OPTIONAL, like type.modes (the identity
-  // gate holds when absent). Each mode = { id, name, baseHeight }.
+  // breakpoint MODES (Phase 5) — each a named baseHeight override (+ optional per-mode rampContrast).
+  // OPTIONAL, like type.modes (the identity gate holds when absent).
   if (Array.isArray(g.modes) && g.modes.length) {
     const modes = g.modes
       .filter((m) => m && typeof m === "object" && typeof m.id === "string")
-      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", baseHeight: clampH(m.baseHeight), ...clampMinWidth(m.minWidth) }));
+      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", baseHeight: clampH(m.baseHeight), ...clampMinWidth(m.minWidth), ...clampContrast(m.rampContrast) }));
     if (modes.length) out.modes = modes;
   }
   return out;
