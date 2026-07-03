@@ -63,11 +63,17 @@ ok(["comfortable", "compact", "spacious", "touch", "pill"].every((id) => G.GEOME
 // ── unknown treatment falls back to the first ──
 ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id, "unknown treatment → first treatment");
 
-// ── radius ladder + space scale present and monotonic ──
+// ── radius ladder = Material 3's shape-corner scale (fixed across treatments) + radiusDefault ──
 {
   const s = G.geomScale({ treatment: "comfortable" });
-  ok(s.radii.none === 0 && s.radii.full === 9999, "radius ladder: none 0, full pill (9999)");
-  ok(s.radii.sm <= s.radii.md && s.radii.md <= s.radii.lg, "radius ladder monotonic sm≤md≤lg");
+  // the exact M3 shape-corner scale: none 0 · xs 4 · sm 8 · md 12 · lg 16 · xl 28 · full pill.
+  ok(JSON.stringify(s.radii) === JSON.stringify({ none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 28, full: 9999 }), `radius ladder = M3 corners (got ${JSON.stringify(s.radii)})`);
+  // FIXED across treatments — M3 has one shape scale (density doesn't rescale corners).
+  for (const t of ["compact", "spacious", "touch", "pill"])
+    ok(JSON.stringify(G.geomScale({ treatment: t }).radii) === JSON.stringify(s.radii), `${t} shares the same M3 radius scale (fixed)`);
+  // the treatment's FEEL is its default corner LEVEL (the M3 "pick a level" model), not a rescaling.
+  ok(G.geomScale({ treatment: "compact" }).radiusDefault === "sm" && s.radiusDefault === "md" && G.geomScale({ treatment: "spacious" }).radiusDefault === "lg" && G.geomScale({ treatment: "pill" }).radiusDefault === "full",
+    "radiusDefault reflects the treatment: compact→sm, comfortable→md, spacious→lg, pill→full");
   const sp = Object.values(s.space);
   ok(sp[0] === 0 && sp.every((v, i) => i === 0 || v >= sp[i - 1]), `space scale starts 0 and is monotonic (${sp})`);
 }
@@ -75,7 +81,8 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
 // ── CSS emit: custom props + a utility class per size ──
 {
   const css = G.geomTokensCSS(G.geomScale({ treatment: "comfortable" }));
-  ok(css.includes("--size-md-height:") && css.includes("--radius-sm:") && css.includes("--space-4:"), "CSS has size + radius + space custom props");
+  ok(css.includes("--size-md-height:") && css.includes("--radius-xs: 4px;") && css.includes("--radius-xl: 28px;") && css.includes("--space-4:"), "CSS has size + the M3 radius scale (xs 4 … xl 28) + space custom props");
+  ok(css.includes("--radius-default: var(--radius-md);"), "CSS aliases --radius-default to the treatment's favoured corner (comfortable → md)");
   ok(/\.control-md\s*\{[^}]*block-size: var\(--size-md-height\)[^}]*padding-block: 0/.test(css), "CSS emits a .control-md utility class (block-size lever, padding-block 0)");
 }
 

@@ -144,10 +144,10 @@ if (rootToks.size === 0 || rootToks.size !== darkToks.size || [...rootToks].some
   FAIL("shadcn", `:root (${rootToks.size}) and .dark (${darkToks.size}) token sets differ`);
 }
 // typography + geometry props: the brand fonts fill shadcn's three family slots, and --radius is DERIVED
-// from the geometry `lg` corner (rem), not hard-coded.
+// from the geometry `md` corner (rem), not hard-coded — the medium corner on the M3-aligned scale.
 {
-  const withSys = X.exportShadcn(C(ALL), { fonts: { body: "Inter", display: "Source Serif 4", mono: "JetBrains Mono" }, radii: { lg: 12 } });
-  if (!withSys.includes("--radius: 0.75rem;")) FAIL("shadcn", "--radius not derived from the geometry lg corner (12px → 0.75rem)");
+  const withSys = X.exportShadcn(C(ALL), { fonts: { body: "Inter", display: "Source Serif 4", mono: "JetBrains Mono" }, radii: { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 28, full: 9999 } });
+  if (!withSys.includes("--radius: 0.75rem;")) FAIL("shadcn", "--radius not derived from the geometry md corner (12px → 0.75rem, M3-aligned scale)");
   if (!withSys.includes("--font-sans: 'Inter',")) FAIL("shadcn", "--font-sans not mapped from the body font");
   if (!withSys.includes("--font-serif: 'Source Serif 4',")) FAIL("shadcn", "--font-serif not mapped from the display font (quoted — digit name)");
   if (!withSys.includes("--font-mono: 'JetBrains Mono',")) FAIL("shadcn", "--font-mono not mapped from the mono font");

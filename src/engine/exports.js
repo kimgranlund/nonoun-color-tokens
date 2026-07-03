@@ -566,11 +566,12 @@ export function exportShadcn(state, opts = {}) {
   const themeInline = SHADCN_ORDER.filter((tok) => MAP[tok])
     .map((tok) => `  --color-${tok}: var(--${tok});`).join("\n");
 
-  // GEOMETRY → --radius: seed shadcn's base radius from the brand geometry's `lg` corner (rem; the sm/md/lg/xl
-  // ladder still derives from it by shadcn's calc convention). TYPOGRAPHY → the brand fonts in shadcn's three
-  // family slots: --font-sans ← body, --font-serif ← display, --font-mono ← mono (quoted — digit names like
-  // "Source Serif 4" are invalid unquoted in Safari). Both fall back to the shadcn defaults when absent.
-  const radiusPx = opts.radii && Number.isFinite(opts.radii.lg) ? opts.radii.lg : null;
+  // GEOMETRY → --radius: seed shadcn's base radius from the brand geometry's `md` corner — a medium
+  // corner on the M3-aligned scale (12px → 0.75rem); shadcn's own sm/md/lg/xl ladder derives from it by
+  // shadcn's calc convention. TYPOGRAPHY → the brand fonts in shadcn's three family slots: --font-sans ←
+  // body, --font-serif ← display, --font-mono ← mono (quoted — digit names like "Source Serif 4" are
+  // invalid unquoted in Safari). Both fall back to the shadcn defaults when absent.
+  const radiusPx = opts.radii && Number.isFinite(opts.radii.md) ? opts.radii.md : null;
   const radiusLine = radiusPx != null ? `  --radius: ${parseFloat((radiusPx / 16).toFixed(4))}rem;` : "  --radius: 0.625rem;";
   const fonts = opts.fonts && typeof opts.fonts === "object" ? opts.fonts : {};
   const fontVars = [

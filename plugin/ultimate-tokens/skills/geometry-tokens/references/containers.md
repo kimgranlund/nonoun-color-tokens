@@ -51,7 +51,8 @@ doesn't cover (an unusual offset, a bespoke grid).
 
 ## Radius & borders
 
-- Container corners: `--radius-sm` (subtle), `--radius-md` (default card), `--radius-lg` (prominent
+- Container corners (the Material 3 shape scale — `xs 4 · sm 8 · md 12 · lg 16 · xl 28`):
+  `--radius-xs`/`-sm` (subtle), `--radius-md` (default card), `--radius-lg`/`-xl` (prominent
   surface). `--radius-none` = square; `--radius-full` = pill/circle.
 - Borders/dividers: WIDTH is `--border-thin` (hairlines, default) or `--border-thick` (emphasis);
   the COLOR is color-tokens' outline roles. Never a hardcoded `1px solid`.

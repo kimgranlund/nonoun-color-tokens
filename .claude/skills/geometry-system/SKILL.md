@@ -75,14 +75,14 @@ walkthrough: `references/foundations.md` §5 + `references/best-practices.md`.
 
 | Export (`geometry.mjs`) | Owns |
 |---|---|
-| `geomScale(config={treatment,baseHeight,rampContrast}, opts={typeScale,overrides})` | the resolved scale `{treatment, label, density, radiusStyle, baseHeight, rampContrast, typed, sizes, radii, space, insets, gaps, borders, focus}` |
+| `geomScale(config={treatment,baseHeight,rampContrast}, opts={typeScale,overrides})` | the resolved scale `{treatment, label, density, radiusStyle, radiusDefault, baseHeight, rampContrast, typed, sizes, radii, space, insets, gaps, borders, focus}` |
 | `buildSize(rawHeight, density, fontOverride)` | one ramp row — the LAW + the power law live here; `fontOverride` is the composition hook |
 | `GEOMETRY_TREATMENTS` / `DEFAULT_GEOMETRY` | the 5 presets (`comfortable/compact/spacious/touch/pill`) = density + radiusStyle + baseHeight + spaceBase; default `{comfortable, 28}` |
 | `geomTokensCSS` | `:root` custom props + the `.control-{size}` utility that embodies the law |
 | `geomTokensDTCG` | W3C `dimension` tokens (`"{px}px"`) — size/radius/space groups |
 | `geomTokensFigma` | DTCG `number` tokens (UNITLESS) under a `Geometry` collection → Figma FLOAT variables |
 
-`RADIUS_LADDERS` (per style, `none·sm·md·lg`; `full 9999` added) and `SPACE_STEPS × spaceBase` (the `--space-*`
+`M3_CORNERS` (the **Material 3 shape-corner scale**, fixed across treatments: `none 0 · xs 4 · sm 8 · md 12 · lg 16 · xl 28 · full 9999`; a treatment's feel is its `radiusDefault` corner LEVEL via `RADIUS_DEFAULT`, aliased to `--radius-default` — the M3 "pick a level" model, not a rescaling) and `SPACE_STEPS × spaceBase` (the `--space-*`
 ladder — the gap **BETWEEN** components, a **separate concern** from control padding). Depth: `foundations.md`
 §6–7.
 
@@ -98,7 +98,7 @@ each a named `space[k]` so the tier follows the treatment's rhythm; plus stroke 
    / height bug → the power law in `buildSize` (and `SIZES`/`CANON_MD`). A density / gap bug → the rhythm in
    `buildSize`. A "control text ≠ brand font" bug → the COMPOSITION (`opts.typeScale` in `geomScale`, joined in
    `model.mjs` `geometryScale`). A treatment / radius-ladder / space bug → `GEOMETRY_TREATMENTS` /
-   `RADIUS_LADDERS` / `SPACE_STEPS`. A token-shape bug → the matching `geomTokensX` emitter.
+   `M3_CORNERS` / `RADIUS_DEFAULT` / `SPACE_STEPS`. A token-shape bug → the matching `geomTokensX` emitter.
 2. **Keep the law a derivation.** Never hard-code a pad — change the inputs (`height`/`icon`) and let
    `(height − icon)/2` fall out. Never add `padding-block` to center text. `roundEven` for height/icon, `round`
    for font/caret. (`references/best-practices.md`.)

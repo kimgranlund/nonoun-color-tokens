@@ -47,7 +47,7 @@ for (const f of files) {
     }
     if (field && field !== "{field}" && !SIZE_FIELDS.has(field)) err(f, m[0], `unknown size field "${field}"`);
   });
-  each(text, /--radius-([a-z]+)\b/g, (m) => { if (!RADII.has(m[1])) err(f, m[0], `unknown radius (engine: ${[...RADII].join("/")})`); });
+  each(text, /--radius-([a-z]+)\b/g, (m) => { if (m[1] !== "default" && !RADII.has(m[1])) err(f, m[0], `unknown radius (engine: ${[...RADII].join("/")}, +default alias)`); });
   each(text, /--space-(\d+)\b/g, (m) => { if (!SPACE.has(m[1])) err(f, m[0], `space step ${m[1]} out of range (0–${SPACE.size - 1})`); });
   each(text, /--inset-([a-z-]+)\b/g, (m) => { if (m[1] !== "{name}" && !INSETS.has(m[1])) err(f, m[0], `unknown inset (engine: ${[...INSETS].join("/")})`); });
   each(text, /--gap-([a-z-]+)\b/g, (m) => { if (m[1] !== "{name}" && !GAPS.has(m[1])) err(f, m[0], `unknown gap (engine: ${[...GAPS].join("/")})`); });

@@ -49,7 +49,7 @@ These reproduce the hand-tuned reference ramp to ±1px — so the table is not s
 | Top-level key | What it is |
 |---|---|
 | `size` | one composite per ramp step (XS–2XL): `height · icon · caret · font · gap · padding · edgePadding · radius · minWidth`, each a `dimension` token |
-| `radius` | the flat radius ladder — `none · sm · md · lg · full` (full = the CSS-pill `9999px`) |
+| `radius` | the **Material 3 shape-corner scale** (fixed across treatments) — `none 0 · xs 4 · sm 8 · md 12 · lg 16 · xl 28 · full 9999`; plus `--radius-default`, aliased to the treatment's favoured corner (`radiusDefault`: sharp→sm · soft→md · round→lg · pill→full — the M3 "pick a level" model, not a per-treatment rescaling) |
 | `space` | the `--space-*` layout scale (page/section/card rhythm — the space **between** components, a separate concern from control padding) |
 | `inset` | the CONTAINER tier's padding — `control-group · card · panel · dialog · page`, each a named `space` rung (derived, never hand-picked) so consumers stop guessing raw `--space-N` |
 | `gap` | the container tier's sibling spacing — `cluster · stack-tight · stack · stack-loose · grid · section`, same named-rung derivation |

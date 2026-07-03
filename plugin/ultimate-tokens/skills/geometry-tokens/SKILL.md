@@ -30,8 +30,10 @@ and around components). Your job is never to type a px value — it's to pick th
    `--space-*` ladder) is treatment-derived and mode-independent. Don't cross them — a control's
    inner padding is `--size-{step}-pad`, a card's inner padding is `--inset-card`.
 3. **Know the grammar.** Control: `--size-{step}-{field}` where field ∈
-   `height · icon · caret · font · gap · pad · pad-edge · radius · min`. Ladders: `--radius-{none|sm|
-   md|lg|full}`, `--space-{0…9}`. Container tier: `--inset-{control-group|card|panel|dialog|page}`,
+   `height · icon · caret · font · gap · pad · pad-edge · radius · min`. Ladders: `--radius-{none|xs|
+   sm|md|lg|xl|full}` (the **Material 3 shape-corner scale** — 0/4/8/12/16/28/pill — plus
+   `--radius-default`, aliased to the treatment's favoured corner), `--space-{0…9}`. Container tier:
+   `--inset-{control-group|card|panel|dialog|page}`,
    `--gap-{cluster|stack-tight|stack|stack-loose|grid|section}`, `--border-{thin|thick}`,
    `--focus-{ring-width|ring-offset}`. The `.control-{step}` class wires a control's box in one.
 
@@ -52,8 +54,9 @@ and around components). Your job is never to type a px value — it's to pick th
    `--inset-*` / `--gap-*` first (they ARE named `--space-*` rungs, so you get the rhythm without
    guessing a number). Drop to a raw `--space-{0…9}` only for a one-off the tier doesn't name. See
    [`references/containers.md`](references/containers.md).
-5. **Radius: the ladder for containers, the height-linked corner for controls.** Containers use
-   `--radius-{sm|md|lg}`; a control's own corner is `--size-{step}-radius` (= height/2 — already a
+5. **Radius: the M3 corner scale for containers, the height-linked corner for controls.** Containers
+   pick a level off the Material-3 scale `--radius-{xs|sm|md|lg|xl}` (or `--radius-default`, which
+   the treatment sets); a control's own corner is `--size-{step}-radius` (= height/2 — already a
    full pill, so a "rounded" control needs nothing extra). `--radius-full` (9999) is for round
    NON-control elements — avatars, standalone pills, dots. Don't put a fixed `--radius-*` on a
    control that should scale with its height.

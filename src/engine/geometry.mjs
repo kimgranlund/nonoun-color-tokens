@@ -51,14 +51,14 @@ export const GEOMETRY_TREATMENTS = [
 
 export const DEFAULT_GEOMETRY = { treatment: "comfortable", baseHeight: 28 };
 
-// the flat radius ladder per style (none·sm·md·lg). `full` is always the pill (height/2 per control;
-// the named token is a CSS-pill 9999). The control's own corner uses the per-size `radiusPill`.
-const RADIUS_LADDERS = {
-  sharp: [0, 2, 4, 6],
-  soft: [0, 4, 8, 12],
-  round: [0, 8, 12, 16],
-  pill: [0, 8, 12, 16],
-};
+// The radius ladder = Material 3's shape-corner scale, verbatim (0·4·8·12·16·28 + full pill). M3 uses
+// ONE fixed shape scale (it does not vary corners by density), so we adopt it as-is across every
+// treatment — the alignment the GAP-01 analysis called for. `full` is the CSS-pill 9999; the control's
+// own corner is still the per-size `radiusPill` (height/2), a separate size-linked value.
+const M3_CORNERS = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 28, full: 9999 };
+// A treatment's radius FEEL is its default corner LEVEL (the M3 way — pick a level from the one scale,
+// don't rescale it): sharp favours a tight corner, round a generous one, pill fully round.
+const RADIUS_DEFAULT = { sharp: "sm", soft: "md", round: "lg", pill: "full" };
 
 // the layout-spacing scale (--space-*): page gutters, card/stack gaps, section rhythm. A SEPARATE concern
 // from control geometry (the law above) — the space BETWEEN components, not the padding inside one. A
@@ -125,8 +125,8 @@ export function geomScale(config = {}, opts = {}) {
     const rawHeight = (typeof ovH === "number" && Number.isFinite(ovH) && ovH > 0) ? ovH : blended;
     sizes[name] = buildSize(rawHeight, t.density, uiSteps && uiSteps[name] ? uiSteps[name].size : null);
   }
-  const ladder = RADIUS_LADDERS[t.radiusStyle] || RADIUS_LADDERS.soft;
-  const radii = { none: ladder[0], sm: ladder[1], md: ladder[2], lg: ladder[3], full: 9999 };
+  const radii = { ...M3_CORNERS }; // the fixed M3 shape-corner scale (treatment-independent)
+  const radiusDefault = RADIUS_DEFAULT[t.radiusStyle] || "md"; // the treatment's favoured corner level
   const space = {};
   SPACE_STEPS.forEach((m, i) => { space[i] = m * t.spaceBase; });
   // The CONTAINER tier — semantic names over the space ladder, so a consumer never guesses a raw
@@ -141,7 +141,7 @@ export function geomScale(config = {}, opts = {}) {
   // clear of the control edge so it survives any radius).
   const borders = { thin: 1, thick: 2 };
   const focus = { ringWidth: 2, ringOffset: 2 };
-  return { treatment: t.id, label: t.label, density: t.density, radiusStyle: t.radiusStyle, baseHeight, rampContrast, typed: !!uiSteps, sizes, radii, space, insets, gaps, borders, focus };
+  return { treatment: t.id, label: t.label, density: t.density, radiusStyle: t.radiusStyle, radiusDefault, baseHeight, rampContrast, typed: !!uiSteps, sizes, radii, space, insets, gaps, borders, focus };
 }
 
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
@@ -169,6 +169,9 @@ const camelKebab = (s) => s.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase()
 export function geomTokensCSS(scale, { unit = "px" } = {}) {
   const lines = [":root {", `  --density: ${scale.density};`, geomSizeVarLines(scale, "  ", unit)];
   for (const [k, v] of Object.entries(scale.radii)) lines.push(`  --radius-${k}: ${dimUnit(v, unit)};`);
+  // the treatment's favoured corner level, aliased so a consumer can use one name and let the
+  // treatment decide (sharp→sm, soft→md, round→lg, pill→full) — the M3 "pick a level" model.
+  if (scale.radiusDefault) lines.push(`  --radius-default: var(--radius-${scale.radiusDefault});`);
   for (const [k, v] of Object.entries(scale.space)) lines.push(`  --space-${k}: ${dimUnit(v, unit)};`);
   // the container tier + strokes (semantic names — see geomScale). Absent on a pre-tier scale.
   for (const [k, v] of Object.entries(scale.insets || {})) lines.push(`  --inset-${camelKebab(k)}: ${dimUnit(v, unit)};`);
