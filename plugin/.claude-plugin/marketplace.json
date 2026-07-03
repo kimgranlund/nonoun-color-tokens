@@ -1,0 +1,19 @@
+{
+  "name": "ultimate-tokens",
+  "owner": {
+    "name": "Kim Granlund",
+    "email": "kim.granlund@gmail.com"
+  },
+  "metadata": {
+    "description": "The consumption-side toolchain for Ultimate Tokens by NONOUN — skills that teach coding agents to use an exported design-token kit (colour · type · geometry) correctly in their own projects. Authored in the generator repo and parity-gated against its engines."
+  },
+  "plugins": [
+    {
+      "name": "ultimate-tokens",
+      "source": "./ultimate-tokens",
+      "description": "Consume an exported Ultimate Tokens kit correctly in any project: color-tokens (59-role semantic colour), typography-tokens (seven-voice scale), geometry-tokens (two-tier dimensional system, Material-3-aligned radii). Each binds to the project's real exported variable names and is parity-gated against the engine.",
+      "category": "developer-tools",
+      "tags": ["design-tokens", "css-variables", "semantic-colors", "type-scale", "geometry", "material-3", "oklch", "consumption"]
+    }
+  ]
+}
