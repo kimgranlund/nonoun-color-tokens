@@ -14,7 +14,7 @@ description: >
 One file, `src/engine/type.mjs`, the type analog of the color engine: a few per-voice params → a systematic
 scale → DTCG / CSS tokens. Pure, no DOM, no magic numbers — every step's size, line-height, letter-spacing,
 weight, and case is **derived** from the treatment's knobs. The conceptual *why* (the seven groups, the
-system relationships, the leading bands, the target token shape) is owned by
+system relationships, the leading constants, the target token shape) is owned by
 `.claude/docs/spec/typography/README.md` — **cite it, don't re-derive.** Color lives next door in `color-math`;
 this skill never touches color.
 
@@ -35,7 +35,7 @@ One-line pointers; this body does not restate them:
 - **Voice taxonomy** — the seven voices × two step ramps (`STEPS_5` 5 / `STEPS_UI` 8; 41 steps), the `roleOf` mapping (Kicker + Code → `mono`), the caps voices, the per-treatment case rules → foundations §2 + §4.
 - **The math** — `buildCategory(name, p, factor, overrides, vp)` in type.mjs: modular scale → 8px floor → the nice-number ladder (with the monotonic bump) → per-cell/per-voice overrides; tracking stays OPTICAL on the modular size; `bodyBase` is the ONE global resize lever (`factor = bodyBase / Body.base` in `typeScale`) → foundations §3.
 - **Emitter shapes** — the four emitters + the `dimUnit` px/rem/em option → foundations §6.
-- **Leading bands** (display 1.05–1.2 · heading 1.05–1.3 · prose 1.45–1.65 · UI 1.25–1.5 · mono ~1.5) — stay inside them → foundations §3.
+- **Leading constants** — FIXED per-role, uniform across treatments (the `font.modes.json` intent): display **0.8** (< 1, large type sets tight) · heading · sub-heading **1.125** · body **1.5** · Kicker **1.4** · code **~1.5** · UI **~1.4** (the one small per-treatment lever, `1.35–1.45`). Not bands → foundations §3.
 
 ## The font-quoting guard — the Safari trap
 
@@ -68,7 +68,7 @@ outside the current treatment flashes the fallback without the eager load).
    - A wrong/missing rendered face → `src/ui/type-fonts.js` (regenerate) + the treatment's `fonts`.
    - A **per-kit, user-tuned** size/shaping/font (NOT a treatment-wide change) → the `typeScale` override channels, never the treatment: a single cell → `config.overrides`; a whole voice's weight/tracking/leading/ratio → `config.voices`; a per-role font swap → `config.fonts` (each MUST stay identity-gated — see the `typeScale` row).
 2. **Edit only `type.mjs`** (+ `scripts/gen-type-fonts.mjs` for a font change). Keep the math in `buildCategory` — never bake a resolved px size into a treatment; pass a `base`/`ratio`/`trackingEm` knob and let the engine derive it. Case is a per-treatment decision via the `transform` arg, not a blanket rule.
-3. **Respect the invariants** (the tests assert these): Body MD = `bodyBase`; every size sits on the nice-number ladder and strictly increases XS→XL; Display tracks negative + scales with size; Sub-heading/Kicker uppercase + positive tracking; Kicker + Code map to `mono`; Code/UI carry the 8-step `STEPS_UI` ramp; exactly ONE treatment (Brutalist/`statement`) sets an uppercase Display; CSS families stay QUOTED; leadings inside the bands.
+3. **Respect the invariants** (the tests assert these): Body MD = `bodyBase`; every size sits on the nice-number ladder and strictly increases XS→XL; Display tracks negative + scales with size; Sub-heading/Kicker uppercase + positive tracking; Kicker + Code map to `mono`; Code/UI carry the 8-step `STEPS_UI` ramp; exactly ONE treatment (Brutalist/`statement`) sets an uppercase Display; CSS families stay QUOTED; leadings at the per-role constants (Display < 1).
 4. **New treatment? — add the SEVEN groups by passing the full `fonts` palette** (`display/heading/body/ui/mono` — five roles) so `roleOf` resolves every voice, and supply `note` (the UI specimen copy reads it). The test asserts every treatment has all seven groups + `fonts`.
 5. **New font? — wire BOTH ends.** `TYPE_TREATMENTS.fonts` (so a voice uses it) AND `scripts/gen-type-fonts.mjs#FAMILIES` (so it's embedded), then `npm run gen:type-fonts` and commit `src/ui/type-fonts.js`.
 
@@ -96,6 +96,6 @@ The guard that catches the Safari font break is the `typeTokensCSS(luxury)` quot
 | `references/foundations.md` | the SINGLE OWNER of the model: the five layers (`cat`→`make7`→treatment→`typeScale`→emitter), the voice taxonomy + step sets, the `buildCategory` math (nice ladder + override channels), `bodyBase` scaling, the emitter shapes, the font-rendering path |
 | `references/best-practices.md` | the non-obvious do/don't (derive-don't-hardcode, the quoting guard, case-is-per-treatment, the manual font regen, both-ends font wiring) + a worked walkthrough from the treatment/specimen history |
 | `references/rubric.md` | score the change before calling it done — the seven groups, the math invariants, the quoting guard, and the font wiring are the gates |
-| `.claude/docs/spec/typography/README.md` | the seven named groups, the system relationships, the leading bands, the target token shape — owned there, cite |
+| `.claude/docs/spec/typography/README.md` | the seven named groups, the system relationships, the leading constants, the target token shape — owned there, cite |
 
 Peers: [[geometry-system]] (composition with type) · [[adding-export-formats]] (the type emitter) · [[building-editor-sections]] (the Typography section) · [[shipping-changes]].

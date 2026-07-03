@@ -29,8 +29,8 @@ wrap.
 ## Paragraph spacing
 
 `--type-{voice}-{step}-para` is the derived paragraph rhythm, by ROLE (not by the display-vs-heading
-grouping): **0.7× size for the display + editorial/context heading roles, 0.75× for body, 1.0× for
-the ui/mono roles — UI, Code, and Heading-Kicker**. Use it as `margin-block-end` between blocks of
+grouping): **0.7× size for the display + heading roles (heading · sub-heading), 0.75× for body, 1.0× for
+the ui/mono roles — UI, Code, and Kicker**. Use it as `margin-block-end` between blocks of
 that voice; it scales with the size across breakpoints, so vertical rhythm stays proportional. Don't
 set paragraph margins by hand.
 
