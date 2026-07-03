@@ -136,6 +136,17 @@ if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "cl
   if ("tokenOverrides" in A.type || "tokenOverrides" in A.geometry) FAIL("token-overrides", "absent tokenOverrides must stay absent after hydrate");
 }
 
+// ── voice styleName (the Figma weight-style string): non-empty persists trimmed/capped; empty/junk drops ──
+{
+  const seed = inDomainState();
+  const R = U.hydrate(U.serialize({ ...seed, type: { treatment: "product", bodyBase: 16,
+    voices: { Display: { weight: 900, styleName: "  Condensed Black Italic  " }, Body: { styleName: "" }, UI: { styleName: 42 } } } }));
+  if (R.type.voices.Display.styleName !== "Condensed Black Italic") FAIL("voice-style", `styleName must round-trip trimmed (got ${JSON.stringify(R.type.voices.Display.styleName)})`);
+  if (R.type.voices.Body || (R.type.voices.UI && R.type.voices.UI.styleName)) FAIL("voice-style", "empty/non-string styleName must drop (and an emptied voice with it)");
+  const long = U.hydrate(U.serialize({ ...seed, type: { treatment: "product", bodyBase: 16, voices: { Display: { styleName: "x".repeat(200) } } } }));
+  if (long.type.voices.Display.styleName.length !== 60) FAIL("voice-style", "styleName caps at 60 chars");
+}
+
 // ── geometry rampContrast (the responsive-ramp knob): <1 persists (2-decimal), 1/absent/invalid drop ──
 {
   const seed = inDomainState();

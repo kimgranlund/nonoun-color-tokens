@@ -2726,7 +2726,14 @@ function typeScale(config = {}) {
   if (config.fonts && typeof config.fonts === "object") {
     for (const role of Object.keys(fonts)) { const f = config.fonts[role]; if (typeof f === "string" && f.trim()) fonts[role] = f.trim(); }
   }
-  return { treatment: t.id, label: t.label, fonts, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories };
+  // per-voice weight STYLE NAMES (config.voices[v].styleName) — the Figma-facing style string for
+  // NON-VARIABLE families ("Condensed Black Italic"), where a numeric weight can't name the face.
+  // Identity-gated: no names ⇒ no styleNames key on the scale, and the primitives emitter skips them.
+  const styleNames = {};
+  if (voices) for (const [name, v] of Object.entries(voices)) {
+    if (t.categories[name] && v && typeof v.styleName === "string" && v.styleName.trim()) styleNames[name] = v.styleName.trim();
+  }
+  return { treatment: t.id, label: t.label, fonts, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories, ...(Object.keys(styleNames).length ? { styleNames } : {}) };
 }
 
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
@@ -2876,6 +2883,10 @@ function typeTokensFigmaPrimitives(scale) {
     if (fam && famKey[fam]) variables[`font/${voice}`] = { type: "ALIAS", target: famKey[fam] };
     const first = Object.values(steps)[0];
     if (first && Number.isFinite(first.weight)) variables[`weight/${voice}`] = { type: "FLOAT", values: { Value: first.weight } };
+    // the weight STYLE NAME (non-variable families) — a STRING primitive beside the numeric weight,
+    // present only when the kit names one (scale.styleNames via config.voices[v].styleName).
+    const sn = scale.styleNames && scale.styleNames[voice];
+    if (sn) variables[`weight-style/${voice}`] = { type: "STRING", values: { Value: sn } };
   }
   return {
     $schema: "figma-ui3-variables.primitives.schema.v1",
@@ -3740,6 +3751,8 @@ function clampType(t) {
       const tr = num(v.tracking, -0.5, 1, false); if (tr !== undefined) o.tracking = tr;
       const le = num(v.leading, 0.8, 3, false); if (le !== undefined) o.leading = le;
       const ra = num(v.ratio, 1, 2, false); if (ra !== undefined) o.ratio = ra;
+      // styleName — the Figma weight-style string for non-variable families; trimmed, capped, non-empty only.
+      if (typeof v.styleName === "string" && v.styleName.trim()) o.styleName = v.styleName.trim().slice(0, 60);
       if (Object.keys(o).length) voices[name] = o;
     }
     if (Object.keys(voices).length) out.voices = voices;
@@ -9957,6 +9970,12 @@ class HctApp extends HTMLElement {
                   this.slider("Tracking", val("tracking", p.trackingEm), -0.05, 0.3, 0.001, (v) => (v >= 0 ? "+" : "") + fmt(v, 3) + "em", (v) => this._setTypeVoice(cName, "tracking", v)),
                   this.slider("Leading", val("leading", p.leading), 0.9, 2, 0.01, (v) => fmt(v, 2), (v) => this._setTypeVoice(cName, "leading", v)),
                   this.slider("Ratio", val("ratio", p.ratio), 1, 1.7, 0.005, (v) => fmt(v, 3), (v) => this._setTypeVoice(cName, "ratio", v)),
+                  // the Figma weight-STYLE name — only meaningful for non-variable families (GT America
+                  // "Condensed Black Italic"), where a numeric weight can't name the face. Exported into
+                  // the Font Primitives collection as weight-style/<voice>; empty = none.
+                  h("label", { class: "mode-editor-label", for: "fld-voice-style-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-") }, "Figma style name"),
+                  h("input", { id: "fld-voice-style-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-"), type: "text", value: vp.styleName || "", placeholder: "e.g. Condensed Bold (non-variable fonts)", "data-fk": "tyvoice-style:" + cName,
+                    "aria-label": "Figma weight style name for " + cName, onchange: (e) => this._setTypeVoiceStyleName(cName, e.target.value) }),
                   tuned ? btn("Reset voice", { variant: "ghost", cls: "tyi-voice-reset", onclick: () => this._resetTypeVoice(cName) }) : false,
                 )
               : h(
@@ -10048,6 +10067,21 @@ class HctApp extends HTMLElement {
       const voices = { ...(t.voices || {}) };
       const v = { ...(voices[voice] || {}) };
       if (!Number.isFinite(num) || num === defaults[param]) delete v[param]; else v[param] = num;
+      if (Object.keys(v).length) voices[voice] = v; else delete voices[voice];
+      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
+      doc.type = t;
+    });
+  }
+
+  // _setTypeVoiceStyleName(voice, value) — the STRING sibling of _setTypeVoice: the Figma weight-style
+  // name for non-variable families. Empty/whitespace clears (so a default round-trips); one undo step.
+  _setTypeVoiceStyleName(voice, value) {
+    const sn = String(value || "").trim().slice(0, 60);
+    this.commit((doc) => {
+      const t = { ...(doc.type || DEFAULT_TYPE) };
+      const voices = { ...(t.voices || {}) };
+      const v = { ...(voices[voice] || {}) };
+      if (sn) v.styleName = sn; else delete v.styleName;
       if (Object.keys(v).length) voices[voice] = v; else delete voices[voice];
       if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
       doc.type = t;

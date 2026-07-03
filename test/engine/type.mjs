@@ -246,6 +246,14 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(col.variables["font/Heading Editorial"].target === "family/display", "Heading Editorial aliases the deduped Inter Tight primitive (family/display)");
   ok(col.variables["font/Heading Eyebrow"].target === col.variables["font/Code"].target, "Eyebrow and Code alias the SAME mono primitive (roleOf → mono)");
   ok(col.variables["weight/Display"].values.Value === base.categories.Display.MD.weight, "weight/Display carries the voice's uniform weight");
+  // weight STYLE NAMES (slice 4): config.voices[v].styleName → scale.styleNames → weight-style/<voice>
+  // STRING primitives; absent names ⇒ no styleNames key and no weight-style vars (the identity gate).
+  ok(!("styleNames" in base) && !Object.keys(col.variables).some((k) => k.startsWith("weight-style/")), "no styleName config ⇒ no styleNames on the scale, no weight-style vars");
+  const named = T.typeScale({ treatment: "product", voices: { Display: { styleName: "Condensed Black Italic" }, "Heading Eyebrow": { styleName: "  Medium  " }, Body: { styleName: "" } } });
+  ok(named.styleNames && named.styleNames.Display === "Condensed Black Italic" && named.styleNames["Heading Eyebrow"] === "Medium" && !("Body" in named.styleNames), "styleNames collect trimmed non-empty names only");
+  const nCol = T.typeTokensFigmaPrimitives(named).collections["Font Primitives"];
+  ok(nCol.variables["weight-style/Display"] && nCol.variables["weight-style/Display"].type === "STRING" && nCol.variables["weight-style/Display"].values.Value === "Condensed Black Italic", "the primitives collection emits weight-style/<voice> STRING vars");
+  ok(!nCol.variables["weight-style/Body"] && nCol.variables["weight/Body"], "an unnamed voice keeps its numeric weight primitive but gets no style var");
 }
 
 if (fails.length) { console.error(`type FAIL (${fails.length}):\n  ` + fails.join("\n  ")); process.exit(1); }

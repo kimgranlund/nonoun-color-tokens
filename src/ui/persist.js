@@ -321,6 +321,8 @@ function clampType(t) {
       const tr = num(v.tracking, -0.5, 1, false); if (tr !== undefined) o.tracking = tr;
       const le = num(v.leading, 0.8, 3, false); if (le !== undefined) o.leading = le;
       const ra = num(v.ratio, 1, 2, false); if (ra !== undefined) o.ratio = ra;
+      // styleName — the Figma weight-style string for non-variable families; trimmed, capped, non-empty only.
+      if (typeof v.styleName === "string" && v.styleName.trim()) o.styleName = v.styleName.trim().slice(0, 60);
       if (Object.keys(o).length) voices[name] = o;
     }
     if (Object.keys(voices).length) out.voices = voices;

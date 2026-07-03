@@ -166,7 +166,14 @@ export function typeScale(config = {}) {
   if (config.fonts && typeof config.fonts === "object") {
     for (const role of Object.keys(fonts)) { const f = config.fonts[role]; if (typeof f === "string" && f.trim()) fonts[role] = f.trim(); }
   }
-  return { treatment: t.id, label: t.label, fonts, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories };
+  // per-voice weight STYLE NAMES (config.voices[v].styleName) — the Figma-facing style string for
+  // NON-VARIABLE families ("Condensed Black Italic"), where a numeric weight can't name the face.
+  // Identity-gated: no names ⇒ no styleNames key on the scale, and the primitives emitter skips them.
+  const styleNames = {};
+  if (voices) for (const [name, v] of Object.entries(voices)) {
+    if (t.categories[name] && v && typeof v.styleName === "string" && v.styleName.trim()) styleNames[name] = v.styleName.trim();
+  }
+  return { treatment: t.id, label: t.label, fonts, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories, ...(Object.keys(styleNames).length ? { styleNames } : {}) };
 }
 
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
@@ -316,6 +323,10 @@ export function typeTokensFigmaPrimitives(scale) {
     if (fam && famKey[fam]) variables[`font/${voice}`] = { type: "ALIAS", target: famKey[fam] };
     const first = Object.values(steps)[0];
     if (first && Number.isFinite(first.weight)) variables[`weight/${voice}`] = { type: "FLOAT", values: { Value: first.weight } };
+    // the weight STYLE NAME (non-variable families) — a STRING primitive beside the numeric weight,
+    // present only when the kit names one (scale.styleNames via config.voices[v].styleName).
+    const sn = scale.styleNames && scale.styleNames[voice];
+    if (sn) variables[`weight-style/${voice}`] = { type: "STRING", values: { Value: sn } };
   }
   return {
     $schema: "figma-ui3-variables.primitives.schema.v1",
