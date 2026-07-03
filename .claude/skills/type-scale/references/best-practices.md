@@ -35,7 +35,7 @@ treatment/specimen history.
 - **Don't blanket-force Display to UPPERCASE.** Display is title/sentence case in four of five treatments;
   ONLY Brutalist/`statement` opts in (via `dTransform:"uppercase"` in the `statement` row). The test asserts
   *exactly one* treatment sets an uppercase Display — adding a second (or removing Brutalist's)
-  turns the gate red. The two standing caps voices are Heading Context and Heading Eyebrow (hardcoded
+  turns the gate red. The two standing caps voices are Kicker and Eyebrow (hardcoded
   `"uppercase"` in `make7`), and they track POSITIVE; Display caps (Brutalist) track
   NEGATIVE. Don't swap those tracking signs.
 

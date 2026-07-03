@@ -110,7 +110,7 @@ asserts this on the projection directly via `brandKit({color:true})` / `{type:tr
 ### 5. Where the served type + geometry come from
 
 `get_type` / `brand://type` return `kit.type` **verbatim** (the `typeScale` output). Its `categories` map has
-**seven** voices from `make7` — `Display`, `Heading Editorial`, `Heading Context`, `Heading Eyebrow`, `Body`,
+**seven** voices from `make7` — `Display`, `Heading`, `Kicker`, `Eyebrow`, `Body`,
 `UI`, `Code` — each step `{ size, lineHeight, letterSpacing, weight, textTransform, paragraphSpacing,
 paragraphIndent }`. (The `usageGuide()` prose collapses these into a four-voice teaching model
 Display/Heading/Body/UI — that is documentation, not the data shape.)

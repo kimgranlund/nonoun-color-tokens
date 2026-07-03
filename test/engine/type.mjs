@@ -6,7 +6,7 @@ const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
 
 // ── treatments: 5 presets, each with the SEVEN named groups ──
-const GROUPS7 = ["Display", "Heading Editorial", "Heading Context", "Heading Eyebrow", "Body", "UI", "Code"];
+const GROUPS7 = ["Display", "Heading", "Kicker", "Eyebrow", "Body", "UI", "Code"];
 ok(T.TYPE_TREATMENTS.length === 5, `5 treatments (got ${T.TYPE_TREATMENTS.length})`);
 ok(T.TYPE_TREATMENTS.every((t) => t.fonts && GROUPS7.every((c) => t.categories[c])), "every treatment has the 7 groups (Display · 3 Headings · Body · UI · Code) + fonts");
 ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((t) => t.id === "luxury") && T.TYPE_TREATMENTS.some((t) => t.id === "editorial"), "has product/luxury/editorial");
@@ -14,18 +14,18 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
 // ── the taxonomy: role mapping (Eyebrow + Code ride MONO) + the UPPERCASE caps voices ──
 {
   const s = T.typeScale({ treatment: "product", bodyBase: 16 });
-  ok(s.roleOf["Heading Eyebrow"] === "mono" && s.roleOf["Code"] === "mono", "Eyebrow + Code map to the mono font role");
-  ok(s.roleOf["Display"] === "display" && s.roleOf["Heading Editorial"] === "heading" && s.roleOf["Body"] === "body" && s.roleOf["UI"] === "ui", "Display/Heading/Body/UI map to their roles");
+  ok(s.roleOf["Eyebrow"] === "mono" && s.roleOf["Code"] === "mono", "Eyebrow + Code map to the mono font role");
+  ok(s.roleOf["Display"] === "display" && s.roleOf["Heading"] === "heading" && s.roleOf["Body"] === "body" && s.roleOf["UI"] === "ui", "Display/Heading/Body/UI map to their roles");
   // CASE is per-treatment now: Context + Eyebrow are the standing UPPERCASE "caps voices"; Display is
   // title/sentence case by default (only Brutalist opts Display into caps — checked below).
-  ok(s.categories["Heading Context"].MD.textTransform === "uppercase" && s.categories["Heading Eyebrow"].MD.textTransform === "uppercase", "Context + Eyebrow are the UPPERCASE caps voices");
-  ok(s.categories["Display"].MD.textTransform === "none" && s.categories["Heading Editorial"].MD.textTransform === "none" && s.categories["Body"].MD.textTransform === "none", "Display + Editorial + Body are title/sentence case by default (Display no longer forced ALL-CAPS)");
+  ok(s.categories["Kicker"].MD.textTransform === "uppercase" && s.categories["Eyebrow"].MD.textTransform === "uppercase", "Context + Eyebrow are the UPPERCASE caps voices");
+  ok(s.categories["Display"].MD.textTransform === "none" && s.categories["Heading"].MD.textTransform === "none" && s.categories["Body"].MD.textTransform === "none", "Display + Editorial + Body are title/sentence case by default (Display no longer forced ALL-CAPS)");
   // only the Brutalist/Statement treatment earns the ALL-CAPS display
   const st = T.typeScale({ treatment: "statement" });
   ok(st.categories["Display"].MD.textTransform === "uppercase", "Brutalist/Statement is the one treatment whose Display is ALL-CAPS");
   ok(T.TYPE_TREATMENTS.filter((t) => t.categories["Display"].transform === "uppercase").length === 1, "exactly ONE treatment (Brutalist) sets an uppercase Display");
   // Context/Eyebrow caps track POSITIVE (open up); Display caps track NEGATIVE (tighten)
-  ok(s.categories["Heading Context"].XL.letterSpacing > 0 && s.categories["Heading Eyebrow"].XL.letterSpacing > 0, "caps headings track positive (open)");
+  ok(s.categories["Kicker"].XL.letterSpacing > 0 && s.categories["Eyebrow"].XL.letterSpacing > 0, "caps headings track positive (open)");
   ok(s.categories["Display"].XL.letterSpacing < 0, "Display caps track negative (tighten)");
   // Code mirrors the UI ramp (8 steps, 3XS..2XL)
   ok(["3XS", "2XS", "XS", "SM", "MD", "LG", "XL", "2XL"].every((k) => s.categories.Code[k]), "Code has the 8-step UI ramp 3XS..2XL");
@@ -221,11 +221,11 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const s = T.typeScale({ treatment: "product", bodyBase: 16 }).categories;
   const near = (a, b) => Math.abs(a - b) <= 0.5;
   ok(near(s.Display.MD.paragraphSpacing, Math.round(s.Display.MD.size * 0.7)), `Display paragraphSpacing = 0.7×size (got ${s.Display.MD.paragraphSpacing} for size ${s.Display.MD.size})`);
-  ok(near(s["Heading Editorial"].MD.paragraphSpacing, Math.round(s["Heading Editorial"].MD.size * 0.7)), "Heading paragraphSpacing = 0.7×size");
+  ok(near(s["Heading"].MD.paragraphSpacing, Math.round(s["Heading"].MD.size * 0.7)), "Heading paragraphSpacing = 0.7×size");
   ok(near(s.Body.MD.paragraphSpacing, Math.round(s.Body.MD.size * 0.75)), `Body (prose) paragraphSpacing = 0.75×size (got ${s.Body.MD.paragraphSpacing})`);
   ok(s.UI.MD.paragraphSpacing === s.UI.MD.size && s.Code.MD.paragraphSpacing === s.Code.MD.size, "ui/mono paragraphSpacing = 1.0×size");
   // singleLineHeight: control-text intent — present on ui/mono voices only, equal to the size (leading 1.0).
-  ok(s.UI.MD.singleLineHeight === s.UI.MD.size && s.Code.SM.singleLineHeight === s.Code.SM.size && s["Heading Eyebrow"].MD.singleLineHeight === s["Heading Eyebrow"].MD.size, "singleLineHeight = size on UI/Code/Eyebrow");
+  ok(s.UI.MD.singleLineHeight === s.UI.MD.size && s.Code.SM.singleLineHeight === s.Code.SM.size && s["Eyebrow"].MD.singleLineHeight === s["Eyebrow"].MD.size, "singleLineHeight = size on UI/Code/Eyebrow");
   ok(!("singleLineHeight" in s.Display.MD) && !("singleLineHeight" in s.Body.MD), "singleLineHeight is ABSENT on display/heading/prose voices");
   // the emitters carry both: CSS -para (+ -line-single where present), DTCG composite, Figma-modes vars.
   const css = T.typeTokensCSS(T.typeScale({ treatment: "product" }));
@@ -250,14 +250,14 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(voices.every((v) => col.variables[`font/${v}`] && col.variables[`font/${v}`].type === "ALIAS"), "every voice emits a font/<voice> ALIAS");
   ok(voices.every((v) => col.variables[`weight/${v}`] && col.variables[`weight/${v}`].type === "FLOAT" && Number.isFinite(col.variables[`weight/${v}`].values.Value)), "every voice emits a weight/<voice> FLOAT primitive");
   ok(voices.every((v) => col.variables[col.variables[`font/${v}`].target]), "every alias target resolves to a primitive in the same collection");
-  ok(col.variables["font/Heading Editorial"].target === "family/display", "Heading Editorial aliases the deduped Inter Tight primitive (family/display)");
-  ok(col.variables["font/Heading Eyebrow"].target === col.variables["font/Code"].target, "Eyebrow and Code alias the SAME mono primitive (roleOf → mono)");
+  ok(col.variables["font/Heading"].target === "family/display", "Heading aliases the deduped Inter Tight primitive (family/display)");
+  ok(col.variables["font/Eyebrow"].target === col.variables["font/Code"].target, "Eyebrow and Code alias the SAME mono primitive (roleOf → mono)");
   ok(col.variables["weight/Display"].values.Value === base.categories.Display.MD.weight, "weight/Display carries the voice's uniform weight");
   // weight STYLE NAMES (slice 4): config.voices[v].styleName → scale.styleNames → weight-style/<voice>
   // STRING primitives; absent names ⇒ no styleNames key and no weight-style vars (the identity gate).
   ok(!("styleNames" in base) && !Object.keys(col.variables).some((k) => k.startsWith("weight-style/")), "no styleName config ⇒ no styleNames on the scale, no weight-style vars");
-  const named = T.typeScale({ treatment: "product", voices: { Display: { styleName: "Condensed Black Italic" }, "Heading Eyebrow": { styleName: "  Medium  " }, Body: { styleName: "" } } });
-  ok(named.styleNames && named.styleNames.Display === "Condensed Black Italic" && named.styleNames["Heading Eyebrow"] === "Medium" && !("Body" in named.styleNames), "styleNames collect trimmed non-empty names only");
+  const named = T.typeScale({ treatment: "product", voices: { Display: { styleName: "Condensed Black Italic" }, "Eyebrow": { styleName: "  Medium  " }, Body: { styleName: "" } } });
+  ok(named.styleNames && named.styleNames.Display === "Condensed Black Italic" && named.styleNames["Eyebrow"] === "Medium" && !("Body" in named.styleNames), "styleNames collect trimmed non-empty names only");
   const nCol = T.typeTokensFigmaPrimitives(named).collections["Font Primitives"];
   ok(nCol.variables["weight-style/Display"] && nCol.variables["weight-style/Display"].type === "STRING" && nCol.variables["weight-style/Display"].values.Value === "Condensed Black Italic", "the primitives collection emits weight-style/<voice> STRING vars");
   ok(!nCol.variables["weight-style/Body"] && nCol.variables["weight/Body"], "an unnamed voice keeps its numeric weight primitive but gets no style var");

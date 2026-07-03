@@ -370,9 +370,9 @@ const SCHEME_NEXT = { system: "light", light: "dark", dark: "system" };
 const TYPE_SPECIMENS = {
   product: {
     "Display": "Make today count",
-    "Heading Editorial": "Your week, at a glance",
-    "Heading Context": "This Morning",
-    "Heading Eyebrow": "Daily Brief",
+    "Heading": "Your week, at a glance",
+    "Kicker": "This Morning",
+    "Eyebrow": "Daily Brief",
     "Body": "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go.",
     "UI": "Today · 4 of 6 done · 2 left",
     "Code": "GET /v1/habits/today → 200",
@@ -380,9 +380,9 @@ const TYPE_SPECIMENS = {
   },
   luxury: {
     "Display": "The Maison Collection",
-    "Heading Editorial": "An invitation to slow down",
-    "Heading Context": "The Atelier",
-    "Heading Eyebrow": "Private Reserve",
+    "Heading": "An invitation to slow down",
+    "Kicker": "The Atelier",
+    "Eyebrow": "Private Reserve",
     "Body": "Crafted in limited number, each piece is finished by hand in our atelier and made to be kept for a lifetime.",
     "UI": "Reserve · Suite 9 · 2 nights",
     "Code": "RES · 2026-09-14 · SUITE-09",
@@ -390,9 +390,9 @@ const TYPE_SPECIMENS = {
   },
   editorial: {
     "Display": "The long road back",
-    "Heading Editorial": "Notes from a vanishing coastline",
-    "Heading Context": "Field Report",
-    "Heading Eyebrow": "Dispatch",
+    "Heading": "Notes from a vanishing coastline",
+    "Kicker": "Field Report",
+    "Eyebrow": "Dispatch",
     "Body": "For thirty years she walked these shores at dawn. What she saw — and what she could no longer find — became the story.",
     "UI": "Issue 47 · 12 min read · Share",
     "Code": "By J. Okonkwo · Oct 2026",
@@ -400,9 +400,9 @@ const TYPE_SPECIMENS = {
   },
   technical: {
     "Display": "99.98% uptime",
-    "Heading Editorial": "Cluster health overview",
-    "Heading Context": "Live Metrics",
-    "Heading Eyebrow": "System Status",
+    "Heading": "Cluster health overview",
+    "Kicker": "Live Metrics",
+    "Eyebrow": "System Status",
     "Body": "All regions reporting nominal. Latency held under 80ms across the last 24 hours of production traffic.",
     "UI": "p99 78ms · 1.2k rps · 0 err",
     "Code": "$ kubectl get pods -n prod",
@@ -410,9 +410,9 @@ const TYPE_SPECIMENS = {
   },
   statement: {
     "Display": "After Hours",
-    "Heading Editorial": "Three nights only",
-    "Heading Context": "Main Stage",
-    "Heading Eyebrow": "Doors 9PM",
+    "Heading": "Three nights only",
+    "Kicker": "Main Stage",
+    "Eyebrow": "Doors 9PM",
     "Body": "No openers. No encore. One set, start to finish, loud enough to feel in your chest.",
     "UI": "SOLD OUT · WAITLIST OPEN",
     "Code": "FRI 02 · WAREHOUSE 9 · DTLA",
@@ -1798,7 +1798,7 @@ class HctApp extends HTMLElement {
   typeAnalysisCards(view) {
     const scale = this._activeTypeScale();
     const card = (label, body) => h("div", { class: "an-card" }, h("div", { class: "an-label" }, label), body);
-    const SHORT = { "Display": "Disp", "Heading Editorial": "H·Ed", "Heading Context": "H·Cx", "Heading Eyebrow": "H·Eye", "Body": "Body", "UI": "UI", "Code": "Code" };
+    const SHORT = { "Display": "Disp", "Heading": "Head", "Kicker": "Kick", "Eyebrow": "Eye", "Body": "Body", "UI": "UI", "Code": "Code" };
     const series = Object.keys(scale.categories)
       .map((c) => ({ cat: c, short: SHORT[c] || c, steps: Object.entries(scale.categories[c] || {}).map(([name, s]) => ({ name, ...s })) }))
       .filter((x) => x.steps.length);
@@ -4470,12 +4470,12 @@ class HctApp extends HTMLElement {
     const pick = (role) => (role ? (dark ? role.darkHex : role.lightHex) : "transparent");
     const main = roles.find((r) => r.suffix === "");
     const onMain = roles.find((r) => r.suffix === "-on-" + sl);
-    const hStep = scale.categories["Heading Editorial"].MD, bStep = scale.categories.Body.MD;
+    const hStep = scale.categories["Heading"].MD, bStep = scale.categories.Body.MD;
     const fam = (cat) => { const fm = scale.fonts[scale.roleOf[cat]] || "Inter"; const g = /mono/i.test(fm) ? "monospace" : /serif/i.test(fm) ? "serif" : "sans-serif"; return `'${fm}', ${g}`; };
     return h(
       "div",
       { class: "example-card tyi-example", style: "background:" + pick(byKey.surface) },
-      h("div", { class: "tyi-ex-head", style: `color:${pick(byKey.onSurface)};font-family:${fam("Heading Editorial")};font-size:${hStep.size}px;line-height:${hStep.lineHeight}px;letter-spacing:${hStep.letterSpacing}px;font-weight:${hStep.weight}` }, TYPE_SAMPLE("Heading Editorial", scale.treatment)),
+      h("div", { class: "tyi-ex-head", style: `color:${pick(byKey.onSurface)};font-family:${fam("Heading")};font-size:${hStep.size}px;line-height:${hStep.lineHeight}px;letter-spacing:${hStep.letterSpacing}px;font-weight:${hStep.weight}` }, TYPE_SAMPLE("Heading", scale.treatment)),
       h("p", { class: "tyi-ex-body", style: `color:${pick(byKey.onSurfaceVariant)};font-family:${fam("Body")};font-size:${bStep.size}px;line-height:${bStep.lineHeight}px;letter-spacing:${bStep.letterSpacing}px;font-weight:${bStep.weight}` }, TYPE_SAMPLE("Body", scale.treatment)),
       h("button", { class: "ex-btn", tabindex: "-1", style: "background:" + pick(main) + ";color:" + pick(onMain) }, "Read more"),
     );

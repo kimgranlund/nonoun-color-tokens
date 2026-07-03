@@ -8,7 +8,7 @@ font size, or a pixel value.
 | Skill | Use when you're setting… | Covers |
 |---|---|---|
 | **color-tokens** | the colour of any UI | the 59-role semantic layer — buttons (all variants + states), form fields, text hierarchy, cards/modals/elevation, intents/toasts/scrims, navigation, focus. Enforces the pairing law and on-colour discipline. |
-| **typography-tokens** | the type of any UI | the seven-voice scale — the voice=job / step=size rule, the body-vs-ui split, single-line vs multi-line, per-role paragraph rhythm, responsive breakpoint modes. |
+| **typography-tokens** | the type of any UI | the seven-role scale — role=function × level=hierarchy-depth (size derived), the body-vs-ui split, single-line vs multi-line, per-role paragraph rhythm, responsive breakpoint modes. |
 | **geometry-tokens** | the size or spacing of any UI | the two-tier dimensional system — control geometry (the centering law) and container geometry (insets/gaps), the Material-3-aligned radius scale, borders, focus rings. |
 
 ## The agent

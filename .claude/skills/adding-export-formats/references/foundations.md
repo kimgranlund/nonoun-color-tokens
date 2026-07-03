@@ -93,7 +93,7 @@ Color isn't the only system. `type.mjs` and `geometry.mjs` are parallel engines 
 scales and emitters:
 
 - **Type** (`type.mjs`): `typeScale(config)` → a resolved scale. Its structure is the **seven named groups**
-  `make7` builds — Display · Heading Editorial · Heading Context · Heading Eyebrow · Body · UI · Code — each a
+  `make7` builds — Display · Heading · Kicker · Eyebrow · Body · UI · Code — each a
   step ramp whose every step carries size/lineHeight/letterSpacing/weight/textTransform. `typeTokensCSS(scale)`
   → CSS custom props + utility classes; `typeTokensDTCG(scale)` → a `fontFamily` group + a `typography` group
   of W3C composite `$type:"typography"` tokens. Font names with digits MUST be quoted in CSS

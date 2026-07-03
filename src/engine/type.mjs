@@ -35,22 +35,27 @@ export const TYPE_RATIOS = [
 // the SCALE + tracking + weight + leading + case relationships are the product. Free families only.
 const cat = (role, base, ratio, leading, weight, trackingEm, steps = STEPS_5, transform = "none") => ({ role, base, ratio, leading, weight, trackingEm, steps, transform });
 
-// make7 — the SEVEN named type groups (the canonical taxonomy from .claude/docs/spec/typography): Display · the
-// three Headings (Editorial · Context · Eyebrow) · Body · UI · Code. Shared STRUCTURE across treatments;
-// each treatment passes its fonts + a few character knobs. Eyebrow + Code ride the MONO role.
+// make7 — the SEVEN named type ROLES (each a FUNCTION, not a size register — the taxonomy in
+// .claude/docs/spec/typography): Display · Heading · Kicker · Eyebrow · Body · UI · Code. A role
+// carries CHARACTER (weight, tracking, leading, case, font cut) that travels with it across every
+// LEVEL; the level (the step) is chosen by hierarchy depth and the size is DERIVED from it (base ×
+// ratio^level), never picked to hit a number. Kicker (was "Heading Context") is the section label /
+// kicker that sits ABOVE a heading; Eyebrow (was "Heading Eyebrow") is the smallest mono overline —
+// neither is a heading, which is why they no longer carry the "Heading" prefix. Shared STRUCTURE
+// across treatments; each treatment passes its fonts + a few character knobs. Eyebrow + Code ride the
+// MONO role.
 //
-// CASE is a per-treatment decision, not a blanket rule. The Display voice defaults to TITLE/SENTENCE case
+// CASE is a per-treatment decision, not a blanket rule. The Display role defaults to TITLE/SENTENCE case
 // (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. The two genuine
-// "caps voices" are Heading-Context (the kicker / section label) and Heading-Eyebrow (the mono overline);
-// those stay uppercase and track POSITIVE so small caps open up. Display tracks NEGATIVE — big type
-// tightens. Leadings sit inside the ui-compose-typography bands: display 1.05–1.2, heading 1.05–1.3,
-// prose 1.45–1.65, UI 1.25–1.5, mono ~1.5.
+// "caps roles" are Kicker (the section label) and Eyebrow (the mono overline); those stay uppercase and
+// track POSITIVE so small caps open up. Display tracks NEGATIVE — big type tightens. Leadings sit inside
+// the bands: display 1.05–1.2, heading 1.05–1.3, prose 1.45–1.65, UI 1.25–1.5, mono ~1.5.
 function make7(o = {}) {
   return {
     "Display": cat("display", o.dBase ?? 60, o.dRatio ?? 1.25, o.dLead ?? 1.08, o.dWeight ?? 700, o.dTrack ?? -0.02, STEPS_5, o.dTransform ?? "none"),
-    "Heading Editorial": cat("heading", 28, o.heRatio ?? 1.25, o.heLead ?? 1.2, o.heWeight ?? 700, o.heTrack ?? -0.005, STEPS_5, "none"),
-    "Heading Context": cat("heading", 26, o.hcRatio ?? 1.2, o.hcLead ?? 1.2, o.hcWeight ?? 600, o.hcTrack ?? 0.1, STEPS_5, "uppercase"),
-    "Heading Eyebrow": cat("mono", 13, 1.15, o.eyeLead ?? 1.4, o.eyeWeight ?? 600, o.eyeTrack ?? 0.16, STEPS_5, "uppercase"),
+    "Heading": cat("heading", 28, o.heRatio ?? 1.25, o.heLead ?? 1.2, o.heWeight ?? 700, o.heTrack ?? -0.005, STEPS_5, "none"),
+    "Kicker": cat("heading", 26, o.hcRatio ?? 1.2, o.hcLead ?? 1.2, o.hcWeight ?? 600, o.hcTrack ?? 0.1, STEPS_5, "uppercase"),
+    "Eyebrow": cat("mono", 13, 1.15, o.eyeLead ?? 1.4, o.eyeWeight ?? 600, o.eyeTrack ?? 0.16, STEPS_5, "uppercase"),
     "Body": cat("body", o.bBase ?? 16, o.bRatio ?? 1.2, o.bLead ?? 1.55, o.bWeight ?? 440, 0, STEPS_5, "none"),
     "UI": cat("ui", 14, 1.125, o.uiLead ?? 1.4, o.uiWeight ?? 480, o.uiTrack ?? 0.006, STEPS_UI, "none"),
     "Code": cat("mono", 13, 1.125, 1.5, o.codeWeight ?? 460, o.codeTrack ?? 0, STEPS_UI, "none"),

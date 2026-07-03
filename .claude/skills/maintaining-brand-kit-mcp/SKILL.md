@@ -51,7 +51,7 @@ in/out; omitted/undefined → **all three** (the back-compat default). `buildSur
   `nonoun-brand-kit:get_semantic(scheme)`, `nonoun-brand-kit:nearest_token(hex)`; resources
   `brand://palettes`, `brand://semantic/light`, `brand://semantic/dark`.
 - **Typography** (`kit.type` present) → tool `nonoun-brand-kit:get_type`; resource `brand://type`. `kit.type.categories`
-  carries the **seven** `make7` voices — **Display**, **Heading Editorial / Context / Eyebrow**, **Body**,
+  carries the **seven** `make7` voices — **Display**, **Heading / Context / Eyebrow**, **Body**,
   **UI**, **Code** — each step with `size · lineHeight · letterSpacing · weight` (+ `textTransform`,
   `paragraph*`). The guide prose teaches a four-voice mental model (Display/Heading/Body/UI); the *data* has
   seven keys — don't claim four.

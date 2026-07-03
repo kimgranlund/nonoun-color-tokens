@@ -15,7 +15,7 @@ if (!existsSync(ENGINE)) { console.log("voice-parity: type engine not found (out
 const { typeScale } = await import(ENGINE);
 const scale = typeScale({ treatment: "product" });
 const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-const VOICES = new Set(Object.keys(scale.categories).map(kebab)); // display, heading-editorial, …
+const VOICES = new Set(Object.keys(scale.categories).map(kebab)); // display, heading, kicker, eyebrow, …
 const STEPS = new Set(Object.values(scale.categories).flatMap((c) => Object.keys(c).map(kebab))); // 3xs..2xl
 const FONT_ROLES = new Set(Object.keys(scale.fonts)); // display heading body ui mono
 const PROPS = new Set(["size", "line", "tracking", "weight", "para", "line-single"]);
@@ -25,7 +25,7 @@ const files = ["SKILL.md", ...readdirSync(join(SKILL_DIR, "references")).filter(
 let failed = false;
 const err = (f, tok, why) => { console.error(`✗ ${f}: ${tok} — ${why}`); failed = true; };
 
-// a voice ref may be one segment (heading) or two (heading-editorial); try longest match against VOICES.
+// a voice ref may be one or two segments; try longest match against VOICES.
 const matchVoice = (rest) => {
   for (const v of [...VOICES].sort((a, b) => b.length - a.length)) if (rest === v || rest.startsWith(v + "-")) return v;
   return null;

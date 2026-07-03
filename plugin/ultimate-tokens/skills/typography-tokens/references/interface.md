@@ -3,7 +3,7 @@
 Everything you *operate* rather than *read* is the **ui** voice on `--font-ui`: buttons, inputs,
 labels, menus, tabs, table cells, badges, tooltips. It carries the widest ramp (**3XS–2XL**, eight
 steps) because interface density varies far more than prose does, and — like the other box-text
-voices (`code` and `heading-eyebrow`, the `mono`-role voices) — it has a **single-line height**
+voices (`code` and `eyebrow`, the `mono`-role voices) — it has a **single-line height**
 (`-line-single`, leading 1.0) for text that sits locked in a box.
 
 ## Control & component text
@@ -16,7 +16,7 @@ voices (`code` and `heading-eyebrow`, the `mono`-role voices) — it has a **sin
 | field label | `.type-ui-sm` (or `-xs`) | `-line-single` |
 | helper / error text under a field | `.type-ui-xs` | `-line` (may wrap) |
 | table cell | `.type-ui-sm` | `-line-single` |
-| table column header | `.type-ui-xs` (often with `heading-context` for caps labels) | `-line-single` |
+| table column header | `.type-ui-xs` (often with `kicker` for caps labels) | `-line-single` |
 | caption / metadata / timestamp | `.type-ui-xs` | `-line` |
 | badge / chip / tag | `.type-ui-2xs` or `-xs` | `-line-single` |
 | tooltip | `.type-ui-xs` | `-line` |

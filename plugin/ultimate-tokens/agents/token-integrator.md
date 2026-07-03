@@ -40,7 +40,8 @@ They are your standing reference; invoke the one a task needs and follow its law
 
 - **`color-tokens`** — which of the 59 roles goes where (buttons + states, text hierarchy,
   containers/elevation, intents/scrims, navigation, focus). The pairing law and on-colour discipline.
-- **`typography-tokens`** — voice = the text's job, step = its size; the body-vs-ui split; line vs
+- **`typography-tokens`** — role = the text's function, level = its hierarchy depth (size derived,
+  never chosen); the body-vs-ui split; line vs
   line-single; per-role rhythm.
 - **`geometry-tokens`** — control geometry (the centering law) vs container geometry (insets/gaps),
   the radius scale, borders, focus rings.

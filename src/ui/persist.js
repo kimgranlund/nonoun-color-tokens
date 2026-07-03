@@ -320,7 +320,7 @@ function clampType(t) {
   // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading, ratio } } for the 7 known
   // voices; each field clamped to a sane range, kept only when finite, attached only when non-empty.
   if (t.voices && typeof t.voices === "object") {
-    const VOICES = ["Display", "Heading Editorial", "Heading Context", "Heading Eyebrow", "Body", "UI", "Code"];
+    const VOICES = ["Display", "Heading", "Kicker", "Eyebrow", "Body", "UI", "Code"];
     const num = (x, lo, hi, round) => { const n = Number(x); if (!Number.isFinite(n)) return undefined; const c = Math.max(lo, Math.min(hi, n)); return round ? Math.round(c) : c; };
     const voices = {};
     for (const name of VOICES) {

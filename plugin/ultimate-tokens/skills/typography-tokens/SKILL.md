@@ -5,7 +5,8 @@ description: >
   font/size/weight/leading/tracking for a heading, body copy, label, button, caption, code, or
   eyebrow ("what type token for this", "which voice/step should this text use", "size this heading",
   "make the type responsive", "why is this text the wrong size/weight", "wire the fonts"). The
-  consumption guide for the seven-voice type scale: how to find and bind the exported `--type-*` /
+  consumption guide for the seven-role type scale (role=function × level=hierarchy-depth, size
+  derived): how to find and bind the exported `--type-*` /
   `--font-*` variables, choose the right VOICE for a text's job and the right STEP for its size, and
   apply the paragraph/single-line rhythm. Never hardcode a px font-size or a font family — this names
   the semantic type token for every job. Scope is TYPE only (colour is color-tokens; radius/spacing/
@@ -34,14 +35,23 @@ properties. Your job is never to pick a px size or a font stack — it is to pic
    utility class `.type-{voice}-{step}` (it wires family+size+line+tracking+weight in one) over
    composing the vars by hand.
 
-## The seven voices — pick by the text's JOB
+## Two axes — role (function) × level (hierarchy depth)
 
-| Voice | Font role | Use for | Steps |
+A **voice is a ROLE** — the text's *function*, carrying its character (weight, tracking, leading,
+case, font) across every size. A **step is a LEVEL** — the element's rank in the hierarchy, from
+which the size is *derived*. They're independent: the same role appears at many levels, and the same
+level hosts different roles. **You pick the role by function and the level by hierarchy depth — never
+a role to hit a size, never a step to hit a px.** Choosing `display` because you want big text, or a
+larger step because you want line-height 26, is the mistake this split exists to prevent.
+
+## The seven roles — pick by the text's FUNCTION
+
+| Voice (role) | Font role | Use for | Steps (levels) |
 |---|---|---|---|
 | **display** | display | hero/marketing headlines, the one big statement on a view | XS–XL |
-| **heading-editorial** | heading | section & content headings (h1–h4), card titles, dialog titles | XS–XL |
-| **heading-context** | heading | kickers / section labels above a heading — wide-tracked, usually uppercase | XS–XL |
-| **heading-eyebrow** | mono | the smallest overline / metadata label — mono, uppercase, tracked | XS–XL |
+| **heading** | heading | section & content headings (h1–h4), card titles, dialog titles | XS–XL |
+| **kicker** | heading | kickers / section labels above a heading — wide-tracked, usually uppercase | XS–XL |
+| **eyebrow** | mono | the smallest overline / metadata label — mono, uppercase, tracked | XS–XL |
 | **body** | body | running prose, paragraphs, descriptions, long-form reading | XS–XL |
 | **ui** | ui | interface text: buttons, labels, inputs, menus, table cells, captions, badges | 3XS–2XL |
 | **code** | mono | code, tabular figures, keyboard shortcuts, technical values | 3XS–2XL |
@@ -51,11 +61,14 @@ button label is `ui`, not `body`. A paragraph is `body`, not `ui`.
 
 ## The laws (violating any of these is a defect)
 
-1. **Voice+step, not px, not a font stack.** If a size or family isn't a `--type-*` var (or a
+1. **Role+level, not px, not a font stack.** If a size or family isn't a `--type-*` var (or a
    `.type-*` class), it doesn't belong in UI code. No `font-size: 14px`, no `font-family: Inter`.
-2. **Voice = job, step = size.** Choose the voice from what the text *is* (a heading, a label), then
-   the step from how big it should be — never reach for `display` just because you want big prose, or
-   `ui` because you want small headings.
+2. **Role = function, level = hierarchy depth; size is derived.** Choose the voice from what the text
+   *is* (a heading, a kicker, a label), then the step from its rank in the hierarchy — the size falls
+   out of the level. Never reach for `display` just to get big text, a larger step just to get a
+   target line-height, or `ui` just to get small headings. If two elements share a role, the more
+   prominent one takes the higher level; if a size feels wrong, it's the wrong *level*, not a reason
+   to switch roles.
 3. **`line` and `para` come with the size.** Line-height (`-line`) and paragraph spacing (`-para`)
    are derived per step — use them; don't set your own `line-height: 1.5` or `margin-bottom`. For
    single-line control text (a button, an input value, an overline) use `-line-single` (leading
@@ -64,7 +77,7 @@ button label is `ui`, not `body`. A paragraph is `body`, not `ui`.
 4. **Tracking is baked and optical.** `-tracking` is tuned per step (tight on display, open on
    eyebrow) — apply it; never add your own `letter-spacing`.
 5. **Weight is the voice's, and case is the treatment's.** Use `-weight`; don't bold a voice by
-   hand. `heading-context` and `heading-eyebrow` are uppercase by treatment — don't `text-transform`
+   hand. `kicker` and `eyebrow` are uppercase by treatment — don't `text-transform`
    them yourself, and don't uppercase a voice that isn't.
 6. **Responsive is per-breakpoint modes, not `clamp()` or `vw`.** If the kit exports breakpoint
    modes, the `--type-*` vars are re-declared inside `@media (min-width: …)` blocks — the same class

@@ -4,7 +4,7 @@ description: >
   Use when a change touches src/engine/type.mjs or any typography in
   nonoun-color-tokens — the modular scale, a voice or treatment,
   tracking/leading/weight/case, a font swap, a fallback-font render, or a red
-  type gate. Covers the seven named voices (Display, three Headings, Body, UI,
+  type gate. Covers the seven named roles (Display · Heading · Kicker · Eyebrow · Body · UI ·
   Code), the five treatments, and the self-hosted fonts. TYPE sibling of
   color-math (COLOR only).
 ---
@@ -23,7 +23,7 @@ this skill never touches color.
 | Layer | What it is | The contract |
 |---|---|---|
 | **`cat(role, base, ratio, leading, weight, trackingEm, steps, transform)`** | builds ONE voice's param record | `{role, base, ratio, leading, weight, trackingEm, steps, transform}` — no resolved sizes yet; `steps` defaults `STEPS_5`, `transform` `"none"` |
-| **`make7(o={})`** | the FACTORY — returns the SEVEN named voices, sharing structure, reading per-voice knobs from `o` | `Display · Heading Editorial · Heading Context · Heading Eyebrow · Body · UI · Code` |
+| **`make7(o={})`** | the FACTORY — returns the SEVEN named voices, sharing structure, reading per-voice knobs from `o` | `Display · Heading · Kicker · Eyebrow · Body · UI · Code` |
 | **`TYPE_TREATMENTS`** (5) | each = `{id,label,note,fonts,categories:make7({...})}` | ids `product · luxury · editorial · technical · statement` (`statement` = Brutalist) |
 | **`typeScale(config={treatment,bodyBase,overrides?,voices?,fonts?})`** | resolves a treatment → `{treatment,label,fonts,roleOf,categories}` | `roleOf` maps each voice→font role; `categories[voice][step]` = the resolved step. The three optional channels are **per-kit overrides** layered over the treatment, each **identity-gated** (absent/empty/non-finite ⇒ byte-identical output): `overrides` = flat per-cell `"<voice>\|<step>"`→size map (moves SIZE only); `voices` = `{<voice>:{weight,tracking,leading,ratio}}` reshaping a whole voice; `fonts` = `{<role>:family}` per-role font swap |
 | **`typeTokensCSS` / `typeTokensResponsiveCSS` / `typeTokensDTCG` / `typeTokensFigmaModes`** | the emitters (operate on a resolved `scale`; px/rem/em via `dimUnit`) | CSS custom props + a utility class per step (+ per-breakpoint `@media` blocks) · DTCG composite `typography` tokens · a breakpoint-moded Figma collection |

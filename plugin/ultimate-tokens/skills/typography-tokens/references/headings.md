@@ -8,9 +8,9 @@ utility class; the raw vars are listed where you need to compose.
 | Voice | Job | Case |
 |---|---|---|
 | **display** | the single hero statement on a landing/marketing view — not a document heading | as-set (mixed) |
-| **heading-editorial** | real document headings: page title, section headings, card/dialog titles | as-set |
-| **heading-context** | a kicker / section label sitting ABOVE a heading (e.g. "PRICING") | uppercase (treatment) |
-| **heading-eyebrow** | the smallest overline / metadata tag — mono, tracked | uppercase (treatment) |
+| **heading** | real document headings: page title, section headings, card/dialog titles | as-set |
+| **kicker** | a kicker / section label sitting ABOVE a heading (e.g. "PRICING") | uppercase (treatment) |
+| **eyebrow** | the smallest overline / metadata tag — mono, tracked | uppercase (treatment) |
 
 ## Mapping to an HTML heading ladder
 
@@ -19,13 +19,13 @@ There is no fixed voice-per-`<h1>`; map by size and importance. A common app map
 | Element | Class |
 |---|---|
 | hero / splash headline | `.type-display-lg` (or `-xl` for the biggest) |
-| page title (h1) | `.type-heading-editorial-xl` |
-| major section (h2) | `.type-heading-editorial-lg` |
-| subsection (h3) | `.type-heading-editorial-md` |
-| card / group title (h4) | `.type-heading-editorial-sm` |
-| minor label (h5/h6) | `.type-heading-editorial-xs` |
-| kicker above any of the above | `.type-heading-context-sm` (or `-xs`) |
-| eyebrow / metadata tag | `.type-heading-eyebrow-xs` — a single-line overline: use `--type-heading-eyebrow-{step}-line-single` (it rides the `mono` role, so it has one; leading 1.0) |
+| page title (h1) | `.type-heading-xl` |
+| major section (h2) | `.type-heading-lg` |
+| subsection (h3) | `.type-heading-md` |
+| card / group title (h4) | `.type-heading-sm` |
+| minor label (h5/h6) | `.type-heading-xs` |
+| kicker above any of the above | `.type-kicker-sm` (or `-xs`) |
+| eyebrow / metadata tag | `.type-eyebrow-xs` — a single-line overline: use `--type-eyebrow-{step}-line-single` (it rides the `mono` role, so it has one; leading 1.0) |
 
 Keep the ladder monotonic — don't skip so far that h2 and h3 look identical, and don't jump the
 display voice into a document where an editorial heading belongs.
@@ -44,8 +44,8 @@ same ink as body (see color-tokens); don't dim it unless it's genuinely secondar
 ## Don't
 
 - Don't use `display` for long text — it's tuned for one short line (tight leading, negative
-  tracking). Multi-line big text is `heading-editorial`.
-- Don't `text-transform: uppercase` a heading — `heading-context`/`heading-eyebrow` are already
+  tracking). Multi-line big text is `heading`.
+- Don't `text-transform: uppercase` a heading — `kicker`/`eyebrow` are already
   uppercase by treatment; the others are intentionally not.
 - Don't hand-set `letter-spacing`/`line-height` on a heading — `-tracking` and `-line` are tuned per
   step.

@@ -50,7 +50,7 @@ addition history.
 ### Serve verbatim; don't reshape
 
 - **`get_type` returns `kit.type` and `get_geometry` returns `kit.geometry` as-is** — the shape is owned by
-  `typeScale`/`geomScale`. `kit.type.categories` carries **seven** voices (Display, Heading Editorial/Context/
+  `typeScale`/`geomScale`. `kit.type.categories` carries **seven** voices (Display, Heading/Context/
   Eyebrow, Body, UI, Code); `kit.geometry.sizes` rows are `{height, icon, caret, font, gap, padding,
   edgePadding, radiusPill, minWidth}` with the top-level `radii` ladder + `space` scale. Don't pluck or rename
   fields in the server; an agent and the test rely on the full shape (the test reads `ty.categories.Body`,

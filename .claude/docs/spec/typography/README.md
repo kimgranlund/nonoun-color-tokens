@@ -18,7 +18,7 @@ generic (no brand/foundry specifics).
 
 ### `Font Specs` — the seven named groups
 
-The engine implements this as **seven groups** (the three Headings are first-class): each is a size ramp,
+The engine implements this as **seven groups** (Kicker + Eyebrow are labels, not headings): each is a size ramp,
 each step carrying `Size · Line Height · Letter Spacing · Weight · Case · Paragraph Spacing · Indent`.
 
 | Group | Steps | Font role | Case | Letter-spacing character |
