@@ -14,6 +14,10 @@ description: >
   running rather than starting a competing one.
 tools: Read, Grep, Glob, Edit, Write, Bash, Task
 model: inherit
+skills:
+  - color-tokens
+  - typography-tokens
+  - geometry-tokens
 ---
 
 # Token integrator — the design-system integration lead
