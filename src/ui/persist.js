@@ -258,7 +258,14 @@ function clampExport(e) {
   if (!e || typeof e !== "object") return {};
   const unit = clampEnum(e.unit, ["px", "rem", "em"], null);
   const colorFormat = clampEnum(e.colorFormat, ["hex", "oklch"], null);
-  const out = { ...(unit ? { unit } : {}), ...(colorFormat ? { colorFormat } : {}) };
+  // colorPrefix — the CSS custom-property prefix core (the `c` in `--c-*`). OPTIONAL: attach only a
+  // sanitized non-empty value that ISN'T the default "c" (so the default round-trips as absent — the
+  // identity gate). Sanitized to a legal ident core; capped; a bare/edge-hyphen/all-junk value drops.
+  const cp = typeof e.colorPrefix === "string"
+    ? e.colorPrefix.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1").slice(0, 40)
+    : "";
+  const colorPrefix = cp && cp !== "c" ? cp : null;
+  const out = { ...(unit ? { unit } : {}), ...(colorFormat ? { colorFormat } : {}), ...(colorPrefix ? { colorPrefix } : {}) };
   return Object.keys(out).length ? { export: out } : {};
 }
 

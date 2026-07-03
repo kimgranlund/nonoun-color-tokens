@@ -67,6 +67,23 @@ for (const m of css.matchAll(/(--c-[a-z0-9-]+)\s*:\s*light-dark\(\s*var\((--[a-z
 }
 if (cssChecked === 0) FAIL("css-resolves", "no --c-* light-dark(var,var) lines found");
 
+// ── configurable colour prefix (--{prefix}-* naming; M3-flavoured export) ────────────────────────
+{
+  if (X.cssPrefixOf(C(ALL)) !== "c") FAIL("prefix", "default state must resolve to the 'c' prefix");
+  const md = X.exportCSS({ ...C(ALL), export: { colorPrefix: "md-sys-color" } });
+  if (!md.includes("--md-sys-color-neutral-on-surface")) FAIL("prefix", "a Material prefix must emit --md-sys-color-{p}-{role}");
+  if (md.includes("--c-neutral-on-surface")) FAIL("prefix", "no stray --c-* names must survive under a custom prefix");
+  // the semantic refs must thread the same prefix (var() points at the prefixed raws) or the cascade breaks.
+  for (const m of md.matchAll(/--md-sys-color-[a-z0-9-]+\s*:\s*light-dark\(\s*var\((--[a-z0-9-]+)\)\s*,\s*var\((--[a-z0-9-]+)\)\s*\)/gi))
+    if (!m[1].startsWith("--md-sys-color-") || !m[2].startsWith("--md-sys-color-")) FAIL("prefix", `a semantic ref didn't thread the prefix: ${m[1]}/${m[2]}`);
+  // IDENTITY: no export / default "c" ⇒ byte-identical to the historical output.
+  if (X.exportCSS({ ...C(ALL), export: { colorPrefix: "c" } }) !== X.exportCSS(C(ALL))) FAIL("prefix", "the default prefix must be byte-identical to no-prefix (identity gate)");
+  // sanitization: junk → legal ident core; leading digit repaired; empty → 'c'.
+  if (X.cssPrefixOf({ export: { colorPrefix: "MD Sys!!" } }) !== "md-sys") FAIL("prefix", "junk prefix must sanitize");
+  if (X.cssPrefixOf({ export: { colorPrefix: "3x" } }) !== "c3x") FAIL("prefix", "leading-digit prefix must be repaired");
+  if (X.cssPrefixOf({ export: { colorPrefix: "" } }) !== "c") FAIL("prefix", "empty prefix falls back to 'c'");
+}
+
 // ── hpg-export-padding (3-digit stop padding in CSS var names) ───────────────────────────
 for (const m of css.matchAll(/--c-[a-z0-9-]+?-(\d+)(?:-\d+)?\s*:/gi)) {
   const stop = m[1];

@@ -217,6 +217,9 @@ function stateOf(doc) {
     vibrancy: c.vibrancy,
     onColorMode: c.onColorMode,
     accentRef: c.accentRef,
+    // export prefs (the CSS prefix is read by exportCSS/exportOKLCH via cssPrefixOf); pass through
+    // when present so the configurable --{prefix}-* naming reaches the emitter. Absent ⇒ default "c".
+    ...(doc.export && typeof doc.export === "object" ? { export: doc.export } : {}),
   };
 }
 

@@ -58,6 +58,16 @@ if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "cl
   if (JSON.stringify(U.hydrate(U.serialize(mixed)).export) !== JSON.stringify({ colorFormat: "oklch" })) FAIL("export", "an invalid unit must drop only that key, keeping the valid colorFormat");
   const bad = JSON.parse(JSON.stringify(base)); bad.export = { unit: "furlong", colorFormat: "cmyk" };
   if ("export" in U.hydrate(U.serialize(bad))) FAIL("export", "an all-invalid export object must drop entirely");
+  // colorPrefix (the configurable --{prefix}-* colour naming): a sanitized non-default value persists;
+  // the default "c" drops (identity); junk sanitizes; a leading digit is repaired.
+  const pfx = JSON.parse(JSON.stringify(base)); pfx.export = { colorPrefix: "md-sys-color" };
+  if (U.hydrate(U.serialize(pfx)).export.colorPrefix !== "md-sys-color") FAIL("export", "colorPrefix must round-trip");
+  const defp = JSON.parse(JSON.stringify(base)); defp.export = { colorPrefix: "c" };
+  if ("export" in U.hydrate(U.serialize(defp))) FAIL("export", "the default colorPrefix 'c' must drop (identity gate)");
+  const junk = JSON.parse(JSON.stringify(base)); junk.export = { colorPrefix: "MD Sys!!" };
+  if (U.hydrate(U.serialize(junk)).export.colorPrefix !== "md-sys") FAIL("export", `colorPrefix must sanitize to a legal ident core (got ${JSON.stringify(U.hydrate(U.serialize(junk)).export)})`);
+  const dig = JSON.parse(JSON.stringify(base)); dig.export = { colorPrefix: "3x" };
+  if (U.hydrate(U.serialize(dig)).export.colorPrefix !== "c3x") FAIL("export", "a leading-digit colorPrefix must be repaired (CSS idents can't start with a digit)");
 }
 
 // clamp-to-default hydrator would fail the above (it discards in-domain values) — that's the anti-hack
