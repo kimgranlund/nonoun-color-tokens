@@ -51,7 +51,7 @@ collections.
   **Download-all `.zip`**. An **Include** toggle row picks which token systems — **Color · Typography ·
   Geometry** — ride the Download-All `.zip` and the Brand-Kit MCP.
 - **Typography.** The type analog of the color engine — a few params → a **systematic type scale** of
-  seven voices (Display · three Headings · Body · UI · Code), with derived size (modular scale), optical
+  seven voices (Display · Heading · Sub-heading · Kicker · Body · UI · Code), with derived size (modular scale), optical
   letter-spacing, leading, and weight. Pick a **treatment** (Product, Luxury, Editorial, Technical,
   Brutalist), preview a live specimen, export **CSS + DTCG** type tokens.
 - **Geometry.** The spatial analog — a few params → a **systematic size ramp** (XS–2XL) → derived control

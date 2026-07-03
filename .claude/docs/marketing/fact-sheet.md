@@ -21,7 +21,7 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 | Type voices | **7** — Display · Heading · Sub-heading · Kicker · Body · UI · Code | `src/engine/type.mjs` `make7` |
 | Type treatments | **5** — Product / Lifestyle · Luxury / Premium · Editorial / Magazine · Technical / Data · Brutalist / Statement | `src/engine/type.mjs` `TYPE_TREATMENTS` |
 | Geometry | size ramp **XS–2XL** on one centering law: edge padding = (height − glyph) / 2 | `src/engine/geometry.mjs` |
-| Geometry treatments | **5** — Comfortable · Compact / Dense · Spacious / Airy · Touch / Mobile · Pill / Rounded | `src/engine/geometry.mjs` `GEO_TREATMENTS` |
+| Geometry treatments | **5** — Comfortable · Compact / Dense · Spacious / Airy · Touch / Mobile · Pill / Rounded | `src/engine/geometry.mjs` `GEOMETRY_TREATMENTS` |
 | Color Categories | **7** categories (Architecture · Cuisine · Film · Literature · Music · Nature · Travel), 12 volumes × 4 = **48 palettes each, 336 total**, each sourced + storied | `src/ui/categories/` |
 | Export formats | CSS custom properties (HEX or OKLCH) · Tailwind v4 · shadcn/ui · DTCG · JSON · Figma variables · Figma UI3 (Material) · re-importable Config · Download-all `.zip` | `src/engine/exports.js` |
 | Export settings | CSS units px / rem / em · color format HEX / OKLCH · per-system Include toggles | Settings → Export |

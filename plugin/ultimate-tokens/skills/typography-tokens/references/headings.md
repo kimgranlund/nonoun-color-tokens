@@ -1,7 +1,8 @@
 # Headings, display, and sub-headings
 
-Three heading voices do different jobs — pick by role, then size by step. Use the `.type-{voice}-{step}`
-utility class; the raw vars are listed where you need to compose.
+Display plus three heading-family voices (heading · sub-heading · kicker) do different jobs — pick by
+role, then size by step. Use the `.type-{voice}-{step}` utility class; the raw vars are listed where you
+need to compose.
 
 ## The heading voices
 
