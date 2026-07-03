@@ -11,9 +11,11 @@ const fails = [];
 const ok = (cond, msg) => { if (!cond) fails.push(msg); };
 
 const manifestPath = join(ROOT, "plugin/ultimate-tokens/.claude-plugin/plugin.json");
-const marketPath = join(ROOT, "plugin/.claude-plugin/marketplace.json");
+// the marketplace descriptor MUST sit at the repo root — that's where `/plugin marketplace add
+// owner/repo` looks; a nested one is invisible to the add command.
+const marketPath = join(ROOT, ".claude-plugin/marketplace.json");
 ok(existsSync(manifestPath), "plugin/ultimate-tokens/.claude-plugin/plugin.json exists");
-ok(existsSync(marketPath), "plugin/.claude-plugin/marketplace.json exists");
+ok(existsSync(marketPath), ".claude-plugin/marketplace.json exists at the REPO ROOT (discoverable by `marketplace add`)");
 
 let manifest, market;
 try { manifest = JSON.parse(readFileSync(manifestPath, "utf8")); } catch (e) { fails.push("plugin.json is not valid JSON: " + e.message); }
@@ -29,9 +31,9 @@ if (market) {
   const entry = (market.plugins || []).find((p) => p.name === "ultimate-tokens");
   ok(entry, "marketplace.json has the ultimate-tokens entry");
   if (entry) {
-    // the source path resolves to the plugin dir, and its manifest name matches
-    const srcDir = join(ROOT, "plugin", entry.source.replace(/^\.\//, ""));
-    ok(existsSync(join(srcDir, ".claude-plugin/plugin.json")), `marketplace source "${entry.source}" resolves to a plugin with a manifest`);
+    // source is relative to the marketplace root (the repo root); it must resolve to a plugin dir.
+    const srcDir = join(ROOT, entry.source.replace(/^\.\//, ""));
+    ok(existsSync(join(srcDir, ".claude-plugin/plugin.json")), `marketplace source "${entry.source}" resolves (from the repo root) to a plugin with a manifest`);
     if (manifest) ok(entry.name === manifest.name, "marketplace entry name matches the plugin.json name");
   }
 }
