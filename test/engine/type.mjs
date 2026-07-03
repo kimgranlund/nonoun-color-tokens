@@ -209,6 +209,26 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(dup.variables["Body/MD/size"].values["Base 2"] === mobile.categories.Body.MD.size, "the breakpoint renamed off \"Base\" keeps its own value (didn't overwrite the synthetic Base)");
 }
 
+// ── paragraphSpacing (per-role factor) + singleLineHeight (ui/mono only) — the schema-parity props ──
+{
+  const s = T.typeScale({ treatment: "product", bodyBase: 16 }).categories;
+  const near = (a, b) => Math.abs(a - b) <= 0.5;
+  ok(near(s.Display.MD.paragraphSpacing, Math.round(s.Display.MD.size * 0.7)), `Display paragraphSpacing = 0.7×size (got ${s.Display.MD.paragraphSpacing} for size ${s.Display.MD.size})`);
+  ok(near(s["Heading Editorial"].MD.paragraphSpacing, Math.round(s["Heading Editorial"].MD.size * 0.7)), "Heading paragraphSpacing = 0.7×size");
+  ok(near(s.Body.MD.paragraphSpacing, Math.round(s.Body.MD.size * 0.75)), `Body (prose) paragraphSpacing = 0.75×size (got ${s.Body.MD.paragraphSpacing})`);
+  ok(s.UI.MD.paragraphSpacing === s.UI.MD.size && s.Code.MD.paragraphSpacing === s.Code.MD.size, "ui/mono paragraphSpacing = 1.0×size");
+  // singleLineHeight: control-text intent — present on ui/mono voices only, equal to the size (leading 1.0).
+  ok(s.UI.MD.singleLineHeight === s.UI.MD.size && s.Code.SM.singleLineHeight === s.Code.SM.size && s["Heading Eyebrow"].MD.singleLineHeight === s["Heading Eyebrow"].MD.size, "singleLineHeight = size on UI/Code/Eyebrow");
+  ok(!("singleLineHeight" in s.Display.MD) && !("singleLineHeight" in s.Body.MD), "singleLineHeight is ABSENT on display/heading/prose voices");
+  // the emitters carry both: CSS -para (+ -line-single where present), DTCG composite, Figma-modes vars.
+  const css = T.typeTokensCSS(T.typeScale({ treatment: "product" }));
+  ok(css.includes("-para:") && css.includes("--type-ui-md-line-single:") && !css.includes("--type-display-md-line-single"), "CSS emits -para everywhere and -line-single only on ui/mono voices");
+  const dt = T.typeTokensDTCG(T.typeScale({ treatment: "product" })).typography;
+  ok(dt.UI.MD.$value.singleLineHeight && !dt.Display.MD.$value.singleLineHeight && /px$/.test(dt.Display.MD.$value.paragraphSpacing), "DTCG composite carries paragraphSpacing (px) + singleLineHeight on ui/mono");
+  const fv = T.typeTokensFigmaModes(T.typeScale({ treatment: "product" }), []).collections.Typography.variables;
+  ok(fv["Display/MD/paragraphSpacing"] && fv["UI/MD/singleLineHeight"] && !fv["Display/MD/singleLineHeight"], "Figma modes carry paragraphSpacing (all) + singleLineHeight (ui/mono only)");
+}
+
 // ── Figma "Font Primitives" companion collection: deduped family primitives + per-voice aliases (5.4c) ──
 {
   const base = T.typeScale({ treatment: "product", bodyBase: 16 });

@@ -9,7 +9,8 @@
 //   lineHeight     = round(size · leading)     (per-role leading; single-line = size)
 //   letterSpacing = round(size · trackingEm)  (optical: negative tightens big display, positive loosens UI)
 //   weight        = the role's weight
-//   paragraphSpacing = size, indent = 0       (schema defaults)
+//   paragraphSpacing = size × PARA_FACTOR[role] (0.7 display/heading · 0.75 prose · 1.0 ui/mono), indent = 0
+//   singleLineHeight = size (ui/mono roles only — the control-text intent next to the multi-line lineHeight)
 
 const round = (v, d = 0) => { const f = 10 ** d; return Math.round(v * f) / f; };
 
@@ -101,6 +102,10 @@ const niceStep = (v) => (v <= 16 ? 1 : v <= 24 ? 2 : v <= 48 ? 4 : v <= 96 ? 8 :
 const niceSize = (v) => { const s = niceStep(v); return Math.max(8, Math.round(v / s) * s); };
 const nextNice = (v) => { let n = v + 1; while (niceSize(n) <= v) n += 1; return niceSize(n); };
 
+// per-role paragraph-spacing factor (× the resolved size) — sourced from the reference Figma system:
+// display/heading paragraphs breathe at ~0.7×, prose at 0.75, ui/mono at 1.0 (a label's own height).
+const PARA_FACTOR = { display: 0.7, heading: 0.7, body: 0.75, ui: 1, mono: 1 };
+
 function buildCategory(name, p, factor, overrides, vp) {
   // per-VOICE shaping overrides (vp): ratio · weight · leading · tracking(em) REPLACE the treatment's for the
   // WHOLE voice (the "select a voice, retune it" lever — like a per-palette Hue). Absent ⇒ the treatment
@@ -130,8 +135,15 @@ function buildCategory(name, p, factor, overrides, vp) {
       letterSpacing: round(derived * trackingEm, 2), // tracking STAYS on the modular-scale size (ratified "size lever; tracking/weight unchanged")
       weight,
       textTransform: p.transform || "none",
-      paragraphSpacing: size, // paragraph rhythm intentionally tracks the resolved size (like lineHeight), not the derived scale
+      // paragraph rhythm tracks the resolved size at a PER-ROLE factor (sourced from the reference
+      // Figma system): big display/heading blocks breathe at ~0.7×size, prose at 0.75, ui/mono at
+      // 1.0 (a label's "paragraph" is just its own height). Indent is a constant 0 (schema parity).
+      paragraphSpacing: Math.round(size * (PARA_FACTOR[p.role] ?? 1)),
       paragraphIndent: 0,
+      // single-line height (= size, leading 1.0) — the CONTROL-text intent, distinct from the
+      // multi-line lineHeight above. Emitted only for the ui/mono roles (UI · Code · Eyebrow),
+      // where text sits in a box and the box owns the rhythm.
+      ...(p.role === "ui" || p.role === "mono" ? { singleLineHeight: size } : {}),
     };
   }
   return out;
@@ -176,7 +188,8 @@ function typeVarLines(scale, indent = "  ", unit = "px") {
   for (const [cName, steps] of Object.entries(scale.categories)) {
     for (const [sName, s] of Object.entries(steps)) {
       const p = `--type-${kebab(cName)}-${kebab(sName)}`;
-      out.push(`${indent}${p}-size: ${dimUnit(s.size, unit)}; ${p}-line: ${dimUnit(s.lineHeight, unit)}; ${p}-tracking: ${dimUnit(s.letterSpacing, unit)}; ${p}-weight: ${s.weight};`);
+      const single = s.singleLineHeight != null ? ` ${p}-line-single: ${dimUnit(s.singleLineHeight, unit)};` : "";
+      out.push(`${indent}${p}-size: ${dimUnit(s.size, unit)}; ${p}-line: ${dimUnit(s.lineHeight, unit)}; ${p}-tracking: ${dimUnit(s.letterSpacing, unit)}; ${p}-weight: ${s.weight}; ${p}-para: ${dimUnit(s.paragraphSpacing, unit)};${single}`);
     }
   }
   return out.join("\n");
@@ -222,7 +235,7 @@ export function typeTokensDTCG(scale, { unit = "px" } = {}) {
     for (const [sName, s] of Object.entries(steps)) {
       typography[cName][sName] = {
         $type: "typography",
-        $value: { fontFamily: scale.fonts[role], fontSize: dimUnit(s.size, unit), lineHeight: dimUnit(s.lineHeight, unit), letterSpacing: dimUnit(s.letterSpacing, unit), fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: dimUnit(s.paragraphSpacing, unit), paragraphIndent: dimUnit(s.paragraphIndent, unit) },
+        $value: { fontFamily: scale.fonts[role], fontSize: dimUnit(s.size, unit), lineHeight: dimUnit(s.lineHeight, unit), letterSpacing: dimUnit(s.letterSpacing, unit), fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: dimUnit(s.paragraphSpacing, unit), paragraphIndent: dimUnit(s.paragraphIndent, unit), ...(s.singleLineHeight != null ? { singleLineHeight: dimUnit(s.singleLineHeight, unit) } : {}) },
       };
     }
   }
@@ -237,7 +250,7 @@ export function typeTokensDTCG(scale, { unit = "px" } = {}) {
 // lineHeight, letterSpacing, weight (weight too, since Figma variables are numbers). `modes` = the SAME
 // shape `_typeModeScales()` returns: [{ name, scale }] (minWidth, if present, is ignored — Figma modes are
 // named, not media-queried). IDENTITY: `modes = []` ⇒ a single "Base" mode whose values equal the base.
-const TYPE_FIGMA_PROPS = ["size", "lineHeight", "letterSpacing", "weight"];
+const TYPE_FIGMA_PROPS = ["size", "lineHeight", "letterSpacing", "weight", "paragraphSpacing"];
 // disambiguateModeNames — Figma requires DISTINCT mode names per collection. "Base" is the synthetic base
 // layer, so a breakpoint named "Base" (or any duplicate of another breakpoint) is renamed ("Mobile 2", …)
 // before it would silently shadow another mode / emit modes:["Base","Base"] (which Figma rejects on import).
@@ -264,6 +277,12 @@ export function typeTokensFigmaModes(baseScale, modes = []) {
           const key = `${cName}/${sName}/${prop}`;
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
           variables[key].values[mode] = s[prop];
+        }
+        // singleLineHeight exists only on the ui/mono voices (UI · Code · Eyebrow) — emit where present.
+        if (s.singleLineHeight != null) {
+          const key = `${cName}/${sName}/singleLineHeight`;
+          if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
+          variables[key].values[mode] = s.singleLineHeight;
         }
       }
     }
