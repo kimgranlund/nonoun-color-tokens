@@ -32,7 +32,9 @@ Canonical specs + rubrics: `.claude/docs/spec/` (e.g. `.claude/docs/spec/data/ro
 - `figma/` — the plugin: `figma/binder/figma-semantic-binder/code.js` mirrors `semanticRoles` for the
   sandbox (parity-gated). `figma/plugin/ui.html` is a generated bundle of the whole app.
 - `test/` — `engine/*` verifiers · `ui/headless-boot.mjs` (the shim run, lettered groups) · `figma/` ·
-  `mcp/` · `smoke/smoke.mjs`. `scripts/` — the generators. `mcp/` — the MCP server.
+  `mcp/` · `plugin/` (skill↔role-table parity) · `smoke/smoke.mjs`. `scripts/` — the generators.
+  `mcp/` — the MCP server. `plugin/ultimate-tokens/` — the CONSUMER-side Claude plugin: skills that
+  teach agents to use exported kits in THEIR projects (parity-gated against the engine).
 - `.claude/docs/spec/` — canonical specs, rubrics, role-table answer key. `.claude/docs/marketing/` — the
   marketing corpus (voice platform · pinned fact sheet · store copy · launch kit); author via the
   `marketing-manager` agent + `color-tokens-brand-voice` skill. `.claude/docs/other/` — **PRIVATE** (see below).
