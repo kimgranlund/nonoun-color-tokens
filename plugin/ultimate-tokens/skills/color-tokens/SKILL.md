@@ -1,14 +1,15 @@
 ---
 name: color-tokens
 description: >
-  Use when building or styling ANY UI in a project that carries an Ultimate Tokens export — picking
-  the color for a button, control, text, card, modal, nav, toast, or state ("which color/token should
-  this use", "style this with our design tokens", "wire the theme", "add hover/disabled states",
-  "make this work in dark mode"). The consumption guide for the 59-role semantic layer: how to find
-  and bind the project's exported palettes, the pairing laws that keep every foreground on a legal
-  background, the state families, and per-surface role maps for interactive elements, text,
-  containers, feedback, and navigation. Never guess a hex and never use a raw stop — this skill
-  names the semantic role for every job.
+  Use when choosing the COLOR of any UI in a project that carries an Ultimate Tokens export — the
+  color/hue/palette/role for a button, control, text, card, modal, nav, toast, border, or state
+  ("which color should this use", "what token for this background/text", "add hover/disabled colors",
+  "wire the color theme", "make the colors work in dark mode", "why is this the wrong color"). The
+  consumption guide for the 59-role semantic COLOR layer: how to find and bind the project's exported
+  palettes, the pairing laws that keep every foreground on a legal background, the state families, and
+  per-surface role maps for interactive elements, text, containers, feedback, and navigation. Never
+  guess a hex and never use a raw stop — this names the semantic role for every job. Scope is COLOR
+  only (not font/size/weight, not radius/spacing/density — those are the sibling token skills).
 ---
 
 # Using Ultimate Tokens color roles
@@ -22,9 +23,11 @@ properties. Your job is never to invent a color — it is to pick the right **ro
 1. **Find the export.** A CSS file whose `:root` sets `color-scheme: light dark` and defines
    `--c-*` variables via `light-dark(...)` (often `palette.css` / `tokens.css`; a DTCG
    `*.tokens.json` may sit beside it). If none exists, stop and ask — do not fabricate tokens.
+   *This guide is for the `--c-*` CSS export;* the Tailwind (`--color-*`) and shadcn exports use
+   different grammars — the role SEMANTICS below still hold, but the variable names differ.
 2. **Enumerate the palettes.** Every `--c-<slug>-050` line marks a palette. The default kit ships
-   eight: `neutral · primary · secondary · tertiary · info · success · warning · danger` — but kits
-   vary; read what's actually there.
+   a neutral plus a brand accent and the four intents (currently eight palettes) — but kits vary;
+   read what's actually there rather than assuming the default set.
 3. **Classify them.** The **chrome palette** (usually `neutral`, the lowest-chroma one) drives
    backgrounds, surfaces, text, and outlines app-wide. The **brand accent** (usually `primary`)
    drives CTAs, links, focus, selection. **Intent palettes** (`info/success/warning/danger`) are
@@ -40,9 +43,10 @@ properties. Your job is never to invent a color — it is to pick the right **ro
    `--c-{p}` fills (and their hover/active); the `-on-surface` family only on that same palette's
    background/surface/container tiers. Never cross palettes mid-pair (text `--c-neutral-on-surface`
    on a `--c-success-container` fill is a violation — use `--c-success-on-surface`).
-3. **States ship as families.** `-hover · -active · -disabled` exist for the accent, both `on-*`
-   sets, both outlines, and containers. Use them verbatim — never synthesize a state with
-   `opacity`, `color-mix()`, or a raw stop. If a state role exists, hand-rolling it is a defect.
+3. **States ship as families.** Wherever a reference lists a `-hover` / `-active` / `-disabled`
+   sibling, use it verbatim — never synthesize a state with `opacity`, `color-mix()`, or a raw
+   stop. If a state role exists, hand-rolling it is a defect. (Not every role has states — the
+   references are the exact map; don't assume a sibling that isn't listed.)
 4. **The scheme is baked in.** Every role flips via `light-dark()` — write each color ONCE, no
    `@media (prefers-color-scheme)` per-color overrides, no `.dark` class swaps. To force a subtree
    into one scheme (a preview pane, an always-dark hero), set `color-scheme: light` / `dark` on it —

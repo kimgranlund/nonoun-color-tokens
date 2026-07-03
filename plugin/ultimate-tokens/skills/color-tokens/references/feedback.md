@@ -23,9 +23,8 @@ surface tier. **Do not "fix" white-on-warning text** — on-colors are fixed lig
 
 The inverse pair, so they read on top of anything:
 bg `--c-neutral-inverse-surface` · text `--c-neutral-inverse-on-surface` · the action link inside a
-toast: the accent's **bright/dim mirror trick** is unnecessary — use bare `--c-{p}` only if it
-clears the inverse bg; otherwise `--c-neutral-inverse-on-surface` underlined. An intent stripe/icon
-on the toast: bare `--c-{intent}`.
+toast: use bare `--c-{p}` only if it clears the inverse background; otherwise
+`--c-neutral-inverse-on-surface` underlined. An intent stripe/icon on the toast: bare `--c-{intent}`.
 
 ## Overlays & scrims — the seven-strength ladder
 

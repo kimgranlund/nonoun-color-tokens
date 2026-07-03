@@ -45,11 +45,17 @@ for (const f of files) {
   }
 }
 
-// belt-and-braces: the count the skill claims must match the canon.
+// belt-and-braces: the counts the skill claims must match the canon (role count + default-palette
+// count — both are derived facts the token grep can't see, so they'd fossilize silently otherwise).
+const NUM_WORD = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
 for (const f of files) {
   const text = readFileSync(join(SKILL_DIR, f), "utf8");
-  for (const m of text.matchAll(/(\d+)[-\s]+(?:semantic[-\s]+)?roles?\b/gi)) {
+  for (const m of text.matchAll(/(\d+)[-\s]+(?:semantic[-\s]+)?roles?\b/gi))
     if (m[1] !== String(rt.rolesPerPalette)) err(f, m[0], `role count drift — canon is ${rt.rolesPerPalette}`);
+  // "<word> palettes" (e.g. "eight palettes") must equal the default kit size.
+  for (const m of text.matchAll(/\b([a-z]+)\s+palettes\b/gi)) {
+    const n = NUM_WORD[m[1].toLowerCase()];
+    if (n !== undefined && n !== PALETTES.size) err(f, m[0], `default-palette count drift — canon is ${PALETTES.size}`);
   }
 }
 
