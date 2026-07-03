@@ -8,6 +8,107 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 
 ## [Unreleased]
 
+### 2026-07-03
+
+#### Added
+- **Ultimate Tokens ships as an installable Claude plugin** (`plugin/ultimate-tokens/`). Three
+  *consumption* skills teach a coding agent to apply an exported kit inside its own project —
+  `color-tokens` (the 59 semantic roles), `typography-tokens` (the seven-voice scale, role × level), and
+  `geometry-tokens` (the two-tier dimensional system) — alongside a **`token-integrator`** entry-point
+  agent that binds to the project's real exported variables and, for large migrations, orchestrates scoped
+  planning → execution → verification sub-agents (the verifier a separate seat from the executors). Install
+  with `/plugin marketplace add kimgranlund/nonoun-color-tokens`. Every skill is parity-gated against the
+  product engines in `npm test`, so it cannot drift from the tokens it documents. (#186, #187, #188, #192,
+  #193, #194, #196)
+- **Configurable token naming scheme across all three systems.** Colour/type/geometry exports emit the
+  default (`--c-*` / `--type-*` / `--size-*`), a **Material 3-flavoured** scheme (`--md-sys-color-*` /
+  `--md-sys-typescale-*` / `--md-sys-*`), or a **custom `--{brand}-*`** prefix — chosen in Settings and
+  unified across colour, type, and geometry. (#189, #191)
+- **Geometry container tier** — semantic inset/gap tokens plus stroke/border tokens beside the existing
+  control geometry, so spacing and dividers are tokenised too. (#183)
+- **Responsive geometry (`rampContrast`)** — the dimensional ramp compresses toward small screens,
+  mirroring the type breakpoint modes. (#182)
+- **Per-role paragraph spacing + single-line height** — every voice carries its own `paragraphSpacing`;
+  the box-text voices (UI · Code · Kicker) also carry `singleLineHeight` (leading 1.0) for non-wrapping
+  control text. (#184)
+- **Per-voice weight style-names** for non-variable font families (e.g. "Condensed Black Italic"), emitted
+  to the Figma Font Primitives collection. (#185)
+
+#### Changed
+- **Type roles decoupled from size and renamed** to drop the size-implying names: the seven voices are now
+  **Display · Heading · Sub-heading · Kicker · Body · UI · Code** (was Heading-Editorial · Heading-Context ·
+  Heading-Eyebrow). A voice is the text's *function*; the step is its *hierarchy level*, from which the size
+  is derived — the type-scale law now states this explicitly, so `display` is never reached for merely
+  "big text." (#195, #197)
+- **Radius ladder aligned to Material 3's shape-corner scale** — `none/xs/sm/md/lg/xl/full =
+  0/4/8/12/16/28/9999`, fixed across the geometry treatments. (#190)
+
+### 2026-07-02
+
+#### Added
+- **Marketing corpus + `marketing-manager` agent + brand-voice skill** — a voice platform, a pinned fact
+  sheet, complete schema-keyed store copy, and a launch/social kit under `.claude/docs/marketing/`,
+  authored and fact-checked through a dedicated agent and brand-voice skill. (#173, #175)
+- **`store-drift-check`** — audits the live Lemon Squeezy store against the corpus, with per-product
+  description probes. (#177, #178)
+- **Standard breakpoint set for Type & Geometry** plus a Figma **Font Primitives** collection export.
+  (#180, #181)
+- **Brand icon kit + social share card** for the live demo site. (#171)
+- **Lemon Squeezy knowledge skills** (`lemon-squeezy-schemas`, `lemon-squeezy-api`). (#174)
+
+#### Changed
+- **Docs tree moved under `.claude/docs/`**, with the agent/skill records serviced to match. (#172)
+- **Email-bound licensing direction recorded** (decision record + corpus pins). (#176)
+
+### 2026-07-01
+
+#### Added
+- **Export settings group completed** — a Colours CSS-format setting (**HEX / OKLCH**) beside
+  Typography/Geometry, a settings-driven **CSS unit format** (px/rem/em) for type + geometry, and the
+  Format dropdown grouped by system. (#167, #168, #169)
+- **shadcn theme carries the brand fonts + a geometry-derived `--radius`.** (#170)
+- **Per-size Height editing for Geometry** (as in Typography), plus a calendar glyph and solid carets.
+  (#163)
+
+#### Changed
+- **Font sizes quantise to a nice-number ladder** (always on). (#166)
+
+#### Fixed
+- **Range-slider drag made robust for the Figma plugin** — pointer-capture + measured-track mapping, driven
+  off `window` so a far drag no longer cuts off. (#164, #165)
+- **The Figma apply-gate modal closes with real completion feedback.** (#161)
+- **The weakest scrim step is zero-padded** (`500-50 → 500-050`, ADR-006). (#162)
+
+### 2026-06-30
+
+#### Added
+- **Monetization gates wired** — `maxSets` (blocks a new kit past the plan cap), `proExport` (DTCG /
+  Tailwind / shadcn are Pro), and `advancedTreatments` (non-default treatments are Pro). (#138, #139, #140)
+- **Lemon Squeezy product/variant IDs wired** — checkout deep-links + a product-id pin. (#159)
+- **Native breakpoint-mode apply for Type & Geometry in Figma** (Phase 5.4b), built on a pure apply-plan
+  for breakpoint-mode variables. (#137, #154)
+- **Per-voice typography tuning** — select a voice and reshape it (Scale select-and-edit), with an editable
+  font combobox per role for custom families. (#149, #151)
+- **Two more editor preview artifacts** — a native slider and form controls. (#148)
+- **Hosted Brand-Kit MCP — spec & plan (Cloudflare).** Account-based (magic-link, one OAuth endpoint); a
+  transport-agnostic `brand-kit-core` extracted for hosted-MCP parity (Phase A); and a normative storage &
+  offline-first sync spec (lazy-anonymous, 90-day retention). (#141, #142, #143, #144, #145)
+
+#### Changed
+- **Editor chrome polish** — Roles click-to-copy, Global toggles → segmented controls, export
+  consolidation, Story rhythm, and Settings labels. (#146, #147)
+
+#### Fixed
+- **Figma apply respects the export-system toggles** (never writes a toggled-off system) and is
+  **provenance-guarded** (never touches a user's own collection). (#155, #160)
+- **The inspector specimen rows stack** in the narrow right pane. (#150)
+- **Example-gallery collapse restored on `main`** (test + style + bundle). (#156)
+
+### 2026-06-29
+
+#### Added
+- **Live seat usage in Account + boot re-validation.** (#136)
+
 ### 2026-06-28
 
 #### Changed

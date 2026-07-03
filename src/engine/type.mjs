@@ -1,8 +1,9 @@
 // type.mjs — the perceptual TYPOGRAPHY engine: the type analog of the color engine. A few parameters
-// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Mirrors the structure of the target
-// schema (.claude/docs/spec/typography/typography.tokens.json): four role "voices" — Display · Heading · Body
-// (Content) · UI — each a size ramp whose every step carries size, line-height, letter-spacing, weight,
-// and paragraph spacing, all DERIVED from the treatment's params (no hand-authored magic numbers).
+// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Seven role "voices" —
+// Display · Heading · Sub-heading · Kicker · Body · UI · Code — each a size ramp whose every step
+// carries size, line-height, letter-spacing, weight, and paragraph spacing, all DERIVED from the
+// treatment's params (no hand-authored magic numbers). (The DTCG shape follows the Figma-variable
+// export at .claude/docs/spec/typography/typography.tokens.json, a frozen snapshot kept for reference.)
 //
 // The system relationships (see .claude/docs/spec/typography/README.md):
 //   size          = base · ratio^n           (a modular scale; n = the step's distance from the base)
@@ -36,26 +37,30 @@ export const TYPE_RATIOS = [
 const cat = (role, base, ratio, leading, weight, trackingEm, steps = STEPS_5, transform = "none") => ({ role, base, ratio, leading, weight, trackingEm, steps, transform });
 
 // make7 — the SEVEN named type ROLES (each a FUNCTION, not a size register — the taxonomy in
-// .claude/docs/spec/typography): Display · Heading · Kicker · Eyebrow · Body · UI · Code. A role
+// .claude/docs/spec/typography): Display · Heading · Sub-heading · Kicker · Body · UI · Code. A role
 // carries CHARACTER (weight, tracking, leading, case, font cut) that travels with it across every
 // LEVEL; the level (the step) is chosen by hierarchy depth and the size is DERIVED from it (base ×
-// ratio^level), never picked to hit a number. Kicker (was "Heading Context") is the section label /
-// kicker that sits ABOVE a heading; Eyebrow (was "Heading Eyebrow") is the smallest mono overline —
-// neither is a heading, which is why they no longer carry the "Heading" prefix. Shared STRUCTURE
-// across treatments; each treatment passes its fonts + a few character knobs. Eyebrow + Code ride the
-// MONO role.
+// ratio^level), never picked to hit a number. Sub-heading is the secondary heading below Heading;
+// Kicker is the smallest overline / section label that sits ABOVE a heading. Shared STRUCTURE across
+// treatments; each treatment passes its fonts + a few character knobs. Kicker + Code ride the MONO role.
+//
+// NOTE (character vs name): this is a RENAME (Sub-heading was "Kicker"; Kicker was "Eyebrow") that
+// preserves each role's tuned CHARACTER — so Sub-heading currently reads as a wide-tracked uppercase
+// label and Kicker rides the mono role. If those characters should follow the new names (a sentence-case
+// Sub-heading, a sans Kicker), retune the knobs below — that's a deliberate follow-up, not this rename.
+// The internal knob prefixes (`hc-`, `eye-`) still feed Sub-heading and Kicker respectively.
 //
 // CASE is a per-treatment decision, not a blanket rule. The Display role defaults to TITLE/SENTENCE case
 // (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. The two genuine
-// "caps roles" are Kicker (the section label) and Eyebrow (the mono overline); those stay uppercase and
-// track POSITIVE so small caps open up. Display tracks NEGATIVE — big type tightens. Leadings sit inside
-// the bands: display 1.05–1.2, heading 1.05–1.3, prose 1.45–1.65, UI 1.25–1.5, mono ~1.5.
+// "caps roles" are Sub-heading and Kicker; those stay uppercase and track POSITIVE so small caps open up.
+// Display tracks NEGATIVE — big type tightens. Leadings sit inside the bands: display 1.05–1.2,
+// heading 1.05–1.3, prose 1.45–1.65, UI 1.25–1.5, mono ~1.5.
 function make7(o = {}) {
   return {
     "Display": cat("display", o.dBase ?? 60, o.dRatio ?? 1.25, o.dLead ?? 1.08, o.dWeight ?? 700, o.dTrack ?? -0.02, STEPS_5, o.dTransform ?? "none"),
     "Heading": cat("heading", 28, o.heRatio ?? 1.25, o.heLead ?? 1.2, o.heWeight ?? 700, o.heTrack ?? -0.005, STEPS_5, "none"),
-    "Kicker": cat("heading", 26, o.hcRatio ?? 1.2, o.hcLead ?? 1.2, o.hcWeight ?? 600, o.hcTrack ?? 0.1, STEPS_5, "uppercase"),
-    "Eyebrow": cat("mono", 13, 1.15, o.eyeLead ?? 1.4, o.eyeWeight ?? 600, o.eyeTrack ?? 0.16, STEPS_5, "uppercase"),
+    "Sub-heading": cat("heading", 26, o.hcRatio ?? 1.2, o.hcLead ?? 1.2, o.hcWeight ?? 600, o.hcTrack ?? 0.1, STEPS_5, "uppercase"),
+    "Kicker": cat("mono", 13, 1.15, o.eyeLead ?? 1.4, o.eyeWeight ?? 600, o.eyeTrack ?? 0.16, STEPS_5, "uppercase"),
     "Body": cat("body", o.bBase ?? 16, o.bRatio ?? 1.2, o.bLead ?? 1.55, o.bWeight ?? 440, 0, STEPS_5, "none"),
     "UI": cat("ui", 14, 1.125, o.uiLead ?? 1.4, o.uiWeight ?? 480, o.uiTrack ?? 0.006, STEPS_UI, "none"),
     "Code": cat("mono", 13, 1.125, 1.5, o.codeWeight ?? 460, o.codeTrack ?? 0, STEPS_UI, "none"),
@@ -146,7 +151,7 @@ function buildCategory(name, p, factor, overrides, vp) {
       paragraphSpacing: Math.round(size * (PARA_FACTOR[p.role] ?? 1)),
       paragraphIndent: 0,
       // single-line height (= size, leading 1.0) — the CONTROL-text intent, distinct from the
-      // multi-line lineHeight above. Emitted only for the ui/mono roles (UI · Code · Eyebrow),
+      // multi-line lineHeight above. Emitted only for the ui/mono roles (UI · Code · Kicker),
       // where text sits in a box and the box owns the rhythm.
       ...(p.role === "ui" || p.role === "mono" ? { singleLineHeight: size } : {}),
     };
@@ -293,7 +298,7 @@ export function typeTokensFigmaModes(baseScale, modes = []) {
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
           variables[key].values[mode] = s[prop];
         }
-        // singleLineHeight exists only on the ui/mono voices (UI · Code · Eyebrow) — emit where present.
+        // singleLineHeight exists only on the ui/mono voices (UI · Code · Kicker) — emit where present.
         if (s.singleLineHeight != null) {
           const key = `${cName}/${sName}/singleLineHeight`;
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };

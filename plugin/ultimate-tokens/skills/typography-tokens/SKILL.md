@@ -3,7 +3,7 @@ name: typography-tokens
 description: >
   Use when setting the TYPE of any UI in a project that carries an Ultimate Tokens export — the
   font/size/weight/leading/tracking for a heading, body copy, label, button, caption, code, or
-  eyebrow ("what type token for this", "which voice/step should this text use", "size this heading",
+  kicker ("what type token for this", "which voice/step should this text use", "size this heading",
   "make the type responsive", "why is this text the wrong size/weight", "wire the fonts"). The
   consumption guide for the seven-role type scale (role=function × level=hierarchy-depth, size
   derived): how to find and bind the exported `--type-*` /
@@ -50,8 +50,8 @@ larger step because you want line-height 26, is the mistake this split exists to
 |---|---|---|---|
 | **display** | display | hero/marketing headlines, the one big statement on a view | XS–XL |
 | **heading** | heading | section & content headings (h1–h4), card titles, dialog titles | XS–XL |
-| **kicker** | heading | kickers / section labels above a heading — wide-tracked, usually uppercase | XS–XL |
-| **eyebrow** | mono | the smallest overline / metadata label — mono, uppercase, tracked | XS–XL |
+| **sub-heading** | heading | sub-headings / section labels above a heading — wide-tracked, usually uppercase | XS–XL |
+| **kicker** | mono | the smallest overline / metadata label — mono, uppercase, tracked | XS–XL |
 | **body** | body | running prose, paragraphs, descriptions, long-form reading | XS–XL |
 | **ui** | ui | interface text: buttons, labels, inputs, menus, table cells, captions, badges | 3XS–2XL |
 | **code** | mono | code, tabular figures, keyboard shortcuts, technical values | 3XS–2XL |
@@ -64,7 +64,7 @@ button label is `ui`, not `body`. A paragraph is `body`, not `ui`.
 1. **Role+level, not px, not a font stack.** If a size or family isn't a `--type-*` var (or a
    `.type-*` class), it doesn't belong in UI code. No `font-size: 14px`, no `font-family: Inter`.
 2. **Role = function, level = hierarchy depth; size is derived.** Choose the voice from what the text
-   *is* (a heading, a kicker, a label), then the step from its rank in the hierarchy — the size falls
+   *is* (a heading, a sub-heading, a label), then the step from its rank in the hierarchy — the size falls
    out of the level. Never reach for `display` just to get big text, a larger step just to get a
    target line-height, or `ui` just to get small headings. If two elements share a role, the more
    prominent one takes the higher level; if a size feels wrong, it's the wrong *level*, not a reason
@@ -72,12 +72,12 @@ button label is `ui`, not `body`. A paragraph is `body`, not `ui`.
 3. **`line` and `para` come with the size.** Line-height (`-line`) and paragraph spacing (`-para`)
    are derived per step — use them; don't set your own `line-height: 1.5` or `margin-bottom`. For
    single-line control text (a button, an input value, an overline) use `-line-single` (leading
-   1.0), which exists on the box-text voices — **UI, Code, and Heading-Eyebrow** (the `ui`/`mono`
+   1.0), which exists on the box-text voices — **UI, Code, and Heading-Kicker** (the `ui`/`mono`
    roles); for multi-line text use `-line`.
 4. **Tracking is baked and optical.** `-tracking` is tuned per step (tight on display, open on
-   eyebrow) — apply it; never add your own `letter-spacing`.
+   kicker) — apply it; never add your own `letter-spacing`.
 5. **Weight is the voice's, and case is the treatment's.** Use `-weight`; don't bold a voice by
-   hand. `kicker` and `eyebrow` are uppercase by treatment — don't `text-transform`
+   hand. `sub-heading` and `kicker` are uppercase by treatment — don't `text-transform`
    them yourself, and don't uppercase a voice that isn't.
 6. **Responsive is per-breakpoint modes, not `clamp()` or `vw`.** If the kit exports breakpoint
    modes, the `--type-*` vars are re-declared inside `@media (min-width: …)` blocks — the same class
@@ -88,7 +88,7 @@ button label is `ui`, not `body`. A paragraph is `body`, not `ui`.
 
 | Setting type on… | Reference |
 |---|---|
-| Headings h1–h6, kickers, eyebrows, display, the heading↔body pairing | [`references/headings.md`](references/headings.md) |
+| Headings h1–h6, sub-headings, kickers, display, the heading↔body pairing | [`references/headings.md`](references/headings.md) |
 | Body prose, lead paragraphs, captions, lists, links, blockquotes, inline code | [`references/prose.md`](references/prose.md) |
 | Buttons, inputs, labels, menus, tabs, table cells, badges, tooltips, code | [`references/interface.md`](references/interface.md) |
 | Breakpoint modes, single-line vs multi-line, fluid-type anti-pattern, fallback fonts | [`references/responsive.md`](references/responsive.md) |

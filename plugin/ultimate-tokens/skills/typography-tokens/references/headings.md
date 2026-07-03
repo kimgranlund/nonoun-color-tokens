@@ -1,4 +1,4 @@
-# Headings, display, and kickers
+# Headings, display, and sub-headings
 
 Three heading voices do different jobs — pick by role, then size by step. Use the `.type-{voice}-{step}`
 utility class; the raw vars are listed where you need to compose.
@@ -9,8 +9,8 @@ utility class; the raw vars are listed where you need to compose.
 |---|---|---|
 | **display** | the single hero statement on a landing/marketing view — not a document heading | as-set (mixed) |
 | **heading** | real document headings: page title, section headings, card/dialog titles | as-set |
-| **kicker** | a kicker / section label sitting ABOVE a heading (e.g. "PRICING") | uppercase (treatment) |
-| **eyebrow** | the smallest overline / metadata tag — mono, tracked | uppercase (treatment) |
+| **sub-heading** | a sub-heading / section label sitting ABOVE a heading (e.g. "PRICING") | uppercase (treatment) |
+| **kicker** | the smallest overline / metadata tag — mono, tracked | uppercase (treatment) |
 
 ## Mapping to an HTML heading ladder
 
@@ -24,8 +24,8 @@ There is no fixed voice-per-`<h1>`; map by size and importance. A common app map
 | subsection (h3) | `.type-heading-md` |
 | card / group title (h4) | `.type-heading-sm` |
 | minor label (h5/h6) | `.type-heading-xs` |
-| kicker above any of the above | `.type-kicker-sm` (or `-xs`) |
-| eyebrow / metadata tag | `.type-eyebrow-xs` — a single-line overline: use `--type-eyebrow-{step}-line-single` (it rides the `mono` role, so it has one; leading 1.0) |
+| sub-heading above any of the above | `.type-sub-heading-sm` (or `-xs`) |
+| kicker / metadata tag | `.type-kicker-xs` — a single-line overline: use `--type-kicker-{step}-line-single` (it rides the `mono` role, so it has one; leading 1.0) |
 
 Keep the ladder monotonic — don't skip so far that h2 and h3 look identical, and don't jump the
 display voice into a document where an editorial heading belongs.
@@ -45,7 +45,7 @@ same ink as body (see color-tokens); don't dim it unless it's genuinely secondar
 
 - Don't use `display` for long text — it's tuned for one short line (tight leading, negative
   tracking). Multi-line big text is `heading`.
-- Don't `text-transform: uppercase` a heading — `kicker`/`eyebrow` are already
+- Don't `text-transform: uppercase` a heading — `sub-heading`/`kicker` are already
   uppercase by treatment; the others are intentionally not.
 - Don't hand-set `letter-spacing`/`line-height` on a heading — `-tracking` and `-line` are tuned per
   step.

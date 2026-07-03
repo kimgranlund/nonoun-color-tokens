@@ -365,14 +365,14 @@ const SCHEME_NEXT = { system: "light", light: "dark", dark: "system" };
 // Per-treatment specimen copy — each treatment carries BESPOKE placeholder text aligned to its concept
 // (lifestyle app · luxury maison · long-form journalism · ops dashboard · gig poster), so the type
 // previews read like the world they're for instead of one shared sports demo. `para` is the Body-XL
-// long-form filler. Context/Eyebrow render uppercase via the engine's textTransform; strings stay
+// long-form filler. Sub-heading/Kicker render uppercase via the engine's textTransform; strings stay
 // title-case here (except Brutalist's already-shouting UI line).
 const TYPE_SPECIMENS = {
   product: {
     "Display": "Make today count",
     "Heading": "Your week, at a glance",
-    "Kicker": "This Morning",
-    "Eyebrow": "Daily Brief",
+    "Sub-heading": "This Morning",
+    "Kicker": "Daily Brief",
     "Body": "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go.",
     "UI": "Today · 4 of 6 done · 2 left",
     "Code": "GET /v1/habits/today → 200",
@@ -381,8 +381,8 @@ const TYPE_SPECIMENS = {
   luxury: {
     "Display": "The Maison Collection",
     "Heading": "An invitation to slow down",
-    "Kicker": "The Atelier",
-    "Eyebrow": "Private Reserve",
+    "Sub-heading": "The Atelier",
+    "Kicker": "Private Reserve",
     "Body": "Crafted in limited number, each piece is finished by hand in our atelier and made to be kept for a lifetime.",
     "UI": "Reserve · Suite 9 · 2 nights",
     "Code": "RES · 2026-09-14 · SUITE-09",
@@ -391,8 +391,8 @@ const TYPE_SPECIMENS = {
   editorial: {
     "Display": "The long road back",
     "Heading": "Notes from a vanishing coastline",
-    "Kicker": "Field Report",
-    "Eyebrow": "Dispatch",
+    "Sub-heading": "Field Report",
+    "Kicker": "Dispatch",
     "Body": "For thirty years she walked these shores at dawn. What she saw — and what she could no longer find — became the story.",
     "UI": "Issue 47 · 12 min read · Share",
     "Code": "By J. Okonkwo · Oct 2026",
@@ -401,8 +401,8 @@ const TYPE_SPECIMENS = {
   technical: {
     "Display": "99.98% uptime",
     "Heading": "Cluster health overview",
-    "Kicker": "Live Metrics",
-    "Eyebrow": "System Status",
+    "Sub-heading": "Live Metrics",
+    "Kicker": "System Status",
     "Body": "All regions reporting nominal. Latency held under 80ms across the last 24 hours of production traffic.",
     "UI": "p99 78ms · 1.2k rps · 0 err",
     "Code": "$ kubectl get pods -n prod",
@@ -411,8 +411,8 @@ const TYPE_SPECIMENS = {
   statement: {
     "Display": "After Hours",
     "Heading": "Three nights only",
-    "Kicker": "Main Stage",
-    "Eyebrow": "Doors 9PM",
+    "Sub-heading": "Main Stage",
+    "Kicker": "Doors 9PM",
     "Body": "No openers. No encore. One set, start to finish, loud enough to feel in your chest.",
     "UI": "SOLD OUT · WAITLIST OPEN",
     "Code": "FRI 02 · WAREHOUSE 9 · DTLA",
@@ -1798,7 +1798,7 @@ class HctApp extends HTMLElement {
   typeAnalysisCards(view) {
     const scale = this._activeTypeScale();
     const card = (label, body) => h("div", { class: "an-card" }, h("div", { class: "an-label" }, label), body);
-    const SHORT = { "Display": "Disp", "Heading": "Head", "Kicker": "Kick", "Eyebrow": "Eye", "Body": "Body", "UI": "UI", "Code": "Code" };
+    const SHORT = { "Display": "Disp", "Heading": "Head", "Sub-heading": "Sub", "Kicker": "Kick", "Body": "Body", "UI": "UI", "Code": "Code" };
     const series = Object.keys(scale.categories)
       .map((c) => ({ cat: c, short: SHORT[c] || c, steps: Object.entries(scale.categories[c] || {}).map(([name, s]) => ({ name, ...s })) }))
       .filter((x) => x.steps.length);

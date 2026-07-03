@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 1.48 — 2026-07-03 — Type roles decoupled from size: the seven voices renamed (#195, #197)
+
+The canonical type taxonomy drops the size-implying names. The seven voices are now **Display · Heading ·
+Sub-heading · Kicker · Body · UI · Code** (was Display · Heading-Editorial · Heading-Context ·
+Heading-Eyebrow · Body · UI · Code). The rename lands in two steps: #195 collapsed `Heading-Editorial →
+Heading`, `Heading-Context → Kicker`, `Heading-Eyebrow → Eyebrow` and fixed the reasoning law; #197 then
+renamed `Kicker → Sub-heading` and `Eyebrow → Kicker`, so the wide-tracked uppercase caps voice reads as
+**Sub-heading** and the smallest mono overline reads as **Kicker**. Character is preserved across the
+rename — Sub-heading is the heading-role uppercase caps voice; Kicker rides the `mono` role — and the
+internal knob prefixes are unchanged (`he-` / `hc-` / `eye-` still feed Heading / Sub-heading / Kicker).
+The **law** is now explicit: *a voice is the text's function; the step is its hierarchy level, from which
+the size is derived* — so `display` is never chosen merely to get big text, nor a larger step merely to hit
+a target line-height. `make7()` (`src/engine/type.mjs`), `docs/spec/typography/README.md`, the `type-scale`
+skill + the `typography-tokens` consumption skill, and the engine/headless/parity tests all move in
+lockstep; `voice-parity` gates the voice names, steps, props, and count. The frozen Figma-export snapshot
+at `typography.tokens.json` keeps its original keys (it mirrors real Figma variable IDs, not the live
+taxonomy).
+
 ## 1.47 — 2026-06-28 — OKLCH-native hue model + chroma-aware OKLCH↔CAM16 inverse (#116, #117)
 
 The per-palette `hue` is now an **OKLCH hue** by default: the doc-level `hueSpace` default flips

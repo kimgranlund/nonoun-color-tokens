@@ -15,22 +15,22 @@ automatically at each breakpoint: you write `.type-body-md` once and it grows wi
 
 ## Single-line vs multi-line height
 
-The `mono`/`ui`-role voices — **UI, Code, and Heading-Eyebrow** — carry TWO leadings per step:
+The `mono`/`ui`-role voices — **UI, Code, and Heading-Kicker** — carry TWO leadings per step:
 
 - `--type-{voice}-{step}-line` — multi-line leading (text that wraps: helper text, tooltips, prose).
 - `--type-{voice}-{step}-line-single` — single-line leading = the size (leading 1.0), for text
-  locked in a box (buttons, inputs, cells, an eyebrow overline) so the box height is exact and
+  locked in a box (buttons, inputs, cells, a kicker overline) so the box height is exact and
   doesn't grow.
 
-The reading voices (display, Heading-Editorial, Heading-Context, body) have only `-line` (they're
-read as multi-line runs). Reach for `-line-single` on a UI/Code/Eyebrow element whose text must not
+The reading voices (display, heading, sub-heading, body) have only `-line` (they're
+read as multi-line runs). Reach for `-line-single` on a UI/Code/Kicker element whose text must not
 wrap.
 
 ## Paragraph spacing
 
 `--type-{voice}-{step}-para` is the derived paragraph rhythm, by ROLE (not by the display-vs-heading
 grouping): **0.7× size for the display + editorial/context heading roles, 0.75× for body, 1.0× for
-the ui/mono roles — UI, Code, and Heading-Eyebrow**. Use it as `margin-block-end` between blocks of
+the ui/mono roles — UI, Code, and Heading-Kicker**. Use it as `margin-block-end` between blocks of
 that voice; it scales with the size across breakpoints, so vertical rhythm stays proportional. Don't
 set paragraph margins by hand.
 

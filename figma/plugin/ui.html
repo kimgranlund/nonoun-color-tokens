@@ -1264,9 +1264,9 @@ a.account-manage:hover { text-decoration: underline; }
 .an-svg .ty-line { fill: none; stroke-width: 1.5; }
 .ty-dot { stroke: none; }
 .ty-s0 { stroke: var(--accent); fill: var(--accent); }                                                      /* Display */
-.ty-s1 { stroke: color-mix(in srgb, var(--accent) 70%, #e0e0e0); fill: color-mix(in srgb, var(--accent) 70%, #e0e0e0); } /* H·Editorial */
-.ty-s2 { stroke: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); fill: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); } /* H·Context */
-.ty-s3 { stroke: var(--ink-dim); fill: var(--ink-dim); stroke-dasharray: 3 3; }                              /* H·Eyebrow (mono) */
+.ty-s1 { stroke: color-mix(in srgb, var(--accent) 70%, #e0e0e0); fill: color-mix(in srgb, var(--accent) 70%, #e0e0e0); } /* Heading */
+.ty-s2 { stroke: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); fill: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); } /* Sub-heading */
+.ty-s3 { stroke: var(--ink-dim); fill: var(--ink-dim); stroke-dasharray: 3 3; }                              /* Kicker (mono) */
 .ty-s4 { stroke: color-mix(in srgb, var(--ink) 60%, var(--accent)); fill: color-mix(in srgb, var(--ink) 60%, var(--accent)); } /* Body */
 .ty-s5 { stroke: var(--ink-faint); fill: var(--ink-faint); }                                                /* UI */
 .ty-s6 { stroke: var(--ink-faint); fill: var(--ink-faint); stroke-dasharray: 3 3; }                         /* Code (mono) */
@@ -2559,10 +2559,11 @@ return { weightedMeanHue, deriveNeutral, RELATIONSHIPS, deriveRelative };
 })();
 __M.type = (function(){
 // type.mjs — the perceptual TYPOGRAPHY engine: the type analog of the color engine. A few parameters
-// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Mirrors the structure of the target
-// schema (.claude/docs/spec/typography/typography.tokens.json): four role "voices" — Display · Heading · Body
-// (Content) · UI — each a size ramp whose every step carries size, line-height, letter-spacing, weight,
-// and paragraph spacing, all DERIVED from the treatment's params (no hand-authored magic numbers).
+// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Seven role "voices" —
+// Display · Heading · Sub-heading · Kicker · Body · UI · Code — each a size ramp whose every step
+// carries size, line-height, letter-spacing, weight, and paragraph spacing, all DERIVED from the
+// treatment's params (no hand-authored magic numbers). (The DTCG shape follows the Figma-variable
+// export at .claude/docs/spec/typography/typography.tokens.json, a frozen snapshot kept for reference.)
 //
 // The system relationships (see .claude/docs/spec/typography/README.md):
 //   size          = base · ratio^n           (a modular scale; n = the step's distance from the base)
@@ -2596,26 +2597,30 @@ const TYPE_RATIOS = [
 const cat = (role, base, ratio, leading, weight, trackingEm, steps = STEPS_5, transform = "none") => ({ role, base, ratio, leading, weight, trackingEm, steps, transform });
 
 // make7 — the SEVEN named type ROLES (each a FUNCTION, not a size register — the taxonomy in
-// .claude/docs/spec/typography): Display · Heading · Kicker · Eyebrow · Body · UI · Code. A role
+// .claude/docs/spec/typography): Display · Heading · Sub-heading · Kicker · Body · UI · Code. A role
 // carries CHARACTER (weight, tracking, leading, case, font cut) that travels with it across every
 // LEVEL; the level (the step) is chosen by hierarchy depth and the size is DERIVED from it (base ×
-// ratio^level), never picked to hit a number. Kicker (was "Heading Context") is the section label /
-// kicker that sits ABOVE a heading; Eyebrow (was "Heading Eyebrow") is the smallest mono overline —
-// neither is a heading, which is why they no longer carry the "Heading" prefix. Shared STRUCTURE
-// across treatments; each treatment passes its fonts + a few character knobs. Eyebrow + Code ride the
-// MONO role.
+// ratio^level), never picked to hit a number. Sub-heading is the secondary heading below Heading;
+// Kicker is the smallest overline / section label that sits ABOVE a heading. Shared STRUCTURE across
+// treatments; each treatment passes its fonts + a few character knobs. Kicker + Code ride the MONO role.
+//
+// NOTE (character vs name): this is a RENAME (Sub-heading was "Kicker"; Kicker was "Eyebrow") that
+// preserves each role's tuned CHARACTER — so Sub-heading currently reads as a wide-tracked uppercase
+// label and Kicker rides the mono role. If those characters should follow the new names (a sentence-case
+// Sub-heading, a sans Kicker), retune the knobs below — that's a deliberate follow-up, not this rename.
+// The internal knob prefixes (`hc-`, `eye-`) still feed Sub-heading and Kicker respectively.
 //
 // CASE is a per-treatment decision, not a blanket rule. The Display role defaults to TITLE/SENTENCE case
 // (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. The two genuine
-// "caps roles" are Kicker (the section label) and Eyebrow (the mono overline); those stay uppercase and
-// track POSITIVE so small caps open up. Display tracks NEGATIVE — big type tightens. Leadings sit inside
-// the bands: display 1.05–1.2, heading 1.05–1.3, prose 1.45–1.65, UI 1.25–1.5, mono ~1.5.
+// "caps roles" are Sub-heading and Kicker; those stay uppercase and track POSITIVE so small caps open up.
+// Display tracks NEGATIVE — big type tightens. Leadings sit inside the bands: display 1.05–1.2,
+// heading 1.05–1.3, prose 1.45–1.65, UI 1.25–1.5, mono ~1.5.
 function make7(o = {}) {
   return {
     "Display": cat("display", o.dBase ?? 60, o.dRatio ?? 1.25, o.dLead ?? 1.08, o.dWeight ?? 700, o.dTrack ?? -0.02, STEPS_5, o.dTransform ?? "none"),
     "Heading": cat("heading", 28, o.heRatio ?? 1.25, o.heLead ?? 1.2, o.heWeight ?? 700, o.heTrack ?? -0.005, STEPS_5, "none"),
-    "Kicker": cat("heading", 26, o.hcRatio ?? 1.2, o.hcLead ?? 1.2, o.hcWeight ?? 600, o.hcTrack ?? 0.1, STEPS_5, "uppercase"),
-    "Eyebrow": cat("mono", 13, 1.15, o.eyeLead ?? 1.4, o.eyeWeight ?? 600, o.eyeTrack ?? 0.16, STEPS_5, "uppercase"),
+    "Sub-heading": cat("heading", 26, o.hcRatio ?? 1.2, o.hcLead ?? 1.2, o.hcWeight ?? 600, o.hcTrack ?? 0.1, STEPS_5, "uppercase"),
+    "Kicker": cat("mono", 13, 1.15, o.eyeLead ?? 1.4, o.eyeWeight ?? 600, o.eyeTrack ?? 0.16, STEPS_5, "uppercase"),
     "Body": cat("body", o.bBase ?? 16, o.bRatio ?? 1.2, o.bLead ?? 1.55, o.bWeight ?? 440, 0, STEPS_5, "none"),
     "UI": cat("ui", 14, 1.125, o.uiLead ?? 1.4, o.uiWeight ?? 480, o.uiTrack ?? 0.006, STEPS_UI, "none"),
     "Code": cat("mono", 13, 1.125, 1.5, o.codeWeight ?? 460, o.codeTrack ?? 0, STEPS_UI, "none"),
@@ -2706,7 +2711,7 @@ function buildCategory(name, p, factor, overrides, vp) {
       paragraphSpacing: Math.round(size * (PARA_FACTOR[p.role] ?? 1)),
       paragraphIndent: 0,
       // single-line height (= size, leading 1.0) — the CONTROL-text intent, distinct from the
-      // multi-line lineHeight above. Emitted only for the ui/mono roles (UI · Code · Eyebrow),
+      // multi-line lineHeight above. Emitted only for the ui/mono roles (UI · Code · Kicker),
       // where text sits in a box and the box owns the rhythm.
       ...(p.role === "ui" || p.role === "mono" ? { singleLineHeight: size } : {}),
     };
@@ -2853,7 +2858,7 @@ function typeTokensFigmaModes(baseScale, modes = []) {
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
           variables[key].values[mode] = s[prop];
         }
-        // singleLineHeight exists only on the ui/mono voices (UI · Code · Eyebrow) — emit where present.
+        // singleLineHeight exists only on the ui/mono voices (UI · Code · Kicker) — emit where present.
         if (s.singleLineHeight != null) {
           const key = `${cName}/${sName}/singleLineHeight`;
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
@@ -3769,7 +3774,7 @@ function clampType(t) {
   // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading, ratio } } for the 7 known
   // voices; each field clamped to a sane range, kept only when finite, attached only when non-empty.
   if (t.voices && typeof t.voices === "object") {
-    const VOICES = ["Display", "Heading", "Kicker", "Eyebrow", "Body", "UI", "Code"];
+    const VOICES = ["Display", "Heading", "Sub-heading", "Kicker", "Body", "UI", "Code"];
     const num = (x, lo, hi, round) => { const n = Number(x); if (!Number.isFinite(n)) return undefined; const c = Math.max(lo, Math.min(hi, n)); return round ? Math.round(c) : c; };
     const voices = {};
     for (const name of VOICES) {
@@ -6078,14 +6083,14 @@ const SCHEME_NEXT = { system: "light", light: "dark", dark: "system" };
 // Per-treatment specimen copy — each treatment carries BESPOKE placeholder text aligned to its concept
 // (lifestyle app · luxury maison · long-form journalism · ops dashboard · gig poster), so the type
 // previews read like the world they're for instead of one shared sports demo. `para` is the Body-XL
-// long-form filler. Context/Eyebrow render uppercase via the engine's textTransform; strings stay
+// long-form filler. Sub-heading/Kicker render uppercase via the engine's textTransform; strings stay
 // title-case here (except Brutalist's already-shouting UI line).
 const TYPE_SPECIMENS = {
   product: {
     "Display": "Make today count",
     "Heading": "Your week, at a glance",
-    "Kicker": "This Morning",
-    "Eyebrow": "Daily Brief",
+    "Sub-heading": "This Morning",
+    "Kicker": "Daily Brief",
     "Body": "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go.",
     "UI": "Today · 4 of 6 done · 2 left",
     "Code": "GET /v1/habits/today → 200",
@@ -6094,8 +6099,8 @@ const TYPE_SPECIMENS = {
   luxury: {
     "Display": "The Maison Collection",
     "Heading": "An invitation to slow down",
-    "Kicker": "The Atelier",
-    "Eyebrow": "Private Reserve",
+    "Sub-heading": "The Atelier",
+    "Kicker": "Private Reserve",
     "Body": "Crafted in limited number, each piece is finished by hand in our atelier and made to be kept for a lifetime.",
     "UI": "Reserve · Suite 9 · 2 nights",
     "Code": "RES · 2026-09-14 · SUITE-09",
@@ -6104,8 +6109,8 @@ const TYPE_SPECIMENS = {
   editorial: {
     "Display": "The long road back",
     "Heading": "Notes from a vanishing coastline",
-    "Kicker": "Field Report",
-    "Eyebrow": "Dispatch",
+    "Sub-heading": "Field Report",
+    "Kicker": "Dispatch",
     "Body": "For thirty years she walked these shores at dawn. What she saw — and what she could no longer find — became the story.",
     "UI": "Issue 47 · 12 min read · Share",
     "Code": "By J. Okonkwo · Oct 2026",
@@ -6114,8 +6119,8 @@ const TYPE_SPECIMENS = {
   technical: {
     "Display": "99.98% uptime",
     "Heading": "Cluster health overview",
-    "Kicker": "Live Metrics",
-    "Eyebrow": "System Status",
+    "Sub-heading": "Live Metrics",
+    "Kicker": "System Status",
     "Body": "All regions reporting nominal. Latency held under 80ms across the last 24 hours of production traffic.",
     "UI": "p99 78ms · 1.2k rps · 0 err",
     "Code": "$ kubectl get pods -n prod",
@@ -6124,8 +6129,8 @@ const TYPE_SPECIMENS = {
   statement: {
     "Display": "After Hours",
     "Heading": "Three nights only",
-    "Kicker": "Main Stage",
-    "Eyebrow": "Doors 9PM",
+    "Sub-heading": "Main Stage",
+    "Kicker": "Doors 9PM",
     "Body": "No openers. No encore. One set, start to finish, loud enough to feel in your chest.",
     "UI": "SOLD OUT · WAITLIST OPEN",
     "Code": "FRI 02 · WAREHOUSE 9 · DTLA",
@@ -7511,7 +7516,7 @@ class HctApp extends HTMLElement {
   typeAnalysisCards(view) {
     const scale = this._activeTypeScale();
     const card = (label, body) => h("div", { class: "an-card" }, h("div", { class: "an-label" }, label), body);
-    const SHORT = { "Display": "Disp", "Heading": "Head", "Kicker": "Kick", "Eyebrow": "Eye", "Body": "Body", "UI": "UI", "Code": "Code" };
+    const SHORT = { "Display": "Disp", "Heading": "Head", "Sub-heading": "Sub", "Kicker": "Kick", "Body": "Body", "UI": "UI", "Code": "Code" };
     const series = Object.keys(scale.categories)
       .map((c) => ({ cat: c, short: SHORT[c] || c, steps: Object.entries(scale.categories[c] || {}).map(([name, s]) => ({ name, ...s })) }))
       .filter((x) => x.steps.length);
