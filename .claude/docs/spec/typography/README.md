@@ -16,24 +16,32 @@ generic (no brand/foundry specifics).
 | `Font Specs` | the **scales**, grouped by role category (below) |
 | `$extensions` | Figma mode metadata |
 
-### `Font Specs` — the seven named groups
+### `Font Specs` — the eleven named voices
 
-The engine implements this as **seven groups** (Sub-heading + Kicker are labels, not headings): each is a size ramp,
-each step carrying `Size · Line Height · Letter Spacing · Weight · Case · Paragraph Spacing · Indent`.
+The engine implements this as **eleven voices** (ADR-013 — the original seven plus four **editorial**
+voices: Lead · Quote · Caption · Legal): each is a size ramp, each step carrying `Size · Line Height ·
+Letter Spacing · Weight · Case · Paragraph Spacing · Indent`.
 
-| Group | Steps | Font role | Case | Letter-spacing character |
+| Voice | Steps | Font role | Case | Letter-spacing character |
 |---|---|---|---|---|
 | **Display** | `XS … XL` (5) | display | sentence/title (UPPERCASE only in Brutalist) | negative, tightens with size |
 | **Heading** | `XS … XL` (5) | heading | sentence | ~0 |
 | **Sub-heading** | `XS … XL` (5) | heading | **UPPERCASE** | wide positive (caps open up) |
 | **Kicker** | `XS … XL` (5) | **mono** | **UPPERCASE** | very wide positive |
+| **Lead** | `SM · MD · LG` (3) | body | sentence | slight negative |
 | **Body** | `XS … XL` (5) | body | sentence | 0 |
+| **Quote** | `SM · MD · LG` (3) | **heading** (display cut) | sentence | slight negative |
+| **Caption** | `SM · MD · LG` (3) | **ui font, prose** | sentence | 0 |
 | **UI** | `3XS … 2XL` (8) | ui | sentence | small positive (optical) |
 | **Code** | `3XS … 2XL` (8) | **mono** | sentence | 0 |
+| **Legal** | `SM · MD · LG` (3) | **ui font, prose** | sentence | 0 |
 
-41 steps in all. Each treatment supplies the font palette + a few character knobs (a shared `make7()`
+53 steps in all. Each treatment supplies the font palette + a few character knobs (a shared `make11()`
 factory); the engine generates every step's size (modular scale), leading, optical tracking, weight, and
-case. Kicker + Code use the mono role; Sub-heading + Kicker are the uppercase caps voices (Display is uppercase only in the Brutalist treatment).
+case. Kicker + Code use the mono role; **Quote** rides the heading role so it inherits each treatment's
+display face (a serif pull-quote in the serif treatments); **Caption + Legal** ride the ui FONT but are
+**prose** (the `box:false` flow — reading leading, no single-line height). Sub-heading + Kicker are the
+uppercase caps voices (Display is uppercase only in the Brutalist treatment).
 
 ## The system relationships (what the generator derives)
 
@@ -50,12 +58,14 @@ coefficient, font roles }`:
   treatments express voice through font, weight, tracking, and scale, not leading:
   - **display — 0.8** (large type sets *tight*, leading < 1)
   - **heading · sub-heading — 1.125**
-  - **body — 1.5**
+  - **body — 1.5** · **Lead — 1.4** · **Quote — 1.35** · **Caption · Legal — 1.5** (the editorial voices)
   - **Kicker — 1.4** · **code — ~1.5**
   - **UI — ~1.4** (the one voice that keeps a small per-treatment lever, `1.35–1.45`)
-- **Single-line Height** = `size × 1.0` — the control-text height, emitted on the box voices **UI · Code · Kicker**.
+- **Single-line Height** = `size × 1.0` — the control-text height, emitted on the **box** voices only
+  (**UI · Code · Kicker**). Keyed on a per-voice `box` flag, not the role — so Caption/Legal, which ride the
+  ui FONT but are prose (`box:false`), do NOT get a single-line height (ADR-013).
 - **Weight** ramps by role — Display `700` (`900` Brutalist), Heading `620–800`, Sub-heading · Kicker `~600`,
-  Body `440`, UI `480`, Code `460`.
+  Lead `400` (`300` Luxury), Body `440`, Quote `450`, Caption · Legal `440`, UI `480`, Code `460`.
 
 A set of **treatments** (Product/Lifestyle, Luxury, Editorial, Technical/Data, Brutalist) seed these
 params, exactly as the color "Color Categories" presets seed palette params.

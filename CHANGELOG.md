@@ -8,6 +8,18 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 
 ## [Unreleased]
 
+### 2026-07-04
+
+#### Added
+- **Four editorial type voices — the taxonomy grows 7 → 11.** Alongside the original seven, the type
+  system now generates **Lead** (a standfirst/lede), **Quote** (a block/pull quote that rides the heading
+  role, so it takes each treatment's display face — a serif pull-quote in the serif treatments), **Caption**
+  (figure/media captions) and **Legal** (fine-print). Each is a semantic token (`--type-quote-md-*`, …) on
+  a lean SM·MD·LG ramp (53 steps total), flowing automatically to every export — CSS, DTCG, Tailwind,
+  Figma variables, and the MCP brand kit. Caption + Legal ride the **UI font** but set as **prose** (reading
+  leading, no single-line height) via a new per-voice flow flag; the seven original voices are byte-identical.
+  (ADR-013)
+
 ### 2026-07-03
 
 #### Added

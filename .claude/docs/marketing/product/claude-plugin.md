@@ -16,7 +16,7 @@ Teach your coding agent to build with your exact tokens — which role goes wher
 
 > A free Claude Code plugin that teaches a coding agent to *consume* an exported Ultimate Tokens kit
 > inside your own project. Three skills — **color-tokens** (which of the 59 semantic roles goes on
-> every surface), **typography-tokens** (the seven-voice scale, role × level), **geometry-tokens**
+> every surface), **typography-tokens** (the eleven-voice scale, role × level), **geometry-tokens**
 > (the two-tier dimensional system) — plus a **`token-integrator`** agent that wires a component or
 > migrates a whole UI onto the kit. Every skill is parity-gated against the generator's engines, so
 > its guidance can't drift from the tokens it documents.
@@ -57,7 +57,7 @@ Teach your coding agent to build with your exact tokens — which role goes wher
 
 ```
 • color-tokens — which of the 59 semantic roles goes where; the on-colour pairing law, per state
-• typography-tokens — the seven-voice scale, role × level (size derived, never guessed)
+• typography-tokens — the eleven-voice scale, role × level (size derived, never guessed)
 • geometry-tokens — the two-tier dimensional system + the Material-3-aligned radius scale
 • token-integrator — binds to your real exported variables; wires a component or migrates a UI
 • Parity-gated against the engines in the generator's test suite — guidance can't drift from the kit

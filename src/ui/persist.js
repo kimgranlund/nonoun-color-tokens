@@ -318,10 +318,12 @@ function clampType(t) {
     for (const r of ["display", "heading", "body", "ui", "mono"]) if (typeof t.fonts[r] === "string" && t.fonts[r].trim()) fonts[r] = t.fonts[r].trim();
     if (Object.keys(fonts).length) out.fonts = fonts;
   }
-  // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading, ratio } } for the 7 known
-  // voices; each field clamped to a sane range, kept only when finite, attached only when non-empty.
+  // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading, ratio } } for the 11 known
+  // voices; each field clamped to a sane range, kept only when finite, attached only when non-empty. This
+  // allowlist MUST track make11's voices — a voice missing here has its per-voice overrides SILENTLY DROPPED
+  // on hydrate (the four editorial voices Lead/Quote/Caption/Legal were added in lockstep with the engine).
   if (t.voices && typeof t.voices === "object") {
-    const VOICES = ["Display", "Heading", "Sub-heading", "Kicker", "Body", "UI", "Code"];
+    const VOICES = ["Display", "Heading", "Sub-heading", "Kicker", "Lead", "Body", "Quote", "Caption", "UI", "Code", "Legal"];
     const num = (x, lo, hi, round) => { const n = Number(x); if (!Number.isFinite(n)) return undefined; const c = Math.max(lo, Math.min(hi, n)); return round ? Math.round(c) : c; };
     const voices = {};
     for (const name of VOICES) {

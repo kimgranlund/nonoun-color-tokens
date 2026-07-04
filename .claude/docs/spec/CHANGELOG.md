@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 1.49 — 2026-07-04 — Editorial type voices: the taxonomy grows 7 → 11 (ADR-013)
+
+Four **editorial** voices join the type taxonomy, so `make7()` becomes **`make11()`**: **Lead** (a
+standfirst/lede — body role), **Quote** (block/pull quote — the **heading** role, so it inherits each
+treatment's display face), **Caption** and **Legal** (fine-print). Each rides an **existing** font role
+(body/heading/ui — no new font) on a lean **`STEPS_3`** ramp (SM·MD·LG, MD = base); total steps 41 → **53**.
+A new per-voice **`box`** flag decouples the paragraph FLOW from the font role — it defaults from the role
+(`ui`/`mono` ⇒ box), so the seven originals are byte-identical, and **Caption + Legal** set `box:false` to
+ride the ui FONT as **prose** (reading leading ~1.5, paragraph factor 0.75×, no single-line height).
+`singleLineHeight` + the paragraph factor now key on `box`, not `role === "ui"||"mono"`. Emitters
+(CSS/DTCG/Figma/MCP) auto-flow; the lockstep set is `persist.js` VOICES, the engine/headless count literals
+(11 voices · 53 steps), `styles.css` `.ty-s0…10`, the `TYPE_SPECIMENS`/`SHORT` maps, this README, the
+`type-scale` + `typography-tokens` skills, and the marketing corpus. There is **no code-enforced type
+answer-key** (unlike colour's `role-table.json`); `voice-parity` auto-derives the voice list from the live
+engine, so parity holds without a hand-kept table. `typography.tokens.json` stays a frozen snapshot.
+
 ## 1.48 — 2026-07-03 — Type roles decoupled from size: the seven voices renamed (#195, #197)
 
 The canonical type taxonomy drops the size-implying names. The seven voices are now **Display · Heading ·

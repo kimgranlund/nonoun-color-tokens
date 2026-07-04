@@ -374,8 +374,12 @@ const TYPE_SPECIMENS = {
     "Sub-heading": "This Morning",
     "Kicker": "Daily Brief",
     "Body": "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go.",
+    "Lead": "The small stuff has a way of piling up. Here's a calmer place to set it down and start the day with a clear head.",
+    "Quote": "Plan less. Finish more.",
+    "Caption": "Your streak keeps itself — no daily check-in required.",
     "UI": "Today · 4 of 6 done · 2 left",
     "Code": "GET /v1/habits/today → 200",
+    "Legal": "Free plan includes two brand kits. Upgrade or cancel anytime.",
     para: "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go — your streak keeps itself, so you can stay present for the part that actually counts.",
   },
   luxury: {
@@ -384,8 +388,12 @@ const TYPE_SPECIMENS = {
     "Sub-heading": "The Atelier",
     "Kicker": "Private Reserve",
     "Body": "Crafted in limited number, each piece is finished by hand in our atelier and made to be kept for a lifetime.",
+    "Lead": "A collection made in limited number, for those who measure luxury in decades rather than seasons.",
+    "Quote": "Kept for a lifetime, then passed to someone you love.",
+    "Caption": "Finished entirely by hand in the atelier, Florence.",
     "UI": "Reserve · Suite 9 · 2 nights",
     "Code": "RES · 2026-09-14 · SUITE-09",
+    "Legal": "Each piece is numbered and accompanied by a certificate of authenticity.",
     para: "Crafted in limited number and finished entirely by hand, every piece leaves our atelier with the quiet confidence of something built to outlast its season — and to be passed, one day, to someone you love.",
   },
   editorial: {
@@ -394,8 +402,12 @@ const TYPE_SPECIMENS = {
     "Sub-heading": "Field Report",
     "Kicker": "Dispatch",
     "Body": "For thirty years she walked these shores at dawn. What she saw — and what she could no longer find — became the story.",
+    "Lead": "For thirty years she walked the shore at dawn — until the birds she counted began, quietly, to disappear.",
+    "Quote": "What she slowly stopped finding became the story.",
+    "Caption": "Above: the north cove at first light, September.",
     "UI": "Issue 47 · 12 min read · Share",
     "Code": "By J. Okonkwo · Oct 2026",
+    "Legal": "First published in Issue 47. Reproduction by permission only.",
     para: "For thirty years she walked these shores at dawn, counting the birds the way her mother had taught her. What she saw over those decades, and what she slowly stopped finding, is the story we set out to tell.",
   },
   technical: {
@@ -404,8 +416,12 @@ const TYPE_SPECIMENS = {
     "Sub-heading": "Live Metrics",
     "Kicker": "System Status",
     "Body": "All regions reporting nominal. Latency held under 80ms across the last 24 hours of production traffic.",
+    "Lead": "Every region reporting nominal — a look at the last 24 hours of production traffic, node by node.",
+    "Quote": "Zero dropped requests. Eleven nodes released overnight.",
+    "Caption": "Fig. 3 — p99 latency, rolling 24-hour window.",
     "UI": "p99 78ms · 1.2k rps · 0 err",
     "Code": "$ kubectl get pods -n prod",
+    "Legal": "Metrics sampled at 10s resolution. SLA credits apply below 99.9% uptime.",
     para: "All regions are reporting nominal: latency held under 80ms across the last 24 hours, the error budget is untouched for the quarter, and the autoscaler released eleven nodes overnight without a single dropped request.",
   },
   statement: {
@@ -414,8 +430,12 @@ const TYPE_SPECIMENS = {
     "Sub-heading": "Main Stage",
     "Kicker": "Doors 9PM",
     "Body": "No openers. No encore. One set, start to finish, loud enough to feel in your chest.",
+    "Lead": "One set, start to finish, three nights only — loud enough to feel in your chest and gone before the city wakes.",
+    "Quote": "No openers. No encore. No second chances.",
+    "Caption": "Warehouse 9, DTLA — doors at nine.",
     "UI": "SOLD OUT · WAITLIST OPEN",
     "Code": "FRI 02 · WAREHOUSE 9 · DTLA",
+    "Legal": "18+. No refunds. Lineup subject to change without notice.",
     para: "No openers, no encore, no second chances: one set from start to finish, three nights only, loud enough to feel in your chest and gone before the city wakes up. Doors at nine — don't be the one telling it secondhand.",
   },
 };
@@ -1798,7 +1818,7 @@ class HctApp extends HTMLElement {
   typeAnalysisCards(view) {
     const scale = this._activeTypeScale();
     const card = (label, body) => h("div", { class: "an-card" }, h("div", { class: "an-label" }, label), body);
-    const SHORT = { "Display": "Disp", "Heading": "Head", "Sub-heading": "Sub", "Kicker": "Kick", "Body": "Body", "UI": "UI", "Code": "Code" };
+    const SHORT = { "Display": "Disp", "Heading": "Head", "Sub-heading": "Sub", "Kicker": "Kick", "Lead": "Lead", "Body": "Body", "Quote": "Quote", "Caption": "Capt", "UI": "UI", "Code": "Code", "Legal": "Legal" };
     const series = Object.keys(scale.categories)
       .map((c) => ({ cat: c, short: SHORT[c] || c, steps: Object.entries(scale.categories[c] || {}).map(([name, s]) => ({ name, ...s })) }))
       .filter((x) => x.steps.length);
@@ -3317,7 +3337,7 @@ class HctApp extends HTMLElement {
     const base = cols[0].scale;
     const ov = (this.doc.type && this.doc.type.tokenOverrides) || {};
     const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const cats = Object.keys(base.categories); // the seven named groups, engine order
+    const cats = Object.keys(base.categories); // the eleven named voices, engine order
     const total = cats.reduce((a, c) => a + Object.keys(base.categories[c]).length, 0);
     // a single value cell: an editable SIZE input (px), w{weight} · {tracking} · line beneath, ↺ when overridden.
     const cell = (col, cat, step) => {
@@ -3679,10 +3699,10 @@ class HctApp extends HTMLElement {
     return stack;
   }
 
-  // renderTypographyScene — the canvas "Typography" view: the FULL specimen (all 21 steps — Display 5,
-  // Heading 5, Body 5, UI 8), grouped by category, each step a live line in the treatment's real face at
-  // its size/lineHeight/letterSpacing/weight + a compact metrics readout. (The retired modal showed only
-  // 8 of 21.) Lives in the same pannable .canvas-scene as the ramps; paints in the canvas preview scheme
+  // renderTypographyScene — the canvas "Typography" view: the FULL specimen (all 53 steps — the seven
+  // originals at 5/5/5/5/5/8/8 plus the four editorial voices Lead/Quote/Caption/Legal at 3 each), grouped
+  // by voice, each step a live line in the treatment's real face at its size/lineHeight/letterSpacing/weight
+  // + a compact metrics readout. Lives in the same pannable .canvas-scene as the ramps; paints in the canvas preview scheme
   // (var(--ink*) flips with the area's color-scheme) and the treatment's fonts (ensureTypeFonts).
   renderTypographyScene(view) {
     ensureTypeFonts();
@@ -3717,7 +3737,7 @@ class HctApp extends HTMLElement {
         h("div", { class: "type-spec-render" + (isPara ? " para" : ""), style: faceStyle }, isPara ? PARA : TYPE_SAMPLE(cat, scale.treatment)),
       );
     };
-    const cats = Object.keys(scale.categories); // the seven named groups, in engine order
+    const cats = Object.keys(scale.categories); // the eleven named voices, in engine order
     const total = cats.reduce((a, c) => a + Object.keys(scale.categories[c]).length, 0);
     const groups = cats.map((cat) => {
       const steps = Object.keys(scale.categories[cat]);
@@ -4431,8 +4451,8 @@ class HctApp extends HTMLElement {
     });
   }
 
-  // typeSpecimenTab — a compact in-pane specimen: each of the seven voices at its MD step. The full
-  // scale (all 41 steps across the 7 groups) lives on the canvas.
+  // typeSpecimenTab — a compact in-pane specimen: each of the eleven voices at its MD step. The full
+  // scale (all 53 steps across the 11 voices) lives on the canvas.
   typeSpecimenTab(view) {
     const scale = this._activeTypeScale();
     const cats = Object.keys(scale.categories);
@@ -4441,7 +4461,7 @@ class HctApp extends HTMLElement {
       "div",
       { class: "insp-body" },
       h("h3", { class: "insp-title" }, icon("type"), "Specimen"),
-      h("div", { class: "insp-sub" }, "Each of the seven voices at MD. The full scale is on the canvas."),
+      h("div", { class: "insp-sub" }, "Each of the eleven voices at MD. The full scale is on the canvas."),
       h(
         "div",
         { class: "tyi-specimen" },

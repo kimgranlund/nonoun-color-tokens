@@ -17,7 +17,8 @@ treatment/specimen history.
   Don't switch to a flat px value; the `Display.XL < Display.XS` ("tracking scales with size") assert
   enforces it. Display stays negative, UI / the caps Headings stay positive.
 - **Use the fixed leading constants** (display **0.8** · heading · sub-heading **1.125** · prose **1.5** ·
-  Kicker **1.4** · code **~1.5** · UI **~1.4**). They're the `font.modes.json` design intent, held uniform
+  Lead **1.4** · Quote **1.35** · Caption · Legal **1.5** · Kicker **1.4** · code **~1.5** · UI **~1.4**).
+  They're the `font.modes.json` design intent, held uniform
   across treatments (only UI keeps a small `1.35–1.45` lever) and owned by
   `.claude/docs/spec/typography/README.md`. Display is deliberately **< 1** (large type sets tight); a Body
   leading of 1.2 would render cramped prose. Retune a `*Lead` knob only for a deliberate character exception.
@@ -38,20 +39,28 @@ treatment/specimen history.
   ONLY Brutalist/`statement` opts in (via `dTransform:"uppercase"` in the `statement` row). The test asserts
   *exactly one* treatment sets an uppercase Display — adding a second (or removing Brutalist's)
   turns the gate red. The two standing caps voices are Sub-heading and Kicker (hardcoded
-  `"uppercase"` in `make7`), and they track POSITIVE; Display caps (Brutalist) track
+  `"uppercase"` in `make11`), and they track POSITIVE; Display caps (Brutalist) track
   NEGATIVE. Don't swap those tracking signs.
 
 ### Treatments + voices come as complete sets
 
 - **A new treatment must pass the full `fonts` palette** (`display/heading/body/ui/mono` — five roles) and
-  call `make7` so all seven voices resolve — the seven-groups assert pins every treatment has them + `fonts`,
+  call `make11` so all eleven voices resolve — the eleven-voices assert pins every treatment has them + `fonts`,
   and `roleOf` needs every role's family present (note `technical` + `editorial` point `fonts.ui`
   at JetBrains Mono — `ui` and `mono` can share a family). Supply `note` too; the UI specimen reads it.
-- **A new voice group means a new `cat(...)` line in `make7`** — its role flows from `cat`'s first arg into
-  `roleOf` automatically, and the emitters map over `categories`, so the CSS/DTCG token emits for free. But
-  the `GROUPS7` list in `test/engine/type.mjs` and `.claude/docs/spec/typography/README.md`'s "seven groups" table
-  both hardcode the seven — update them, and expect the "every treatment has the 7 groups" assert to need
-  the new name. (Eight groups is a taxonomy change, not just code.)
+- **A new voice group means a new `cat(...)` line in `make11`** — its role flows from `cat`'s first arg into
+  `roleOf` automatically, and the emitters map over `categories`, so the CSS/DTCG/Figma token emits for free.
+  But a voice count is hardcoded in several places that DON'T auto-flow, and missing one is a silent break:
+  - the **`persist.js` VOICES allowlist** — the one FUNCTIONAL landmine: a voice absent here has its
+    per-voice overrides **silently dropped on hydrate** (the allowlist must track `make11`'s voices);
+  - the **`styles.css` `.ty-s0…N` series colours** — one per voice, in order (the analysis-chart strokes);
+  - the **`GROUPS` list** in `test/engine/type.mjs` (formerly `GROUPS7`) and the **headless count literals**
+    in `test/ui/headless-boot.mjs` (**53 steps / 11 groups**, plus `53 × cols` in Compare);
+  - `.claude/docs/spec/typography/README.md`'s voice table and the `TYPE_SPECIMENS`/`SHORT` specimen maps.
+
+  There is NO code-enforced type answer-key (unlike colour's `role-table.json`) — the consumption plugin's
+  `voice-parity.mjs` auto-derives the voice list from the live engine, so the guard is the tests + these
+  hand-kept lists, not a table. Adding (or renaming) a voice is a taxonomy change, not just code (ADR-013).
 
 ### The fonts are a manual, two-ended chain
 
@@ -78,8 +87,8 @@ The pattern behind the 5-treatment set + the per-voice character knobs (and the 
    high-contrast serif set LIGHT (`dWeight 400`) and large (`dBase 76`), generous prose (`bBase 17`,
    `bRatio 1.25`), wide-tracked caps labels (`hcTrack 0.18`, `eyeTrack 0.26`). The font palette
    (`Source Serif 4` display/heading, `Inter` body/ui) serves the voice.
-2. **Expressed it as `make7` knob overrides**, not hand-authored sizes — every override is a `base`/`ratio`/
-   `leading`/`weight`/`trackingEm`/`transform` value; `buildCategory` derives the 41 steps. Kept leadings
+2. **Expressed it as `make11` knob overrides**, not hand-authored sizes — every override is a `base`/`ratio`/
+   `leading`/`weight`/`trackingEm`/`transform` value; `buildCategory` derives the 53 steps. Kept leadings
    at the per-role leading constants and tracking optical.
 3. **Made Brutalist the ONLY ALL-CAPS Display** (`dTransform:"uppercase"`), leaving the other four
    title/sentence. The "exactly one uppercase Display" gate locks this in.
@@ -87,7 +96,7 @@ The pattern behind the 5-treatment set + the per-voice character knobs (and the 
    name), the emitter MUST quote it — the `typeTokensCSS(luxury) → '--font-display: 'Source Serif 4''` assert
    is the backstop. (Lineage: the unquoted-digit-name break is exactly the
    smoke-is-Chrome-only memory's Safari class.)
-5. **Validated** — `node test/engine/type.mjs` (all green: 5×7, roleOf, caps voices, one-uppercase-Display,
+5. **Validated** — `node test/engine/type.mjs` (all green: 5×11, roleOf, caps voices, one-uppercase-Display,
    monotonic, optical tracking, Code 8-step, bodyBase scaling, the quoting guard, DTCG composite — prints
    `type PASS`), then `npm test`. For a font change, also ran `npm run gen:type-fonts`, committed
    `src/ui/type-fonts.js`, and eyeballed the specimen in Safari (the smoke is Chrome-only).
