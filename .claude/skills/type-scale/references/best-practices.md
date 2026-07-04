@@ -56,6 +56,9 @@ treatment/specimen history.
   - the **`styles.css` `.ty-s0…N` series colours** — one per voice, in order (the analysis-chart strokes);
   - the **`GROUPS` list** in `test/engine/type.mjs` (formerly `GROUPS7`) and the **headless count literals**
     in `test/ui/headless-boot.mjs` (**53 steps / 11 groups**, plus `53 × cols` in Compare);
+  - the **`test/smoke/smoke.mjs`** Typography-section count (`type-spec-line`===53 / `type-spec-group`===11)
+    — **Chrome-only, so `npm test` won't catch it; only CI's smoke leg does** (the classic Safari-blind-spot
+    trap in reverse — a green local gate can still red the smoke leg on a stale count);
   - `.claude/docs/spec/typography/README.md`'s voice table and the `TYPE_SPECIMENS`/`SHORT` specimen maps.
 
   There is NO code-enforced type answer-key (unlike colour's `role-table.json`) — the consumption plugin's
