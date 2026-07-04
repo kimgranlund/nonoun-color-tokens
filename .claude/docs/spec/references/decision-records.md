@@ -186,6 +186,35 @@ Format: Context → Decision → Rationale → Consequences → Status.
   (`test/engine/hct.mjs`).
 - **Status.** DECIDED.
 
+## ADR-012 — Ramp hue anchored in each path's RENDER space (per-path direct solve)  (complements ADR-011)
+- **Context.** ADR-011 makes the palette `hue` an OKLCH hue and lands the *identity* color on it to
+  ~0.00°. But a RAMP is exported in OKLCH while **authored in another space** — the perceptual/peak ramp
+  in **OKHSL** (`okhslStops`), the "even" ramp in **HCT/CAM16** (`paletteStops`). "Constant hue" disagrees
+  between the author space and OKLCH by a chroma- **and lightness**-dependent amount (the **Abney
+  effect**). Anchoring the hue through one proxy point — `effHue → oklchToCam16Hue`, sampled at the hue's
+  **peak tone** and a chroma fraction (`hueAnchorFrac`) — left the KEY stop (500) off the set OKLCH hue:
+  ~6° on perceptual blues, up to ~9° on the even path under mid-tone amplification (`dampAmp`).
+- **Decision.** Anchor the hue in the space each ramp **renders**, at the **KEY stop (500)'s ACTUAL
+  chroma + lightness** — not a peak-tone proxy. Each path Newton-solves its own author-space hue so stop
+  500 reads back at the set OKLCH hue:
+  1. **Perceptual/peak** → `solveOkhslHue(targetOklchHue, s₅₀₀, l₅₀₀)` over `rgbToOklchHue∘okhslToRgb`
+     (shipped #201/#202).
+  2. **Even** → `solveCam16Hue(targetOklchHue, c₅₀₀, tone₅₀₀)` over `hctToOklch` (this change).
+  `effHue`/`hueAnchorFrac` are RETAINED for the `hueSpace:"cam16"` passthrough, the even path's **gamut
+  basis** (the `c₅₀₀` seed), and the OKHSL cusp seed.
+- **Rationale.** The error is a space mismatch that varies with **both** chroma and lightness, so only a
+  solve at the stop's real conditions cancels it; a single peak-tone anchor is right at one end and wrong
+  at the other. Same discipline as ADR-011 (anchor the inverse at the palette's own chroma) — **anchor in
+  the space the ramp renders, not a proxy.** Result: **~0.5° across the wheel, any damping, both paths**
+  (from 6°/9°).
+- **Consequences.** A few extra Newton iterations per palette (cheap — palettes are few, the loop is ≤16
+  steps and converges in ~3). **`role-table.json` is UNCHANGED** — this is a render-layer calibration, not
+  a role remap, so the parity gate holds. Only OKLCH-hue palettes shift; `hueSpace:"cam16"` docs render
+  byte-identical (the passthrough branch). Gate: `oklch-hue-anchor` (`test/engine/tonal.mjs`) asserts stop
+  500 exports within **1°** of the set hue across the wheel incl. blues, for **both** ramp paths, at
+  `dampAmp` 0 and 66.
+- **Status.** DECIDED.
+
 ---
 
 ## Quick map: decisions an enhancing agent is most likely to "fix" (don't)

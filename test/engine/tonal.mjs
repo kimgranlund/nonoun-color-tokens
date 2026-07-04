@@ -313,27 +313,32 @@ for (const mode of ["perceptual", "peak"]) {
 }
 
 // ── oklch-hue-anchor — with hueSpace:"oklch", the KEY stop (500) lands on the SET OKLCH hue ──────────
-// The perceptual ramp is AUTHORED in OKHSL but EXPORTED in OKLCH; the two disagree on "constant hue" by a
-// chroma/lightness-dependent amount (Abney), worst in the blues (~6° at nominal). okhslStops SOLVES the
-// OKHSL hue directly (solveOkhslHue) so stop 500 reads back at the set OKLCH hue, anchored at that stop's
-// OWN saturation + lightness — exact for ANY damping, no CAM16 round-trip. (hueAnchorFrac still seeds the
-// even path + the cusp geometry, so its math is locked below too.)
+// Both ramps are EXPORTED in OKLCH but AUTHORED in another space (perceptual → OKHSL, even → HCT/CAM16),
+// and each disagrees with OKLCH on "constant hue" by a chroma/lightness-dependent amount (Abney), worst in
+// the blues (~6° perceptual, ~9° even). Each path now SOLVES its own render space directly at stop 500's
+// OWN chroma+lightness — perceptual via solveOkhslHue, even via solveCam16Hue — so the key stop reads back
+// at the set OKLCH hue for ANY damping. (hueAnchorFrac still seeds the even path's gamut basis + the cusp
+// geometry, so its deterministic math is locked below too.)
 {
-  // (a) hueAnchorFrac: nominal × (1 + dampAmp/100), capped at 1 — a deterministic lock (still used by the
-  // even/CAM16 ramp path + the cusp seed).
+  // (a) hueAnchorFrac: nominal × (1 + dampAmp/100), capped at 1 — a deterministic lock (still seeds the
+  // even/CAM16 ramp's gamut basis + the cusp seed).
   const near = (a, b) => Math.abs(a - b) < 1e-3;
   if (!near(T.hueAnchorFrac({ chroma: 76 }, { dampAmp: 66 }), 1.0)) FAIL("oklch-hue-anchor", `hueAnchorFrac(76%,amp66)=${T.hueAnchorFrac({ chroma: 76 }, { dampAmp: 66 })}, want 1.0`);
   if (!near(T.hueAnchorFrac({ chroma: 25 }, { dampAmp: 66 }), 0.415)) FAIL("oklch-hue-anchor", `hueAnchorFrac(25%,amp66)=${T.hueAnchorFrac({ chroma: 25 }, { dampAmp: 66 })}, want 0.415`);
   if (!near(T.hueAnchorFrac({ chroma: 40 }, { dampAmp: 0 }), 0.40)) FAIL("oklch-hue-anchor", `hueAnchorFrac(40%,amp0)=${T.hueAnchorFrac({ chroma: 40 }, { dampAmp: 0 })}, want 0.40`);
   // (b) end-to-end: stop 500 exports within 1° of the SET OKLCH hue across the wheel — including the BLUES
-  // (the old CAM16-proxy's ~6° worst case) — at BOTH the un-amplified default (dampAmp:0) and an amplified
-  // center (dampAmp:66). A revert to the CAM16-proxy anchor would push the blues past 1° and trip this.
-  for (const dampAmp of [0, 66]) {
-    const oc = { ...(T.DEFAULT_CONTROLS || {}), hueSpace: "oklch", toneMode: "perceptual", dampAmp, damp: 96, dampCurve: 1.2 };
-    for (const [hue, chroma] of [[300, 76], [235, 80], [270, 70], [290, 70], [250, 70], [70, 100], [27, 55], [145, 55], [190, 60], [30, 60]]) {
-      const s500 = T.paletteStops({ hue, chroma, skew: 0, lift: 0 }, oc, T.EXPORT_STOPS).find((s) => s.stop === 500);
-      const err = angDiff(rgbToOklchHue(s500.rgb), hue);
-      if (err > 1.0) FAIL("oklch-hue-anchor", `hue ${hue}/chroma ${chroma} (dampAmp ${dampAmp}): stop 500 exports OKLCH hue off by ${err.toFixed(2)}° (>1° — anchor drift)`);
+  // (the old proxy's worst case: ~6° perceptual, ~9° even) — for BOTH render paths (OKHSL-authored
+  // "perceptual" AND HCT-authored "even", each solving its OWN render space via solveOkhslHue /
+  // solveCam16Hue), at BOTH the un-amplified default (dampAmp:0) and an amplified center (dampAmp:66). A
+  // revert to a peak-anchored proxy on either path would push the blues past 1° and trip this.
+  for (const toneMode of ["perceptual", "even"]) {
+    for (const dampAmp of [0, 66]) {
+      const oc = { ...(T.DEFAULT_CONTROLS || {}), hueSpace: "oklch", toneMode, dampAmp, damp: 96, dampCurve: 1.2 };
+      for (const [hue, chroma] of [[300, 76], [235, 80], [270, 70], [290, 70], [250, 70], [70, 100], [27, 55], [145, 55], [190, 60], [30, 60]]) {
+        const s500 = T.paletteStops({ hue, chroma, skew: 0, lift: 0 }, oc, T.EXPORT_STOPS).find((s) => s.stop === 500);
+        const err = angDiff(rgbToOklchHue(s500.rgb), hue);
+        if (err > 1.0) FAIL("oklch-hue-anchor", `${toneMode} hue ${hue}/chroma ${chroma} (dampAmp ${dampAmp}): stop 500 exports OKLCH hue off by ${err.toFixed(2)}° (>1° — anchor drift)`);
+      }
     }
   }
 }

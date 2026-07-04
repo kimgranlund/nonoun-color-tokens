@@ -94,7 +94,8 @@ toneAt(stop, skew, lift):
 ## 5. Chroma targeting and edge damping
 
 ```
-hue    = effHue(palette.hue, hueSpace, palette.chroma/100)  // cam16 hue; if hueSpace=oklch, the chroma-aware OKLCH→CAM16 inverse anchored at this palette's chroma
+hue    = hueSpace=="oklch" ? solveCam16Hue(palette.hue, chroma@500, tone@500)  // solve the CAM16 hue directly in the RENDER space at stop 500's ACTUAL chroma+tone so the key stop EXPORTS at the set OKLCH hue (kills the Abney residual a peak-tone proxy left — worst in the blues); effHue seeds only the gamut basis
+                        : palette.hue                        // cam16 hue passes straight through
 pk     = peakC(hue).c                     // hue's own max chroma in sRGB
 target = (palette.chroma / 100) * pk      // chroma control is % of the hue's peak
 

@@ -2230,7 +2230,7 @@ __M.tonal = (function(){
 //   hctToRgb(hue, chroma, tone) -> { rgb:[r,g,b] (0-255 ints), inGamut, lstar }
 //   maxChromaInGamut(hue, tone) -> number   peakC(hue) -> { c, tone }
 //   oklchToCam16Hue(h)          -> CAM16 hue (degrees)
-const { hctToRgb, maxChromaInGamut, peakC, oklchToCam16Hue, lstarFromRgb, cam16FromRgb } = __M.hct;
+const { hctToRgb, hctToOklch, maxChromaInGamut, peakC, oklchToCam16Hue, lstarFromRgb, cam16FromRgb } = __M.hct;
 const { okhslToRgb, rgbToOkhsl, rgbToOklchHue } = __M.okhsl;
 
 // ── Stop sets ────────────────────────────────────────────────────────────────
@@ -2339,6 +2339,35 @@ function solveOkhslHue(targetOklchHue, s, l) {
   return h;
 }
 
+// solveCam16Hue — the even/CAM16 analog of solveOkhslHue: the CAM16 hue whose color at (chroma, tone) reads
+// back at `targetOklchHue`. The "even" ramp RENDERS through the HCT engine (a CAM16 hue) but EXPORTS in
+// OKLCH, and the two disagree on "constant hue" by a chroma- AND lightness-dependent amount (Abney) — up to
+// ~2° at the blue pole, ~9° under mid-tone amplification. The effHue proxy anchored at the hue's PEAK tone,
+// not the 500 stop's actual tone, so the residual survived. Solving the KEY stop (500) directly in the
+// RENDER space at its ACTUAL chroma + tone lands it on the set OKLCH hue for any damping. f(h)≈h (slope ≈1)
+// → Newton converges in a few steps. (This is the same "anchor in the space the ramp renders" fix #202 gave
+// the OKHSL path — now applied to the even/CAM16 path for parity.)
+function solveCam16Hue(targetOklchHue, chroma, tone) {
+  let h = targetOklchHue; // seed: CAM16 hue ≈ OKLCH hue to first order
+  for (let i = 0; i < 16; i++) {
+    const got = hctToOklch(h, chroma, tone)[2];
+    const err = (((got - targetOklchHue) % 360) + 540) % 360 - 180;
+    if (Math.abs(err) < 1e-3) break;
+    h = (((h - err) % 360) + 360) % 360;
+  }
+  return h;
+}
+
+// evenChroma — the even path's per-stop chroma from the gamut ceiling + a pre-computed intended target and
+// damping multiplier m: damp toward intended·m, floor toward chromaFloor% of the gamut but never past
+// intended, clamp in-gamut. Factored so the per-stop map AND the stop-500 hue anchor share ONE formula and
+// can't drift (the oklch-hue-anchor gate reads the exported hue, so any drift here trips it).
+function evenChroma(maxc, intended, m, chromaFloor) {
+  const damped = Math.min(intended * m, maxc);
+  const floorC = Math.min(((chromaFloor ?? 0) / 100) * maxc, intended);
+  return Math.min(maxc, Math.max(damped, floorC));
+}
+
 // shape — remap normalized position p∈[0,1] (0=light end, 1=dark end) to q∈[0,1].
 // ten = tension/100; tension only affects logistic and exp (others ignore it).
 function shape(p, curve, ten) {
@@ -2386,19 +2415,32 @@ function toneAt(stop, skew, lift, { curve, lmin, lmax, tension }) {
 function paletteStops(palette, controls, stops) {
   const mode = controls.toneMode || "perceptual";
   if (mode === "perceptual" || mode === "peak") return okhslStops(palette, controls, stops, mode);
-  // Resolve the BASE hue once. The per-stop hue may be EDGE-ROTATED below (hueShift);
-  // when hueShift=0 every stop uses baseHue (the flat-hue, hue-stability default).
-  const baseHue = effHue(palette.hue, controls.hueSpace, hueAnchorFrac(palette, controls));
   const shift = palette.hueShift ?? 0; // edge hue rotation: ±deg at the ends
   const sameDir = palette.hueSameDir === true; // true = both ends bend the SAME way (|s|), else opposite (s)
-  const pk = peakC(baseHue).c; // the BASE hue's max chroma in sRGB
-  const target = (palette.chroma / 100) * pk; // control is % of the BASE-hue peak
   const ctl = {
     curve: controls.curve,
     lmin: controls.lmin,
     lmax: controls.lmax,
     tension: controls.tension,
   };
+  // Resolve the BASE CAM16 hue once (flat across the ramp when hueShift=0 — the hue-stability default).
+  // For an OKLCH-hue palette, SOLVE it in the RENDER space at the KEY stop (500)'s ACTUAL chroma + tone so
+  // it exports back at the SET OKLCH hue — killing the Abney residual the peak-tone-anchored effHue proxy
+  // left (up to ~2° at dampAmp 0, ~9° under amplification, worst in the blues). For a CAM16-hue palette the
+  // slider IS a CAM16 hue → pass straight through (effHue's cam16 branch is the identity, preserved here).
+  let baseHue;
+  if (controls.hueSpace === "oklch") {
+    const tone500 = toneAt(500, palette.skew, palette.lift, ctl);
+    const seedHue = effHue(palette.hue, "oklch", hueAnchorFrac(palette, controls)); // ~baseHue, only for the gamut basis
+    const maxc500 = maxChromaInGamut(seedHue, tone500);
+    const intended500 = (palette.chroma / 100) * (controls.relChroma ? maxc500 : peakC(seedHue).c);
+    const c500 = evenChroma(maxc500, intended500, 1 + (controls.dampAmp ?? 0) / 100, controls.chromaFloor); // s=0 ⇒ m = 1 + dampAmp/100
+    baseHue = solveCam16Hue(palette.hue, Math.max(c500, 8), tone500); // floor the solve chroma so the hue stays well-defined for near-greys
+  } else {
+    baseHue = palette.hue;
+  }
+  const pk = peakC(baseHue).c; // the BASE hue's max chroma in sRGB
+  const target = (palette.chroma / 100) * pk; // control is % of the BASE-hue peak
   return stops.map((stop) => {
     const tone = toneAt(stop, palette.skew, palette.lift, ctl);
     const s = (stop - 500) / 450; // signed position: <0 light · 0 mid · >0 dark
@@ -2429,14 +2471,12 @@ function paletteStops(palette, controls, stops) {
     // its gamut envelope and palettes read as equally saturated regardless of hue. min(·, maxc) keeps
     // it in-gamut either way (m can exceed 1 via dampAmp).
     const intended = controls.relChroma ? (palette.chroma / 100) * maxc : target; // un-damped chroma for this stop
-    const damped = Math.min(intended * m, maxc);
-    // Chroma FLOOR: the edge damping starves the light/dark ends — for a LOW-chroma palette the light
-    // stops collapse to near-white (the "dead zone"). The floor lifts each stop back toward its INTENDED
-    // chroma, up to chromaFloor% of the stop's gamut, but NEVER above `intended` — so a muted palette
-    // stays muted (doesn't over-saturate) and a neutral (intended≈0) stays neutral. Saturated palettes
-    // already clamp at/near maxc, so the floor never binds — their vibrancy is untouched.
-    const floorC = Math.min(((controls.chromaFloor ?? 0) / 100) * maxc, intended);
-    const chroma = Math.min(maxc, Math.max(damped, floorC));
+    // evenChroma: damp toward intended·m, then apply the chroma FLOOR — the edge damping starves the
+    // light/dark ends, so for a LOW-chroma palette the light stops collapse to near-white (the "dead
+    // zone"); the floor lifts each stop back toward INTENDED, up to chromaFloor% of the stop's gamut but
+    // NEVER above intended (a muted palette stays muted, a neutral stays neutral, saturated stops already
+    // clamp at/near maxc so the floor never binds). Shared with the stop-500 hue anchor so they can't drift.
+    const chroma = evenChroma(maxc, intended, m, controls.chromaFloor);
     // Emit via the engine at the per-stop (hue, chroma, tone): in-gamut, hits the
     // tone, holds the SPECIFIED hue (constant when hueShift=0, else edge-rotated).
     const out = hctToRgb(hue, chroma, tone);
