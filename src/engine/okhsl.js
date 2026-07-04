@@ -172,6 +172,15 @@ export function oklchToRgb(L, C, H) {
   return [clamp255(255 * srgbTransfer(rgb[0])), clamp255(255 * srgbTransfer(rgb[1])), clamp255(255 * srgbTransfer(rgb[2]))];
 }
 
+// rgbToOklchHue([r,g,b]) — the OKLCH HUE (degrees) of an sRGB color. The tonal engine uses it to anchor
+// an OKLCH-hue palette DIRECTLY in the space its perceptual ramp renders (OKHSL→sRGB→OKLCH), landing the
+// key stop on the set hue without a CAM16 round-trip. (Same OKLab basis as rgbToOkhsl below.)
+export function rgbToOklchHue([r, g, b]) {
+  const lab = linearSrgbToOklab(srgbTransferInv(r / 255), srgbTransferInv(g / 255), srgbTransferInv(b / 255));
+  const h = Math.atan2(lab[2], lab[1]) * 180 / Math.PI;
+  return h < 0 ? h + 360 : h;
+}
+
 // rgbToOkhsl([r,g,b]) — inverse. Returns { h: degrees, s: 0..1, l: 0..1 }.
 export function rgbToOkhsl([r, g, b]) {
   const lab = linearSrgbToOklab(srgbTransferInv(r / 255), srgbTransferInv(g / 255), srgbTransferInv(b / 255));

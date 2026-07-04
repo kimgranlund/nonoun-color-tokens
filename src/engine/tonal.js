@@ -11,7 +11,7 @@
 //   maxChromaInGamut(hue, tone) -> number   peakC(hue) -> { c, tone }
 //   oklchToCam16Hue(h)          -> CAM16 hue (degrees)
 import { hctToRgb, maxChromaInGamut, peakC, oklchToCam16Hue, lstarFromRgb, cam16FromRgb } from "./hct.js";
-import { okhslToRgb, rgbToOkhsl } from "./okhsl.js";
+import { okhslToRgb, rgbToOkhsl, rgbToOklchHue } from "./okhsl.js";
 
 // ── Stop sets ────────────────────────────────────────────────────────────────
 // Display ramp: 050..950 step 50 (19 stops). Light at 050, dark at 950.
@@ -101,6 +101,22 @@ export function effHue(hue, hueSpace, chromaFrac = 1) {
 export function hueAnchorFrac(palette, controls) {
   const nominal = (palette.chroma ?? 0) / 100;
   return Math.min(1, nominal * (1 + (controls.dampAmp ?? 0) / 100));
+}
+
+// solveOkhslHue — the OKHSL hue whose color at (s, l) reads back at `targetOklchHue`. The perceptual ramp
+// is AUTHORED in OKHSL but EXPORTED in OKLCH, and the two disagree on "constant hue" by a chroma- and
+// lightness-dependent amount (Abney) — worst in the blues (~6°). Anchoring the KEY stop directly in the
+// RENDER space, at its ACTUAL saturation/lightness, lands it on the set OKLCH hue exactly, for any damping
+// — no CAM16 round-trip. f(h)≈h (slope ≈1), so h ← h − (got − target) is Newton; converges in a few steps.
+function solveOkhslHue(targetOklchHue, s, l) {
+  let h = targetOklchHue; // seed: OKHSL hue ≈ OKLCH hue to first order
+  for (let i = 0; i < 16; i++) {
+    const got = rgbToOklchHue(okhslToRgb(h, s, l));
+    const err = (((got - targetOklchHue) % 360) + 540) % 360 - 180;
+    if (Math.abs(err) < 1e-3) break;
+    h = (((h - err) % 360) + 360) % 360;
+  }
+  return h;
 }
 
 // shape — remap normalized position p∈[0,1] (0=light end, 1=dark end) to q∈[0,1].
@@ -226,13 +242,26 @@ function okhslLAt(lstar) {
 
 function okhslStops(palette, controls, stops, mode) {
   const baseHue = effHue(palette.hue, controls.hueSpace, hueAnchorFrac(palette, controls));
-  const pk = peakC(baseHue);                                       // { c, tone } — the cusp
-  const hOk = rgbToOkhsl(hctToRgb(baseHue, pk.c, pk.tone).rgb).h;  // the palette's hue in OKHSL space
+  const pk = peakC(baseHue);                                       // { c, tone } — the cusp (peak geometry)
   const shift = palette.hueShift ?? 0;
   const sameDir = palette.hueSameDir === true;
   const lLight = okhslLAt(controls.lmax ?? 100);                   // light end (l≈1 at lmax=100 → 050 white)
   const lDark = okhslLAt(controls.lmin ?? 5);                      // dark end
   const cuspL = okhslLAt(pk.tone);                                 // OKHSL lightness of the cusp (peak pivot)
+  // The palette's hue in OKHSL space — constant across the ramp when hueShift=0. For an OKLCH-hue palette,
+  // SOLVE it directly so the KEY stop (500) reads back at the SET OKLCH hue, anchored at that stop's OWN
+  // saturation + lightness in the render space (kills the Abney drift the CAM16 proxy left — worst in the
+  // blues, ~6°). For a CAM16-hue palette the hue IS a CAM16 hue, so carry baseHue through OKHSL as before.
+  let hOk;
+  if (controls.hueSpace === "oklch") {
+    const s500 = Math.min(1, Math.max(0, (palette.chroma / 100) * (1 + (controls.dampAmp ?? 0) / 100))); // sp=0 ⇒ m = 1 + dampAmp/100
+    const v = palette.cuspPull ?? controls.vibrancy ?? 0;
+    const t500 = mode === "peak" ? 1 : Math.max(0, Math.min(1, v / 100));
+    const l500 = lerp(lerp(lLight, lDark, 0.5), cuspL, t500);      // stop-500 lightness (even↔cusp blend)
+    hOk = solveOkhslHue(palette.hue, s500, l500);
+  } else {
+    hOk = rgbToOkhsl(hctToRgb(baseHue, pk.c, pk.tone).rgb).h;
+  }
   return stops.map((stop) => {
     // lightness per stop — STOP-based so the display(19) and export(25) ramps agree at a given stop.
     // Blend the EVEN-perceptual distribution toward the CUSP-anchored ("peak") one by `vibrancy`:
