@@ -1405,7 +1405,7 @@ ok(app.settingsOpen === false, "(set) closeSettings dismisses the modal");
 // ── (ty) Typography SECTION: the switcher flips this.section → full 21-step canvas specimen + inspector ──
 app.setSection("typography"); flushRaf();
 ok(app.section === "typography" && !!app.querySelector(".type-spec"), "(ty) the section switcher enters Typography (the canvas specimen renders)");
-ok(app.querySelectorAll(".type-spec-line").length === 41 && app.querySelectorAll(".type-spec-group").length === 7, `(ty) the canvas shows the FULL specimen — 41 steps across the 7 named groups (Display·Heading·Sub-heading·Kicker·Body·UI·Code) (got ${app.querySelectorAll(".type-spec-line").length} lines / ${app.querySelectorAll(".type-spec-group").length} groups)`);
+ok(app.querySelectorAll(".type-spec-line").length === 53 && app.querySelectorAll(".type-spec-group").length === 11, `(ty) the canvas shows the FULL specimen — 53 steps across the 11 named voices (Display·Heading·Sub-heading·Kicker·Lead·Body·Quote·Caption·UI·Code·Legal) (got ${app.querySelectorAll(".type-spec-line").length} lines / ${app.querySelectorAll(".type-spec-group").length} groups)`);
 ok(app.querySelectorAll(".an-card").length >= 4, `(ty) the left rail shows the type analysis cards (got ${app.querySelectorAll(".an-card").length})`);
 // specimen order: each group lists LARGEST → smallest (the first token in the document is Display's XL step)
 ok(txtOf(app.querySelectorAll(".type-spec-token")[0] || {}) === "type-display-xl", `(ty) the specimen lists each group largest→smallest (first token is type-display-xl, got ${txtOf(app.querySelectorAll(".type-spec-token")[0] || {})})`);
@@ -1429,7 +1429,7 @@ app.typeSegment = "scale"; app.render(); flushRaf();
 // (tyv) Scale tab — per-voice tuning: select a voice → its shaping sliders expand; _setTypeVoice writes
 // doc.type.voices + flows to the scale + persist; reset clears. (Voices are mode-independent → the base.)
 app.typeVoice = null; app.render(); flushRaf();
-ok(app.querySelectorAll(".tyi-voice").length === 7 && !app.querySelector(".tyi-voice-edit"), `(tyv) the Scale tab lists the 7 voices, none expanded by default (got ${app.querySelectorAll(".tyi-voice").length})`);
+ok(app.querySelectorAll(".tyi-voice").length === 11 && !app.querySelector(".tyi-voice-edit"), `(tyv) the Scale tab lists the 11 voices, none expanded by default (got ${app.querySelectorAll(".tyi-voice").length})`);
 app.typeVoice = "Body"; app.render(); flushRaf();
 ok(!!app.querySelector(".tyi-voice-edit") && !!app.querySelector(".is-sel"), "(tyv) selecting a voice expands its tuning sliders");
 app._setTypeVoice("Body", "weight", 600); flushRaf();
@@ -1439,14 +1439,14 @@ app._resetTypeVoice("Body"); flushRaf();
 ok(!app.doc.type.voices, "(tyv) reset clears the only voice override (back to the treatment)");
 app.typeVoice = null; app.render(); flushRaf();
 // the canvas Specimen·Tokens toggle flips the canvas to the READ-ONLY token MATRIX (a real <table>) in the
-// scrolling .is-table shell — rows = the 41 steps, columns = Base (+ each breakpoint), sticky token names.
+// scrolling .is-table shell — rows = the 53 steps, columns = Base (+ each breakpoint), sticky token names.
 app.setTypeSpecMode("tokens"); flushRaf();
 ok(!!app.querySelector(".tok-table") && !app.querySelector(".type-spec"), "(ty-tok) the Specimen·Tokens toggle renders the token matrix table (no specimen scene)");
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(ty-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
 ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 1, "(ty-tok) there is exactly one Base column header");
 ok(app._typeTokenColumns().length === 1, "(ty-tok) base-only — exactly one column (Base) with no breakpoints");
-ok(app.querySelectorAll(".tok-row").length === 41, `(ty-tok) one row per type step (41) (got ${app.querySelectorAll(".tok-row").length})`);
-ok(app.querySelectorAll(".tok-group").length === 7, `(ty-tok) the rows are grouped by voice — 7 group headers (got ${app.querySelectorAll(".tok-group").length})`);
+ok(app.querySelectorAll(".tok-row").length === 53, `(ty-tok) one row per type step (53) (got ${app.querySelectorAll(".tok-row").length})`);
+ok(app.querySelectorAll(".tok-group").length === 11, `(ty-tok) the rows are grouped by voice — 11 group headers (got ${app.querySelectorAll(".tok-group").length})`);
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}).startsWith("--type-display-xl"), `(ty-tok) the first (sticky) token name is the --type-display-xl step (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setTypeSpecMode("specimen"); flushRaf();
 ok(!!app.querySelector(".type-spec") && !app.querySelector(".tok-table"), "(ty-tok) toggling back to Specimen restores the live specimen (token table gone)");
@@ -1537,15 +1537,15 @@ app.typeMode = "compare"; app.render(); flushRaf();
   ok(cols.length === 1 + app.doc.type.modes.length, `(ty-cmp) Compare renders one column per mode — Base + ${app.doc.type.modes.length} breakpoint(s) = ${1 + app.doc.type.modes.length} (got ${cols.length})`);
   ok(!!app.querySelector(".canvas-compare") && !!app.querySelector(".compare"), "(ty-cmp) Compare uses the shared .canvas-compare / .canvas-scene.compare shell");
   ok(txtOf(app.querySelectorAll(".compare-col-label")[0] || {}) === "Base", "(ty-cmp) the first column is labelled Base");
-  // each column carries a full 41-line specimen (the override forced its mode while the scene built).
-  ok(app.querySelectorAll(".type-spec-line").length === 41 * cols.length, `(ty-cmp) every column renders the full 41-step specimen (got ${app.querySelectorAll(".type-spec-line").length} lines across ${cols.length} cols)`);
+  // each column carries a full 53-line specimen (the override forced its mode while the scene built).
+  ok(app.querySelectorAll(".type-spec-line").length === 53 * cols.length, `(ty-cmp) every column renders the full 53-step specimen (got ${app.querySelectorAll(".type-spec-line").length} lines across ${cols.length} cols)`);
   ok(app._typeModeOverride === null, "(ty-cmp) the transient _typeModeOverride is cleared after each column builds (never leaks)");
   // MAJOR: the inspector body-size slider edits the BASE scale in Compare (it shows Base) — not a no-op.
   app._setActiveTypeBodyBase(19); app.commitDrag?.(); flushRaf();
   ok(app.doc.type.bodyBase === 19, `(ty-cmp) the body-size slider edits doc.type.bodyBase while in Compare (got ${app.doc.type.bodyBase})`);
 }
 app.typeMode = "base"; app.render(); flushRaf();
-ok(!app.querySelector(".compare-col") && !!app.querySelector(".type-spec") && app.querySelectorAll(".type-spec-line").length === 41, "(ty-cmp) leaving Compare restores the single specimen scene");
+ok(!app.querySelector(".compare-col") && !!app.querySelector(".type-spec") && app.querySelectorAll(".type-spec-line").length === 53, "(ty-cmp) leaving Compare restores the single specimen scene");
 // Compare is omitted when only Base exists (after the mode is deleted below) — asserted in (ty-cmp-omit).
 // (ty-tok-orphan) MAJOR 5 — deleting a mode STRIPS that mode's per-cell overrides (no "...|<id>" orphans
 // survive serialize→hydrate forever). Set a per-mode override, delete the mode, assert the key is gone.

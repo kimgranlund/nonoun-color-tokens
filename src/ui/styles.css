@@ -1248,21 +1248,31 @@ a.account-manage:hover { text-decoration: underline; }
    open path, closing it into a filled wedge. Keep fill:none winning regardless of source order. */
 .an-svg .ty-line { fill: none; stroke-width: 1.5; }
 .ty-dot { stroke: none; }
+/* one series colour per voice, by index in the 11-voice order:
+   0 Display · 1 Heading · 2 Sub-heading · 3 Kicker · 4 Lead · 5 Body · 6 Quote · 7 Caption · 8 UI · 9 Code · 10 Legal */
 .ty-s0 { stroke: var(--accent); fill: var(--accent); }                                                      /* Display */
 .ty-s1 { stroke: color-mix(in srgb, var(--accent) 70%, #e0e0e0); fill: color-mix(in srgb, var(--accent) 70%, #e0e0e0); } /* Heading */
 .ty-s2 { stroke: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); fill: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); } /* Sub-heading */
 .ty-s3 { stroke: var(--ink-dim); fill: var(--ink-dim); stroke-dasharray: 3 3; }                              /* Kicker (mono) */
-.ty-s4 { stroke: color-mix(in srgb, var(--ink) 60%, var(--accent)); fill: color-mix(in srgb, var(--ink) 60%, var(--accent)); } /* Body */
-.ty-s5 { stroke: var(--ink-faint); fill: var(--ink-faint); }                                                /* UI */
-.ty-s6 { stroke: var(--ink-faint); fill: var(--ink-faint); stroke-dasharray: 3 3; }                         /* Code (mono) */
+.ty-s4 { stroke: color-mix(in srgb, var(--accent) 55%, var(--ink)); fill: color-mix(in srgb, var(--accent) 55%, var(--ink)); } /* Lead */
+.ty-s5 { stroke: color-mix(in srgb, var(--ink) 60%, var(--accent)); fill: color-mix(in srgb, var(--ink) 60%, var(--accent)); } /* Body */
+.ty-s6 { stroke: color-mix(in srgb, var(--accent) 40%, var(--ink-dim)); fill: color-mix(in srgb, var(--accent) 40%, var(--ink-dim)); } /* Quote (heading cut) */
+.ty-s7 { stroke: var(--ink-dim); fill: var(--ink-dim); }                                                    /* Caption (ui font, prose) */
+.ty-s8 { stroke: var(--ink-faint); fill: var(--ink-faint); }                                                /* UI */
+.ty-s9 { stroke: var(--ink-faint); fill: var(--ink-faint); stroke-dasharray: 3 3; }                         /* Code (mono) */
+.ty-s10 { stroke: color-mix(in srgb, var(--ink-faint) 80%, var(--accent)); fill: color-mix(in srgb, var(--ink-faint) 80%, var(--accent)); stroke-dasharray: 3 3; } /* Legal (ui font, prose) */
 .an-leg-mark.ty { background: var(--ink-faint); }
 .an-leg-mark.ty.s0 { background: var(--accent); }
 .an-leg-mark.ty.s1 { background: color-mix(in srgb, var(--accent) 70%, #e0e0e0); }
 .an-leg-mark.ty.s2 { background: color-mix(in srgb, var(--accent) 45%, var(--ink-dim)); }
 .an-leg-mark.ty.s3 { background: var(--ink-dim); }
-.an-leg-mark.ty.s4 { background: color-mix(in srgb, var(--ink) 60%, var(--accent)); }
-.an-leg-mark.ty.s5 { background: var(--ink-faint); }
-.an-leg-mark.ty.s6 { background: var(--ink-faint); }
+.an-leg-mark.ty.s4 { background: color-mix(in srgb, var(--accent) 55%, var(--ink)); }
+.an-leg-mark.ty.s5 { background: color-mix(in srgb, var(--ink) 60%, var(--accent)); }
+.an-leg-mark.ty.s6 { background: color-mix(in srgb, var(--accent) 40%, var(--ink-dim)); }
+.an-leg-mark.ty.s7 { background: var(--ink-dim); }
+.an-leg-mark.ty.s8 { background: var(--ink-faint); }
+.an-leg-mark.ty.s9 { background: var(--ink-faint); }
+.an-leg-mark.ty.s10 { background: color-mix(in srgb, var(--ink-faint) 80%, var(--accent)); }
 .ty-roles { display: flex; flex-direction: column; gap: 5px; padding: 2px 0; }
 .ty-role { display: flex; align-items: baseline; gap: 8px; font-size: 10.5px; }
 .ty-role .ty-role-k { width: 54px; color: var(--ink-dim); flex: none; }

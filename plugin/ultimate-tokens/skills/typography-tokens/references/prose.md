@@ -1,17 +1,21 @@
-# Prose — body copy, captions, lists, links, code-in-text
+# Prose — body copy, lead, quotes, captions, legal, lists, links, code-in-text
 
 Running text you *read* (as opposed to interface chrome you *operate*) is the **body** voice on
-`--font-body`. Interface text is `ui` — see interface.md; the split matters.
+`--font-body`. Interface text is `ui` — see interface.md; the split matters. Prose also has four
+dedicated **editorial** voices — reach for the specific voice over a body step when one fits.
 
-## The body ramp
+## The prose voices
 
-| Text | Class |
-|---|---|
-| lead / intro paragraph | `.type-body-lg` |
-| default body copy, paragraphs | `.type-body-md` |
-| dense or secondary prose | `.type-body-sm` |
-| fine print, legal, footnotes | `.type-body-xs` |
-| a big pull-quote / standfirst | `.type-body-xl` |
+| Text | Class | Why not a body step |
+|---|---|---|
+| standfirst / intro paragraph | `.type-lead-md` | **lead** — a larger, lighter opening paragraph, its own semantic token |
+| default body copy, paragraphs | `.type-body-md` | — |
+| dense or secondary prose | `.type-body-sm` | — |
+| a block quote / pull-quote | `.type-quote-md` | **quote** rides the *display face* (a serif pull-quote in serif treatments) |
+| figure / image / table caption | `.type-caption-md` | **caption** — the ui font, but prose (wraps, reading leading) |
+| fine print, legal, footnotes | `.type-legal-md` | **legal** — the smallest reading voice, ui font + prose |
+
+The four editorial voices ride the lean **SM · MD · LG** ramp (`.type-{voice}-sm|md|lg`); default to `-md`.
 
 ## Paragraph rhythm
 
@@ -28,10 +32,12 @@ sizes are tuned the way they are.
 ## Lists, blockquotes, captions
 
 - List items: the same `.type-body-{step}` as the surrounding prose; the marker inherits it.
-- Blockquote: `.type-body-lg` (or the body step one up from the surrounding copy) — emphasis by size,
-  the color/border by color-tokens.
-- Caption / figure label: `.type-body-xs` or, if it's interface metadata rather than prose,
-  `.type-ui-xs` (interface.md).
+- Blockquote / pull-quote: `.type-quote-{step}` — the dedicated **quote** voice (the display face,
+  its own leading); the color/border come from color-tokens. (For a quiet inline aside a body step
+  is fine, but a set-apart quote is `quote`.)
+- Caption / figure label: `.type-caption-{step}` — the dedicated **caption** voice (ui font, prose).
+  If it's really interface *metadata* rather than a caption, `.type-ui-xs` (interface.md).
+- Fine print / legal / footnotes: `.type-legal-{step}`.
 
 ## Links in prose
 

@@ -35,7 +35,7 @@ Design tokens, derived — not guessed.
 
 **H2** `Type and space, from the same source`
 
-> Typography composes on a modular scale — seven voices from Display to Code, five treatments from
+> Typography composes on a modular scale — eleven voices from headline to fine-print, five treatments from
 > Editorial to Brutalist, sizes snapped to a designer's ladder. Geometry builds a size ramp on one
 > centering law: edge padding = (height − glyph) / 2, so controls sit optically true at every size.
 > Change the source; both systems follow.

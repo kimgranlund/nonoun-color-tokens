@@ -1,26 +1,29 @@
 ## Foundations — the model a type-engine change leans on
 
 The load-bearing ideas. If a change feels like it needs a hand-authored size or a new branch, you are
-probably fighting one of these. The full *why* (the seven groups, the system relationships, the leading
+probably fighting one of these. The full *why* (the eleven voices, the system relationships, the leading
 bands, the target token shape) is owned by `.claude/docs/spec/typography/README.md` — this file is only the mental
 model the *procedure* assumes.
 
 ### 1. Five layers, one direction of flow
 
-`type.mjs` builds bottom-up: **`cat` → `make7` → a treatment → `typeScale` → an emitter.** Nothing skips a
+`type.mjs` builds bottom-up: **`cat` → `make11` → a treatment → `typeScale` → an emitter.** Nothing skips a
 layer.
 
-- **`cat(role, base, ratio, leading, weight, trackingEm, steps, transform)`** is a thin
+- **`cat(role, base, ratio, leading, weight, trackingEm, steps, transform, box)`** is a thin
   constructor — it just packages one voice's *params* into a record. No sizes are computed here. `steps`
-  defaults to `STEPS_5`, `transform` to `"none"`.
-- **`make7(o={})`** is the FACTORY: it returns the seven voices as a `{name: catRecord}`
+  defaults to `STEPS_5`, `transform` to `"none"`, and `box` DEFAULTS from the role (`ui`/`mono` ⇒ `true`,
+  every other role ⇒ `false`) — the presentation-flow flag the math keys on (see §2 + §3), overridable.
+- **`make11(o={})`** is the FACTORY: it returns the eleven voices as a `{name: catRecord}`
   object, every voice sharing the same STRUCTURE while reading its knobs from `o` (with a default per knob,
   e.g. `o.dRatio ?? 1.25`). The knobs are prefixed by voice: Display `d-` (`dBase/dRatio/dLead/dWeight/
-  dTrack/dTransform`), Heading `he-`, Sub-heading `hc-`, Kicker `eye-`, Body `b-`, UI `ui-`,
-  Code `code-`/`codeWeight`/`codeTrack`. A knob a treatment doesn't pass falls to the `make7` default.
-- **A treatment** is `{id, label, note, fonts, categories: make7({...})}`. It supplies
+  dTrack/dTransform`), Heading `he-`, Sub-heading `hc-`, Kicker `eye-`, Lead `lead-`
+  (`leadWeight/leadLead/leadTrack`), Body `b-`, Quote `quote-` (`quoteRatio/quoteLead/quoteWeight/quoteTrack`),
+  Caption `cap-` (`capLead/capWeight`), UI `ui-`, Code `code-`/`codeWeight`/`codeTrack`, Legal `legal-`
+  (`legalLead/legalWeight`). A knob a treatment doesn't pass falls to the `make11` default.
+- **A treatment** is `{id, label, note, fonts, categories: make11({...})}`. It supplies
   the **font palette** (`{display, heading, body, ui, mono}` — five roles) and a few character knobs; the
-  shared `make7` structure does the rest. `note` is the human description the UI specimen reads.
+  shared `make11` structure does the rest. `note` is the human description the UI specimen reads.
 - **`typeScale(config = {treatment, bodyBase, overrides?, voices?, fonts?})`** resolves a treatment into
   the output object `{treatment, label, fonts, roleOf, categories}` — it runs `buildCategory` over every
   voice and attaches `roleOf` (voice→font-role) and a copy of `fonts`. The three optional channels are
@@ -33,22 +36,36 @@ layer.
   operate on the resolved `scale` — they never re-run the math, they read `scale.categories` /
   `scale.fonts` / `scale.roleOf`.
 
-### 2. The seven named voices + the two step sets
+### 2. The eleven named voices + the three step sets
 
-The canonical taxonomy (.claude/docs/spec/typography): **Display · Heading · Sub-heading · Heading
-Kicker · Body · UI · Code** — Sub-heading + Kicker are LABELS (not headings), which is why they lost the "Heading" prefix. Two step ramps (`STEPS_5`/`STEPS_UI` in type.mjs):
+The canonical taxonomy (.claude/docs/spec/typography): **Display · Heading · Sub-heading · Kicker · Lead ·
+Body · Quote · Caption · UI · Code · Legal** — Sub-heading + Kicker are LABELS (not headings), which is why
+they lost the "Heading" prefix; the four editorial voices (Lead · Quote · Caption · Legal) are ADR-013.
+Three step ramps (`STEPS_3`/`STEPS_5`/`STEPS_UI` in type.mjs):
 
+- **`STEPS_3`** = `[["SM",−1],["MD",0],["LG",1]]` (3) — the lean editorial ramp: Lead, Quote, Caption, Legal.
+  These voices realistically use one-or-two registers, so they skip the full XS–XL (MD = the voice's base).
 - **`STEPS_5`** = `[["XS",−2],["SM",−1],["MD",0],["LG",1],["XL",2]]` — Display, Heading, Sub-heading, Kicker, Body.
 - **`STEPS_UI`** = `[["3XS",−4],["2XS",−3],["XS",−2],["SM",−1],["MD",0],["LG",1],["XL",2],["2XL",3]]` (8) —
-  UI and Code. (41 steps across the seven groups in all.)
+  UI and Code. (53 steps across the eleven voices in all.)
 
 `MD` is always exponent 0, i.e. the voice's *base* size. The exponent is the step's signed distance from the
 base, so the same modular ratio governs both directions.
 
-**The role map (`roleOf`)** comes straight from each `cat`'s first arg: Display→`display`, both editorial
-Heading + Sub-heading → `heading`, Body→`body`, UI→`ui`, and the two mono voices — **Kicker and Code — →`mono`**
-(both `cat("mono", …)`). That mono pairing is deliberate: the kicker overline and code both want the
-monospaced face. The emitters use `roleOf` to point each voice's CSS/DTCG at the right `--font-{role}`.
+**The role map (`roleOf`)** comes straight from each `cat`'s first arg: Display→`display`; Heading,
+Sub-heading, and **Quote** → `heading` (so the pull-quote inherits each treatment's display face — a serif
+quote in the serif treatments, a grotesque in Brutalist); **Lead** + Body → `body`; UI, **Caption**, and
+**Legal** → `ui`; and the two mono voices — **Kicker and Code — →`mono`** (both `cat("mono", …)`). That mono
+pairing is deliberate: the kicker overline and code both want the monospaced face. The emitters use `roleOf`
+to point each voice's CSS/DTCG at the right `--font-{role}`.
+
+**The `box` flag (flow ≠ font).** A per-voice `box` field decouples the presentation FLOW from the font
+role. It DEFAULTS from the role (`ui`/`mono` ⇒ `box:true`; every other role ⇒ `false`), so the seven
+original voices are byte-identical. A BOX voice is CONTROL/label text — it emits a `singleLineHeight` and
+uses a flat label-height paragraph factor; a PROSE voice wraps (no single-line height, reading paragraph
+factor). The override that matters: **Caption + Legal ride the `ui` FONT but set `box:false`** — they are
+prose (reading leading ~1.5), NOT the box/control treatment the UI voice itself gets. `singleLineHeight` and
+the paragraph factor key on `box`, NOT on `role === "ui"||"mono"` (see §3).
 
 ### 3. The math — `buildCategory(name, p, factor, overrides, vp)`
 
@@ -64,7 +81,9 @@ lineHeight    = Math.round(size · leading)            # re-derives from the RES
 letterSpacing = round(derived · trackingEm, 2)        # 2-dp px; optical — an override never moves tracking
 weight        = weight                                # flat across steps
 textTransform = p.transform || "none"
-paragraphSpacing = size; paragraphIndent = 0          # rhythm tracks the resolved size
+paragraphSpacing = round(size · (p.box ? 1 : PARA_PROSE[role] ?? 0.75))   # BOX = flat label height; PROSE breathes
+paragraphIndent  = 0                                  # rhythm tracks the resolved size
+singleLineHeight = size                               # BOX voices ONLY (control-text intent, leading 1.0)
 ```
 
 - **Modular scale**: `size = base · ratio^n`. A `ratio` of 1.2 (Minor Third) means each step is 20% larger
@@ -92,13 +111,19 @@ paragraphSpacing = size; paragraphIndent = 0          # rhythm tracks the resolv
   per-voice `vp` (from `config.voices`) retunes a WHOLE voice's ratio/weight/leading/tracking — like a
   per-palette Hue. Other voices stay byte-identical.
 - **The 8px floor** (`Math.max(8, …)`) keeps the smallest UI/Code steps legible even after a small `bodyBase`.
+- **Paragraph rhythm keys on `box`, not role.** `paragraphSpacing = round(size · (box ? 1 : PARA_PROSE[role] ??
+  0.75))` — a BOX voice (control/label text: UI · Code · Kicker) uses a flat `1.0×size` (its "paragraph" is its
+  own height); a PROSE voice breathes at its reading factor from `PARA_PROSE` (`{display:0.7, heading:0.7,
+  body:0.75}`), and a ui-FONT prose voice — Caption · Legal — falls back to `0.75`. `singleLineHeight`
+  (= size, leading 1.0 — the control-text intent) is emitted for the BOX voices ONLY, never for the ui-font
+  prose voices. (The constant is `PARA_PROSE`, renamed from `PARA_FACTOR`.)
 
 ### 4. Case is per-treatment, not a blanket rule
 
 `textTransform` comes from each voice's `transform` arg. The standing rules:
 
 - **Sub-heading** and **Kicker** are the two genuine UPPERCASE "caps voices" — `"uppercase"`
-  is hardcoded in `make7` for both. They track POSITIVE so small caps open up.
+  is hardcoded in `make11` for both. They track POSITIVE so small caps open up.
 - **Display** defaults to title/sentence case (`o.dTransform ?? "none"`). Only the **Brutalist/`statement`**
   treatment passes `dTransform:"uppercase"` — the one earned ALL-CAPS display. The test
   asserts *exactly one* treatment sets an uppercase Display (the exactly-one-uppercase-Display assert), and
@@ -119,7 +144,7 @@ Each treatment expresses a distinct voice through case + weight contrast + track
 | `statement` | Brutalist / Statement | Inter Tight · Inter Tight · Inter · Inter · JetBrains Mono | one heavy grotesque (`dWeight 900`), ALL-CAPS display, dramatic jumps (`dRatio 1.5`) |
 
 The SCALE + tracking + weight + leading + case relationships are the product; fonts are swappable (free
-families only). Note `luxury`'s Display base is 76 (not the `make7` default 60) — treatments override knobs.
+families only). Note `luxury`'s Display base is 76 (not the `make11` default 60) — treatments override knobs.
 Note also `technical` and `editorial` map the **UI** voice to JetBrains Mono (their `fonts.ui` is the mono
 family), while `mono` is always JetBrains Mono.
 
@@ -144,8 +169,9 @@ these clean: 16px→1rem, 24px→1.5rem).
   unit STRINGS (default px, e.g. `"16px"`); `fontWeight` is a NUMBER; `textCase` carries `textTransform`;
   `fontFamily` is the role's family string (`scale.fonts[role]`).
 - **`typeTokensFigmaModes(baseScale, modes)`** → ONE Figma variable collection (`"Typography"`) with
-  `modes: ["Base", …breakpoints]` and four FLOAT variables per voice×step
-  (`<voice>/<step>/{size,lineHeight,letterSpacing,weight}` — weight too; Figma variables are numbers).
+  `modes: ["Base", …breakpoints]` and five FLOAT variables per voice×step
+  (`<voice>/<step>/{size,lineHeight,letterSpacing,weight,paragraphSpacing}` — weight too; Figma variables
+  are numbers), plus `singleLineHeight` on the box voices (UI · Code · Kicker) where present.
   `disambiguateModeNames` renames a breakpoint named "Base" or a duplicate (`"Wide 2"`) so Figma never
   rejects the import. `modes = []` ⇒ a single "Base" mode equal to the base scale (identity).
 

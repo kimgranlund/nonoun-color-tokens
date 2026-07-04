@@ -5,7 +5,7 @@ description: >
   font/size/weight/leading/tracking for a heading, body copy, label, button, caption, code, or
   kicker ("what type token for this", "which voice/step should this text use", "size this heading",
   "make the type responsive", "why is this text the wrong size/weight", "wire the fonts"). The
-  consumption guide for the seven-role type scale (role=function × level=hierarchy-depth, size
+  consumption guide for the eleven-role type scale (role=function × level=hierarchy-depth, size
   derived): how to find and bind the exported `--type-*` /
   `--font-*` variables, choose the right VOICE for a text's job and the right STEP for its size, and
   apply the paragraph/single-line rhythm. Never hardcode a px font-size or a font family — this names
@@ -15,7 +15,7 @@ description: >
 
 # Using Ultimate Tokens type roles
 
-An Ultimate Tokens export gives seven named **voices**, each a ramp of **steps**, as CSS custom
+An Ultimate Tokens export gives eleven named **voices**, each a ramp of **steps**, as CSS custom
 properties. Your job is never to pick a px size or a font stack — it is to pick the right **voice**
 (the text's role) and **step** (its size within that role).
 
@@ -44,7 +44,7 @@ level hosts different roles. **You pick the role by function and the level by hi
 a role to hit a size, never a step to hit a px.** Choosing `display` because you want big text, or a
 larger step because you want line-height 26, is the mistake this split exists to prevent.
 
-## The seven roles — pick by the text's FUNCTION
+## The eleven roles — pick by the text's FUNCTION
 
 | Voice (role) | Font role | Use for | Steps (levels) |
 |---|---|---|---|
@@ -52,12 +52,18 @@ larger step because you want line-height 26, is the mistake this split exists to
 | **heading** | heading | section & content headings (h1–h4), card titles, dialog titles | XS–XL |
 | **sub-heading** | heading | sub-headings / section labels above a heading — wide-tracked, usually uppercase | XS–XL |
 | **kicker** | mono | the smallest overline / metadata label — mono, uppercase, tracked | XS–XL |
+| **lead** | body | the standfirst / intro paragraph opening an article or section — larger than body | SM–LG |
 | **body** | body | running prose, paragraphs, descriptions, long-form reading | XS–XL |
-| **ui** | ui | interface text: buttons, labels, inputs, menus, table cells, captions, badges | 3XS–2XL |
+| **quote** | heading | block quotes & pull quotes — takes the display face (a serif pull-quote in serif treatments) | SM–LG |
+| **caption** | ui (prose) | figure/image/media captions, table captions, chart annotations | SM–LG |
+| **ui** | ui | interface text: buttons, labels, inputs, menus, table cells, badges | 3XS–2XL |
 | **code** | mono | code, tabular figures, keyboard shortcuts, technical values | 3XS–2XL |
+| **legal** | ui (prose) | fine-print, disclaimers, legal, footnotes — the smallest reading text | SM–LG |
 
 Note the split: **body** is for *prose you read*; **ui** is for *interface chrome you operate*. A
-button label is `ui`, not `body`. A paragraph is `body`, not `ui`.
+button label is `ui`, not `body`. A paragraph is `body`, not `ui`. The **editorial** voices are prose
+too — **lead**, **quote**, **caption**, **legal** — even though caption/legal render in the *ui font*;
+they wrap (use `-line`, not `-line-single`). Reach for `caption` on a figure caption, not `ui`.
 
 ## The laws (violating any of these is a defect)
 
@@ -89,7 +95,7 @@ button label is `ui`, not `body`. A paragraph is `body`, not `ui`.
 | Setting type on… | Reference |
 |---|---|
 | Headings h1–h6, sub-headings, kickers, display, the heading↔body pairing | [`references/headings.md`](references/headings.md) |
-| Body prose, lead paragraphs, captions, lists, links, blockquotes, inline code | [`references/prose.md`](references/prose.md) |
+| Body prose, lead/standfirst, quotes & pull-quotes, captions, legal fine-print, lists, links, inline code | [`references/prose.md`](references/prose.md) |
 | Buttons, inputs, labels, menus, tabs, table cells, badges, tooltips, code | [`references/interface.md`](references/interface.md) |
 | Breakpoint modes, single-line vs multi-line, fluid-type anti-pattern, fallback fonts | [`references/responsive.md`](references/responsive.md) |
 

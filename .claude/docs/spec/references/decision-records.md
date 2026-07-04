@@ -215,6 +215,41 @@ Format: Context → Decision → Rationale → Consequences → Status.
   `dampAmp` 0 and 66.
 - **Status.** DECIDED.
 
+## ADR-013 — Editorial type voices (7 → 11) + the box/flow decoupling
+- **Context.** The type taxonomy shipped **seven** voices (Display · Heading · Sub-heading · Kicker ·
+  Body · UI · Code) — a `make7()` factory, each voice a size ramp riding one of five font roles
+  (display/heading/body/ui/mono). It lacked the everyday **editorial** roles: a standfirst/lede, a
+  block/pull quote, a figure/media caption, and fine-print. Two constraints shaped the fix: the engine
+  emitters are all generic (a new voice auto-flows from one `cat()` line), and `role` conflated three
+  things — the **font**, the **paragraph flow** (single-line height + paragraph factor), and the character.
+- **Decision.** Add **four editorial voices → `make11()`** (via intent-grill, 2 rounds):
+  1. **Set + roles.** **Lead** (body role — a larger standfirst), **Quote** (**heading** role, so it
+     inherits each treatment's display face — a serif pull-quote in the serif treatments, a grotesque in
+     Brutalist), **Caption** and **Legal** (fine-print). All four ride **existing** font roles, so **no new
+     font** is introduced.
+  2. **Lean ramp.** Each new voice uses a 3-step **`STEPS_3`** (SM·MD·LG, MD = base), not the full XS–XL
+     — editorial voices use one-or-two registers. Total steps 41 → **53**.
+  3. **The `box`/flow decoupling (OVERRIDE of the old role⇒flow coupling).** A new per-voice **`box`**
+     field separates presentation flow from font role. It DEFAULTS from the role (`ui`/`mono` ⇒ `box`), so
+     the seven originals are **byte-identical**. **Caption + Legal ride the ui FONT but set `box:false`** —
+     they are PROSE (reading leading ~1.5, paragraph factor 0.75×, **no single-line height**), not the
+     control/box treatment the UI voice itself gets. `singleLineHeight` and the paragraph factor now key on
+     `box`, not on `role === "ui"||"mono"`.
+  4. **Treatment integration** — hybrid: fixed cross-treatment defaults + a few per-voice knobs
+     (`leadWeight`, `quoteLead`, `legalWeight`, …), the Kicker/Code pattern; used sparingly (Luxury lightens
+     Lead/Quote, Editorial tightens the Quote leading, Brutalist heavies the Quote).
+- **Rationale.** A voice is a **function**, so the editorial roles are voices (semantic tokens
+  `--type-quote-*` etc.), not Body levels. Riding existing roles keeps the blast bounded; the `box` flag is
+  the minimal, correct model for "ui font, prose flow" and generalizes the old ui/mono⇒single-line rule.
+- **Consequences.** Emitters (CSS/DTCG/Figma/MCP) auto-flowed. The lockstep edits: `persist.js` VOICES
+  allowlist (else per-voice overrides drop on hydrate — the one silent landmine), the test count literals
+  (`GROUPS` 11, headless 53 steps / 11 groups), `styles.css` `.ty-s0…10` series colours, and the
+  `TYPE_SPECIMENS`/`SHORT` maps. **There is NO code-enforced type answer-key** (unlike colour's
+  `role-table.json`): `typography.tokens.json` is a frozen reference snapshot, and the consumption plugin's
+  `voice-parity.mjs` **auto-derives** the voice list from the live engine — so parity holds without a
+  hand-kept table; the spec/README/marketing "seven"→"eleven" is doc drift, serviced in the same change.
+- **Status.** DECIDED.
+
 ---
 
 ## Quick map: decisions an enhancing agent is most likely to "fix" (don't)

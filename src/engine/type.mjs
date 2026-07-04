@@ -10,14 +10,18 @@
 //   lineHeight     = round(size · leading)     (per-role leading; single-line = size)
 //   letterSpacing = round(size · trackingEm)  (optical: negative tightens big display, positive loosens UI)
 //   weight        = the role's weight
-//   paragraphSpacing = size × PARA_FACTOR[role] (0.7 display/heading · 0.75 prose · 1.0 ui/mono), indent = 0
-//   singleLineHeight = size (ui/mono roles only — the control-text intent next to the multi-line lineHeight)
+//   paragraphSpacing = size × (box ? 1.0 : PARA_PROSE[role]≈0.7–0.75) (box = label height; prose = reading), indent = 0
+//   singleLineHeight = size (BOX voices only — the control-text intent next to the multi-line lineHeight)
 
 const round = (v, d = 0) => { const f = 10 ** d; return Math.round(v * f) / f; };
 
 // step ramps: [name, exponent] where exponent is the step's distance from the base (size = base·ratio^n).
 const STEPS_5 = [["XS", -2], ["SM", -1], ["MD", 0], ["LG", 1], ["XL", 2]];
 const STEPS_UI = [["3XS", -4], ["2XS", -3], ["XS", -2], ["SM", -1], ["MD", 0], ["LG", 1], ["XL", 2], ["2XL", 3]];
+// lean editorial ramp (SM·MD·LG) for the four editorial voices — Lead · Quote · Caption · Legal. These
+// voices realistically use one-or-two registers, so they get a 3-step ramp (MD = the voice's base), not
+// the full XS–XL. Uniform across the four so the token matrix + override UI stay regular.
+const STEPS_3 = [["SM", -1], ["MD", 0], ["LG", 1]];
 
 // classic modular ratios (the "musical" scale), for reference + the UI's ratio picker.
 export const TYPE_RATIOS = [
@@ -32,42 +36,57 @@ export const TYPE_RATIOS = [
 ];
 
 // A "treatment" seeds the params, exactly as the color "Color Categories" presets seed palette params.
-// Each category: { role, base, ratio, leading, weight, trackingEm, steps, transform }. Fonts are swappable;
-// the SCALE + tracking + weight + leading + case relationships are the product. Free families only.
-const cat = (role, base, ratio, leading, weight, trackingEm, steps = STEPS_5, transform = "none") => ({ role, base, ratio, leading, weight, trackingEm, steps, transform });
+// Each category: { role, base, ratio, leading, weight, trackingEm, steps, transform, box }. Fonts are
+// swappable; the SCALE + tracking + weight + leading + case relationships are the product. Free families only.
+// `box` — the presentation FLOW, decoupled from the font role: box voices are CONTROL/label text (they emit
+// a single-line height and use label-height paragraph spacing); prose voices wrap (no single-line height,
+// reading paragraph spacing). It DEFAULTS from the role (ui/mono ⇒ box) so the 7 original voices are
+// unchanged, and is overridable — Caption/Legal ride the ui FONT but are prose (box:false), per the design.
+const cat = (role, base, ratio, leading, weight, trackingEm, steps = STEPS_5, transform = "none", box = role === "ui" || role === "mono") => ({ role, base, ratio, leading, weight, trackingEm, steps, transform, box });
 
-// make7 — the SEVEN named type ROLES (each a FUNCTION, not a size register — the taxonomy in
-// .claude/docs/spec/typography): Display · Heading · Sub-heading · Kicker · Body · UI · Code. A role
-// carries CHARACTER (weight, tracking, leading, case, font cut) that travels with it across every
-// LEVEL; the level (the step) is chosen by hierarchy depth and the size is DERIVED from it (base ×
-// ratio^level), never picked to hit a number. Sub-heading is the secondary heading below Heading;
-// Kicker is the smallest overline / section label that sits ABOVE a heading. Shared STRUCTURE across
-// treatments; each treatment passes its fonts + a few character knobs. Kicker + Code ride the MONO role.
+// make11 — the ELEVEN named type ROLES (each a FUNCTION, not a size register — the taxonomy in
+// .claude/docs/spec/typography): Display · Heading · Sub-heading · Kicker · Lead · Body · Quote · Caption ·
+// UI · Code · Legal. A role carries CHARACTER (weight, tracking, leading, case, font cut) that travels
+// with it across every LEVEL; the level (the step) is chosen by hierarchy depth and the size is DERIVED
+// from it (base × ratio^level), never picked to hit a number. Sub-heading is the secondary heading below
+// Heading; Kicker is the smallest overline / section label that sits ABOVE a heading. Shared STRUCTURE
+// across treatments; each treatment passes its fonts + a few character knobs. Kicker + Code ride the MONO
+// role.
 //
-// NOTE (character vs name): this is a RENAME (Sub-heading was "Kicker"; Kicker was "Eyebrow") that
-// preserves each role's tuned CHARACTER — so Sub-heading currently reads as a wide-tracked uppercase
-// label and Kicker rides the mono role. If those characters should follow the new names (a sentence-case
-// Sub-heading, a sans Kicker), retune the knobs below — that's a deliberate follow-up, not this rename.
+// The FOUR editorial voices (ADR-013) add the reading roles the original seven lacked, each on the lean
+// SM·MD·LG ramp (STEPS_3): Lead (the standfirst — a larger body intro, body role); Quote (block/pull
+// quote — the HEADING role, so it inherits each treatment's display face: a serif pull-quote in the serif
+// treatments, a grotesque in Brutalist); Caption (figure/media caption) and Legal (fine-print) — both ride
+// the ui FONT but are PROSE (box:false → wrapping, reading leading ~1.5, not the box/control single-line
+// treatment). They ride EXISTING font roles (body/heading/ui), so no new font is introduced.
+//
+// NOTE (character vs name): Sub-heading was "Kicker"; Kicker was "Eyebrow" (a preserved-character rename).
 // The internal knob prefixes (`hc-`, `eye-`) still feed Sub-heading and Kicker respectively.
 //
 // CASE is a per-treatment decision, not a blanket rule. The Display role defaults to TITLE/SENTENCE case
 // (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. The two genuine
 // "caps roles" are Sub-heading and Kicker; those stay uppercase and track POSITIVE so small caps open up.
 // Display tracks NEGATIVE — big type tightens. LEADINGS are a system constant (the font.modes.json
-// design intent), uniform across treatments so the same ratio set holds everywhere: display 0.8 (< 1 —
-// large type sets tight), heading + sub-heading 1.125, prose (body) 1.5, Kicker 1.4, UI 1.4, mono/code
-// ~1.5; single-line control text (UI · Code · Kicker) = 1.0. Treatments express voice through font,
-// weight, tracking, and scale — NOT leading, which is fixed to the intent (retune a per-voice `*Lead`
-// knob only for a deliberate character exception).
-function make7(o = {}) {
+// design intent, extended for the editorial voices), uniform across treatments so the same ratio set holds
+// everywhere: display 0.8 (< 1 — large type sets tight), heading + sub-heading 1.125, prose (body) 1.5,
+// Lead 1.4, Quote 1.35, Caption + Legal 1.5, Kicker 1.4, UI 1.4, mono/code ~1.5; single-line control text
+// (the BOX voices UI · Code · Kicker) = 1.0. Treatments express voice through font, weight, tracking, and
+// scale — NOT leading, which is fixed to the intent (retune a per-voice `*Lead` knob only for a deliberate
+// character exception). The editorial voices keep a few knobs (weight/leading/tracking) for the same
+// per-treatment latitude Kicker/Code have — used sparingly (see the treatments below), fixed otherwise.
+function make11(o = {}) {
   return {
     "Display": cat("display", o.dBase ?? 60, o.dRatio ?? 1.25, o.dLead ?? 0.8, o.dWeight ?? 700, o.dTrack ?? -0.02, STEPS_5, o.dTransform ?? "none"),
     "Heading": cat("heading", 28, o.heRatio ?? 1.25, o.heLead ?? 1.125, o.heWeight ?? 700, o.heTrack ?? -0.005, STEPS_5, "none"),
     "Sub-heading": cat("heading", 26, o.hcRatio ?? 1.2, o.hcLead ?? 1.125, o.hcWeight ?? 600, o.hcTrack ?? 0.1, STEPS_5, "uppercase"),
     "Kicker": cat("mono", 13, 1.15, o.eyeLead ?? 1.4, o.eyeWeight ?? 600, o.eyeTrack ?? 0.16, STEPS_5, "uppercase"),
+    "Lead": cat("body", 20, 1.2, o.leadLead ?? 1.4, o.leadWeight ?? 400, o.leadTrack ?? -0.005, STEPS_3, "none"),
     "Body": cat("body", o.bBase ?? 16, o.bRatio ?? 1.2, o.bLead ?? 1.5, o.bWeight ?? 440, 0, STEPS_5, "none"),
+    "Quote": cat("heading", 22, o.quoteRatio ?? 1.2, o.quoteLead ?? 1.35, o.quoteWeight ?? 450, o.quoteTrack ?? -0.005, STEPS_3, "none"),
+    "Caption": cat("ui", 13, 1.1, o.capLead ?? 1.5, o.capWeight ?? 440, 0, STEPS_3, "none", false), // ui FONT, prose flow
     "UI": cat("ui", 14, 1.125, o.uiLead ?? 1.4, o.uiWeight ?? 480, o.uiTrack ?? 0.006, STEPS_UI, "none"),
     "Code": cat("mono", 13, 1.125, 1.5, o.codeWeight ?? 460, o.codeTrack ?? 0, STEPS_UI, "none"),
+    "Legal": cat("ui", 11, 1.1, o.legalLead ?? 1.5, o.legalWeight ?? 440, 0, STEPS_3, "none", false), // ui FONT, prose flow
   };
 }
 
@@ -78,23 +97,23 @@ export const TYPE_TREATMENTS = [
   // Product — calm geometric sans, gentle hierarchy, title-case display. The everyday system voice.
   { id: "product", label: "Product / Lifestyle", note: "Neutral geometric sans, title-case display — screen-native, calm, versatile.",
     fonts: { display: "Inter Tight", heading: "Inter Tight", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
-    categories: make7({ dBase: 54, dRatio: 1.25, dWeight: 700, dTrack: -0.02, heWeight: 620, uiLead: 1.35, eyeTrack: 0.14 }) },
+    categories: make11({ dBase: 54, dRatio: 1.25, dWeight: 700, dTrack: -0.02, heWeight: 620, uiLead: 1.35, eyeTrack: 0.14 }) },
   // Luxury — high-contrast serif set LIGHT and large, airy prose, wide-tracked labels. Restraint, not shout.
   { id: "luxury", label: "Luxury / Premium", note: "High-contrast serif display set light and large, airy sans body, wide-tracked labels — restraint over shout.",
     fonts: { display: "Source Serif 4", heading: "Source Serif 4", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
-    categories: make7({ dBase: 76, dRatio: 1.25, dWeight: 400, dTrack: -0.005, heWeight: 500, heTrack: 0, hcRatio: 1.25, hcWeight: 500, hcTrack: 0.18, bBase: 17, bRatio: 1.25, bWeight: 400, uiTrack: 0.04, uiLead: 1.45, eyeWeight: 500, eyeTrack: 0.26 }) },
+    categories: make11({ dBase: 76, dRatio: 1.25, dWeight: 400, dTrack: -0.005, heWeight: 500, heTrack: 0, hcRatio: 1.25, hcWeight: 500, hcTrack: 0.18, bBase: 17, bRatio: 1.25, bWeight: 400, uiTrack: 0.04, uiLead: 1.45, eyeWeight: 500, eyeTrack: 0.26, leadWeight: 300, quoteWeight: 400, quoteLead: 1.4 }) },
   // Editorial — serif headlines in title case, tight sans subheads, sans body tuned for long-form reading.
   { id: "editorial", label: "Editorial / Magazine", note: "Serif headlines in title case, tight sans subheads, sans body for long-form reading, mono metadata.",
     fonts: { display: "Source Serif 4", heading: "Inter Tight", body: "Inter", ui: "JetBrains Mono", mono: "JetBrains Mono" },
-    categories: make7({ dBase: 60, dRatio: 1.25, dWeight: 650, dTrack: -0.015, heWeight: 750, heTrack: -0.01, bBase: 18, bRatio: 1.25, eyeTrack: 0.2 }) },
+    categories: make11({ dBase: 60, dRatio: 1.25, dWeight: 650, dTrack: -0.015, heWeight: 750, heTrack: -0.01, bBase: 18, bRatio: 1.25, eyeTrack: 0.2, leadLead: 1.45, quoteLead: 1.3 }) },
   // Technical — mono-forward, tabular, dense, tight leading. Display reads as data, not a slogan.
   { id: "technical", label: "Technical / Data", note: "Mono-forward — tabular figures, dense, tight leading, restrained scale. Display reads as data, not slogan.",
     fonts: { display: "Inter", heading: "Inter", body: "Inter", ui: "JetBrains Mono", mono: "JetBrains Mono" },
-    categories: make7({ dBase: 42, dRatio: 1.2, dWeight: 650, dTrack: -0.01, heWeight: 600, heRatio: 1.2, hcRatio: 1.18, hcTrack: 0.08, bBase: 15, bRatio: 1.2, uiTrack: 0, uiLead: 1.35 }) },
+    categories: make11({ dBase: 42, dRatio: 1.2, dWeight: 650, dTrack: -0.01, heWeight: 600, heRatio: 1.2, hcRatio: 1.18, hcTrack: 0.08, bBase: 15, bRatio: 1.2, uiTrack: 0, uiLead: 1.35 }) },
   // Brutalist — one heavy grotesque, the earned ALL-CAPS display, tight tracking, dramatic size jumps.
   { id: "statement", label: "Brutalist / Statement", note: "One heavy grotesque, ALL-CAPS display, tight tracking, dramatic size jumps — the loud voice, used on purpose.",
     fonts: { display: "Inter Tight", heading: "Inter Tight", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
-    categories: make7({ dBase: 84, dRatio: 1.5, dWeight: 900, dTrack: -0.04, dTransform: "uppercase", heWeight: 800, heRatio: 1.4, heTrack: -0.02, hcRatio: 1.3, hcWeight: 700, hcTrack: 0.12, bRatio: 1.25, bWeight: 500, uiWeight: 550, uiTrack: 0.02, eyeWeight: 700, eyeTrack: 0.12 }) },
+    categories: make11({ dBase: 84, dRatio: 1.5, dWeight: 900, dTrack: -0.04, dTransform: "uppercase", heWeight: 800, heRatio: 1.4, heTrack: -0.02, hcRatio: 1.3, hcWeight: 700, hcTrack: 0.12, bRatio: 1.25, bWeight: 500, uiWeight: 550, uiTrack: 0.02, eyeWeight: 700, eyeTrack: 0.12, quoteWeight: 700, quoteTrack: -0.01, legalWeight: 500 }) },
 ];
 
 export const DEFAULT_TYPE = { treatment: "product", bodyBase: 16 };
@@ -116,9 +135,11 @@ const niceStep = (v) => (v <= 16 ? 1 : v <= 24 ? 2 : v <= 48 ? 4 : v <= 96 ? 8 :
 const niceSize = (v) => { const s = niceStep(v); return Math.max(8, Math.round(v / s) * s); };
 const nextNice = (v) => { let n = v + 1; while (niceSize(n) <= v) n += 1; return niceSize(n); };
 
-// per-role paragraph-spacing factor (× the resolved size) — sourced from the reference Figma system:
-// display/heading paragraphs breathe at ~0.7×, prose at 0.75, ui/mono at 1.0 (a label's own height).
-const PARA_FACTOR = { display: 0.7, heading: 0.7, body: 0.75, ui: 1, mono: 1 };
+// per-role READING paragraph factor (× the resolved size) for PROSE voices — sourced from the reference
+// Figma system: display/heading paragraphs breathe at ~0.7×, body prose at 0.75. BOX voices (control/label
+// text) don't consult this — they use a flat 1.0 (a label's "paragraph" is its own height). A prose voice
+// on a non-reading role (Caption/Legal ride the ui FONT but are prose) falls back to 0.75.
+const PARA_PROSE = { display: 0.7, heading: 0.7, body: 0.75 };
 
 function buildCategory(name, p, factor, overrides, vp) {
   // per-VOICE shaping overrides (vp): ratio · weight · leading · tracking(em) REPLACE the treatment's for the
@@ -149,15 +170,16 @@ function buildCategory(name, p, factor, overrides, vp) {
       letterSpacing: round(derived * trackingEm, 2), // tracking STAYS on the modular-scale size (ratified "size lever; tracking/weight unchanged")
       weight,
       textTransform: p.transform || "none",
-      // paragraph rhythm tracks the resolved size at a PER-ROLE factor (sourced from the reference
-      // Figma system): big display/heading blocks breathe at ~0.7×size, prose at 0.75, ui/mono at
-      // 1.0 (a label's "paragraph" is just its own height). Indent is a constant 0 (schema parity).
-      paragraphSpacing: Math.round(size * (PARA_FACTOR[p.role] ?? 1)),
+      // paragraph rhythm tracks the resolved size, keyed on FLOW not just role: a BOX voice (control/label
+      // text — UI · Code · Kicker) uses 1.0×size (its "paragraph" is its own height); a PROSE voice breathes
+      // at its reading factor (display/heading ~0.7, body 0.75, and a ui-font prose voice — Caption/Legal —
+      // falls back to 0.75). Indent is a constant 0 (schema parity).
+      paragraphSpacing: Math.round(size * (p.box ? 1 : (PARA_PROSE[p.role] ?? 0.75))),
       paragraphIndent: 0,
       // single-line height (= size, leading 1.0) — the CONTROL-text intent, distinct from the
-      // multi-line lineHeight above. Emitted only for the ui/mono roles (UI · Code · Kicker),
-      // where text sits in a box and the box owns the rhythm.
-      ...(p.role === "ui" || p.role === "mono" ? { singleLineHeight: size } : {}),
+      // multi-line lineHeight above. Emitted only for the BOX voices (UI · Code · Kicker), where text
+      // sits in a box and the box owns the rhythm — NOT for the ui-FONT prose voices (Caption · Legal).
+      ...(p.box ? { singleLineHeight: size } : {}),
     };
   }
   return out;
@@ -302,7 +324,7 @@ export function typeTokensFigmaModes(baseScale, modes = []) {
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
           variables[key].values[mode] = s[prop];
         }
-        // singleLineHeight exists only on the ui/mono voices (UI · Code · Kicker) — emit where present.
+        // singleLineHeight exists only on the BOX voices (UI · Code · Kicker) — emit where present.
         if (s.singleLineHeight != null) {
           const key = `${cName}/${sName}/singleLineHeight`;
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };

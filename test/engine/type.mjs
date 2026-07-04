@@ -5,10 +5,10 @@ import * as T from "../../src/engine/type.mjs";
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
 
-// ── treatments: 5 presets, each with the SEVEN named groups ──
-const GROUPS7 = ["Display", "Heading", "Sub-heading", "Kicker", "Body", "UI", "Code"];
+// ── treatments: 5 presets, each with the ELEVEN named voices (7 original + 4 editorial, ADR-013) ──
+const GROUPS = ["Display", "Heading", "Sub-heading", "Kicker", "Lead", "Body", "Quote", "Caption", "UI", "Code", "Legal"];
 ok(T.TYPE_TREATMENTS.length === 5, `5 treatments (got ${T.TYPE_TREATMENTS.length})`);
-ok(T.TYPE_TREATMENTS.every((t) => t.fonts && GROUPS7.every((c) => t.categories[c])), "every treatment has the 7 groups (Display · 3 Headings · Body · UI · Code) + fonts");
+ok(T.TYPE_TREATMENTS.every((t) => t.fonts && GROUPS.every((c) => t.categories[c])), "every treatment has the 11 voices (Display · Heading · Sub-heading · Kicker · Lead · Body · Quote · Caption · UI · Code · Legal) + fonts");
 ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((t) => t.id === "luxury") && T.TYPE_TREATMENTS.some((t) => t.id === "editorial"), "has product/luxury/editorial");
 
 // ── the taxonomy: role mapping (Kicker + Code ride MONO) + the UPPERCASE caps voices ──
@@ -29,6 +29,24 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
   ok(s.categories["Display"].XL.letterSpacing < 0, "Display caps track negative (tighten)");
   // Code mirrors the UI ramp (8 steps, 3XS..2XL)
   ok(["3XS", "2XS", "XS", "SM", "MD", "LG", "XL", "2XL"].every((k) => s.categories.Code[k]), "Code has the 8-step UI ramp 3XS..2XL");
+}
+
+// ── the FOUR editorial voices (ADR-013): 11-voice count, roles, the lean SM·MD·LG ramp, box/prose decoupling ──
+{
+  const s = T.typeScale({ treatment: "product", bodyBase: 16 });
+  const c = s.categories;
+  ok(Object.keys(c).length === 11, `11 voices total (got ${Object.keys(c).length})`);
+  ok(s.roleOf.Lead === "body" && s.roleOf.Quote === "heading" && s.roleOf.Caption === "ui" && s.roleOf.Legal === "ui", "editorial roles: Lead→body · Quote→heading (display cut) · Caption/Legal→ui font");
+  for (const v of ["Lead", "Quote", "Caption", "Legal"]) ok(Object.keys(c[v]).join() === "SM,MD,LG", `${v} rides the lean 3-step ramp SM·MD·LG (got ${Object.keys(c[v])})`);
+  // the box/prose DECOUPLING is the load-bearing decision: Caption + Legal ride the ui FONT but are PROSE —
+  // reading leading (~1.5) + reading paragraph spacing (0.75×) + NO single-line height — unlike the ui voice.
+  ok(!("singleLineHeight" in c.Caption.MD) && !("singleLineHeight" in c.Legal.MD), "Caption/Legal ride the ui role but do NOT emit a single-line height (box:false — prose flow)");
+  ok(c.Caption.MD.lineHeight === Math.round(c.Caption.MD.size * 1.5) && c.Legal.MD.lineHeight === Math.round(c.Legal.MD.size * 1.5), "Caption/Legal use prose leading 1.5 (not the ui box leading 1.4)");
+  ok(c.Caption.MD.paragraphSpacing === Math.round(c.Caption.MD.size * 0.75), `Caption paragraphSpacing = prose 0.75×size (not the ui box 1.0×) — got ${c.Caption.MD.paragraphSpacing} for size ${c.Caption.MD.size}`);
+  // Quote rides the heading role → inherits each treatment's display face (a serif pull-quote in serif treatments)
+  const ed = T.typeScale({ treatment: "editorial" });
+  ok(ed.fonts[ed.roleOf.Quote] === ed.fonts.heading, "Quote uses the heading/display font, so a serif treatment yields a serif pull-quote");
+  ok(c.Lead.MD.size === 20 && c.Quote.MD.size === 22 && c.Caption.MD.size === 13 && c.Legal.MD.size === 11, `editorial MD base sizes (Lead 20 · Quote 22 · Caption 13 · Legal 11) — got ${[c.Lead.MD.size, c.Quote.MD.size, c.Caption.MD.size, c.Legal.MD.size]}`);
 }
 
 // ── the modular scale: size = base · ratio^n, monotonic, MD = base ──
@@ -220,20 +238,20 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(dup.variables["Body/MD/size"].values["Base 2"] === mobile.categories.Body.MD.size, "the breakpoint renamed off \"Base\" keeps its own value (didn't overwrite the synthetic Base)");
 }
 
-// ── paragraphSpacing (per-role factor) + singleLineHeight (ui/mono only) — the schema-parity props ──
+// ── paragraphSpacing (box=1.0 / prose factor) + singleLineHeight (BOX voices only) — the schema-parity props ──
 {
   const s = T.typeScale({ treatment: "product", bodyBase: 16 }).categories;
   const near = (a, b) => Math.abs(a - b) <= 0.5;
   ok(near(s.Display.MD.paragraphSpacing, Math.round(s.Display.MD.size * 0.7)), `Display paragraphSpacing = 0.7×size (got ${s.Display.MD.paragraphSpacing} for size ${s.Display.MD.size})`);
   ok(near(s["Heading"].MD.paragraphSpacing, Math.round(s["Heading"].MD.size * 0.7)), "Heading paragraphSpacing = 0.7×size");
   ok(near(s.Body.MD.paragraphSpacing, Math.round(s.Body.MD.size * 0.75)), `Body (prose) paragraphSpacing = 0.75×size (got ${s.Body.MD.paragraphSpacing})`);
-  ok(s.UI.MD.paragraphSpacing === s.UI.MD.size && s.Code.MD.paragraphSpacing === s.Code.MD.size, "ui/mono paragraphSpacing = 1.0×size");
-  // singleLineHeight: control-text intent — present on ui/mono voices only, equal to the size (leading 1.0).
-  ok(s.UI.MD.singleLineHeight === s.UI.MD.size && s.Code.SM.singleLineHeight === s.Code.SM.size && s["Kicker"].MD.singleLineHeight === s["Kicker"].MD.size, "singleLineHeight = size on UI/Code/Kicker");
-  ok(!("singleLineHeight" in s.Display.MD) && !("singleLineHeight" in s.Body.MD), "singleLineHeight is ABSENT on display/heading/prose voices");
+  ok(s.UI.MD.paragraphSpacing === s.UI.MD.size && s.Code.MD.paragraphSpacing === s.Code.MD.size, "the BOX voices (UI/Code) paragraphSpacing = 1.0×size");
+  // singleLineHeight: control-text intent — present IFF a voice is a BOX voice (UI/Code/Kicker), equal to size.
+  ok(s.UI.MD.singleLineHeight === s.UI.MD.size && s.Code.SM.singleLineHeight === s.Code.SM.size && s["Kicker"].MD.singleLineHeight === s["Kicker"].MD.size, "singleLineHeight = size on the BOX voices UI/Code/Kicker");
+  ok(["Display", "Heading", "Sub-heading", "Lead", "Body", "Quote", "Caption", "Legal"].every((v) => !("singleLineHeight" in s[v].MD)), "singleLineHeight is ABSENT on every PROSE voice — incl. Caption/Legal, which ride the ui role but are prose (box:false)");
   // the emitters carry both: CSS -para (+ -line-single where present), DTCG composite, Figma-modes vars.
   const css = T.typeTokensCSS(T.typeScale({ treatment: "product" }));
-  ok(css.includes("-para:") && css.includes("--type-ui-md-line-single:") && !css.includes("--type-display-md-line-single"), "CSS emits -para everywhere and -line-single only on ui/mono voices");
+  ok(css.includes("-para:") && css.includes("--type-ui-md-line-single:") && !css.includes("--type-display-md-line-single") && !css.includes("--type-caption-md-line-single"), "CSS emits -para everywhere and -line-single only on the BOX voices (absent on Caption, though it rides ui)");
   const dt = T.typeTokensDTCG(T.typeScale({ treatment: "product" })).typography;
   ok(dt.UI.MD.$value.singleLineHeight && !dt.Display.MD.$value.singleLineHeight && /px$/.test(dt.Display.MD.$value.paragraphSpacing), "DTCG composite carries paragraphSpacing (px) + singleLineHeight on ui/mono");
   const fv = T.typeTokensFigmaModes(T.typeScale({ treatment: "product" }), []).collections.Typography.variables;
