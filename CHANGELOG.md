@@ -48,12 +48,13 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   type export's `line-height` shifts accordingly. (#199)
 
 #### Fixed
-- **Exported OKLCH hue now matches the hue you set** on saturated palettes. The ramp is built through
-  CAM16/OKHSL and converted back to OKLCH for the `css-oklch` export; the OKLCH↔CAM16 hue anchor was
-  calibrated at the palette's *nominal* chroma, but `dampAmp` drives the vivid center stops to *full*
-  saturation — so the Abney effect left those stops ~2–3° off the slider value (e.g. Hue 300 exported as
-  ~297). The anchor now targets the saturation the center stop actually reaches, landing the vivid stops
-  within ~1° of the set hue. Near-grey palettes (where hue is barely defined) also improve. (#201)
+- **Exported OKLCH hue now matches the hue you set.** The perceptual ramp is authored in OKHSL and
+  exported in OKLCH, and the two disagree on "constant hue" by a chroma/lightness-dependent amount (the
+  Abney effect) — worst in the blues, where a set Hue 270 exported ~6° off (Hue 300 → ~297). The key stop
+  (500) is now anchored by solving the OKHSL hue **directly in the render space, at that stop's own
+  saturation and lightness**, so it reads back on the set OKLCH hue exactly — within **~0.5° across the
+  whole wheel**, at any damping (was up to 6°). Supersedes the interim reached-saturation anchor.
+  (#201, #202)
 - **Download-All now includes BOTH colour-CSS formats.** The bundle emitted only one CSS folder
   (`css-hex/` *or* `css-oklch/`) based on a `Colour format` setting; it now always ships **both**
   `css-hex/` and `css-oklch/`, matching how it already ships both Tailwind and shadcn and the export

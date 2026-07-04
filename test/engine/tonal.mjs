@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import * as T from "../../src/engine/tonal.js";
 import * as E from "../../src/engine/hct.js";
+import { rgbToOklchHue } from "../../src/engine/okhsl.js";
 
 const RT = JSON.parse(readFileSync(new URL("../../.claude/docs/spec/data/role-table.json", import.meta.url), "utf8"));
 const DEFAULTS = RT.defaults;                       // 8 palettes {name,hue,chroma,skew,lift,on}
@@ -311,36 +312,29 @@ for (const mode of ["perceptual", "peak"]) {
   if (Math.abs(pk.tone - hi.tone) > 2) FAIL("vibrancy", `vibrancy 100 (${hi.tone.toFixed(0)}) != peak mode center (${pk.tone.toFixed(0)})`);
 }
 
-// ── oklch-hue-anchor — with hueSpace:"oklch", the VIVID center stop lands on the SET OKLCH hue ──────
-// effHue anchors the OKLCH→CAM16 inverse at the chroma the ramp's center stop actually REACHES
-// (hueAnchorFrac = nominal chroma × the peak damp-amplification, capped at 1). When dampAmp drives the
-// center to full saturation, that anchor sits on the gamut peak where OKLCH/CAM16/OKHSL agree, so the
-// saturated swatches export within ~1° of the slider value. (Anchoring at the raw nominal chroma left a
-// ~2–3° Abney drift on those vivid stops — the "why is the OKLCH hue different" report.)
+// ── oklch-hue-anchor — with hueSpace:"oklch", the KEY stop (500) lands on the SET OKLCH hue ──────────
+// The perceptual ramp is AUTHORED in OKHSL but EXPORTED in OKLCH; the two disagree on "constant hue" by a
+// chroma/lightness-dependent amount (Abney), worst in the blues (~6° at nominal). okhslStops SOLVES the
+// OKHSL hue directly (solveOkhslHue) so stop 500 reads back at the set OKLCH hue, anchored at that stop's
+// OWN saturation + lightness — exact for ANY damping, no CAM16 round-trip. (hueAnchorFrac still seeds the
+// even path + the cusp geometry, so its math is locked below too.)
 {
-  // (a) the helper math: nominal × (1 + dampAmp/100), capped at 1 — a deterministic lock.
+  // (a) hueAnchorFrac: nominal × (1 + dampAmp/100), capped at 1 — a deterministic lock (still used by the
+  // even/CAM16 ramp path + the cusp seed).
   const near = (a, b) => Math.abs(a - b) < 1e-3;
-  if (!near(T.hueAnchorFrac({ chroma: 76 }, { dampAmp: 66 }), 1.0)) FAIL("oklch-hue-anchor", `hueAnchorFrac(76%,amp66)=${T.hueAnchorFrac({ chroma: 76 }, { dampAmp: 66 })}, want 1.0 (0.76×1.66 capped)`);
+  if (!near(T.hueAnchorFrac({ chroma: 76 }, { dampAmp: 66 }), 1.0)) FAIL("oklch-hue-anchor", `hueAnchorFrac(76%,amp66)=${T.hueAnchorFrac({ chroma: 76 }, { dampAmp: 66 })}, want 1.0`);
   if (!near(T.hueAnchorFrac({ chroma: 25 }, { dampAmp: 66 }), 0.415)) FAIL("oklch-hue-anchor", `hueAnchorFrac(25%,amp66)=${T.hueAnchorFrac({ chroma: 25 }, { dampAmp: 66 })}, want 0.415`);
-  if (!near(T.hueAnchorFrac({ chroma: 40 }, { dampAmp: 0 }), 0.40)) FAIL("oklch-hue-anchor", `hueAnchorFrac(40%,amp0)=${T.hueAnchorFrac({ chroma: 40 }, { dampAmp: 0 })}, want 0.40 (no amplification)`);
-  // (b) end-to-end: with the center amplified to full saturation (dampAmp>0 — the scenario the anchor
-  // corrects), a vivid palette's stop 500 exports within 1.5° of the SET OKLCH hue. A revert to the
-  // nominal anchor would push these to ~2.5–3° (the Abney drift) and trip this gate.
-  const oklchHue = (rgb) => {
-    const lin = rgb.map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
-    const [r, g, b] = lin;
-    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-    const A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
-    const B = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
-    let H = Math.atan2(B, A) * 180 / Math.PI; return H < 0 ? H + 360 : H;
-  };
-  const oc = { ...(T.DEFAULT_CONTROLS || {}), hueSpace: "oklch", toneMode: "perceptual", dampAmp: 66, damp: 96, dampCurve: 1.2 };
-  for (const [hue, chroma] of [[300, 76], [235, 80], [70, 100], [27, 55], [145, 55], [190, 60]]) {
-    const s500 = T.paletteStops({ hue, chroma, skew: 0, lift: 0 }, oc, T.EXPORT_STOPS).find((s) => s.stop === 500);
-    const err = angDiff(oklchHue(s500.rgb), hue);
-    if (err > 1.5) FAIL("oklch-hue-anchor", `hue ${hue}/chroma ${chroma}: stop 500 exports OKLCH hue off by ${err.toFixed(2)}° (>1.5° — anchor drift)`);
+  if (!near(T.hueAnchorFrac({ chroma: 40 }, { dampAmp: 0 }), 0.40)) FAIL("oklch-hue-anchor", `hueAnchorFrac(40%,amp0)=${T.hueAnchorFrac({ chroma: 40 }, { dampAmp: 0 })}, want 0.40`);
+  // (b) end-to-end: stop 500 exports within 1° of the SET OKLCH hue across the wheel — including the BLUES
+  // (the old CAM16-proxy's ~6° worst case) — at BOTH the un-amplified default (dampAmp:0) and an amplified
+  // center (dampAmp:66). A revert to the CAM16-proxy anchor would push the blues past 1° and trip this.
+  for (const dampAmp of [0, 66]) {
+    const oc = { ...(T.DEFAULT_CONTROLS || {}), hueSpace: "oklch", toneMode: "perceptual", dampAmp, damp: 96, dampCurve: 1.2 };
+    for (const [hue, chroma] of [[300, 76], [235, 80], [270, 70], [290, 70], [250, 70], [70, 100], [27, 55], [145, 55], [190, 60], [30, 60]]) {
+      const s500 = T.paletteStops({ hue, chroma, skew: 0, lift: 0 }, oc, T.EXPORT_STOPS).find((s) => s.stop === 500);
+      const err = angDiff(rgbToOklchHue(s500.rgb), hue);
+      if (err > 1.0) FAIL("oklch-hue-anchor", `hue ${hue}/chroma ${chroma} (dampAmp ${dampAmp}): stop 500 exports OKLCH hue off by ${err.toFixed(2)}° (>1° — anchor drift)`);
+    }
   }
 }
 
