@@ -311,8 +311,41 @@ for (const mode of ["perceptual", "peak"]) {
   if (Math.abs(pk.tone - hi.tone) > 2) FAIL("vibrancy", `vibrancy 100 (${hi.tone.toFixed(0)}) != peak mode center (${pk.tone.toFixed(0)})`);
 }
 
+// ── oklch-hue-anchor — with hueSpace:"oklch", the VIVID center stop lands on the SET OKLCH hue ──────
+// effHue anchors the OKLCH→CAM16 inverse at the chroma the ramp's center stop actually REACHES
+// (hueAnchorFrac = nominal chroma × the peak damp-amplification, capped at 1). When dampAmp drives the
+// center to full saturation, that anchor sits on the gamut peak where OKLCH/CAM16/OKHSL agree, so the
+// saturated swatches export within ~1° of the slider value. (Anchoring at the raw nominal chroma left a
+// ~2–3° Abney drift on those vivid stops — the "why is the OKLCH hue different" report.)
+{
+  // (a) the helper math: nominal × (1 + dampAmp/100), capped at 1 — a deterministic lock.
+  const near = (a, b) => Math.abs(a - b) < 1e-3;
+  if (!near(T.hueAnchorFrac({ chroma: 76 }, { dampAmp: 66 }), 1.0)) FAIL("oklch-hue-anchor", `hueAnchorFrac(76%,amp66)=${T.hueAnchorFrac({ chroma: 76 }, { dampAmp: 66 })}, want 1.0 (0.76×1.66 capped)`);
+  if (!near(T.hueAnchorFrac({ chroma: 25 }, { dampAmp: 66 }), 0.415)) FAIL("oklch-hue-anchor", `hueAnchorFrac(25%,amp66)=${T.hueAnchorFrac({ chroma: 25 }, { dampAmp: 66 })}, want 0.415`);
+  if (!near(T.hueAnchorFrac({ chroma: 40 }, { dampAmp: 0 }), 0.40)) FAIL("oklch-hue-anchor", `hueAnchorFrac(40%,amp0)=${T.hueAnchorFrac({ chroma: 40 }, { dampAmp: 0 })}, want 0.40 (no amplification)`);
+  // (b) end-to-end: with the center amplified to full saturation (dampAmp>0 — the scenario the anchor
+  // corrects), a vivid palette's stop 500 exports within 1.5° of the SET OKLCH hue. A revert to the
+  // nominal anchor would push these to ~2.5–3° (the Abney drift) and trip this gate.
+  const oklchHue = (rgb) => {
+    const lin = rgb.map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+    const [r, g, b] = lin;
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    const A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+    const B = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+    let H = Math.atan2(B, A) * 180 / Math.PI; return H < 0 ? H + 360 : H;
+  };
+  const oc = { ...(T.DEFAULT_CONTROLS || {}), hueSpace: "oklch", toneMode: "perceptual", dampAmp: 66, damp: 96, dampCurve: 1.2 };
+  for (const [hue, chroma] of [[300, 76], [235, 80], [70, 100], [27, 55], [145, 55], [190, 60]]) {
+    const s500 = T.paletteStops({ hue, chroma, skew: 0, lift: 0 }, oc, T.EXPORT_STOPS).find((s) => s.stop === 500);
+    const err = angDiff(oklchHue(s500.rgb), hue);
+    if (err > 1.5) FAIL("oklch-hue-anchor", `hue ${hue}/chroma ${chroma}: stop 500 exports OKLCH hue off by ${err.toFixed(2)}° (>1.5° — anchor drift)`);
+  }
+}
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-for (const g of ["ingamut", "monotonic", "white-endpoint", "chroma-target", "curve-fidelity", "hue-stability", "damping-curve", "edge-hue", "rel-chroma", "okhsl-modes", "chroma-floor", "vibrancy"]) {
+for (const g of ["ingamut", "monotonic", "white-endpoint", "chroma-target", "curve-fidelity", "hue-stability", "damping-curve", "edge-hue", "rel-chroma", "okhsl-modes", "chroma-floor", "vibrancy", "oklch-hue-anchor"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

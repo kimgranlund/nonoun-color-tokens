@@ -85,10 +85,22 @@ const lerp = (a, b, t) => a + (b - a) * t;
 // 'oklch' inputs are mapped through the engine; 'cam16' (default) pass straight.
 // Compute this a single time and feed the SAME value to every stop so the
 // emitted CAM16 hue is constant across the ramp (hue-stability).
-// chromaFrac (0..1, default 1) anchors the OKLCH→CAM16 inverse at the palette's OWN chroma (chroma
-// is %-of-peak), so the identity color lands on the requested OKLCH hue regardless of saturation.
+// chromaFrac (0..1, default 1) anchors the OKLCH→CAM16 inverse at a chroma fraction of the hue's peak,
+// so a color at that saturation lands on the requested OKLCH hue. Because OKLCH↔CAM16 hue shifts with
+// chroma (Abney), the anchor should sit where the ramp's SATURATED stops actually are — see
+// hueAnchorFrac. (Anchoring at the raw nominal chroma left the vivid stops ~2–3° off the set hue,
+// because dampAmp drives the center stops past nominal toward the gamut peak.)
 export function effHue(hue, hueSpace, chromaFrac = 1) {
   return hueSpace === "oklch" ? oklchToCam16Hue(hue, chromaFrac) : hue;
+}
+
+// hueAnchorFrac — the chroma fraction the ramp's VIVID CENTER stop (500) actually reaches: the nominal
+// chroma amplified by the peak damping multiplier (m at stop 500 = 1 + dampAmp/100, since the edge-damp
+// term vanishes there), capped at the gamut peak. Anchoring effHue here — not at the raw nominal chroma —
+// puts the OKLCH-hue calibration on the saturated swatches the user reads, so they land on the SET hue.
+export function hueAnchorFrac(palette, controls) {
+  const nominal = (palette.chroma ?? 0) / 100;
+  return Math.min(1, nominal * (1 + (controls.dampAmp ?? 0) / 100));
 }
 
 // shape — remap normalized position p∈[0,1] (0=light end, 1=dark end) to q∈[0,1].
@@ -140,7 +152,7 @@ export function paletteStops(palette, controls, stops) {
   if (mode === "perceptual" || mode === "peak") return okhslStops(palette, controls, stops, mode);
   // Resolve the BASE hue once. The per-stop hue may be EDGE-ROTATED below (hueShift);
   // when hueShift=0 every stop uses baseHue (the flat-hue, hue-stability default).
-  const baseHue = effHue(palette.hue, controls.hueSpace, (palette.chroma ?? 0) / 100);
+  const baseHue = effHue(palette.hue, controls.hueSpace, hueAnchorFrac(palette, controls));
   const shift = palette.hueShift ?? 0; // edge hue rotation: ±deg at the ends
   const sameDir = palette.hueSameDir === true; // true = both ends bend the SAME way (|s|), else opposite (s)
   const pk = peakC(baseHue).c; // the BASE hue's max chroma in sRGB
@@ -213,7 +225,7 @@ function okhslLAt(lstar) {
 }
 
 function okhslStops(palette, controls, stops, mode) {
-  const baseHue = effHue(palette.hue, controls.hueSpace, (palette.chroma ?? 0) / 100);
+  const baseHue = effHue(palette.hue, controls.hueSpace, hueAnchorFrac(palette, controls));
   const pk = peakC(baseHue);                                       // { c, tone } — the cusp
   const hOk = rgbToOkhsl(hctToRgb(baseHue, pk.c, pk.tone).rgb).h;  // the palette's hue in OKHSL space
   const shift = palette.hueShift ?? 0;
