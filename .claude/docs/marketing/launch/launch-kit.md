@@ -20,6 +20,12 @@ within a minute of clicking. Posture: **social/short-form** (§4). Facts:
 • Stop hand-nudging hex. Pick a key color; ship a whole system. → {{APP_URL}}
 • Your AI agent guesses hex codes. Give it your actual tokens instead —
   Brand-Kit MCP, in the free tier. → {{APP_URL}}
+• Install the Ultimate Tokens plugin and your coding agent builds with your
+  exact roles — which of the 59 goes where, not a guessed hex. Free.
+  → /plugin marketplace add kimgranlund/nonoun-color-tokens
+• Export your tokens under your own names — Ultimate, Material 3-style
+  --md-sys-*, or a --{brand}-* root. They land in the convention you already
+  run. → {{APP_URL}}
 • 336 curated palettes from real places, dishes, films, and biomes — each
   carrying its story, each opening as an editable kit. → {{APP_URL}}
 ```
@@ -41,6 +47,14 @@ within a minute of clicking. Posture: **social/short-form** (§4). Facts:
 > The Ultimate Tokens Figma plugin is live: the whole perceptual generator, inside Figma, writing
 > straight into your variable collections — 59 semantic roles, light + dark modes, raw→role cascade.
 > Fully offline, fully free. → (Community link)
+
+## Claude plugin launch post
+
+> The Ultimate Tokens Claude plugin is live. Install it into Claude Code and your coding agent builds
+> with your exact tokens — which of the 59 semantic roles goes on each surface, not a guessed hex.
+> Three consumption skills (color · type · geometry) and a `token-integrator` agent that wires a
+> component or migrates a whole UI. Free, MIT, parity-gated against the generator so its guidance
+> can't drift from the tokens. → `/plugin marketplace add kimgranlund/nonoun-color-tokens`
 
 ## Channel notes
 

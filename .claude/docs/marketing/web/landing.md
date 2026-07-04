@@ -46,15 +46,18 @@ Design tokens, derived — not guessed.
 
 > CSS custom properties. W3C design tokens. Tailwind. shadcn. Figma variables with a raw→role cascade.
 > A re-importable config. They aren't kept in sync — they're derived from one source, so they cannot
-> drift.
+> drift. Emit every one under your own naming: the default, a Material 3-style `--md-sys-*` root, or a
+> `--{brand}-*` prefix, so the tokens land in the convention your codebase already uses.
 
 ## Section · Agents
 
 **H2** `Your agents build with your tokens`
 
-> AI agents guess design values all day. Hand yours the Brand-Kit MCP instead — a zero-dependency
-> server pre-filled with your kit. Claude Code, Cursor, any MCP client: exact roles, resolved tokens,
-> no invented hex.
+> AI agents guess design values all day — a plausible hex, an approximate size. Give yours the real
+> ones instead. The Brand-Kit MCP serves your kit to any MCP client — Claude Code, Cursor — a
+> zero-dependency server pre-filled with exact roles and resolved tokens. The free Ultimate Tokens
+> Claude plugin teaches the agent which of the 59 roles goes on each surface, binding to your
+> project's real exported variables. Serve the values; apply them correctly.
 
 ## Section · Ownership
 

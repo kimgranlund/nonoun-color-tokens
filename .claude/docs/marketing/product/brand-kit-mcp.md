@@ -44,3 +44,7 @@ claude mcp add brand-kit -- node /path/to/brand-kit-server.mjs
 • resolve_token / nearest_token — exact lookups, no approximations
 • brand:// resources + an apply_brand prompt
 ```
+
+**Cross-reference.** The MCP *serves* the values; the [Ultimate Tokens Claude plugin](claude-plugin.md)
+teaches the agent *how to apply them* — which of the 59 roles goes on each surface. Both are free and
+available today.

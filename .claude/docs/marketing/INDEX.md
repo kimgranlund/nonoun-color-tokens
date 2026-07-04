@@ -19,6 +19,7 @@ voice-check script and the platform rubric before it ships.
 | [`product/boilerplate.md`](product/boilerplate.md) | The description ladder — one-liner → long — for directories, cards, press |
 | [`product/figma-plugin.md`](product/figma-plugin.md) | The Figma Community listing |
 | [`product/brand-kit-mcp.md`](product/brand-kit-mcp.md) | The MCP story — download copy, directory listing, agent pitch, setup block |
+| [`product/claude-plugin.md`](product/claude-plugin.md) | The consumption-plugin story — install copy, marketplace listing, agent pitch, the distribution-layer angle |
 | [`launch/launch-kit.md`](launch/launch-kit.md) | Announcements, social variants, the demonstration thread |
 | [`web/landing.md`](web/landing.md) | Landing-page copy blocks for `app.nonoun.io` |
 

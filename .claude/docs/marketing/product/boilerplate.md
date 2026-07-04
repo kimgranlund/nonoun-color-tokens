@@ -36,8 +36,9 @@ Derive OKLCH-true color, type & geometry systems from one source. Export to CSS,
 > color becomes a measured tonal ramp and 59 semantic roles, resolved for light and dark in one pass.
 > Typography and geometry compose from the same source: seven type voices on a modular scale, a size
 > ramp built on one centering law. Every export — CSS custom properties, W3C design tokens, Tailwind,
-> shadcn, Figma variables, and a Brand-Kit MCP server your AI agents read directly — is the same
-> decision, exported twice; it cannot drift. It runs in the browser, works offline, needs no sign-up,
+> shadcn, Figma variables, and a Brand-Kit MCP server your AI agents read directly, each under whichever
+> naming convention your team already uses — is the same decision, exported twice; it cannot drift. It
+> runs in the browser, works offline, needs no sign-up,
 > and your work never leaves your machine but the license check. Free to start; Pro is $39/year;
 > Studio covers teams.
 
@@ -47,4 +48,5 @@ Derive OKLCH-true color, type & geometry systems from one source. Export to CSS,
   without a hand-off."
 - *Studios:* "One brand kit per client, every export in sync — Studio covers 5 seats for $149/year."
 - *AI-tooling readers:* "Point Claude Code, Cursor, or any MCP agent at your kit and it builds with
-  your exact roles instead of guessing a hex."
+  your exact roles instead of guessing a hex — or install the free Ultimate Tokens Claude plugin so
+  the agent knows which of the 59 roles belongs on each surface."

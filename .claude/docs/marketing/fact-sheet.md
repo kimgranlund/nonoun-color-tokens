@@ -24,9 +24,11 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 | Geometry treatments | **5** — Comfortable · Compact / Dense · Spacious / Airy · Touch / Mobile · Pill / Rounded | `src/engine/geometry.mjs` `GEOMETRY_TREATMENTS` |
 | Color Categories | **7** categories (Architecture · Cuisine · Film · Literature · Music · Nature · Travel), 12 volumes × 4 = **48 palettes each, 336 total**, each sourced + storied | `src/ui/categories/` |
 | Export formats | CSS custom properties (HEX or OKLCH) · Tailwind v4 · shadcn/ui · DTCG · JSON · Figma variables · Figma UI3 (Material) · re-importable Config · Download-all `.zip` | `src/engine/exports.js` |
-| Export settings | CSS units px / rem / em · naming scheme (Ultimate / Material / Custom) · per-system Include toggles | Settings → Export |
+| Export settings | CSS units px / rem / em · naming scheme (Ultimate / Material 3 / Custom) · per-system Include toggles | Settings → Export |
+| Token naming scheme | **3 schemes**, one convention across colour · type · geometry — **Ultimate** (default: `--c-*` · `--type-*` · `--size-*`) · **Material 3-style** (`--md-sys-color-*` · `--md-sys-typescale-*` · `--md-sys-*`, extended with our roles) · **Custom** `--{brand}-*` root | Settings → Export ("Naming convention") |
 | Figma plugin | **free, fully offline** (`networkAccess: none`); binds semantic variables with a raw→semantic cascade + breakpoint modes | `figma/plugin/manifest.json` |
 | Brand-Kit MCP | zero-dependency stdio server download, pre-filled with your tokens, for Claude Code / Cursor / any MCP agent; **hosted** endpoint is a Pro feature (not yet live — never market it as live) | `mcp/` |
+| Ultimate Tokens Claude plugin | installable Claude Code plugin, **free + MIT**, that teaches a coding agent to CONSUME an exported kit in its own project — 3 skills (**color-tokens** · **typography-tokens** · **geometry-tokens**) + the **`token-integrator`** agent; parity-gated against the engines in `npm test`. Install: `/plugin marketplace add kimgranlund/nonoun-color-tokens` → `/plugin install ultimate-tokens` | `plugin/ultimate-tokens/` |
 | Dependencies | **zero** runtime dependencies; ships as one self-contained file that runs offline | `package.json`, `dist/nonoun-color-tokens.html` |
 | Privacy | local-first: your browser + your Figma file; the **only network call is the license check** | `src/main.ts` |
 | Free tier | full generator · **2 brand kits** · core exports · base treatments · offline Figma plugin · MCP download | `src/engine/flags.js` |

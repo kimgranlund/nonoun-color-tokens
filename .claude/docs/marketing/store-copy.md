@@ -135,9 +135,11 @@ rest of the body to begin after it so the card truncates on a complete thought
 >
 > ### One source, every export
 > Ship the whole kit without a hand-off: **CSS custom properties**, **W3C design tokens (DTCG)**,
-> **Tailwind**, and **shadcn**. Bind it to **Figma variables** — Color Primitives and Color Modes, aliased
-> so a raw-color edit cascades to every role. Or serve it to your AI coding agents over **MCP**, so they
-> build with your exact tokens instead of guessing a hex.
+> **Tailwind**, and **shadcn** — under your own naming, whether that's the default, a Material 3-style
+> `--md-sys-*` root, or a `--{brand}-*` prefix your codebase already uses. Bind it to **Figma variables** —
+> Color Primitives and Color Modes, aliased so a raw-color edit cascades to every role. Or serve it to your
+> AI coding agents over **MCP**, so they build with your exact tokens instead of guessing a hex; the free
+> Ultimate Tokens **Claude plugin** teaches the agent which of the 59 roles to apply where.
 >
 > ### What Pro unlocks
 > Free gives you the full generator and two brand kits — enough to ship a real system. **Pro removes the
@@ -198,8 +200,10 @@ bullets + FAQ only.
 • 59 semantic roles per palette, light + dark
 • Three composing systems — Color · Typography · Geometry
 • Exports: CSS · DTCG · Tailwind · shadcn
+• Your own naming — Ultimate, Material 3-style --md-sys-*, or a --{brand}-* root
 • Figma variables — semantic binding cascade + breakpoint modes
 • Brand-Kit MCP — feed your exact tokens to Claude, Cursor, VS Code
+• Free Claude plugin — your coding agent applies your exact roles, not a guess
 • Free Figma plugin, fully offline
 • Your data stays in your browser / your file
 ```
@@ -249,6 +253,17 @@ bullets + FAQ only.
 > **What can I export?**
 > CSS custom properties, W3C design tokens (DTCG), Tailwind, and shadcn — plus Figma variables and a
 > Brand-Kit MCP server for AI agents.
+>
+> **Can I match my team's variable names?**
+> Yes. Pick a naming convention in **Settings → Export** and every export — colour, type, and geometry —
+> emits under it: the default names, a Material 3-style `--md-sys-*` root, or a custom `--{brand}-*` prefix.
+> The tokens drop into the convention your codebase already runs.
+>
+> **Can my AI coding agent use the kit?**
+> Two ways, both free. Download the **Brand-Kit MCP** server and point Claude Code, Cursor, or any MCP
+> agent at it to read your exact roles and resolved tokens. Or install the **Ultimate Tokens Claude plugin**
+> (`/plugin marketplace add kimgranlund/nonoun-color-tokens`) — it teaches the agent which of the 59
+> semantic roles belongs on each surface, binding to your project's real exported variables.
 >
 > **Where is my data stored?**
 > In your browser and your Figma file. Nothing is uploaded; the only network call is the one that validates
@@ -493,7 +508,7 @@ Subject: Three things to try with Pro
 > 1. **Spin up a kit per client** — there's no limit anymore.
 > 2. **Export the full suite** — drop the same tokens into CSS, Figma, and Tailwind without re-deriving.
 > 3. **Download the Brand-Kit MCP and point your AI agent at it** — it'll build with your exact roles
->    instead of guessing.
+>    instead of guessing. (The free Ultimate Tokens Claude plugin teaches it which role to apply where.)
 >
 > Stuck on anything? Reply to this email.
 
