@@ -55,6 +55,12 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   saturation and lightness**, so it reads back on the set OKLCH hue exactly — within **~0.5° across the
   whole wheel**, at any damping (was up to 6°). Supersedes the interim reached-saturation anchor.
   (#201, #202)
+- **The same hue fix now covers the "even" tone mode.** The even/CAM16 ramp is authored in HCT and had the
+  same Abney drift on OKLCH-hue palettes — up to ~2° un-amplified and **~9° under mid-tone amplification**
+  (`dampAmp`), worst in the blues. Its key stop (500) is now solved **directly in the render space at that
+  stop's actual chroma and tone** (`solveCam16Hue`), matching the perceptual path to **~0.5° across the
+  wheel** at any damping. Both ramp paths now anchor hue in the space they render (ADR-012); `cam16`-hue
+  documents are unaffected.
 - **Download-All now includes BOTH colour-CSS formats.** The bundle emitted only one CSS folder
   (`css-hex/` *or* `css-oklch/`) based on a `Colour format` setting; it now always ships **both**
   `css-hex/` and `css-oklch/`, matching how it already ships both Tailwind and shadcn and the export
