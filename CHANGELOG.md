@@ -11,6 +11,16 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-07-04
 
 #### Added
+- **Export a Claude Design bundle — `claude-design/tokens.json`.** A new export format (Export drawer →
+  *Claude Design*, and in Download-All under the Color system) emits the token layer of a
+  [Claude Design](https://claude.ai/design) system: a small **generation colour role set** — surfaces &
+  chrome (`background · surface · surface-raised · foreground · muted · border · ring`) plus the
+  accent/intent roles (`primary · secondary · accent · danger · success · warning · info`, each paired
+  with a `-foreground`) — reduced from the 59 roles by the same name→role matcher the shadcn export uses,
+  plus the composed **type** (fonts + a per-voice·step size scale), **spacing**, and **radii** ladders
+  (numeric px). Colours ship both schemes (`colors` = light, `colorsDark` = dark); a vision-capable Claude
+  reads the file to generate on-brand screens. Validated against the `design-system-author` skill's
+  `ds_check.py` D3 gate.
 - **Four editorial type voices — the taxonomy grows 7 → 11.** Alongside the original seven, the type
   system now generates **Lead** (a standfirst/lede), **Quote** (a block/pull quote that rides the heading
   role, so it takes each treatment's display face — a serif pull-quote in the serif treatments), **Caption**

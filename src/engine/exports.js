@@ -605,6 +605,80 @@ export function exportShadcn(state, opts = {}) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// exportClaudeDesign — the tokens.json layer of a Claude Design system bundle
+// (claude.ai/design). A vision-capable Claude reads the bundle to GENERATE on-brand
+// screens, so the colour layer is a small GENERATION role set (surface/primary/danger/…),
+// reduced from the 59 roles by the SAME name-matcher shadcn uses — NOT all 59. `colors`
+// carries the light scheme (the canonical `--color-*` value a spine reads), `colorsDark`
+// the dark end (nonoun is light-dark-native — dropping it would be lossy). type/spacing/
+// radii come from the passed-in, override-aware scales: `typeSc` = typeScale(config),
+// `geomSc` = the resolved geometry scale (model.geometryScale). Reconciles with the
+// design-system-author skill's tokens.json shape + ds_check.py's `colors` D3 gate.
+// ──────────────────────────────────────────────────────────────────────────────
+export function exportClaudeDesign(state, typeSc, geomSc) {
+  const palettes = derivedAll(state);
+  const find = (re) => palettes.find((p) => re.test(p.name.toLowerCase()));
+  const neutral = find(/neutral|gray|grey|slate|stone|zinc|mono/) || palettes[0];
+  const primary = find(/primary|brand/) || palettes.find((p) => p !== neutral) || palettes[0];
+  if (!neutral || !primary) return JSON.stringify({ $note: "Claude Design export needs at least one enabled palette." }, null, 2);
+  const danger = find(/danger|destruct|error|critical|red/);
+  const success = find(/success|positive|green/);
+  const warning = find(/warn|caution|amber|yellow|orange/);
+  const info = find(/info|information/);
+  const secondary = find(/secondary/);
+  const accent = find(/tertiary|accent/);
+
+  const rs = (p, sfx) => p && p.roles.find((r) => r.suffix === sfx);
+  const prime = (p) => rs(p, "");
+  const onAccent = (p) => p && p.roles.find((r) => r.suffix === "-on-" + p.n);
+
+  // generation role -> the nonoun role whose light/dark ends drive it (null roles are skipped)
+  const MAP = {
+    background: rs(neutral, "-background"),
+    surface: rs(neutral, "-surface"),
+    "surface-raised": rs(neutral, "-surface-high"),
+    foreground: rs(neutral, "-on-surface"),
+    muted: rs(neutral, "-on-surface-variant"),
+    border: rs(neutral, "-outline-variant"),
+    primary: prime(primary), "primary-foreground": onAccent(primary),
+    secondary: secondary ? prime(secondary) : rs(neutral, "-surface-high"),
+    "secondary-foreground": secondary ? onAccent(secondary) : rs(neutral, "-on-surface"),
+    ...(accent ? { accent: prime(accent), "accent-foreground": onAccent(accent) } : {}),
+    ring: prime(primary),
+    danger: prime(danger || primary), "danger-foreground": onAccent(danger || primary),
+    ...(success ? { success: prime(success), "success-foreground": onAccent(success) } : {}),
+    ...(warning ? { warning: prime(warning), "warning-foreground": onAccent(warning) } : {}),
+    ...(info ? { info: prime(info), "info-foreground": onAccent(info) } : {}),
+  };
+  const colors = {}, colorsDark = {};
+  for (const [role, r] of Object.entries(MAP)) {
+    if (!r) continue;
+    colors[role] = r.light.hex;
+    colorsDark[role] = r.dark.hex;
+  }
+
+  // type — the five family roles + a per-voice·step size scale (size / lineHeight px numbers, numeric
+  // weight). Dimensions follow the format's numeric-px convention (its `spacing:[4,8,16]` example), NOT
+  // colours' string form — a spine appends the unit.
+  const type = { fonts: { ...(typeSc && typeSc.fonts) }, scale: {} };
+  if (typeSc && typeSc.categories) for (const [cName, steps] of Object.entries(typeSc.categories))
+    for (const [sName, s] of Object.entries(steps))
+      type.scale[`${cName.toLowerCase()}-${sName.toLowerCase()}`] = { size: s.size, lineHeight: s.lineHeight, weight: s.weight };
+
+  // spacing — the geometry ladder as a numeric-px ARRAY (indexed step scale, per the format's example);
+  // radii — the NAMED corner tiers (none/xs/…/full) a generator reaches for by name, numeric px.
+  const spacing = geomSc && geomSc.space ? Object.keys(geomSc.space).sort((a, b) => a - b).map((k) => geomSc.space[k]) : [];
+  const radii = {};
+  if (geomSc && geomSc.radii) for (const [k, v] of Object.entries(geomSc.radii)) radii[k] = v;
+
+  return JSON.stringify({
+    $generator: "Ultimate Tokens by NONOUN",
+    $note: "Claude Design tokens.json — `colors` is the generation role set (light scheme); `colorsDark` is the dark scheme. Dimensions (type sizes, spacing, radii) are px numbers; they feed the DESIGN.md spine's Typography/Layout sections.",
+    colors, colorsDark, type, spacing, radii,
+  }, null, 2);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // exportAll — every format in one object (theme-independent).
 // ──────────────────────────────────────────────────────────────────────────────
 export function exportAll(state, opts) {

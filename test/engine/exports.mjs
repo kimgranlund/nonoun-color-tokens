@@ -2,6 +2,8 @@
 // verify.mjs — export-formats validation adapter (CRITIC side; deny-on-write to the advancer).
 import { readFileSync } from "node:fs";
 import * as X from "../../src/engine/exports.js";
+import { typeScale } from "../../src/engine/type.mjs";
+import { geomScale } from "../../src/engine/geometry.mjs";
 
 const RT = JSON.parse(readFileSync(new URL("../../.claude/docs/spec/data/role-table.json", import.meta.url), "utf8"));
 const C = (palettes) => ({ palettes, curve: "logistic", tension: 0, lmin: 5, lmax: 100, damp: 80, hueSpace: "cam16", theme: "auto" });
@@ -165,8 +167,44 @@ if (!kp.keyColors || kp.keyColors.length !== 2 || kp.keyColors[0].role !== "domi
 // a palette with no key colors emits no key tokens (opt-in only)
 if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present when none set");
 
+// ── hpg-export-claude-design (claude.ai/design tokens.json: colour role set + composed type/space/radii) ──
+{
+  const tsc = typeScale({});
+  const gsc = geomScale({});
+  let cd;
+  try { cd = JSON.parse(X.exportClaudeDesign(C(ALL), tsc, gsc)); } catch { FAIL("claude-design", "not valid JSON"); cd = null; }
+  if (cd) {
+    // the GENERATION colour role set — a REDUCTION of the 59 roles (background/surface/foreground/…), NOT
+    // all 59; light in `colors`, dark in `colorsDark`, both flat {role:"#hex"} for ds_check.py's D3 gate.
+    const needRoles = ["background", "surface", "foreground", "muted", "border", "primary", "primary-foreground", "danger", "danger-foreground"];
+    if (!cd.colors || typeof cd.colors !== "object") FAIL("claude-design", "no colors block");
+    else {
+      for (const role of needRoles) if (!(role in cd.colors)) FAIL("claude-design", `colors missing '${role}'`);
+      // #rrggbb solids, or #rrggbbaa where the source role is faithfully translucent (e.g. a subtle
+      // outline-variant border) — both valid CSS hex, both accepted by ds_check.py's D3 (#{3,8}).
+      for (const [k, v] of Object.entries(cd.colors)) if (!/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v)) FAIL("claude-design", `colors.${k} not #rrggbb(aa): ${v}`);
+    }
+    // colorsDark mirrors colors' keys exactly (every light role has its dark end, same order)
+    if (!cd.colorsDark || Object.keys(cd.colorsDark).join() !== Object.keys(cd.colors || {}).join()) FAIL("claude-design", "colorsDark keys differ from colors");
+    // ALL defaults enabled → info/success/warning are full palettes, so their intent roles appear
+    for (const role of ["success", "warning", "info"]) if (cd.colors && !(role in cd.colors)) FAIL("claude-design", `colors missing intent '${role}' (all palettes enabled)`);
+    // composed TYPE: fonts + a per-voice·step size scale (numeric px size/lineHeight + numeric weight) from typeScale
+    if (!cd.type || !cd.type.fonts || !cd.type.scale || !Object.keys(cd.type.scale).length) FAIL("claude-design", "type.scale empty (typeScale not composed)");
+    else for (const s of Object.values(cd.type.scale)) if (![s.size, s.lineHeight, s.weight].every((n) => typeof n === "number" && n > 0)) FAIL("claude-design", "type.scale step not numeric px");
+    // composed GEOMETRY: spacing (numeric-px ARRAY, per the format's example) + radii (NAMED numeric-px tiers)
+    if (!Array.isArray(cd.spacing) || !cd.spacing.length || cd.spacing.some((v) => typeof v !== "number")) FAIL("claude-design", "spacing not a numeric array");
+    if (!cd.radii || !Object.keys(cd.radii).length || Object.values(cd.radii).some((v) => typeof v !== "number")) FAIL("claude-design", "radii not numeric px");
+  }
+  // disabled-palette safety: all-off → the $note fallback (no throw, no colors block)
+  try { const j = JSON.parse(X.exportClaudeDesign(C(RT.defaults.map((p) => ({ ...p, on: false }))), tsc, gsc)); if (j.colors) FAIL("claude-design", "all-disabled emitted colors"); if (!j.$note) FAIL("claude-design", "all-disabled missing $note"); }
+  catch { FAIL("claude-design", "all-disabled not valid JSON"); }
+  // scales omitted → colours still emit (type/space/radii just empty), never throws
+  try { const bare = JSON.parse(X.exportClaudeDesign(C(ALL))); if (!bare.colors || !bare.colors.primary) FAIL("claude-design", "colours absent when scales omitted"); }
+  catch { FAIL("claude-design", "throws when scales omitted"); }
+}
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn", "keycolors"]) {
+for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn", "keycolors", "claude-design"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

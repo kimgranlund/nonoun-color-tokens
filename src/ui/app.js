@@ -20,6 +20,7 @@ import {
   seedFromKeyColor,
   hexToOklch,
   brandKit,
+  exportClaudeDesign,
   SCRIM_BASES,
   SCRIM_STEPS,
 } from "./model.mjs";
@@ -5155,6 +5156,7 @@ class HctApp extends HTMLElement {
       ["Colors", [["css", "Hex"], ["oklch", "OKLCH"], ["tailwind", "Tailwind v4"], ["shadcn", "shadcn/ui"], ["figma", "Figma"], ["ui3", "Figma UI3"], ["dtcg", "DTCG"], ["json", "JSON"]]],
       ["Typography", [["type-css", "Type · CSS"], ["type-dtcg", "Type · DTCG"]]],
       ["Geometry", [["geom-css", "Geometry · CSS"], ["geom-dtcg", "Geometry · DTCG"]]],
+      ["Claude Design", [["claude-design", "tokens.json"]]],
       ["Project", [["config", "Config"]]],
     ];
     // the per-system token output for the Typography / Geometry format tabs (the colour formats live on
@@ -5169,8 +5171,10 @@ class HctApp extends HTMLElement {
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
       "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), ug),
       "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
+      // the Claude Design (claude.ai/design) bundle's token layer — colour role set + composed type/geometry
+      "claude-design": () => exportClaudeDesign(this.doc, typeSc, geomSc),
     };
-    const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG" };
+    const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG", "claude-design": "Claude Design · tokens.json" };
     // the systems currently opted into the Download-All + MCP bundle (for the footer summary).
     const SYS_LABEL = { color: "Color", type: "Typography", geometry: "Geometry" };
     const included = ["color", "type", "geometry"].filter((k) => this.exportSystems[k] !== false).map((k) => SYS_LABEL[k]).join(" · ");
@@ -5404,6 +5408,13 @@ class HctApp extends HTMLElement {
         { name: "figma-aliased/Dark_tokens.json", data: JSON.stringify(aliased["Dark_tokens.json"], null, 2) },
         { name: "figma-aliased/README.txt", data: ALIASED_README },
       );
+      // claude-design/tokens.json — the Claude Design (claude.ai/design) system bundle's token layer:
+      // the generation colour role set (light + dark) plus the composed type/spacing/radii the DESIGN.md
+      // spine reads. Rides `systems.color` (a Claude Design kit is colour-led; type/geometry compose in).
+      files.push({
+        name: "claude-design/tokens.json",
+        data: exportClaudeDesign(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base")),
+      });
     }
     if (sys.type) {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)

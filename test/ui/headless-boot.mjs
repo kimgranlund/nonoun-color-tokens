@@ -682,6 +682,10 @@ app.exportTab = "type-css"; app.render(); flushRaf();
 ok((txtOf(app.querySelector(".drawer-pre")) || "").includes(".type-"), "(mc8) the Type·CSS format tab previews the type tokens");
 app.exportTab = "geom-css"; app.render(); flushRaf();
 ok((txtOf(app.querySelector(".drawer-pre")) || "").includes(".control-"), "(mc9) the Geometry·CSS format tab previews the geometry tokens");
+// the Claude Design tab previews the composed tokens.json (a colour role set + type/spacing/radii)
+app.exportTab = "claude-design"; app.render(); flushRaf();
+{ const cdTxt = txtOf(app.querySelector(".drawer-pre")) || ""; let cdJson = null; try { cdJson = JSON.parse(cdTxt); } catch {}
+  ok(cdJson && cdJson.colors && cdJson.colors.primary && Array.isArray(cdJson.spacing) && cdJson.spacing.length && cdJson.radii && cdJson.radii.md, "(mc9b) the Claude Design tab previews valid tokens.json (colors + spacing array + named radii)"); }
 
 // the MCP .zip reflects the opt-in: a colour-only kit has no type/geometry in brand-kit.json
 app.exportSystems = { color: true, type: false, geometry: false };
@@ -1035,12 +1039,12 @@ ok(zb[0] === 0x50 && zb[1] === 0x4b && zb[2] === 0x03 && zb[3] === 0x04, "(ee) t
 const eocd = zb.length - 22; // EOCD has no trailing comment → it's the final 22 bytes
 const eocdSig = zb[eocd] === 0x50 && zb[eocd + 1] === 0x4b && zb[eocd + 2] === 0x05 && zb[eocd + 3] === 0x06;
 const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
-// default opt-in = all three systems on: 10 colour files (BOTH css-hex/ + css-oklch/ folders) + 4
-// figma-aliased + 5 typography (incl. figma/ + figma/ moded + figma/ primitives) + 4 geometry
-// + the config = 24.
-ok(eocdSig && entries === 24, `(ee) the EOCD reports 24 entries — colour (10) + figma-aliased (4) + typography (5) + geometry (4) + config (got ${entries})`);
+// default opt-in = all three systems on: 11 colour files (BOTH css-hex/ + css-oklch/ folders +
+// claude-design/tokens.json, which rides systems.color) + 4 figma-aliased + 5 typography (incl.
+// figma/ + figma/ moded + figma/ primitives) + 4 geometry + the config = 25.
+ok(eocdSig && entries === 25, `(ee) the EOCD reports 25 entries — colour (11, incl. claude-design/tokens.json) + figma-aliased (4) + typography (5) + geometry (4) + config (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
-const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "nonoun-color-tokens-my-set-config.json",
+const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "claude-design/tokens.json", "nonoun-color-tokens-my-set-config.json",
   "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt",
   "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "figma/typography.modes.variables.json", "figma/typography.primitives.variables.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.variables.json", "figma/dimension.modes.variables.json"];
 ok(wantPaths.every((p) => zipText.includes(p)), "(ee) every colour format + typography/ + geometry/ + the moded Figma-variable files + the config + the figma-aliased/ cascade variant is present in the archive");

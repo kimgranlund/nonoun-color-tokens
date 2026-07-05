@@ -4569,6 +4569,80 @@ function exportShadcn(state, opts = {}) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// exportClaudeDesign — the tokens.json layer of a Claude Design system bundle
+// (claude.ai/design). A vision-capable Claude reads the bundle to GENERATE on-brand
+// screens, so the colour layer is a small GENERATION role set (surface/primary/danger/…),
+// reduced from the 59 roles by the SAME name-matcher shadcn uses — NOT all 59. `colors`
+// carries the light scheme (the canonical `--color-*` value a spine reads), `colorsDark`
+// the dark end (nonoun is light-dark-native — dropping it would be lossy). type/spacing/
+// radii come from the passed-in, override-aware scales: `typeSc` = typeScale(config),
+// `geomSc` = the resolved geometry scale (model.geometryScale). Reconciles with the
+// design-system-author skill's tokens.json shape + ds_check.py's `colors` D3 gate.
+// ──────────────────────────────────────────────────────────────────────────────
+function exportClaudeDesign(state, typeSc, geomSc) {
+  const palettes = derivedAll(state);
+  const find = (re) => palettes.find((p) => re.test(p.name.toLowerCase()));
+  const neutral = find(/neutral|gray|grey|slate|stone|zinc|mono/) || palettes[0];
+  const primary = find(/primary|brand/) || palettes.find((p) => p !== neutral) || palettes[0];
+  if (!neutral || !primary) return JSON.stringify({ $note: "Claude Design export needs at least one enabled palette." }, null, 2);
+  const danger = find(/danger|destruct|error|critical|red/);
+  const success = find(/success|positive|green/);
+  const warning = find(/warn|caution|amber|yellow|orange/);
+  const info = find(/info|information/);
+  const secondary = find(/secondary/);
+  const accent = find(/tertiary|accent/);
+
+  const rs = (p, sfx) => p && p.roles.find((r) => r.suffix === sfx);
+  const prime = (p) => rs(p, "");
+  const onAccent = (p) => p && p.roles.find((r) => r.suffix === "-on-" + p.n);
+
+  // generation role -> the nonoun role whose light/dark ends drive it (null roles are skipped)
+  const MAP = {
+    background: rs(neutral, "-background"),
+    surface: rs(neutral, "-surface"),
+    "surface-raised": rs(neutral, "-surface-high"),
+    foreground: rs(neutral, "-on-surface"),
+    muted: rs(neutral, "-on-surface-variant"),
+    border: rs(neutral, "-outline-variant"),
+    primary: prime(primary), "primary-foreground": onAccent(primary),
+    secondary: secondary ? prime(secondary) : rs(neutral, "-surface-high"),
+    "secondary-foreground": secondary ? onAccent(secondary) : rs(neutral, "-on-surface"),
+    ...(accent ? { accent: prime(accent), "accent-foreground": onAccent(accent) } : {}),
+    ring: prime(primary),
+    danger: prime(danger || primary), "danger-foreground": onAccent(danger || primary),
+    ...(success ? { success: prime(success), "success-foreground": onAccent(success) } : {}),
+    ...(warning ? { warning: prime(warning), "warning-foreground": onAccent(warning) } : {}),
+    ...(info ? { info: prime(info), "info-foreground": onAccent(info) } : {}),
+  };
+  const colors = {}, colorsDark = {};
+  for (const [role, r] of Object.entries(MAP)) {
+    if (!r) continue;
+    colors[role] = r.light.hex;
+    colorsDark[role] = r.dark.hex;
+  }
+
+  // type — the five family roles + a per-voice·step size scale (size / lineHeight px numbers, numeric
+  // weight). Dimensions follow the format's numeric-px convention (its `spacing:[4,8,16]` example), NOT
+  // colours' string form — a spine appends the unit.
+  const type = { fonts: { ...(typeSc && typeSc.fonts) }, scale: {} };
+  if (typeSc && typeSc.categories) for (const [cName, steps] of Object.entries(typeSc.categories))
+    for (const [sName, s] of Object.entries(steps))
+      type.scale[`${cName.toLowerCase()}-${sName.toLowerCase()}`] = { size: s.size, lineHeight: s.lineHeight, weight: s.weight };
+
+  // spacing — the geometry ladder as a numeric-px ARRAY (indexed step scale, per the format's example);
+  // radii — the NAMED corner tiers (none/xs/…/full) a generator reaches for by name, numeric px.
+  const spacing = geomSc && geomSc.space ? Object.keys(geomSc.space).sort((a, b) => a - b).map((k) => geomSc.space[k]) : [];
+  const radii = {};
+  if (geomSc && geomSc.radii) for (const [k, v] of Object.entries(geomSc.radii)) radii[k] = v;
+
+  return JSON.stringify({
+    $generator: "Ultimate Tokens by NONOUN",
+    $note: "Claude Design tokens.json — `colors` is the generation role set (light scheme); `colorsDark` is the dark scheme. Dimensions (type sizes, spacing, radii) are px numbers; they feed the DESIGN.md spine's Typography/Layout sections.",
+    colors, colorsDark, type, spacing, radii,
+  }, null, 2);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // exportAll — every format in one object (theme-independent).
 // ──────────────────────────────────────────────────────────────────────────────
 function exportAll(state, opts) {
@@ -4583,7 +4657,7 @@ function exportAll(state, opts) {
   };
 }
 
-return { SCRIM_BASES, SCRIM_STEPS, exportCSS, cssPrefixOf, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, exportAll };
+return { SCRIM_BASES, SCRIM_STEPS, exportCSS, cssPrefixOf, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, exportClaudeDesign, exportAll };
 })();
 __M.figmaPlugin = (function(){
 // GENERATED by gen-figma-assets.mjs from figma/binder/figma-semantic-binder/ — DO NOT EDIT.
@@ -5379,7 +5453,7 @@ function baseOverrideSlice(store) {
   }
   return Object.keys(out).length ? out : undefined;
 }
-const { exportCSS, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, SCRIM_BASES, SCRIM_STEPS } = __M.exports;
+const { exportCSS, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, exportClaudeDesign, SCRIM_BASES, SCRIM_STEPS } = __M.exports;
 
 // Re-export the scrim model so the UI (app.js) can build the Mapping tab's re-point targets from the
 // SAME source of truth as the exporters — no second, drift-prone hardcoded scrim-step list.
@@ -5858,7 +5932,7 @@ function tokenCount(doc) {
 
 // Re-exports the app needs from the core (so app.js imports one module).
 
-return { geometryScale, configFromVariables, slug, defaultDocument, figmaBundle, brandKit, contrastRatio, keyCss, seedFromKeyColor, rgbToOklchArr, hexToOklch, projectView, appThemeCSS, tokenCount, SCRIM_BASES, SCRIM_STEPS, hctToRgb, lstarFromRgb, hexToRgb, STOPS, EXPORT_STOPS, DEFAULT_CONTROLS };
+return { geometryScale, configFromVariables, slug, defaultDocument, figmaBundle, brandKit, contrastRatio, keyCss, seedFromKeyColor, rgbToOklchArr, hexToOklch, projectView, appThemeCSS, tokenCount, SCRIM_BASES, SCRIM_STEPS, exportClaudeDesign, hctToRgb, lstarFromRgb, hexToRgb, STOPS, EXPORT_STOPS, DEFAULT_CONTROLS };
 })();
 (function(){
 // app.js — the DOM app for the HCT Palette Generator.
@@ -5869,7 +5943,7 @@ return { geometryScale, configFromVariables, slug, defaultDocument, figmaBundle,
 // lists them. The six validated capability modules do all the color/token work
 // (imported through model.mjs); this file only owns DOM + interaction.
 
-const { defaultDocument, projectView, tokenCount, slug, contrastRatio, appThemeCSS, hctToRgb, STOPS, figmaBundle, configFromVariables, seedFromKeyColor, hexToOklch, brandKit, SCRIM_BASES, SCRIM_STEPS } = __M.model;
+const { defaultDocument, projectView, tokenCount, slug, contrastRatio, appThemeCSS, hctToRgb, STOPS, figmaBundle, configFromVariables, seedFromKeyColor, hexToOklch, brandKit, exportClaudeDesign, SCRIM_BASES, SCRIM_STEPS } = __M.model;
 const { STORAGE_KEY, serialize, hydrate } = __M.persist;
 const { clampProfile, resolveFlags, flagOf: flagFromFlags, resolveTier, entitlementActive } = __M.flags;
 const { FIGMA_PLUGIN } = __M.figmaPlugin;
@@ -11002,6 +11076,7 @@ class HctApp extends HTMLElement {
       ["Colors", [["css", "Hex"], ["oklch", "OKLCH"], ["tailwind", "Tailwind v4"], ["shadcn", "shadcn/ui"], ["figma", "Figma"], ["ui3", "Figma UI3"], ["dtcg", "DTCG"], ["json", "JSON"]]],
       ["Typography", [["type-css", "Type · CSS"], ["type-dtcg", "Type · DTCG"]]],
       ["Geometry", [["geom-css", "Geometry · CSS"], ["geom-dtcg", "Geometry · DTCG"]]],
+      ["Claude Design", [["claude-design", "tokens.json"]]],
       ["Project", [["config", "Config"]]],
     ];
     // the per-system token output for the Typography / Geometry format tabs (the colour formats live on
@@ -11016,8 +11091,10 @@ class HctApp extends HTMLElement {
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
       "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), ug),
       "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
+      // the Claude Design (claude.ai/design) bundle's token layer — colour role set + composed type/geometry
+      "claude-design": () => exportClaudeDesign(this.doc, typeSc, geomSc),
     };
-    const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG" };
+    const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG", "claude-design": "Claude Design · tokens.json" };
     // the systems currently opted into the Download-All + MCP bundle (for the footer summary).
     const SYS_LABEL = { color: "Color", type: "Typography", geometry: "Geometry" };
     const included = ["color", "type", "geometry"].filter((k) => this.exportSystems[k] !== false).map((k) => SYS_LABEL[k]).join(" · ");
@@ -11251,6 +11328,13 @@ class HctApp extends HTMLElement {
         { name: "figma-aliased/Dark_tokens.json", data: JSON.stringify(aliased["Dark_tokens.json"], null, 2) },
         { name: "figma-aliased/README.txt", data: ALIASED_README },
       );
+      // claude-design/tokens.json — the Claude Design (claude.ai/design) system bundle's token layer:
+      // the generation colour role set (light + dark) plus the composed type/spacing/radii the DESIGN.md
+      // spine reads. Rides `systems.color` (a Claude Design kit is colour-led; type/geometry compose in).
+      files.push({
+        name: "claude-design/tokens.json",
+        data: exportClaudeDesign(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base")),
+      });
     }
     if (sys.type) {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
