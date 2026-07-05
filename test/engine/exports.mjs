@@ -167,7 +167,9 @@ if (!kp.keyColors || kp.keyColors.length !== 2 || kp.keyColors[0].role !== "domi
 // a palette with no key colors emits no key tokens (opt-in only)
 if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present when none set");
 
-// ── hpg-export-claude-design (claude.ai/design tokens.json: colour role set + composed type/space/radii) ──
+// ── hpg-export-claude-design (claude.ai/design FULL bundle: tokens.json + DESIGN.md spine + @dsCard ──
+// previews). The engine gate re-implements ds_check.py's D1/D2/D3 so the bundle can't drift checker-dirty
+// without npm test catching it — one shared colour source must stay consistent across all three layers.
 {
   const tsc = typeScale({});
   const gsc = geomScale({});
@@ -186,6 +188,10 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
     }
     // colorsDark mirrors colors' keys exactly (every light role has its dark end, same order)
     if (!cd.colorsDark || Object.keys(cd.colorsDark).join() !== Object.keys(cd.colors || {}).join()) FAIL("claude-design", "colorsDark keys differ from colors");
+    // GOLDEN ANCHOR — the published role SEQUENCE (all 8 palettes on) is locked to the #207 contract; a
+    // self-consistent reorder would still pass D3 but silently change tokens.json, so pin it explicitly.
+    const CD_ROLE_ORDER = "background,surface,surface-raised,foreground,muted,border,primary,primary-foreground,secondary,secondary-foreground,accent,accent-foreground,ring,danger,danger-foreground,success,success-foreground,warning,warning-foreground,info,info-foreground";
+    if (cd.colors && Object.keys(cd.colors).join(",") !== CD_ROLE_ORDER) FAIL("claude-design", `colors role order drifted from #207: ${Object.keys(cd.colors).join(",")}`);
     // ALL defaults enabled → info/success/warning are full palettes, so their intent roles appear
     for (const role of ["success", "warning", "info"]) if (cd.colors && !(role in cd.colors)) FAIL("claude-design", `colors missing intent '${role}' (all palettes enabled)`);
     // composed TYPE: fonts + a per-voice·step size scale (numeric px size/lineHeight + numeric weight) from typeScale
@@ -201,6 +207,62 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   // scales omitted → colours still emit (type/space/radii just empty), never throws
   try { const bare = JSON.parse(X.exportClaudeDesign(C(ALL))); if (!bare.colors || !bare.colors.primary) FAIL("claude-design", "colours absent when scales omitted"); }
   catch { FAIL("claude-design", "throws when scales omitted"); }
+
+  // ── the DESIGN.md spine + the @dsCard previews + the bundle — reconciled against tokens.json canon ──
+  if (cd && cd.colors) {
+    const norm = (v) => { v = String(v).trim().replace(/;$/, "").trim().toLowerCase(); const m = v.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/); return m ? "#" + m.slice(1).map((c) => c + c).join("") : v; };
+    const canon = {}; for (const [k, v] of Object.entries(cd.colors)) canon["color-" + k] = norm(v); // ds_check keys roles as color-{k}
+
+    // SPINE — the 9 sections present, and every authoritative colour table row (one --color-* + one hex)
+    // equals the tokens.json canon (ds_check.py D3, the shakedown case: a spine-table hex that drifts).
+    const spine = X.exportClaudeDesignSpine(C(ALL), tsc, gsc);
+    for (let n = 1; n <= 9; n++) if (!spine.includes(`## ${n}. `)) FAIL("claude-design", `spine missing section ${n}`);
+    for (const line of spine.split("\n")) {
+      if (!/^\s*\|.*\|/.test(line)) continue;                       // a markdown table row
+      const vars = [...new Set(line.match(/--[A-Za-z0-9-]+/g) || [])];
+      const hexes = line.match(/#[0-9a-fA-F]{3,8}\b/g) || [];
+      if (vars.length === 1 && hexes.length === 1 && canon[vars[0].slice(2)] && norm(hexes[0]) !== canon[vars[0].slice(2)])
+        FAIL("claude-design", `spine ${vars[0]}=${hexes[0]} drifts from tokens ${canon[vars[0].slice(2)]}`);
+    }
+    const spineOff = X.exportClaudeDesignSpine(C(RT.defaults.map((p) => ({ ...p, on: false }))), tsc, gsc);
+    if (spineOff.includes("--color-")) FAIL("claude-design", "disabled spine is not the palette-less placeholder");
+
+    // PREVIEWS — ds_check.py D1 (first-line @dsCard + gallery group) · D2 (self-contained, ≤256KiB) ·
+    // D3 (every light-scope --color-* def, and any var() fallback, equals canon).
+    const REMOTE = /(?:src\s*=\s*["']?(?:https?:)?\/\/)|(?:<link\b[^>]*?href\s*=\s*["']?(?:https?:)?\/\/)|(?:@import\s+(?:url\()?\s*["']?(?:https?:)?\/\/)|(?:url\(\s*["']?(?:https?:)?\/\/)/i;
+    const GROUPS = ["Type", "Colors", "Spacing", "Components", "Brand"];
+    const comps = X.exportClaudeDesignComponents(C(ALL), tsc, gsc);
+    if (!Array.isArray(comps) || comps.length < 4) FAIL("claude-design", `too few previews (${comps && comps.length})`);
+    const seen = new Set();
+    for (const c of comps || []) {
+      if (!c.name || !c.name.startsWith("components/") || !c.name.endsWith(".html")) FAIL("claude-design", `bad preview name ${c && c.name}`);
+      const first = c.data.split("\n").find((l) => l.trim()) || "";
+      const m = /^\s*<!--\s*@dsCard\b([^>]*?)-->/.exec(first);
+      if (!m) { FAIL("claude-design", `${c.name}: first line is not an @dsCard marker`); continue; }
+      const g = (m[1].match(/group\s*=\s*"([^"]*)"/) || [])[1];
+      if (!g) FAIL("claude-design", `${c.name}: @dsCard has no group`);
+      else if (!GROUPS.includes(g)) FAIL("claude-design", `${c.name}: group "${g}" not a gallery group`);
+      else seen.add(g);
+      const nbytes = Buffer.byteLength(c.data);
+      if (REMOTE.test(c.data)) FAIL("claude-design", `${c.name}: loads an external resource`);
+      if (nbytes > 256 * 1024) FAIL("claude-design", `${c.name}: ${nbytes} > 256KiB`);
+      if (nbytes < 300) FAIL("claude-design", `${c.name}: looks thin (${nbytes}B)`);
+      const lightScope = c.data.replace(/@media[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/g, "");   // drop @media (dark) — a scheme override, not drift
+      for (const d of lightScope.matchAll(/--([A-Za-z0-9-]+)\s*:\s*([^;}"'\n]+)/g))
+        if (canon["color-" + d[1].replace(/^color-/, "")] && d[1].startsWith("color-") && norm(d[2]) !== canon[d[1]])
+          FAIL("claude-design", `${c.name}: --${d[1]}=${d[2]} drifts from canon`);
+      for (const u of c.data.matchAll(/var\(\s*--(color-[A-Za-z0-9-]+)\s*,\s*([^)]+)\)/g))
+        if (canon[u[1]] && norm(u[2]) !== canon[u[1]]) FAIL("claude-design", `${c.name}: var(--${u[1]}) fallback drifts`);
+    }
+    if (seen.size < 3) FAIL("claude-design", `previews cover only ${seen.size} gallery group(s)`);
+
+    // BUNDLE — the folder carries all three layers; a palette-less doc degrades to tokens.json only.
+    const names = X.exportClaudeDesignBundle(C(ALL), tsc, gsc).map((f) => f.name);
+    if (!names.includes("tokens.json") || !names.includes("DESIGN.md") || !names.some((n) => n.startsWith("components/")))
+      FAIL("claude-design", `bundle missing a layer: ${names.join(",")}`);
+    const off = X.exportClaudeDesignBundle(C(RT.defaults.map((p) => ({ ...p, on: false }))), tsc, gsc);
+    if (off.length !== 1 || off[0].name !== "tokens.json") FAIL("claude-design", "disabled bundle is not tokens.json-only");
+  }
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────

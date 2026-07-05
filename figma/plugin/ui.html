@@ -4568,23 +4568,46 @@ function exportShadcn(state, opts = {}) {
   ].join("\n");
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Claude Design (claude.ai/design) — a full generation bundle
 // ──────────────────────────────────────────────────────────────────────────────
-// exportClaudeDesign — the tokens.json layer of a Claude Design system bundle
-// (claude.ai/design). A vision-capable Claude reads the bundle to GENERATE on-brand
-// screens, so the colour layer is a small GENERATION role set (surface/primary/danger/…),
-// reduced from the 59 roles by the SAME name-matcher shadcn uses — NOT all 59. `colors`
-// carries the light scheme (the canonical `--color-*` value a spine reads), `colorsDark`
-// the dark end (nonoun is light-dark-native — dropping it would be lossy). type/spacing/
-// radii come from the passed-in, override-aware scales: `typeSc` = typeScale(config),
-// `geomSc` = the resolved geometry scale (model.geometryScale). Reconciles with the
-// design-system-author skill's tokens.json shape + ds_check.py's `colors` D3 gate.
-// ──────────────────────────────────────────────────────────────────────────────
-function exportClaudeDesign(state, typeSc, geomSc) {
+// A vision-capable Claude reads a Claude Design bundle as ITS INSTRUCTIONS and
+// generates on-brand screens from it. Three layers: `tokens.json` (the token
+// source) · `DESIGN.md` (the 9-section spine — the prompt) · `components/*.html`
+// (self-contained @dsCard previews). `cdColorRoles` is the SINGLE colour source
+// all three render from, so ds_check.py's D3 cross-layer consistency holds by
+// construction (tokens.json canon == the spine table == every preview `:root`).
+// Colours reduce the 59 roles to a small generation set via the SAME name-matcher
+// shadcn uses. `typeSc` = typeScale(config); `geomSc` = model.geometryScale.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// what each generation role is FOR (the "role, not just a hex" the format wants) — clean prose only
+// (no `#hex` / `--var`, so a spine table row built from it stays one-var-one-hex for D3).
+const CD_PURPOSE = {
+  background: "the app canvas — the lowest, calmest surface",
+  surface: "cards, panels, and raised content on the background",
+  "surface-raised": "the top surfaces — popovers, menus, sticky bars",
+  foreground: "primary text and icons on background or surface",
+  muted: "secondary text, captions, and disabled labels",
+  border: "hairlines, dividers, and input outlines",
+  primary: "the one decisive action per view — CTAs, links, focus, selection",
+  secondary: "supporting actions and quieter emphasis",
+  accent: "a third brand accent for highlights and tags",
+  ring: "the focus ring on interactive elements",
+  danger: "destructive or error states — delete, failure, critical",
+  success: "positive states — saved, complete, valid",
+  warning: "caution states — needs attention, unsaved, at risk",
+  info: "neutral-informational states — tips and notices",
+};
+
+// cdColorRoles — the reduced generation role set with light + dark ends + purpose. THE shared source
+// for tokens.json, the spine table, and the previews. Returns null when no palette is enabled.
+function cdColorRoles(state) {
   const palettes = derivedAll(state);
   const find = (re) => palettes.find((p) => re.test(p.name.toLowerCase()));
   const neutral = find(/neutral|gray|grey|slate|stone|zinc|mono/) || palettes[0];
   const primary = find(/primary|brand/) || palettes.find((p) => p !== neutral) || palettes[0];
-  if (!neutral || !primary) return JSON.stringify({ $note: "Claude Design export needs at least one enabled palette." }, null, 2);
+  if (!neutral || !primary) return null;
   const danger = find(/danger|destruct|error|critical|red/);
   const success = find(/success|positive|green/);
   const warning = find(/warn|caution|amber|yellow|orange/);
@@ -4614,32 +4637,314 @@ function exportClaudeDesign(state, typeSc, geomSc) {
     ...(warning ? { warning: prime(warning), "warning-foreground": onAccent(warning) } : {}),
     ...(info ? { info: prime(info), "info-foreground": onAccent(info) } : {}),
   };
-  const colors = {}, colorsDark = {};
+  const out = [];
   for (const [role, r] of Object.entries(MAP)) {
     if (!r) continue;
-    colors[role] = r.light.hex;
-    colorsDark[role] = r.dark.hex;
+    out.push({ role, light: r.light.hex, dark: r.dark.hex, purpose: CD_PURPOSE[role] || "" });
   }
+  return out;
+}
 
-  // type — the five family roles + a per-voice·step size scale (size / lineHeight px numbers, numeric
-  // weight). Dimensions follow the format's numeric-px convention (its `spacing:[4,8,16]` example), NOT
-  // colours' string form — a spine appends the unit.
+// cdTypeLayer / cdSpacing / cdRadii — the composed dimension layers, numeric px (the format's
+// `spacing:[4,8,16]` convention; a spine/preview appends the unit).
+function cdTypeLayer(typeSc) {
   const type = { fonts: { ...(typeSc && typeSc.fonts) }, scale: {} };
   if (typeSc && typeSc.categories) for (const [cName, steps] of Object.entries(typeSc.categories))
     for (const [sName, s] of Object.entries(steps))
       type.scale[`${cName.toLowerCase()}-${sName.toLowerCase()}`] = { size: s.size, lineHeight: s.lineHeight, weight: s.weight };
+  return type;
+}
+const cdSpacing = (geomSc) => (geomSc && geomSc.space ? Object.keys(geomSc.space).sort((a, b) => a - b).map((k) => geomSc.space[k]) : []);
+const cdRadii = (geomSc) => { const r = {}; if (geomSc && geomSc.radii) for (const [k, v] of Object.entries(geomSc.radii)) r[k] = v; return r; };
 
-  // spacing — the geometry ladder as a numeric-px ARRAY (indexed step scale, per the format's example);
-  // radii — the NAMED corner tiers (none/xs/…/full) a generator reaches for by name, numeric px.
-  const spacing = geomSc && geomSc.space ? Object.keys(geomSc.space).sort((a, b) => a - b).map((k) => geomSc.space[k]) : [];
-  const radii = {};
-  if (geomSc && geomSc.radii) for (const [k, v] of Object.entries(geomSc.radii)) radii[k] = v;
+const cdHumanize = (role) => role.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+const cdFontStack = (name, generic) => (name ? `'${name}', ${generic}` : generic);
 
+// exportClaudeDesign — the tokens.json layer (`colors` light · `colorsDark` dark · numeric type/spacing/radii).
+function exportClaudeDesign(state, typeSc, geomSc) {
+  const roles = cdColorRoles(state);
+  if (!roles) return JSON.stringify({ $note: "Claude Design export needs at least one enabled palette." }, null, 2);
+  const colors = {}, colorsDark = {};
+  for (const r of roles) { colors[r.role] = r.light; colorsDark[r.role] = r.dark; }
   return JSON.stringify({
     $generator: "Ultimate Tokens by NONOUN",
     $note: "Claude Design tokens.json — `colors` is the generation role set (light scheme); `colorsDark` is the dark scheme. Dimensions (type sizes, spacing, radii) are px numbers; they feed the DESIGN.md spine's Typography/Layout sections.",
-    colors, colorsDark, type, spacing, radii,
+    colors, colorsDark,
+    type: cdTypeLayer(typeSc), spacing: cdSpacing(geomSc), radii: cdRadii(geomSc),
   }, null, 2);
+}
+
+// cdRootCSS — the inline :root every preview shares: each role at its LIGHT hex (== tokens.json canon),
+// dark in an @media block. ds_check strips @media (so dark ≠ light isn't read as drift) and only observes
+// `--color-*` roles that exist in canon, so this single block keeps every preview D3-consistent.
+function cdRootCSS(roles) {
+  const light = roles.map((r) => `--color-${r.role}:${r.light}`).join(";");
+  const dark = roles.map((r) => `--color-${r.role}:${r.dark}`).join(";");
+  return `:root{color-scheme:light dark;${light}}@media(prefers-color-scheme:dark){:root{${dark}}}`;
+}
+
+// exportClaudeDesignComponents — the self-contained @dsCard previews. Returns [{name, data}] with names
+// relative to the bundle root (components/*.html). Empty when no palette is enabled.
+function exportClaudeDesignComponents(state, typeSc, geomSc) {
+  const roles = cdColorRoles(state);
+  if (!roles) return [];
+  const has = (role) => roles.some((r) => r.role === role);
+  const root = cdRootCSS(roles);
+  const fonts = (typeSc && typeSc.fonts) || {};
+  const sans = "system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  const bodyStack = cdFontStack(fonts.body, sans);
+  const headStack = cdFontStack(fonts.heading || fonts.display, sans);
+  const monoStack = cdFontStack(fonts.mono, "ui-monospace, SFMono-Regular, monospace");
+  const rad = cdRadii(geomSc);
+  const radMd = rad.md != null ? rad.md : 8;
+  const radLg = rad.lg != null ? rad.lg : 12;
+
+  // shell: the @dsCard marker MUST be the first line; then an inline <style> (root + base .cd canvas +
+  // the card's own CSS) and the markup. No external loads (D2). Uses var() with NO fallback (no drift).
+  const card = (group, title, subtitle, css, body) =>
+    `<!-- @dsCard group="${group}" title="${title}" subtitle="${subtitle}" -->\n` +
+    `<style>${root}*{box-sizing:border-box}` +
+    `.cd{font-family:${bodyStack};background:var(--color-background);color:var(--color-foreground);padding:24px;line-height:1.5}` +
+    `.cd h3{font-family:${headStack};margin:0 0 12px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-muted)}` +
+    `.cd code{font-family:${monoStack};font-size:12px}${css}</style>\n<div class="cd">${body}</div>\n`;
+
+  const files = [];
+
+  // Colors — surfaces/text as labelled swatches, accents/intents as fills carrying their paired text.
+  {
+    const NEUTRAL = ["background", "surface", "surface-raised", "foreground", "muted", "border"].filter(has);
+    const FILL = ["primary", "secondary", "accent", "danger", "success", "warning", "info"].filter(has);
+    const nTiles = NEUTRAL.map((role) =>
+      `<div style="border:1px solid var(--color-border);border-radius:8px;overflow:hidden"><div style="height:44px;background:var(--color-${role})"></div><div style="padding:8px 10px"><div style="font-weight:600;font-size:13px">${cdHumanize(role)}</div><code style="color:var(--color-muted)">--color-${role}</code></div></div>`).join("");
+    const fTiles = FILL.map((role) =>
+      `<div style="border-radius:8px;overflow:hidden;background:var(--color-${role})"><div style="padding:16px;color:var(--color-${role}-foreground)"><div style="font-weight:700">${cdHumanize(role)}</div><div style="font-size:12px;opacity:.85">Aa on --color-${role}-foreground</div></div></div>`).join("");
+    const grid = "display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px";
+    files.push({ name: "components/colors.html", data: card("Colors", "Color roles", "surfaces · accents · intents", "",
+      `<h3>Surfaces &amp; text</h3><div style="${grid};margin-bottom:24px">${nTiles}</div><h3>Accents &amp; intents</h3><div style="${grid}">${fTiles}</div>`) });
+  }
+
+  // Typography — one specimen line per major voice, at its real size/leading/weight.
+  {
+    const scale = cdTypeLayer(typeSc).scale;
+    const voiceFont = { display: "display", heading: "heading", body: "body", ui: "ui", caption: "ui" };
+    const spec = ["display", "heading", "body", "ui", "caption"].map((needle) => {
+      const key = [`${needle}-md`, `${needle}-lg`, `${needle}-sm`].find((k) => scale[k]) || Object.keys(scale).find((k) => k.startsWith(needle + "-"));
+      if (!key) return "";
+      const s = scale[key];
+      const stack = cdFontStack(fonts[voiceFont[needle]] || fonts.body, sans);
+      return `<div style="font-family:${stack};font-size:${s.size}px;line-height:${s.lineHeight}px;font-weight:${s.weight};margin-bottom:14px">${cdHumanize(needle)} — the spectrum of design <span style="font-family:${bodyStack};font-size:12px;font-weight:400;color:var(--color-muted)">${key} · ${s.size}/${s.lineHeight} · ${s.weight}</span></div>`;
+    }).filter(Boolean).join("");
+    files.push({ name: "components/typography.html", data: card("Type", "Type scale", "voices · sizes · weights", "", `<h3>Type scale</h3>${spec || "<p>No type scale.</p>"}`) });
+  }
+
+  // Spacing — the numeric-px scale as bars, the named radii as tiles.
+  {
+    const sp = cdSpacing(geomSc);
+    const bars = sp.map((v, i) =>
+      `<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><code style="width:72px;color:var(--color-muted)">[${i}] ${v}px</code><div style="height:14px;width:${Math.max(v, 2)}px;background:var(--color-primary);border-radius:3px"></div></div>`).join("");
+    const tiles = Object.entries(rad).map(([k, v]) =>
+      `<div style="text-align:center"><div style="width:60px;height:60px;background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:${Math.min(v, 30)}px;margin:0 auto"></div><div style="font-size:12px;margin-top:6px">${k}<br><span style="color:var(--color-muted)">${v}px</span></div></div>`).join("");
+    files.push({ name: "components/spacing.html", data: card("Spacing", "Spacing &amp; radii", "the rhythm scale", "",
+      `<h3>Spacing scale</h3><div style="margin-bottom:24px">${bars || "<p>No spacing scale.</p>"}</div><h3>Radii</h3><div style="display:flex;gap:16px;flex-wrap:wrap">${tiles}</div>`) });
+  }
+
+  // Buttons — every fill × default/hover/disabled, distinct so the render-check never sees identical variants.
+  {
+    const btnRoles = ["primary", "secondary", "accent", "danger"].filter(has);
+    const css = `.brow{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap}.blabel{width:88px;font-size:12px;color:var(--color-muted);text-transform:capitalize}` +
+      `.btn{border:0;border-radius:${radMd}px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer}.btn--hover{filter:brightness(1.12)}.btn--disabled{opacity:.45;filter:grayscale(.25);cursor:not-allowed}`;
+    const rows = btnRoles.map((role) => {
+      const base = `background:var(--color-${role});color:var(--color-${role}-foreground)`;
+      return `<div class="brow"><span class="blabel">${role}</span><button class="btn" style="${base}">Button</button><button class="btn btn--hover" style="${base}">Hover</button><button class="btn btn--disabled" style="${base}">Disabled</button></div>`;
+    }).join("");
+    files.push({ name: "components/buttons.html", data: card("Components", "Buttons", "fills · hover · disabled", css,
+      `<h3>Buttons</h3>${rows}<p style="font-size:12px;color:var(--color-muted);margin:8px 0 0">Each fill pairs with its <code>--color-{role}-foreground</code>. Hover brightens; disabled drops opacity.</p>`) });
+  }
+
+  // Inputs — default / focus (ring) / disabled, each visually distinct (the states §4 names get a preview).
+  {
+    const css = `.field{margin-bottom:14px;max-width:340px}.flabel{display:block;font-size:12px;color:var(--color-muted);margin-bottom:4px}` +
+      `.in{display:block;width:100%;padding:9px 12px;border-radius:${radMd}px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-foreground);font:inherit}` +
+      `.in::placeholder{color:var(--color-muted)}.in--focus{border-color:var(--color-ring);box-shadow:0 0 0 2px var(--color-ring);outline:none}.in--disabled{opacity:.5}`;
+    const body = `<h3>Inputs</h3>` +
+      `<div class="field"><span class="flabel">Default</span><input class="in" placeholder="you@example.com"></div>` +
+      `<div class="field"><span class="flabel">Focus (--color-ring)</span><input class="in in--focus" value="typing…"></div>` +
+      `<div class="field"><span class="flabel">Disabled</span><input class="in in--disabled" value="locked" disabled></div>` +
+      `<p style="font-size:12px;color:var(--color-muted);margin:4px 0 0"><code>--color-surface</code> field, <code>--color-border</code> outline, <code>--color-ring</code> on focus, <code>--color-muted</code> placeholder.</p>`;
+    files.push({ name: "components/inputs.html", data: card("Components", "Inputs", "default · focus · disabled", css, body) });
+  }
+
+  // Feedback — the intent palettes as chips + alert rows (each intent visually distinct).
+  {
+    const INTENT = ["info", "success", "warning", "danger"].filter(has);
+    const msg = { danger: "something failed", success: "it worked", warning: "attention needed", info: "a neutral notice" };
+    const chips = INTENT.map((role) =>
+      `<span style="display:inline-block;background:var(--color-${role});color:var(--color-${role}-foreground);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;text-transform:capitalize;margin:0 8px 8px 0">${role}</span>`).join("");
+    const alerts = INTENT.map((role) =>
+      `<div style="display:flex;gap:10px;align-items:flex-start;border:1px solid var(--color-${role});border-radius:8px;padding:12px 14px;margin-bottom:10px"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:var(--color-${role});color:var(--color-${role}-foreground);display:grid;place-items:center;font-weight:700;font-size:13px">!</span><div><div style="font-weight:600;text-transform:capitalize">${role}</div><div style="font-size:13px;color:var(--color-muted)">A ${role} message — this intent means ${msg[role]}.</div></div></div>`).join("");
+    files.push({ name: "components/feedback.html", data: card("Components", "Status &amp; intents", "chips · alerts", "",
+      `<h3>Status &amp; intents</h3><div style="margin-bottom:16px">${chips}</div>${alerts}`) });
+  }
+
+  // Card — a composed surface (elevation via the surface ladder, not a heavy shadow) with real actions.
+  {
+    const primaryLabel = has("primary") ? "primary" : "foreground";
+    files.push({ name: "components/card.html", data: card("Components", "Content card", "surface · elevation · actions", "",
+      `<h3>Card</h3><div style="max-width:360px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:${radLg}px;padding:20px;box-shadow:0 1px 2px rgba(0,0,0,.06)">` +
+      `<div style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--color-${primaryLabel});font-weight:700;margin-bottom:8px">Featured</div>` +
+      `<div style="font-family:${headStack};font-size:20px;font-weight:700;margin-bottom:8px">A composed surface</div>` +
+      `<p style="margin:0 0 16px">Body copy sits on <code>--color-surface</code>, one step above the page. Detail text uses <code>--color-muted</code>.</p>` +
+      `<div style="font-size:13px;color:var(--color-muted);margin-bottom:16px">Updated moments ago · 3 min read</div>` +
+      `<div style="display:flex;gap:10px"><button style="border:0;border-radius:${radMd}px;padding:9px 16px;font:inherit;font-weight:600;background:var(--color-primary);color:var(--color-primary-foreground);cursor:pointer">Primary</button>` +
+      `<button style="border:1px solid var(--color-border);border-radius:${radMd}px;padding:9px 16px;font:inherit;font-weight:600;background:transparent;color:var(--color-foreground);cursor:pointer">Secondary</button></div></div>`) });
+  }
+
+  return files;
+}
+
+// exportClaudeDesignSpine — the DESIGN.md spine: the 9-section generation PROMPT. The §2 Colour table
+// is authoritative for ds_check D3 (one `--color-*` + one light hex per row, == tokens.json canon).
+function exportClaudeDesignSpine(state, typeSc, geomSc) {
+  const roles = cdColorRoles(state);
+  if (!roles) return "# Design System\n\n_Enable at least one palette to author the spine._\n";
+  const brand = ((state && state.name) || "This").toString().trim() || "This";
+  const has = (role) => roles.some((r) => r.role === role);
+  const val = (role) => (roles.find((r) => r.role === role) || {}).light;
+
+  const type = cdTypeLayer(typeSc), scale = type.scale, fonts = type.fonts;
+  const sizes = Object.values(scale).map((s) => s.size);
+  const minS = sizes.length ? Math.min(...sizes) : 0, maxS = sizes.length ? Math.max(...sizes) : 0;
+  // weights PER VOICE (each carries its rule) rather than a bare set dump; the on-screen body floor.
+  const voiceWeight = (needle) => { const k = [`${needle}-md`, `${needle}-lg`, `${needle}-sm`].find((x) => scale[x]) || Object.keys(scale).find((x) => x.startsWith(needle + "-")); return k ? scale[k].weight : null; };
+  const weightLine = [["Body", "body"], ["Headings", "heading"], ["Display", "display"], ["UI", "ui"], ["Mono", "code"]].map(([lab, n]) => { const w = voiceWeight(n); return w ? `${lab} ${w}` : null; }).filter(Boolean).join(" · ");
+  const bodyBase = (scale["body-md"] || scale["body-lg"] || {}).size || 16;
+  const sp = cdSpacing(geomSc), rad = cdRadii(geomSc);
+
+  // §2 — one authoritative row per NON-foreground role (foregrounds are prose-paired below, so no row
+  // carries two colours). Each row: exactly one `--color-*` + one light `#hex` → ds_check D3 canon.
+  const colorRows = roles.filter((r) => !r.role.endsWith("-foreground"))
+    .map((r) => `| ${cdHumanize(r.role)} | \`--color-${r.role}\` | \`${r.light}\` | ${r.purpose} |`).join("\n");
+  const fgPairs = roles.filter((r) => r.role.endsWith("-foreground")).map((r) => `\`--color-${r.role}\``).join(", ");
+  const intents = ["info", "success", "warning", "danger"].filter(has);
+
+  const fontLine = [fonts.heading && `**Display & headings** — \`${fonts.heading}\``, fonts.body && `**Body & UI** — \`${fonts.body}\``, fonts.mono && `**Mono** — \`${fonts.mono}\``].filter(Boolean).join(" · ");
+  const spLine = sp.length ? sp.join(" · ") : "4 · 8 · 12 · 16 · 24";
+  const RAD_USE = { none: "flush edges", xs: "chips & tags", sm: "inputs & small controls", md: "buttons & controls", lg: "cards & panels", xl: "modals & sheets", full: "pills & avatars" };
+  const radLine = Object.entries(rad).map(([k, v]) => `\`${k}\` ${v}px (${RAD_USE[k] || "—"})`).join(" · ") || "`md` 12px (controls) · `lg` 16px (cards)";
+  const surfaceLadder = ["background", "surface", "surface-raised"].filter(has).map((r) => `\`--color-${r}\``).join(" → ");
+
+  return `# ${brand} — Design System
+
+_**Read this file as your instructions — it is the prompt.** Generate screens that match this brand:
+values live in \`tokens.json\`, and the \`components/\` previews are representative reference renderings.
+(Generated by Ultimate Tokens · NONOUN.)_
+
+## 1. Visual Theme & Atmosphere
+
+Calm, legible, and perceptually even. ${has("primary") ? "A single decisive accent" : "A restrained accent"} does the
+work; neutral surfaces carry the interface; the intent colours speak only when they mean something.
+Every colour ships a **light and a dark** end — design once and both schemes hold. Favour restraint over
+decoration: whitespace, hierarchy, and one clear action per view.
+
+## 2. Color Palette & Roles
+
+Reason over **roles**, never raw hexes. Each row is the light value; \`tokens.json\` → \`colors\` (light) and
+\`colorsDark\` (dark) carry both schemes — do not invent per-colour dark overrides, the pair is provided.
+
+| Role | Variable | Value | Use it for |
+|---|---|---|---|
+${colorRows}
+
+**Pairing law.** Text on a fill uses that fill's paired \`-foreground\` (${fgPairs || "the matching text token"}) —
+e.g. \`--color-primary-foreground\` on a \`--color-primary\` fill. Text on \`--color-background\`/\`--color-surface\`
+uses \`--color-foreground\` (primary) or \`--color-muted\` (secondary). Never cross a pair.
+
+**Intents carry meaning, not decoration.** ${intents.length ? intents.map((r) => `\`--color-${r}\``).join(", ") : "The status colours"}
+signal status only — never reach for \`--color-danger\` for an ordinary button. Chrome (neutral surfaces) and
+\`--color-primary\` carry everything else.
+
+## 3. Typography Rules
+
+${fontLine || "**Body** — system-ui"}. If a brand face isn't loaded in the render pane, it falls back to
+\`system-ui\` (sans) / \`ui-monospace\` (mono) — design so the hierarchy still reads in the fallback.
+Weight by role: ${weightLine || "body 400 · headings 600"} — use each weight for its voice, not
+interchangeably. The scale spans **${minS}–${maxS}px** across ${Object.keys(scale).length} steps
+(\`tokens.json\` → \`type.scale\`, keyed \`voice-step\`); set size **and** line-height together from it, never free-type.
+
+## 4. Component Stylings
+
+State the interactive states explicitly — generic output betrays itself in hover/focus/disabled.
+
+- **Buttons.** Fill = \`--color-{role}\`, text = \`--color-{role}-foreground\`, radius \`${rad.md != null ? rad.md : 8}px\`.
+  **Hover** brightens the fill slightly; **active** presses it a touch further; **focus** shows a 2px
+  \`--color-ring\` outline; **disabled** drops opacity (~45%) and removes the pointer.
+- **Inputs.** \`--color-surface\` field, \`1px --color-border\`, \`--color-foreground\` text,
+  \`--color-muted\` placeholder; **focus** swaps the border to \`--color-ring\` (+ a 2px ring);
+  **disabled** drops opacity.
+- **Cards.** \`--color-surface\` on the \`--color-background\` page, \`1px --color-border\`, radius
+  \`${rad.lg != null ? rad.lg : 12}px\`; an interactive card lifts one surface step on **hover**.
+- **Badges / chips.** Intent fill + its \`-foreground\`, pill radius.
+
+## 5. Layout Principles
+
+Space on the numeric scale (px): ${spLine}. Compose gaps and padding from these steps — never invent a 7px
+or 13px gap. Corner radii: ${radLine}. Keep a comfortable reading measure (~60–75ch) and align to a
+consistent grid; let whitespace, not borders, do the separating.
+
+## 6. Depth & Elevation
+
+Elevation is a **surface step, not a drop shadow**: raise content along the ladder
+${surfaceLadder || "`--color-surface`"}. A shadow is optional garnish on the top-most surfaces
+(popovers, menus) — keep it soft (a single low-alpha layer), never a heavy glow on a flat card.
+
+## 7. Do's & Don'ts
+
+**Three hard rules — never break these:**
+
+- ❌ **Never hardcode a colour.** Every colour is a \`--color-*\` role — ✅ bind to the role, so a re-theme flows everywhere.
+- ❌ **Never break a foreground pair** (e.g. \`--color-foreground\` on a \`--color-primary\` fill) — ✅ use the fill's own \`-foreground\`, or contrast fails in one scheme.
+- ❌ **Never stack competing primaries** — ✅ one \`--color-primary\` action per view, so the eye lands where you intend.
+
+**Prefer:**
+
+- Reach for an intent colour only for its meaning; don't decorate with \`--color-danger\` / \`--color-success\`.
+- Elevate by stepping the surface ladder; don't fake depth with a heavy shadow on a flat surface.
+- Compose spacing, radii, and type from the scales; don't free-type off-scale gaps or sizes.
+- Express a state with its token (hover/disabled), not with raw \`opacity\` on an arbitrary colour.
+
+## 8. Responsive Behavior
+
+Design mobile-first and let columns **stack** below ~640px; reveal multi-column layouts as width allows.
+Reduce display sizes on small screens, but keep primary reading text at the body base (**${bodyBase}px**)
+or larger — the smaller body steps are for dense, secondary UI — and touch targets ≥44px. Let content
+reflow; hide only genuinely secondary chrome. Both colour schemes must hold at every width.
+
+## 9. Agent Prompt Guide
+
+You are generating UI for **${brand}**. Work in this order:
+
+1. **Tokens first** — take colours, type, spacing, and radii from \`tokens.json\`; never invent a value.
+2. **Roles, then scheme** — pick the semantic \`--color-*\` role for each element; both light and dark ends
+   are provided, so don't hand-roll a dark variant.
+3. **Scale, then states** — size and space from the scales, then add the interactive states
+   (hover / focus / disabled) — the states are where generic output shows.
+4. **One focus per view** — a single \`--color-primary\` action; keep the rest neutral; let an intent
+   colour speak only when it carries status.
+
+When two rules conflict, the three hard rules in §7 win. Mirror the structure and pairing of the
+\`components/\` previews.
+`;
+}
+
+// exportClaudeDesignBundle — the whole bundle as [{name, data}] (names relative to the bundle root):
+// tokens.json + DESIGN.md + components/*.html. One shared colour source ⇒ ds_check D3 holds across all three.
+function exportClaudeDesignBundle(state, typeSc, geomSc) {
+  const files = [{ name: "tokens.json", data: exportClaudeDesign(state, typeSc, geomSc) }];
+  if (cdColorRoles(state)) {
+    files.push({ name: "DESIGN.md", data: exportClaudeDesignSpine(state, typeSc, geomSc) });
+    files.push(...exportClaudeDesignComponents(state, typeSc, geomSc));
+  }
+  return files;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -4657,7 +4962,7 @@ function exportAll(state, opts) {
   };
 }
 
-return { SCRIM_BASES, SCRIM_STEPS, exportCSS, cssPrefixOf, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, exportClaudeDesign, exportAll };
+return { SCRIM_BASES, SCRIM_STEPS, exportCSS, cssPrefixOf, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, exportClaudeDesign, exportClaudeDesignComponents, exportClaudeDesignSpine, exportClaudeDesignBundle, exportAll };
 })();
 __M.figmaPlugin = (function(){
 // GENERATED by gen-figma-assets.mjs from figma/binder/figma-semantic-binder/ — DO NOT EDIT.
@@ -5453,7 +5758,7 @@ function baseOverrideSlice(store) {
   }
   return Object.keys(out).length ? out : undefined;
 }
-const { exportCSS, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, exportClaudeDesign, SCRIM_BASES, SCRIM_STEPS } = __M.exports;
+const { exportCSS, exportOKLCH, exportJSON, exportDTCG, exportUI3, exportTailwind, exportShadcn, exportClaudeDesign, exportClaudeDesignSpine, exportClaudeDesignBundle, SCRIM_BASES, SCRIM_STEPS } = __M.exports;
 
 // Re-export the scrim model so the UI (app.js) can build the Mapping tab's re-point targets from the
 // SAME source of truth as the exporters — no second, drift-prone hardcoded scrim-step list.
@@ -5932,7 +6237,7 @@ function tokenCount(doc) {
 
 // Re-exports the app needs from the core (so app.js imports one module).
 
-return { geometryScale, configFromVariables, slug, defaultDocument, figmaBundle, brandKit, contrastRatio, keyCss, seedFromKeyColor, rgbToOklchArr, hexToOklch, projectView, appThemeCSS, tokenCount, SCRIM_BASES, SCRIM_STEPS, exportClaudeDesign, hctToRgb, lstarFromRgb, hexToRgb, STOPS, EXPORT_STOPS, DEFAULT_CONTROLS };
+return { geometryScale, configFromVariables, slug, defaultDocument, figmaBundle, brandKit, contrastRatio, keyCss, seedFromKeyColor, rgbToOklchArr, hexToOklch, projectView, appThemeCSS, tokenCount, SCRIM_BASES, SCRIM_STEPS, exportClaudeDesign, exportClaudeDesignSpine, exportClaudeDesignBundle, hctToRgb, lstarFromRgb, hexToRgb, STOPS, EXPORT_STOPS, DEFAULT_CONTROLS };
 })();
 (function(){
 // app.js — the DOM app for the HCT Palette Generator.
@@ -5943,7 +6248,7 @@ return { geometryScale, configFromVariables, slug, defaultDocument, figmaBundle,
 // lists them. The six validated capability modules do all the color/token work
 // (imported through model.mjs); this file only owns DOM + interaction.
 
-const { defaultDocument, projectView, tokenCount, slug, contrastRatio, appThemeCSS, hctToRgb, STOPS, figmaBundle, configFromVariables, seedFromKeyColor, hexToOklch, brandKit, exportClaudeDesign, SCRIM_BASES, SCRIM_STEPS } = __M.model;
+const { defaultDocument, projectView, tokenCount, slug, contrastRatio, appThemeCSS, hctToRgb, STOPS, figmaBundle, configFromVariables, seedFromKeyColor, hexToOklch, brandKit, exportClaudeDesign, exportClaudeDesignSpine, exportClaudeDesignBundle, SCRIM_BASES, SCRIM_STEPS } = __M.model;
 const { STORAGE_KEY, serialize, hydrate } = __M.persist;
 const { clampProfile, resolveFlags, flagOf: flagFromFlags, resolveTier, entitlementActive } = __M.flags;
 const { FIGMA_PLUGIN } = __M.figmaPlugin;
@@ -11076,7 +11381,7 @@ class HctApp extends HTMLElement {
       ["Colors", [["css", "Hex"], ["oklch", "OKLCH"], ["tailwind", "Tailwind v4"], ["shadcn", "shadcn/ui"], ["figma", "Figma"], ["ui3", "Figma UI3"], ["dtcg", "DTCG"], ["json", "JSON"]]],
       ["Typography", [["type-css", "Type · CSS"], ["type-dtcg", "Type · DTCG"]]],
       ["Geometry", [["geom-css", "Geometry · CSS"], ["geom-dtcg", "Geometry · DTCG"]]],
-      ["Claude Design", [["claude-design", "tokens.json"]]],
+      ["Claude Design", [["claude-design", "tokens.json"], ["claude-design-spine", "DESIGN.md"]]],
       ["Project", [["config", "Config"]]],
     ];
     // the per-system token output for the Typography / Geometry format tabs (the colour formats live on
@@ -11091,10 +11396,12 @@ class HctApp extends HTMLElement {
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
       "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), ug),
       "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
-      // the Claude Design (claude.ai/design) bundle's token layer — colour role set + composed type/geometry
+      // the Claude Design (claude.ai/design) bundle — the token layer + the DESIGN.md spine (the generation
+      // prompt); the component previews ride the Download-All bundle only (a folder, not a single preview).
       "claude-design": () => exportClaudeDesign(this.doc, typeSc, geomSc),
+      "claude-design-spine": () => exportClaudeDesignSpine(this.doc, typeSc, geomSc),
     };
-    const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG", "claude-design": "Claude Design · tokens.json" };
+    const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG", "claude-design": "Claude Design · tokens.json", "claude-design-spine": "Claude Design · DESIGN.md" };
     // the systems currently opted into the Download-All + MCP bundle (for the footer summary).
     const SYS_LABEL = { color: "Color", type: "Typography", geometry: "Geometry" };
     const included = ["color", "type", "geometry"].filter((k) => this.exportSystems[k] !== false).map((k) => SYS_LABEL[k]).join(" · ");
@@ -11328,13 +11635,13 @@ class HctApp extends HTMLElement {
         { name: "figma-aliased/Dark_tokens.json", data: JSON.stringify(aliased["Dark_tokens.json"], null, 2) },
         { name: "figma-aliased/README.txt", data: ALIASED_README },
       );
-      // claude-design/tokens.json — the Claude Design (claude.ai/design) system bundle's token layer:
-      // the generation colour role set (light + dark) plus the composed type/spacing/radii the DESIGN.md
-      // spine reads. Rides `systems.color` (a Claude Design kit is colour-led; type/geometry compose in).
-      files.push({
-        name: "claude-design/tokens.json",
-        data: exportClaudeDesign(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base")),
-      });
+      // claude-design/ — the full Claude Design (claude.ai/design) system bundle: tokens.json (the
+      // generation colour role set + composed type/spacing/radii) + DESIGN.md (the 9-section generation
+      // prompt) + components/*.html (self-contained @dsCard previews). One shared colour source keeps all
+      // three ds_check-D3-consistent. Rides `systems.color` (a Claude Design kit is colour-led; type/geometry
+      // compose in). A vision-capable Claude reads the folder to generate on-brand screens.
+      files.push(...exportClaudeDesignBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"))
+        .map((f) => ({ name: `claude-design/${f.name}`, data: f.data })));
     }
     if (sys.type) {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)

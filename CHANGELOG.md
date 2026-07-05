@@ -8,6 +8,23 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 
 ## [Unreleased]
 
+### 2026-07-05
+
+#### Added
+- **The Claude Design export is now the FULL bundle — spine + previews, not just tokens.** Building on the
+  `tokens.json` layer, Download-All's `claude-design/` folder now carries the complete three-layer
+  [Claude Design](https://claude.ai/design) system: **`DESIGN.md`** — the 9-section generation prompt
+  (Visual Theme · Color Palette & Roles · Typography · Component Stylings · Layout · Depth & Elevation ·
+  Do's & Don'ts · Responsive · Agent Prompt Guide), written *as* instructions with the brand's own
+  guardrails (the pairing law, intents-mean-status, elevation-as-surface-ladder) — plus six
+  **self-contained `components/*.html`** @dsCard previews (colors · type scale · spacing/radii · buttons ·
+  status/intents · a composed card) that render the brand with no external loads. A new **DESIGN.md**
+  preview tab sits beside **tokens.json** in the Export drawer. One shared colour source feeds all three
+  layers, so the whole bundle stays cross-layer-consistent — validated against the `design-system-author`
+  skill's `ds_check.py` (**D1 card grammar · D2 self-containment · D3 cross-layer consistency all PASS**),
+  for both a full 8-palette kit and a minimal 2-palette one. A vision-capable Claude reads the folder to
+  generate on-brand screens.
+
 ### 2026-07-04
 
 #### Added
