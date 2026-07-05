@@ -1044,11 +1044,12 @@ const eocd = zb.length - 22; // EOCD has no trailing comment → it's the final 
 const eocdSig = zb[eocd] === 0x50 && zb[eocd + 1] === 0x4b && zb[eocd + 2] === 0x05 && zb[eocd + 3] === 0x06;
 const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
 // default opt-in = all three systems on: 20 colour files (BOTH css-hex/ + css-oklch/ folders + the full
-// design-system-for-claude-code/ bundle: DESIGN.md + tokens.json + 7 components/*.html + README.md, all
-// riding systems.color) + 4 figma-aliased + 5 typography (incl. figma/ + figma/ moded + figma/ primitives) + 4 geometry + config = 34.
-ok(eocdSig && entries === 34, `(ee) the EOCD reports 34 entries — colour (20, incl. the design-system-for-claude-code/ bundle of 10) + figma-aliased (4) + typography (5) + geometry (4) + config (got ${entries})`);
+// design-system-for-claude-code/ bundle: DESIGN.md + tokens.json + 7 components/*.html + README.md (10),
+// design-system-for-google-stitch/ bundle: DESIGN.md + README.md (2, the byte-identical spine + Stitch receipt),
+// all riding systems.color) + 4 figma-aliased + 5 typography (incl. figma/ + figma/ moded + figma/ primitives) + 4 geometry + config = 36.
+ok(eocdSig && entries === 36, `(ee) the EOCD reports 36 entries — colour (22, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2) + figma-aliased (4) + typography (5) + geometry (4) + config (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
-const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "design-system-for-claude-code/DESIGN.md", "design-system-for-claude-code/tokens.json", "design-system-for-claude-code/components/colors.html", "design-system-for-claude-code/README.md", "nonoun-color-tokens-my-set-config.json",
+const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "design-system-for-claude-code/DESIGN.md", "design-system-for-claude-code/tokens.json", "design-system-for-claude-code/components/colors.html", "design-system-for-claude-code/README.md", "design-system-for-google-stitch/DESIGN.md", "design-system-for-google-stitch/README.md", "nonoun-color-tokens-my-set-config.json",
   "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt",
   "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "figma/typography.modes.variables.json", "figma/typography.primitives.variables.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.variables.json", "figma/dimension.modes.variables.json"];
 ok(wantPaths.every((p) => zipText.includes(p)), "(ee) every colour format + typography/ + geometry/ + the moded Figma-variable files + the config + the figma-aliased/ cascade variant is present in the archive");

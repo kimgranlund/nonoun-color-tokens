@@ -222,9 +222,43 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   try { const j = JSON.parse(off[0].data); if (j.colors) FAIL("design-system", "all-disabled emitted colors"); if (!j.$note) FAIL("design-system", "all-disabled missing $note"); } catch { FAIL("design-system", "all-disabled not valid JSON"); }
 }
 
+// ── hpg-export-design-system-stitch (the Google Stitch profile: DESIGN.md ONLY — the SAME canonical spine,
+// byte-identical to the Claude Code DESIGN.md — plus a Stitch-lint-framed README receipt). One core, two
+// uploads: the acceptance is byte-identity of the DESIGN.md, so P3 adds NO second spine to drift.
+{
+  const tsc = typeScale({});
+  const gsc = geomScale({});
+  const stitch = X.exportDesignSystemStitchBundle(C(ALL), tsc, gsc, { date: "2026-07-05" });
+  const byName = Object.fromEntries(stitch.map((f) => [f.name, f.data]));
+  // Stitch consumes ONE file: exactly DESIGN.md + README.md, no tokens.json/previews.
+  if (stitch.length !== 2) FAIL("design-system-stitch", `stitch bundle is not 2 files (got ${stitch.length}: ${stitch.map((f) => f.name).join(", ")})`);
+  for (const layer of ["DESIGN.md", "README.md"]) if (!(layer in byName)) FAIL("design-system-stitch", `stitch bundle missing ${layer}`);
+
+  // BYTE-IDENTITY — the Stitch DESIGN.md must equal the Claude Code DESIGN.md exactly (one canonical spine).
+  const claudeSpine = X.exportDesignSystemSpine(C(ALL), tsc, gsc);
+  if (byName["DESIGN.md"] !== claudeSpine) FAIL("design-system-stitch", "Stitch DESIGN.md is NOT byte-identical to the Claude Code spine");
+  const claudeBundle = Object.fromEntries(X.exportDesignSystemBundle(C(ALL), tsc, gsc, { date: "2026-07-05" }).map((f) => [f.name, f.data]));
+  if (byName["DESIGN.md"] !== claudeBundle["DESIGN.md"]) FAIL("design-system-stitch", "Stitch DESIGN.md diverges from the Claude Code bundle's DESIGN.md");
+
+  // no light-dark() in the carrier (Stitch rejects it) — inherited from the shared spine, asserted here too.
+  if (/^\s+[a-z0-9-]+(?:-dark)?:\s*"light-dark\(/mi.test(byName["DESIGN.md"])) FAIL("design-system-stitch", "light-dark() in the Stitch frontmatter carrier");
+
+  // Stitch-profile README receipt: distinct header + the single-file / byte-identical / lint framing.
+  const rm = byName["README.md"];
+  if (!/design-system-for-google-stitch — Stitch profile export/.test(rm)) FAIL("design-system-stitch", "README is not the Stitch profile receipt");
+  if (!/`DESIGN\.md` only/.test(rm)) FAIL("design-system-stitch", "Stitch receipt missing the single-file note");
+  if (!/byte-identical/.test(rm)) FAIL("design-system-stitch", "Stitch receipt missing the byte-identical note");
+  if (!/prelint\.py check`: 0 errors/.test(rm)) FAIL("design-system-stitch", "Stitch receipt missing the prelint 0-errors gate");
+  if (!/orphaned-tokens/.test(rm)) FAIL("design-system-stitch", "Stitch receipt missing the orphaned-tokens lint note");
+
+  // disabled-palette: all-off → empty upload set (nothing to upload), no throw.
+  const off = X.exportDesignSystemStitchBundle(C(RT.defaults.map((p) => ({ ...p, on: false }))), tsc, gsc);
+  if (off.length !== 0) FAIL("design-system-stitch", "disabled Stitch bundle is not empty");
+}
+
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn", "keycolors", "design-system"]) {
+for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn", "keycolors", "design-system", "design-system-stitch"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
