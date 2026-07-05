@@ -20,9 +20,9 @@ import {
   seedFromKeyColor,
   hexToOklch,
   brandKit,
-  exportClaudeDesign,
-  exportClaudeDesignSpine,
-  exportClaudeDesignBundle,
+  exportDesignSystemTokens,
+  exportDesignSystemSpine,
+  exportDesignSystemBundle,
   SCRIM_BASES,
   SCRIM_STEPS,
 } from "./model.mjs";
@@ -5158,7 +5158,7 @@ class HctApp extends HTMLElement {
       ["Colors", [["css", "Hex"], ["oklch", "OKLCH"], ["tailwind", "Tailwind v4"], ["shadcn", "shadcn/ui"], ["figma", "Figma"], ["ui3", "Figma UI3"], ["dtcg", "DTCG"], ["json", "JSON"]]],
       ["Typography", [["type-css", "Type · CSS"], ["type-dtcg", "Type · DTCG"]]],
       ["Geometry", [["geom-css", "Geometry · CSS"], ["geom-dtcg", "Geometry · DTCG"]]],
-      ["Claude Design", [["claude-design", "tokens.json"], ["claude-design-spine", "DESIGN.md"]]],
+      ["Design System", [["ds-tokens", "tokens.json"], ["ds-spine", "DESIGN.md"]]],
       ["Project", [["config", "Config"]]],
     ];
     // the per-system token output for the Typography / Geometry format tabs (the colour formats live on
@@ -5173,12 +5173,12 @@ class HctApp extends HTMLElement {
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
       "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), ug),
       "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
-      // the Claude Design (claude.ai/design) bundle — the token layer + the DESIGN.md spine (the generation
-      // prompt); the component previews ride the Download-All bundle only (a folder, not a single preview).
-      "claude-design": () => exportClaudeDesign(this.doc, typeSc, geomSc),
-      "claude-design-spine": () => exportClaudeDesignSpine(this.doc, typeSc, geomSc),
+      // the Design System export — the universal-dialect DESIGN.md core + tokens.json (the LLM generation
+      // system); the component previews ride the Download-All bundle only (a folder, not a single preview).
+      "ds-tokens": () => exportDesignSystemTokens(this.doc, typeSc, geomSc),
+      "ds-spine": () => exportDesignSystemSpine(this.doc, typeSc, geomSc),
     };
-    const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG", "claude-design": "Claude Design · tokens.json", "claude-design-spine": "Claude Design · DESIGN.md" };
+    const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG", "ds-tokens": "Design System · tokens.json", "ds-spine": "Design System · DESIGN.md" };
     // the systems currently opted into the Download-All + MCP bundle (for the footer summary).
     const SYS_LABEL = { color: "Color", type: "Typography", geometry: "Geometry" };
     const included = ["color", "type", "geometry"].filter((k) => this.exportSystems[k] !== false).map((k) => SYS_LABEL[k]).join(" · ");
@@ -5412,13 +5412,14 @@ class HctApp extends HTMLElement {
         { name: "figma-aliased/Dark_tokens.json", data: JSON.stringify(aliased["Dark_tokens.json"], null, 2) },
         { name: "figma-aliased/README.txt", data: ALIASED_README },
       );
-      // claude-design/ — the full Claude Design (claude.ai/design) system bundle: tokens.json (the
-      // generation colour role set + composed type/spacing/radii) + DESIGN.md (the 9-section generation
-      // prompt) + components/*.html (self-contained @dsCard previews). One shared colour source keeps all
-      // three ds_check-D3-consistent. Rides `systems.color` (a Claude Design kit is colour-led; type/geometry
-      // compose in). A vision-capable Claude reads the folder to generate on-brand screens.
-      files.push(...exportClaudeDesignBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"))
-        .map((f) => ({ name: `claude-design/${f.name}`, data: f.data })));
+      // design-system-for-claude-code/ — the LLM design-system bundle: DESIGN.md (the universal-dialect
+      // core — Stitch-canonical sections + Responsive + Agent Prompt Guide) + tokens.json (hex colors/
+      // colorsDark + the type/spacing/radii ladders) + components/*.html (self-contained @dsCard previews)
+      // + README.md (the profile receipt). One shared colour source (dsColorRoles) keeps every carrier
+      // value-equal by construction. Rides `systems.color`. A vision-capable Claude reads the folder to
+      // generate on-brand screens; the measured-reduction on-colors hold WCAG AA in both schemes.
+      files.push(...exportDesignSystemBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"), { date: new Date().toISOString().slice(0, 10) })
+        .map((f) => ({ name: `design-system-for-claude-code/${f.name}`, data: f.data })));
     }
     if (sys.type) {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)

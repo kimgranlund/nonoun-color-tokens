@@ -2,6 +2,7 @@
 // verify.mjs — export-formats validation adapter (CRITIC side; deny-on-write to the advancer).
 import { readFileSync } from "node:fs";
 import * as X from "../../src/engine/exports.js";
+import { dsBundleGates } from "../../src/engine/ds-gates.js";
 import { typeScale } from "../../src/engine/type.mjs";
 import { geomScale } from "../../src/engine/geometry.mjs";
 
@@ -167,106 +168,63 @@ if (!kp.keyColors || kp.keyColors.length !== 2 || kp.keyColors[0].role !== "domi
 // a palette with no key colors emits no key tokens (opt-in only)
 if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present when none set");
 
-// ── hpg-export-claude-design (claude.ai/design FULL bundle: tokens.json + DESIGN.md spine + @dsCard ──
-// previews). The engine gate re-implements ds_check.py's D1/D2/D3 so the bundle can't drift checker-dirty
-// without npm test catching it — one shared colour source must stay consistent across all three layers.
+// ── hpg-export-design-system (the LLM design-system bundle: DESIGN.md universal-dialect core + tokens.json
+// + @dsCard previews + README receipt). The engine gate runs the ported §8 verifier (ds-gates.js) on the
+// emitted bundle — the same platform-agnostic checks bundle_gates.py enforces (contrast all-pairs × both
+// schemes · scheme parity · carrier equality · refs · section grammar · previews · relative leading). Runs
+// on the DEFAULT palettes (a theme != the Studio golden): the emitter must be theme-general.
 {
   const tsc = typeScale({});
   const gsc = geomScale({});
-  let cd;
-  try { cd = JSON.parse(X.exportClaudeDesign(C(ALL), tsc, gsc)); } catch { FAIL("claude-design", "not valid JSON"); cd = null; }
-  if (cd) {
-    // the GENERATION colour role set — a REDUCTION of the 59 roles (background/surface/foreground/…), NOT
-    // all 59; light in `colors`, dark in `colorsDark`, both flat {role:"#hex"} for ds_check.py's D3 gate.
-    const needRoles = ["background", "surface", "foreground", "muted", "border", "primary", "primary-foreground", "danger", "danger-foreground"];
-    if (!cd.colors || typeof cd.colors !== "object") FAIL("claude-design", "no colors block");
-    else {
-      for (const role of needRoles) if (!(role in cd.colors)) FAIL("claude-design", `colors missing '${role}'`);
-      // #rrggbb solids, or #rrggbbaa where the source role is faithfully translucent (e.g. a subtle
-      // outline-variant border) — both valid CSS hex, both accepted by ds_check.py's D3 (#{3,8}).
-      for (const [k, v] of Object.entries(cd.colors)) if (!/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v)) FAIL("claude-design", `colors.${k} not #rrggbb(aa): ${v}`);
-    }
-    // colorsDark mirrors colors' keys exactly (every light role has its dark end, same order)
-    if (!cd.colorsDark || Object.keys(cd.colorsDark).join() !== Object.keys(cd.colors || {}).join()) FAIL("claude-design", "colorsDark keys differ from colors");
-    // GOLDEN ANCHOR — the published role SEQUENCE (all 8 palettes on) is locked to the #207 contract; a
-    // self-consistent reorder would still pass D3 but silently change tokens.json, so pin it explicitly.
-    const CD_ROLE_ORDER = "background,surface,surface-raised,foreground,muted,border,primary,primary-foreground,secondary,secondary-foreground,accent,accent-foreground,ring,danger,danger-foreground,success,success-foreground,warning,warning-foreground,info,info-foreground";
-    if (cd.colors && Object.keys(cd.colors).join(",") !== CD_ROLE_ORDER) FAIL("claude-design", `colors role order drifted from #207: ${Object.keys(cd.colors).join(",")}`);
-    // ALL defaults enabled → info/success/warning are full palettes, so their intent roles appear
-    for (const role of ["success", "warning", "info"]) if (cd.colors && !(role in cd.colors)) FAIL("claude-design", `colors missing intent '${role}' (all palettes enabled)`);
-    // composed TYPE: fonts + a per-voice·step size scale (numeric px size/lineHeight + numeric weight) from typeScale
-    if (!cd.type || !cd.type.fonts || !cd.type.scale || !Object.keys(cd.type.scale).length) FAIL("claude-design", "type.scale empty (typeScale not composed)");
-    else for (const s of Object.values(cd.type.scale)) if (![s.size, s.lineHeight, s.weight].every((n) => typeof n === "number" && n > 0)) FAIL("claude-design", "type.scale step not numeric px");
-    // composed GEOMETRY: spacing (numeric-px ARRAY, per the format's example) + radii (NAMED numeric-px tiers)
-    if (!Array.isArray(cd.spacing) || !cd.spacing.length || cd.spacing.some((v) => typeof v !== "number")) FAIL("claude-design", "spacing not a numeric array");
-    if (!cd.radii || !Object.keys(cd.radii).length || Object.values(cd.radii).some((v) => typeof v !== "number")) FAIL("claude-design", "radii not numeric px");
+  const files = X.exportDesignSystemBundle(C(ALL), tsc, gsc, { date: "2026-07-05" });
+  const byName = Object.fromEntries(files.map((f) => [f.name, f.data]));
+  for (const layer of ["DESIGN.md", "tokens.json", "README.md"]) if (!(layer in byName)) FAIL("design-system", `bundle missing ${layer}`);
+  const previews = files.filter((f) => f.name.startsWith("components/"));
+  if (previews.length < 5) FAIL("design-system", `too few previews (${previews.length})`);
+  const asPreviews = previews.map((p) => ({ name: p.name.replace("components/", ""), html: p.data }));
+
+  // §8 GATES — the ported platform-agnostic verifier must report ZERO fails on the emitted bundle.
+  const gate = dsBundleGates({ designMd: byName["DESIGN.md"], tokensJson: byName["tokens.json"], previews: asPreviews });
+  if (gate.fails > 0) FAIL("design-system", `§8 gates: ${gate.fails} fail(s) — ${gate.findings.filter((f) => f.level === "ERROR").map((f) => f.msg).join(" | ")}`);
+
+  // tokens.json shape: grammar-named colors + `primary` alias, scheme parity, numeric type/space/radii, leading FACTOR
+  let tj = null;
+  try { tj = JSON.parse(byName["tokens.json"]); } catch { FAIL("design-system", "tokens.json not valid JSON"); }
+  if (tj) {
+    if (!tj.colors || !tj.colors.primary) FAIL("design-system", "no `primary` Stitch-compat alias");
+    if (!Object.keys(tj.colors).some((k) => /-on-/.test(k))) FAIL("design-system", "no `{family}-on-{family}` on-color (grammar)");
+    if (!Object.keys(tj.colors).some((k) => /-surface$/.test(k))) FAIL("design-system", "no neutral `-surface` slot (grammar)");
+    if (Object.keys(tj.colorsDark).join() !== Object.keys(tj.colors).join()) FAIL("design-system", "colorsDark keys differ from colors (scheme parity)");
+    for (const [k, v] of Object.entries(tj.colors)) if (!/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v)) FAIL("design-system", `colors.${k} not #rrggbb(aa): ${v}`);
+    if (!tj.type || !tj.type.scale || !Object.keys(tj.type.scale).length) FAIL("design-system", "type.scale empty");
+    else for (const s of Object.values(tj.type.scale)) { if (!(s.size > 0 && s.weight > 0)) FAIL("design-system", "type.scale step not numeric"); if (!(s.lineHeight > 0 && s.lineHeight <= 4)) FAIL("design-system", `type.scale lineHeight not a factor (${s.lineHeight})`); }
+    if (!Array.isArray(tj.spacing) || tj.spacing.some((v) => typeof v !== "number")) FAIL("design-system", "spacing not a numeric array");
+    if (!tj.radii || Object.values(tj.radii).some((v) => typeof v !== "number")) FAIL("design-system", "radii not numeric");
   }
-  // disabled-palette safety: all-off → the $note fallback (no throw, no colors block)
-  try { const j = JSON.parse(X.exportClaudeDesign(C(RT.defaults.map((p) => ({ ...p, on: false }))), tsc, gsc)); if (j.colors) FAIL("claude-design", "all-disabled emitted colors"); if (!j.$note) FAIL("claude-design", "all-disabled missing $note"); }
-  catch { FAIL("claude-design", "all-disabled not valid JSON"); }
-  // scales omitted → colours still emit (type/space/radii just empty), never throws
-  try { const bare = JSON.parse(X.exportClaudeDesign(C(ALL))); if (!bare.colors || !bare.colors.primary) FAIL("claude-design", "colours absent when scales omitted"); }
-  catch { FAIL("claude-design", "throws when scales omitted"); }
 
-  // ── the DESIGN.md spine + the @dsCard previews + the bundle — reconciled against tokens.json canon ──
-  if (cd && cd.colors) {
-    const norm = (v) => { v = String(v).trim().replace(/;$/, "").trim().toLowerCase(); const m = v.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/); return m ? "#" + m.slice(1).map((c) => c + c).join("") : v; };
-    const canon = {}; for (const [k, v] of Object.entries(cd.colors)) canon["color-" + k] = norm(v); // ds_check keys roles as color-{k}
+  // DESIGN.md: the canonical sections, the grammar teaching, and light-dark() ONLY in the runtime block.
+  const md = byName["DESIGN.md"];
+  for (const sec of ["## Overview", "## Colors", "## Typography", "## Components", "## Do's and Don'ts", "## Responsive Behavior", "## Agent Prompt Guide"]) if (!md.includes(sec)) FAIL("design-system", `spine missing ${sec}`);
+  if (!md.includes("### Token naming")) FAIL("design-system", "spine missing the Token naming grammar section");
+  if (/^\s+[a-z0-9-]+(?:-dark)?:\s*"light-dark\(/mi.test(md)) FAIL("design-system", "light-dark() in a frontmatter carrier (Stitch rejects it)");
+  if (!/color-scheme: light dark/.test(md) || !/light-dark\(oklch/.test(md)) FAIL("design-system", "no color-scheme + light-dark(oklch) runtime block");
 
-    // SPINE — the 9 sections present, and every authoritative colour table row (one --color-* + one hex)
-    // equals the tokens.json canon (ds_check.py D3, the shakedown case: a spine-table hex that drifts).
-    const spine = X.exportClaudeDesignSpine(C(ALL), tsc, gsc);
-    for (let n = 1; n <= 9; n++) if (!spine.includes(`## ${n}. `)) FAIL("claude-design", `spine missing section ${n}`);
-    for (const line of spine.split("\n")) {
-      if (!/^\s*\|.*\|/.test(line)) continue;                       // a markdown table row
-      const vars = [...new Set(line.match(/--[A-Za-z0-9-]+/g) || [])];
-      const hexes = line.match(/#[0-9a-fA-F]{3,8}\b/g) || [];
-      if (vars.length === 1 && hexes.length === 1 && canon[vars[0].slice(2)] && norm(hexes[0]) !== canon[vars[0].slice(2)])
-        FAIL("claude-design", `spine ${vars[0]}=${hexes[0]} drifts from tokens ${canon[vars[0].slice(2)]}`);
-    }
-    const spineOff = X.exportClaudeDesignSpine(C(RT.defaults.map((p) => ({ ...p, on: false }))), tsc, gsc);
-    if (spineOff.includes("--color-")) FAIL("claude-design", "disabled spine is not the palette-less placeholder");
-
-    // PREVIEWS — ds_check.py D1 (first-line @dsCard + gallery group) · D2 (self-contained, ≤256KiB) ·
-    // D3 (every light-scope --color-* def, and any var() fallback, equals canon).
-    const REMOTE = /(?:src\s*=\s*["']?(?:https?:)?\/\/)|(?:<link\b[^>]*?href\s*=\s*["']?(?:https?:)?\/\/)|(?:@import\s+(?:url\()?\s*["']?(?:https?:)?\/\/)|(?:url\(\s*["']?(?:https?:)?\/\/)/i;
-    const GROUPS = ["Type", "Colors", "Spacing", "Components", "Brand"];
-    const comps = X.exportClaudeDesignComponents(C(ALL), tsc, gsc);
-    if (!Array.isArray(comps) || comps.length < 4) FAIL("claude-design", `too few previews (${comps && comps.length})`);
-    const seen = new Set();
-    for (const c of comps || []) {
-      if (!c.name || !c.name.startsWith("components/") || !c.name.endsWith(".html")) FAIL("claude-design", `bad preview name ${c && c.name}`);
-      const first = c.data.split("\n").find((l) => l.trim()) || "";
-      const m = /^\s*<!--\s*@dsCard\b([^>]*?)-->/.exec(first);
-      if (!m) { FAIL("claude-design", `${c.name}: first line is not an @dsCard marker`); continue; }
-      const g = (m[1].match(/group\s*=\s*"([^"]*)"/) || [])[1];
-      if (!g) FAIL("claude-design", `${c.name}: @dsCard has no group`);
-      else if (!GROUPS.includes(g)) FAIL("claude-design", `${c.name}: group "${g}" not a gallery group`);
-      else seen.add(g);
-      const nbytes = Buffer.byteLength(c.data);
-      if (REMOTE.test(c.data)) FAIL("claude-design", `${c.name}: loads an external resource`);
-      if (nbytes > 256 * 1024) FAIL("claude-design", `${c.name}: ${nbytes} > 256KiB`);
-      if (nbytes < 300) FAIL("claude-design", `${c.name}: looks thin (${nbytes}B)`);
-      const lightScope = c.data.replace(/@media[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/g, "");   // drop @media (dark) — a scheme override, not drift
-      for (const d of lightScope.matchAll(/--([A-Za-z0-9-]+)\s*:\s*([^;}"'\n]+)/g))
-        if (canon["color-" + d[1].replace(/^color-/, "")] && d[1].startsWith("color-") && norm(d[2]) !== canon[d[1]])
-          FAIL("claude-design", `${c.name}: --${d[1]}=${d[2]} drifts from canon`);
-      for (const u of c.data.matchAll(/var\(\s*--(color-[A-Za-z0-9-]+)\s*,\s*([^)]+)\)/g))
-        if (canon[u[1]] && norm(u[2]) !== canon[u[1]]) FAIL("claude-design", `${c.name}: var(--${u[1]}) fallback drifts`);
-    }
-    if (seen.size < 3) FAIL("claude-design", `previews cover only ${seen.size} gallery group(s)`);
-
-    // BUNDLE — the folder carries all three layers; a palette-less doc degrades to tokens.json only.
-    const names = X.exportClaudeDesignBundle(C(ALL), tsc, gsc).map((f) => f.name);
-    if (!names.includes("tokens.json") || !names.includes("DESIGN.md") || !names.some((n) => n.startsWith("components/")))
-      FAIL("claude-design", `bundle missing a layer: ${names.join(",")}`);
-    const off = X.exportClaudeDesignBundle(C(RT.defaults.map((p) => ({ ...p, on: false }))), tsc, gsc);
-    if (off.length !== 1 || off[0].name !== "tokens.json") FAIL("claude-design", "disabled bundle is not tokens.json-only");
+  // the §8 gate CATCHES a broken bundle (a constant dark on-color) — proves npm test would fail on the F1 defect.
+  if (tj) {
+    const bad = JSON.parse(JSON.stringify(tj)); const onKey = Object.keys(bad.colorsDark).find((k) => { const m = k.match(/^(.+)-on-\1$/); return m && bad.colorsDark[k].toUpperCase() !== "#FFFFFF"; }); bad.colorsDark[onKey] = "#FFFFFF";
+    const g = dsBundleGates({ designMd: md, tokensJson: bad, previews: asPreviews });
+    if (g.fails === 0) FAIL("design-system", "the §8 gate does not catch a constant dark on-color (F1)");
   }
+
+  // disabled-palette fallback: all-off → tokens.json-only with a $note, no throw
+  const off = X.exportDesignSystemBundle(C(RT.defaults.map((p) => ({ ...p, on: false }))), tsc, gsc);
+  if (off.length !== 1 || off[0].name !== "tokens.json") FAIL("design-system", "disabled bundle is not tokens.json-only");
+  try { const j = JSON.parse(off[0].data); if (j.colors) FAIL("design-system", "all-disabled emitted colors"); if (!j.$note) FAIL("design-system", "all-disabled missing $note"); } catch { FAIL("design-system", "all-disabled not valid JSON"); }
 }
 
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn", "keycolors", "claude-design"]) {
+for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn", "keycolors", "design-system"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

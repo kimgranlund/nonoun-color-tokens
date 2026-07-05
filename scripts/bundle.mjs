@@ -17,6 +17,7 @@ const categoryKey = (file) => (file === "index.js" ? "categoryIndex" : "category
 const MODS = [
   ["hct", "src/engine/hct.js"], ["okhsl", "src/engine/okhsl.js"], ["semantic", "src/engine/semantic.js"],
   ["tonal", "src/engine/tonal.js"], ["derive", "src/engine/derive.mjs"], ["type", "src/engine/type.mjs"], ["geometry", "src/engine/geometry.mjs"], ["flags", "src/engine/flags.js"], ["persist", "src/ui/persist.js"],
+  ["dsGates", "src/engine/ds-gates.js"], // zero-dep §8 carrier primitives; before `exports` (which imports them)
   ["exports", "src/engine/exports.js"], ["figmaPlugin", "src/ui/figma-plugin-assets.js"], ["mcpAssets", "src/ui/mcp-assets.js"], ["typeFonts", "src/ui/type-fonts.js"],
   ...CATEGORY_FILES.filter((f) => f !== "index.js").map((f) => [categoryKey(f), `${CATEGORY_DIR}/${f}`]),
   ["categoryIndex", `${CATEGORY_DIR}/index.js`],
@@ -26,7 +27,7 @@ const MODS = [
   ["model", "src/ui/model.mjs"], ["app", "src/ui/app.js"],
 ];
 const KEY = { "hct.js": "hct", "okhsl.js": "okhsl", "semantic.js": "semantic", "tonal.js": "tonal", "derive.mjs": "derive", "type.mjs": "type", "geometry.mjs": "geometry", "flags.js": "flags", "persist.js": "persist",
-  "exports.js": "exports", "figma-plugin-assets.js": "figmaPlugin", "mcp-assets.js": "mcpAssets", "type-fonts.js": "typeFonts", "zip.mjs": "zip", "mode-apply-plan.mjs": "modeApplyPlan", "icons.js": "icons", "model.mjs": "model",
+  "ds-gates.js": "dsGates", "exports.js": "exports", "figma-plugin-assets.js": "figmaPlugin", "mcp-assets.js": "mcpAssets", "type-fonts.js": "typeFonts", "zip.mjs": "zip", "mode-apply-plan.mjs": "modeApplyPlan", "icons.js": "icons", "model.mjs": "model",
   ...Object.fromEntries(CATEGORY_FILES.map((f) => [f, categoryKey(f)])) };
 
 function transform(src) {
@@ -47,6 +48,9 @@ function transform(src) {
     if (!key) throw new Error("unknown dynamic import path " + path);
     return `Promise.resolve(__M.${key})`;
   });
+  // `export default` is NOT supported by this naive inliner — it would leak into the module IIFE as a
+  // syntax error and only surface in the Chrome smoke leg. Fail loudly at bundle time instead.
+  if (/^export\s+default\b/m.test(src)) throw new Error("export default is not supported by the single-file bundler — use a named export");
   // collect + strip declaration exports
   src = src.replace(/^export\s+(async\s+function|function|const|let|var|class)\s+([A-Za-z0-9_$]+)/gm, (_, kind, name) => { names.add(name); return `${kind} ${name}`; });
   // collect + strip list exports  (export { a, b as c };)
