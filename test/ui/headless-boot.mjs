@@ -966,8 +966,8 @@ ok(SI.every((c) => c.slug && c.category && c.count === 48 && Array.isArray(c.str
 const TPm = await LS("travel"); // one category lazily loaded
 const TP = TPm.PRESETS;
 ok(Array.isArray(TP) && TP.length === 48, `(hh) travel category lazily loads 48 presets (got ${TP && TP.length})`);
-ok(TP.every((p) => p.palettes.length === 10), "(hh) each preset has 10 palettes (a derived neutral + 6 sampled + danger/warning/success)");
-const SLOTS = ["neutral","primary-base","primary-muted","secondary-base","secondary-muted","accent-base","accent-muted","danger","warning","success"];
+ok(TP.every((p) => p.palettes.length === 11), "(hh) each preset has 11 palettes (a derived neutral + 6 sampled + info/success/warning/danger)");
+const SLOTS = ["neutral","primary-base","primary-muted","secondary-base","secondary-muted","accent-base","accent-muted","info","success","warning","danger"];
 ok(TP.every((p) => JSON.stringify(p.palettes.map((x) => x.name)) === JSON.stringify(SLOTS)), "(hh) every preset leads with the derived neutral, then the {tier}-{rank} + status model, identically");
 // the leading neutral is DERIVED from the character palettes' key colors (environment tone): a
 // low-chroma tinted grey retaining the derived target as its dominant key color.
@@ -982,11 +982,11 @@ ok(TP.every((p) => p.lmax === 100 && p.lmin === 5 && p.damp === 70 && p.dampAmp 
 // retains the original palette exactly while the ramp re-derives an even scale from it.
 ok(TP.every((p) => p.palettes.slice(1, 7).every((q) => q.keyColors && q.keyColors.length === 1 && q.keyColors[0].role === "dominant" && Array.isArray(q.keyColors[0].oklch) && q.keyColors[0].oklch.length === 3)),
   "(hh) every sampled preset palette retains its source color as a dominant key color (OKLCH)");
-// every category lazily loads + holds 48 fully-formed presets (10 palettes each)
+// every category lazily loads + holds 48 fully-formed presets (11 palettes each)
 for (const c of SI) {
   const m = await LS(c.slug);
-  ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === 48 && m.PRESETS.every((p) => p.palettes.length === 10),
-    `(hh) category "${c.slug}" loads 48 presets × 10 palettes`);
+  ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === 48 && m.PRESETS.every((p) => p.palettes.length === 11),
+    `(hh) category "${c.slug}" loads 48 presets × 11 palettes`);
 }
 // lift-anchoring (EVEN mode): a LIGHT dominant must open LIGHT, not the old mid-dark L*≈46 grey.
 // This is the "colors look really wrong" fix. Keyed on any preset whose primary-base source is light.
@@ -1008,8 +1008,8 @@ const setsBeforeHH = app.sets.length;
 const openPreset = TP[0];
 app.openConfigAsSet(openPreset, "Opened");
 ok(app.view === "editor" && app.sets.length === setsBeforeHH + 1, "(hh) opening a preset adds an EDITABLE copy to your sets + enters the editor");
-ok(app.doc.palettes.length === 10 && app.doc.palettes[0].name === "neutral" && app.doc.palettes[1].name === "primary-base", "(hh) the opened copy carries the 10 named palettes (neutral first, then primary-base)");
-ok(app.doc.palettes.some((p) => p.name === "danger") && app.doc.palettes.some((p) => p.name === "success"), "(hh) the status palettes (danger/warning/success) are present in the copy");
+ok(app.doc.palettes.length === 11 && app.doc.palettes[0].name === "neutral" && app.doc.palettes[1].name === "primary-base", "(hh) the opened copy carries the 11 named palettes (neutral first, then primary-base)");
+ok(["info","success","warning","danger"].every((n) => app.doc.palettes.some((p) => p.name === n)), "(hh) the status palettes (info/success/warning/danger) are present in the copy");
 app.toGallery(); flushRaf();
 ok(app.category === "travel", "(hh) returning from the editor lands back on the open category page");
 // search filters the category's shelf — use a distinctive long word from the opened preset's name

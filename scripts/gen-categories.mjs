@@ -11,7 +11,8 @@
 //
 // NAMING — per .claude/docs/spec/colors/color-model-function.md:
 //   sampled 6 colors → {tier}-{rank}: primary-base/muted, secondary-base/muted, accent-base/muted
-//   status 3 colors  → danger/warning/success  (NOT in the category JSON — a sensible default set is appended)
+//   status 4 colors  → info/success/warning/danger  (NOT in the category JSON — the canonical semantic
+//                      status set is appended, matching the product's Info/Success/Warning/Danger families)
 //
 // 1/3/2 → 2-2-2 MAPPING: dominant → primary-base; supporting nearest the ground → primary-muted;
 //   the other two supporting (by chroma) → secondary-base/muted; the two accents → accent-base/muted.
@@ -30,11 +31,14 @@ const SRCDIR = resolve(here, "../.claude/docs/spec/colors/categories");
 const OUTDIR = resolve(here, "../src/ui/categories");
 const HIER_ROLE = { d: "dominant", s: "supporting", a: "accent" };
 
-// status colors aren't in the category JSON — a neutral, professional default set, shared by every preset.
+// status colors aren't in the category JSON — a neutral, professional default set, shared by every
+// preset. The canonical semantic-status four (matching the product's Info/Success/Warning/Danger
+// families), in a single muted register so no preset's status block fights its curated character.
 const STATUS = {
-  danger: { hex: "#B3261E", oklch: [0.52, 0.176, 27] },
-  warning: { hex: "#A66A00", oklch: [0.62, 0.118, 73] },
+  info: { hex: "#346FB8", oklch: [0.54, 0.13, 255] },
   success: { hex: "#2E7D4F", oklch: [0.56, 0.115, 152] },
+  warning: { hex: "#A66A00", oklch: [0.62, 0.118, 73] },
+  danger: { hex: "#B3261E", oklch: [0.52, 0.176, 27] },
 };
 
 const hexToRgb = (hex) => {
@@ -109,9 +113,10 @@ function mapColors(swatches) {
     p("secondary-muted", secondary[1]),
     p("accent-base", acc[0]),
     p("accent-muted", acc[1]),
-    palette("danger", STATUS.danger.hex, STATUS.danger.oklch),
-    palette("warning", STATUS.warning.hex, STATUS.warning.oklch),
+    palette("info", STATUS.info.hex, STATUS.info.oklch),
     palette("success", STATUS.success.hex, STATUS.success.oklch),
+    palette("warning", STATUS.warning.hex, STATUS.warning.oklch),
+    palette("danger", STATUS.danger.hex, STATUS.danger.oklch),
   ];
 }
 
