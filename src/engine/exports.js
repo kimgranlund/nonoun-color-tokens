@@ -983,6 +983,161 @@ export function exportClaudeDesignBundle(state, typeSc, geomSc) {
   return files;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// DESIGN SYSTEM export — design-system-for-{claude-code,google-stitch,figma-make}
+// ══════════════════════════════════════════════════════════════════════════════
+// Overhaul of the superseded claude-design bundle (BUNDLE-REVIEW.md F1/F2). The consumption
+// role set uses the Ultimate Tokens grammar `{family}[-slot]` (spec §6.5) with MEASURED
+// on-colors per fill per scheme (§7 R1). One source — dsColorRoles — renders tokens.json, the
+// DESIGN.md frontmatter, and the previews, so §8 carrier-equality holds by construction.
+// Spec: .claude/docs/spec (design-system-files-for-llms.md in the export repo).
+
+const DS_AA = 4.5;
+const dsContrast = (a, b) => {
+  const la = relLumExp(a), lb = relLumExp(b);
+  const hi = Math.max(la, lb), lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+// The neutral-duty (chrome) family carries the surface + state slots: the neutral-named palette,
+// else the first enabled one (the reference theme's near-achromatic primary-base leads the list).
+const dsChrome = (palettes) =>
+  palettes.find((p) => /neutral|gray|grey|slate|stone|zinc|mono/.test(p.name.toLowerCase())) || palettes[0];
+const dsRole = (p, suffix) => p && p.roles.find((r) => r.suffix === suffix);
+
+// R1 — the measured on-color + (rarely stepped) fill, per fill per scheme (§7). The two text poles
+// are the chrome family's on-surface ends (ink = its light end / paper = its dark end; the ramp
+// desaturates to near-neutral at the extremes, so these are the theme's near-black + near-white).
+//   1. If a pole already clears 4.5:1 on the NATURAL fill, take the better-contrasting one — no step.
+//      A deliberately-light signature fill (mirror silver) keeps its identity and takes a near-black
+//      label; a saturated fill keeps its color and takes white.
+//   2. DEAD ZONE — a mid-luminance fill where NEITHER near-black nor near-white clears 4.5 (the poles
+//      aren't pure black/white, so a band exists). Step the fill toward the scheme's fill-text pole
+//      (darken in light / lighten in dark) until that pole clears 4.5 (Studio 54 light success 550→600).
+const DS_LOW_CHROMA = 0.04; // a near-neutral NON-chrome family reads as metal/silver/grey
+const DS_METAL_INK = 7;     // a light-metallic fill takes a crisp near-black label
+function dsFillOn(p, poles, scheme, allowMetal) {
+  const prime = dsRole(p, "");
+  const nat = scheme === "light" ? prime.light : prime.dark; // {rgb, frac, hex}
+  const preferred = scheme === "light" ? poles.paper : poles.ink; // the scheme's fill-text pole
+  const other = scheme === "light" ? poles.ink : poles.paper;
+  const stops = Object.keys(p.stops).map(Number).sort((a, b) => a - b);
+  const startStop = Number(scheme === "light" ? prime.lightRef : prime.darkRef);
+  const at = (s) => p.byStop.get(s);
+  const idx = stops.indexOf(startStop);
+
+  // Light-metallic families — a near-neutral NON-chrome family (mirror silver, a grey accent) reads
+  // as metal, not as a button: a dark-grey fill + white text looks disabled and betrays the metal the
+  // prose sells (R5). Render a LIGHT fill with a near-black label: lighten from the prime until the ink
+  // pole clears DS_METAL_INK; the dark scheme brightens one tier further (a metallic reflects more on a
+  // dark surface). The chrome family is exempt (its low chroma is the neutral room, not an accent).
+  const primeChroma = rgbToOklch(prime.light.rgb).C; // OKLCH chroma (scheme-independent classifier)
+  if (allowMetal && primeChroma < DS_LOW_CHROMA && idx >= 0) {
+    let j = idx;
+    for (; j > 0; j--) if (dsContrast(poles.ink, at(stops[j])) >= DS_METAL_INK) break;
+    if (scheme === "dark") j = Math.max(0, j - 1);
+    return { fillRgb: at(stops[j]), onRgb: poles.ink };
+  }
+
+  // 1. a pole clears 4.5 on the natural fill → take the better one, no step.
+  const cP = dsContrast(preferred, nat.rgb), cO = dsContrast(other, nat.rgb);
+  if (cP >= DS_AA || cO >= DS_AA) return { fillRgb: nat.rgb, onRgb: cP >= cO ? preferred : other };
+  // 2. dead zone — neither pole clears 4.5 on the natural fill: step toward the fill-text pole.
+  const dir = scheme === "light" ? +1 : -1; // light: darken the fill (higher stop); dark: lighten it
+  if (idx >= 0) for (let j = idx + dir; j >= 0 && j < stops.length; j += dir) {
+    if (dsContrast(preferred, at(stops[j])) >= DS_AA) return { fillRgb: at(stops[j]), onRgb: preferred };
+  }
+  return { fillRgb: nat.rgb, onRgb: cP >= cO ? preferred : other }; // fallback: best available
+}
+
+// dsColorRoles(state) → the reduced consumption set (§6.5/§7): { chrome, poles, tokens:[{name,
+// light,dark}], alias }. Each end = { rgb, frac, hex, oklch }. tokens.json, the DESIGN.md
+// frontmatter, and every preview :root all read from this one source. Null when no palette enabled.
+export function dsColorRoles(state) {
+  const palettes = derivedAll(state);
+  if (!palettes.length) return null;
+  const chrome = dsChrome(palettes);
+  const onSurf = dsRole(chrome, "-on-surface");
+  if (!onSurf) return null;
+  const poles = { ink: onSurf.light.rgb, paper: onSurf.dark.rgb };
+
+  const endOf = (e) => {
+    const frac = e.frac == null ? 1 : e.frac;
+    return { rgb: e.rgb, frac, hex: e.hex != null ? e.hex : (frac === 1 ? hexOf(e.rgb) : hex8(e.rgb, frac)), oklch: roleOklch({ rgb: e.rgb, frac }) };
+  };
+  const rgbEnd = (rgb) => endOf({ rgb, frac: 1 });
+  const tokens = [];
+  const push = (name, l, d) => tokens.push({ name, light: l, dark: d });
+  const slot = (p, suffix, name) => { const r = dsRole(p, suffix); if (r) push(name, endOf(r.light), endOf(r.dark)); };
+
+  // ── chrome family: the neutral-duty surface + state slots ──
+  const cn = chrome.n;
+  slot(chrome, "-background", `${cn}-background`);
+  slot(chrome, "-surface", `${cn}-surface`);
+  slot(chrome, "-surface-high", `${cn}-surface-high`);
+  slot(chrome, "-on-surface", `${cn}-on-surface`);
+  slot(chrome, "-on-surface-variant", `${cn}-on-surface-variant`);
+  slot(chrome, "-outline-variant", `${cn}-outline-variant`);
+  const chL = dsFillOn(chrome, poles, "light", false), chD = dsFillOn(chrome, poles, "dark", false);
+  push(`${cn}`, rgbEnd(chL.fillRgb), rgbEnd(chD.fillRgb));
+  slot(chrome, "-hover", `${cn}-hover`);
+  slot(chrome, "-active", `${cn}-active`);
+  push(`${cn}-on-${cn}`, rgbEnd(chL.onRgb), rgbEnd(chD.onRgb));
+
+  // ── every other family: base fill + measured on-color (§7 R2 — signature families included) ──
+  const isIntent = (p) => /danger|destruct|error|critical|success|positive|warn|caution|info/.test(p.name.toLowerCase());
+  const others = palettes.filter((p) => p !== chrome && !isIntent(p));
+  const intentOrder = ["danger", "success", "warning", "info"];
+  const rank = (p) => { const t = p.name.toLowerCase(); const i = intentOrder.findIndex((k) => t.includes(k)); return i < 0 ? 99 : i; };
+  const intents = palettes.filter((p) => p !== chrome && isIntent(p)).sort((a, b) => rank(a) - rank(b));
+  for (const p of [...others, ...intents]) {
+    const fl = dsFillOn(p, poles, "light", true), fd = dsFillOn(p, poles, "dark", true);
+    push(`${p.n}`, rgbEnd(fl.fillRgb), rgbEnd(fd.fillRgb));
+    push(`${p.n}-on-${p.n}`, rgbEnd(fl.onRgb), rgbEnd(fd.onRgb));
+  }
+
+  // ── Stitch-compat alias: `primary` = the brand-base fill (satisfies the required `primary` role).
+  // Mirror the brand family's already-emitted base token verbatim so the alias never diverges from it.
+  const brand = palettes.find((p) => /primary|brand/.test(p.name.toLowerCase())) || chrome;
+  const brandBase = tokens.find((t) => t.name === brand.n) || tokens.find((t) => t.name === cn);
+  const alias = { name: "primary", light: brandBase.light, dark: brandBase.dark };
+
+  const families = [chrome.n, ...others.map((p) => p.n), ...intents.map((p) => p.n)];
+  return { chrome, poles, tokens, alias, families };
+}
+
+// dsFactor — leading as a unitless multiplier of size (§9.2: never px). dsTypeLayer — the full voice·step
+// scale as { size, lineHeight (factor), weight }, keyed `<voice>-<step>`; letterSpacing is omitted (the
+// DESIGN.md frontmatter carries it as em where a voice tracks). dsSpacing/dsRadii — the geometry ladders.
+const dsFactor = (line, size) => (size > 0 ? Number((line / size).toFixed(3)) : 0);
+function dsTypeLayer(typeSc) {
+  const type = { fonts: { ...(typeSc && typeSc.fonts) }, scale: {} };
+  if (typeSc && typeSc.categories) for (const [cName, steps] of Object.entries(typeSc.categories))
+    for (const [sName, s] of Object.entries(steps))
+      type.scale[`${cName.toLowerCase()}-${sName.toLowerCase()}`] = { size: s.size, lineHeight: dsFactor(s.lineHeight, s.size), weight: s.weight };
+  return type;
+}
+const dsSpacing = (geomSc) => (geomSc && geomSc.space ? Object.keys(geomSc.space).sort((a, b) => a - b).map((k) => geomSc.space[k]) : []);
+const dsRadii = (geomSc) => { const r = {}; if (geomSc && geomSc.radii) for (const [k, v] of Object.entries(geomSc.radii)) r[k] = v; return r; };
+
+// exportDesignSystemTokens — the tokens.json carrier (Claude profile): hex `colors`/`colorsDark`, the
+// full type scale (leading factors), the spacing array, and the radii ladder. Hex is the proven carrier
+// (§6.2); the DESIGN.md frontmatter carries the SAME colors as OKLCH (carrier equality holds by construction).
+export function exportDesignSystemTokens(state, typeSc, geomSc) {
+  const ds = dsColorRoles(state);
+  if (!ds) return JSON.stringify({ $note: "Design System export needs at least one enabled palette." }, null, 2);
+  const colors = {}, colorsDark = {};
+  for (const t of ds.tokens) { colors[t.name] = t.light.hex; colorsDark[t.name] = t.dark.hex; }
+  colors[ds.alias.name] = ds.alias.light.hex; colorsDark[ds.alias.name] = ds.alias.dark.hex;
+  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. \`colors\` light / \`colorsDark\` dark. Values hex (parser-unverified carrier); the DESIGN.md frontmatter carries the same colors as OKLCH. type.scale lineHeight is a unitless multiplier of size (leading factor — never px); letter-spacing, where present, is em/%. Every on-pair is measured ≥4.5:1 in both schemes.`;
+  return JSON.stringify({
+    $generator: "Ultimate Tokens by NONOUN",
+    $note: note,
+    colors, colorsDark,
+    type: dsTypeLayer(typeSc), spacing: dsSpacing(geomSc), radii: dsRadii(geomSc),
+  }, null, 2);
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // exportAll — every format in one object (theme-independent).
 // ──────────────────────────────────────────────────────────────────────────────
