@@ -20,6 +20,13 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   leading, no single-line height) via a new per-voice flow flag; the seven original voices are byte-identical.
   (ADR-013)
 
+#### Changed
+- **Curated palette presets carry the full status set — `info · success · warning · danger`.** Every
+  gallery preset (7 categories × 48) now ships an **`info`** (blue) status family alongside
+  success / warning / danger — the canonical four, matching the product's Info/Success/Warning/Danger
+  defaults — and emits them in that order. Each preset grows 10 → 11 palettes; the status block stays a
+  single muted register so it never fights a preset's curated character.
+
 ### 2026-07-03
 
 #### Added
