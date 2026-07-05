@@ -23,6 +23,7 @@ import {
   exportDesignSystemTokens,
   exportDesignSystemSpine,
   exportDesignSystemBundle,
+  exportDesignSystemStitchBundle,
   SCRIM_BASES,
   SCRIM_STEPS,
 } from "./model.mjs";
@@ -5418,8 +5419,13 @@ class HctApp extends HTMLElement {
       // + README.md (the profile receipt). One shared colour source (dsColorRoles) keeps every carrier
       // value-equal by construction. Rides `systems.color`. A vision-capable Claude reads the folder to
       // generate on-brand screens; the measured-reduction on-colors hold WCAG AA in both schemes.
-      files.push(...exportDesignSystemBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"), { date: new Date().toISOString().slice(0, 10) })
+      const dsDate = new Date().toISOString().slice(0, 10);
+      files.push(...exportDesignSystemBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"), { date: dsDate })
         .map((f) => ({ name: `design-system-for-claude-code/${f.name}`, data: f.data })));
+      // design-system-for-google-stitch/ — the SAME canonical DESIGN.md (Stitch consumes one file,
+      // byte-identical to the Claude Code spine) + a Stitch-profile README receipt. One core, two uploads.
+      files.push(...exportDesignSystemStitchBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"), { date: dsDate })
+        .map((f) => ({ name: `design-system-for-google-stitch/${f.name}`, data: f.data })));
     }
     if (sys.type) {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
