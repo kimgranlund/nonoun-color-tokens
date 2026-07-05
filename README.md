@@ -9,8 +9,8 @@ local build; download it and it runs offline from `file://`.)
 
 A perceptual color-palette and **design-token** generator. It builds tonal ramps that are visually
 even across their whole range, derives a **59-role semantic layer** (surfaces, on-colors, outlines,
-containers, scrims, inverse), and exports to **CSS, Tailwind v4, shadcn/ui, Figma, DTCG, JSON** and
-more — plus a one-click `.zip` of everything.
+containers, scrims, inverse), and exports to **CSS, Tailwind v4, shadcn/ui, Figma, DTCG, JSON, Claude
+Design** and more — plus a one-click `.zip` of everything.
 
 It ships three ways: a **Vite web app**, a single dependency-free **`<nonoun-color-tokens>` web
 component**, and a **Figma plugin** that writes the palette straight into the file's variable
@@ -47,8 +47,9 @@ collections.
   films, biomes… and carrying their story. Open any one as an editable copy. Each category's data is
   lazy-loaded.
 - **Exports.** CSS (Hex or **OKLCH**), **Tailwind v4**, **shadcn/ui**, **Figma** variables,
-  **Figma UI3** (Material), **DTCG**, **JSON**, a re-importable parametric **Config**, and a
-  **Download-all `.zip`**. An **Include** toggle row picks which token systems — **Color · Typography ·
+  **Figma UI3** (Material), **DTCG**, **JSON**, a **Claude Design** bundle (`tokens.json` +
+  `DESIGN.md` + preview components, for generating on-brand UI with Claude), a re-importable parametric
+  **Config**, and a **Download-all `.zip`**. An **Include** toggle row picks which token systems — **Color · Typography ·
   Geometry** — ride the Download-All `.zip` and the Brand-Kit MCP.
 - **Typography.** The type analog of the color engine — a few params → a **systematic type scale** of
   seven voices (Display · Heading · Sub-heading · Kicker · Body · UI · Code), with derived size (modular scale), optical

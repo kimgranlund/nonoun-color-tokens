@@ -22,7 +22,7 @@ const PINNED = [
   { re: /\b(\d+)\s+categories\b/gi, want: "7", name: "color categories" },
   { re: /\b(\d+)\s+(?:curated\s+)?palettes\s+(?:in\s+)?total\b/gi, want: "336", name: "total curated palettes" },
   { re: /\b(\d+)\s+composing\s+systems?\b/gi, want: "3", name: "composing systems" },
-  { re: /\b(\d+)\s+(?:type\s+)?voices\b/gi, want: "7", name: "type voices" },
+  { re: /\b(\d+)\s+(?:type\s+)?voices\b/gi, want: "11", name: "type voices" },
   { re: /\b(\d+)\s+seats?\s+included\b/gi, want: "5", name: "Studio seats included" },
   { re: /\b(\d+)[-\s]day\s+refund\b/gi, want: "14", name: "refund window" },
 ];

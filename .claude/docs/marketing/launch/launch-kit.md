@@ -23,6 +23,8 @@ within a minute of clicking. Posture: **social/short-form** (§4). Facts:
 • Install the Ultimate Tokens plugin and your coding agent builds with your
   exact roles — which of the 59 goes where, not a guessed hex. Free.
   → /plugin marketplace add kimgranlund/nonoun-color-tokens
+• Export a Claude Design bundle; Claude generates on-brand screens from your
+  system. Free, every tier. → {{APP_URL}}
 • Export your tokens under your own names — Ultimate, Material 3-style
   --md-sys-*, or a --{brand}-* root. They land in the convention you already
   run. → {{APP_URL}}
@@ -55,6 +57,14 @@ within a minute of clicking. Posture: **social/short-form** (§4). Facts:
 > Three consumption skills (color · type · geometry) and a `token-integrator` agent that wires a
 > component or migrates a whole UI. Free, MIT, parity-gated against the generator so its guidance
 > can't drift from the tokens. → `/plugin marketplace add kimgranlund/nonoun-color-tokens`
+
+## Claude Design export launch post
+
+> Ultimate Tokens now exports a Claude Design bundle. Point Claude Design (`claude.ai/design`) at it and
+> Claude generates on-brand product screens from your system: `tokens.json` (light + dark roles, plus
+> type, spacing, radii), a `DESIGN.md` generation prompt carrying your kit's own guardrails, and 7
+> self-contained preview cards. Derive the system once; generate the app on-brand. Free, on every tier.
+> → {{APP_URL}}
 
 ## Channel notes
 

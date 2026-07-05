@@ -139,7 +139,9 @@ rest of the body to begin after it so the card truncates on a complete thought
 > `--md-sys-*` root, or a `--{brand}-*` prefix your codebase already uses. Bind it to **Figma variables** —
 > Color Primitives and Color Modes, aliased so a raw-color edit cascades to every role. Or serve it to your
 > AI coding agents over **MCP**, so they build with your exact tokens instead of guessing a hex; the free
-> Ultimate Tokens **Claude plugin** teaches the agent which of the 59 roles to apply where.
+> Ultimate Tokens **Claude plugin** teaches the agent which of the 59 roles to apply where. Or export a
+> **Claude Design** bundle — `tokens.json`, a `DESIGN.md` generation prompt, and preview cards — that a
+> vision-capable Claude reads to generate on-brand screens from your system, free on every tier.
 >
 > ### What Pro unlocks
 > Free gives you the full generator and two brand kits — enough to ship a real system. **Pro removes the
@@ -204,6 +206,7 @@ bullets + FAQ only.
 • Figma variables — semantic binding cascade + breakpoint modes
 • Brand-Kit MCP — feed your exact tokens to Claude, Cursor, VS Code
 • Free Claude plugin — your coding agent applies your exact roles, not a guess
+• Claude Design bundle — hand your kit to Claude to generate on-brand screens (free)
 • Free Figma plugin, fully offline
 • Your data stays in your browser / your file
 ```
@@ -251,8 +254,9 @@ bullets + FAQ only.
 > No — the Figma plugin is free and runs fully offline. Pro lives in the web app.
 >
 > **What can I export?**
-> CSS custom properties, W3C design tokens (DTCG), Tailwind, and shadcn — plus Figma variables and a
-> Brand-Kit MCP server for AI agents.
+> CSS custom properties, W3C design tokens (DTCG), Tailwind, and shadcn — plus Figma variables, a
+> Brand-Kit MCP server for AI agents, and a Claude Design bundle a vision-capable Claude reads to generate
+> on-brand screens.
 >
 > **Can I match my team's variable names?**
 > Yes. Pick a naming convention in **Settings → Export** and every export — colour, type, and geometry —
@@ -264,6 +268,11 @@ bullets + FAQ only.
 > agent at it to read your exact roles and resolved tokens. Or install the **Ultimate Tokens Claude plugin**
 > (`/plugin marketplace add kimgranlund/nonoun-color-tokens`) — it teaches the agent which of the 59
 > semantic roles belongs on each surface, binding to your project's real exported variables.
+>
+> **Can Claude generate a UI from my kit?**
+> Yes — export the **Claude Design** bundle (free on every tier). It's `tokens.json`, a `DESIGN.md`
+> generation prompt carrying your kit's own guardrails, and preview cards: the three layers a
+> vision-capable Claude reads at `claude.ai/design` to generate on-brand screens from your system.
 >
 > **Where is my data stored?**
 > In your browser and your Figma file. Nothing is uploaded; the only network call is the one that validates
