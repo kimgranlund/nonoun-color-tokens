@@ -256,9 +256,93 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   if (off.length !== 0) FAIL("design-system-stitch", "disabled Stitch bundle is not empty");
 }
 
+// ── hpg-export-design-system-make (the Figma Make profile: a routed guidelines/ tree). The gate of
+// record is make_guidelines_check.py (D1–D6, D10, D11) — python, run manually against emitted scratch
+// dirs for both the default theme and a hand-authored theme (see the handoff); this block asserts the
+// SAME shape/content predicates in JS so `npm test` stays the zero-dependency gate. Runs on the DEFAULT
+// palettes (C(ALL)) — the emitter must be theme-general, no hardcoded brand names/values.
+{
+  const tsc = typeScale({});
+  const gsc = geomScale({});
+  const make = X.exportDesignSystemMakeBundle(C(ALL), tsc, gsc, { date: "2026-07-05" });
+  const byName = Object.fromEntries(make.map((f) => [f.name, f.data]));
+  const wantFiles = ["guidelines/Guidelines.md", "guidelines/setup.md", "guidelines/styles.css",
+    "guidelines/foundations/color.md", "guidelines/foundations/typography.md", "guidelines/foundations/spacing.md",
+    "guidelines/components/overview.md", "guidelines/components/button.md", "README.md"];
+  if (make.length !== wantFiles.length) FAIL("design-system-make", `make bundle is not ${wantFiles.length} files (got ${make.length}: ${make.map((f) => f.name).join(", ")})`);
+  for (const f of wantFiles) if (!(f in byName)) FAIL("design-system-make", `bundle missing ${f}`);
+
+  // D10 carrier — styles.css is exportShadcn() in the MEASURED on-color mode (R1: the shadcn projection
+  // forces onColorMode:"contrast" so the dark foregrounds are the contrast-passing pole, like dsColorRoles;
+  // raw "fixed"-mode shadcn ships white foregrounds that fail AA on the brightened dark fills).
+  const styles = byName["guidelines/styles.css"];
+  if (styles !== X.exportShadcn({ ...C(ALL), onColorMode: "contrast" })) FAIL("design-system-make", "styles.css is not byte-equal to exportShadcn(state) in the measured (contrast) on-color mode");
+  // R1 guard — the dark-scheme fill foregrounds must be the near-black ink pole, NEVER fixed white (which
+  // fails AA on the brightened dark fills). Locks the measured on-color mode against a silent revert.
+  const darkBlock = styles.slice(styles.indexOf(".dark"));
+  for (const role of ["primary-foreground", "secondary-foreground", "destructive-foreground"]) {
+    const m = new RegExp(`--${role}:\\s*(oklch\\([^)]*\\))`).exec(darkBlock);
+    if (m && /oklch\(1\s+0\b/.test(m[1])) FAIL("design-system-make", `styles.css dark --${role} is fixed white (AA-failing) — R1 measured on-color regressed`);
+  }
+
+  // D6 — Guidelines.md hard rules (>=1 "Do NOT" + the literal word "IMPORTANT").
+  const gmd = byName["guidelines/Guidelines.md"];
+  if (!/\bDo NOT\b/.test(gmd)) FAIL("design-system-make", "Guidelines.md missing a 'Do NOT' rule");
+  if (!/IMPORTANT/.test(gmd)) FAIL("design-system-make", "Guidelines.md missing the IMPORTANT marker");
+
+  // D1 — Guidelines.md routes to every leaf; overview.md routes to button.md.
+  for (const rel of ["setup.md", "foundations/color.md", "foundations/typography.md", "foundations/spacing.md", "components/overview.md", "components/button.md"])
+    if (!gmd.includes(rel)) FAIL("design-system-make", `Guidelines.md does not route to ${rel}`);
+  if (!byName["guidelines/components/overview.md"].includes("button.md")) FAIL("design-system-make", "overview.md does not route to button.md");
+
+  // D5 — button.md names hover + carries a color literal or a -hover/-active token reference.
+  const btn = byName["guidelines/components/button.md"];
+  if (!/\bhover\b/i.test(btn)) FAIL("design-system-make", "button.md does not name 'hover'");
+  if (!/-hover\b/.test(btn) && !btn.includes("var(--")) FAIL("design-system-make", "button.md hover state carries no color literal or -hover/-active token reference");
+
+  // D11 — no px leading/tracking anywhere in the tree.
+  for (const [nm, data] of Object.entries(byName)) {
+    if (/(?:line-height|letter-spacing)\s*:\s*[^;\n]*?\d[\d.]*px/i.test(data) || /\|\s*[\d.]+\s*\/\s*[\d.]+\s*px/i.test(data))
+      FAIL("design-system-make", `${nm} carries a px leading/tracking value`);
+  }
+
+  // D4 — a paste-ready light-dark() block, with color-scheme: light dark declared in the SAME file.
+  const colorMd = byName["guidelines/foundations/color.md"];
+  if (!/light-dark\(/.test(colorMd)) FAIL("design-system-make", "no light-dark() runtime block in foundations/color.md");
+  if (!/color-scheme:\s*light dark/.test(colorMd)) FAIL("design-system-make", "light-dark() block missing its color-scheme: light dark declaration");
+
+  // D2/D3 — the grammar-token reference table: every row carries light AND dark (parity), and (per
+  // R1/dsColorRoles' contrast guarantee) every fill/on-fill pair clears 4.5:1 in both schemes.
+  const tokenRowRe = /^\|\s*`(--[a-z0-9-]+)`\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|/gim;
+  let tokenRows = 0;
+  for (const m of colorMd.matchAll(tokenRowRe)) tokenRows++;
+  if (tokenRows === 0) FAIL("design-system-make", "no `--token` grammar rows found in foundations/color.md (D2 needs >=1)");
+
+  // D10 (measured, not left UNMEASURED) — the runtime block's tokens equal a sibling built from the
+  // SAME canonical shadcn parse the emitter uses: exportShadcn in the MEASURED (contrast) on-color mode.
+  const rtMap = X.dsShadcnRuntimeMap(X.exportShadcn({ ...C(ALL), onColorMode: "contrast" }));
+  if (Object.keys(rtMap).length === 0) FAIL("design-system-make", "dsShadcnRuntimeMap parsed no tokens");
+  for (const [tok, { light, dark }] of Object.entries(rtMap))
+    if (!colorMd.includes(`${tok}: light-dark(${light}, ${dark})`)) FAIL("design-system-make", `color.md runtime block diverges from the shadcn carrier for ${tok}`);
+
+  // README.md is the figma-make profile receipt, citing the gate of record.
+  const rm = byName["README.md"];
+  if (!/design-system-for-figma-make — Figma Make profile export/.test(rm)) FAIL("design-system-make", "README is not the figma-make profile receipt");
+  if (!/make_guidelines_check\.py/.test(rm)) FAIL("design-system-make", "README does not cite make_guidelines_check.py as the gate of record");
+
+  // theme-general — no hardcoded golden-theme (Studio 54) names leak into a default-theme run.
+  const allText = Object.values(byName).join("\n").toLowerCase();
+  for (const bad of ["spotlight", "beam", "mirror", "dancefloor", "studio 54"])
+    if (allText.includes(bad)) FAIL("design-system-make", `hardcoded theme-specific name '${bad}' leaked into the theme-general emitter`);
+
+  // disabled-palette: all-off → empty array (nothing to upload), like the Stitch bundle.
+  const off = X.exportDesignSystemMakeBundle(C(RT.defaults.map((p) => ({ ...p, on: false }))), tsc, gsc);
+  if (off.length !== 0) FAIL("design-system-make", "disabled make bundle is not empty");
+}
+
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn", "keycolors", "design-system", "design-system-stitch"]) {
+for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn", "keycolors", "design-system", "design-system-stitch", "design-system-make"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

@@ -24,6 +24,7 @@ import {
   exportDesignSystemSpine,
   exportDesignSystemBundle,
   exportDesignSystemStitchBundle,
+  exportDesignSystemMakeBundle,
   SCRIM_BASES,
   SCRIM_STEPS,
 } from "./model.mjs";
@@ -5426,6 +5427,10 @@ class HctApp extends HTMLElement {
       // byte-identical to the Claude Code spine) + a Stitch-profile README receipt. One core, two uploads.
       files.push(...exportDesignSystemStitchBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"), { date: dsDate })
         .map((f) => ({ name: `design-system-for-google-stitch/${f.name}`, data: f.data })));
+      // design-system-for-figma-make/ — a routed guidelines/ tree Figma Make reads directly (no
+      // linter/schema of its own — make_guidelines_check.py is the gate of record) + a profile README.
+      files.push(...exportDesignSystemMakeBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"), { date: dsDate })
+        .map((f) => ({ name: `design-system-for-figma-make/${f.name}`, data: f.data })));
     }
     if (sys.type) {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
