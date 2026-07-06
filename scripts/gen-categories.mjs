@@ -149,6 +149,38 @@ function deriveNeutralPalette(palettes) {
 
 const VIVID_MIDS = { damp: 70, dampCurve: 1.5, dampAmp: 55, dampBias: 0 };
 
+// ── per-palette TYPOGRAPHY: map the human 5-slot DESIGN (stored on a spec palette's optional `type`) to an
+// engine typeScale config { treatment, bodyBase?, fonts, voices }. The design is designer-friendly (one
+// entry per font ROLE); the mapping is the ONE place the vocabulary is translated (persist.clampType +
+// engine/type.mjs consume the output verbatim, so opening a preset applies it via hydrate — see the LLD).
+// Each font ROLE covers all its voices (fonts are per-role), so 5 families dress all 11 voices; the design's
+// per-slot tracking/leading/weight shape the ROLE's PRIMARY voice (secondary editorial voices keep the base
+// treatment's character). mono→Kicker (the slot's tracking IS the wide-kicker value; Code stays neutral).
+const TYPE_VOICE_OF = { display: "Display", heading: "Heading", body: "Body", ui: "UI", mono: "Kicker" };
+const TYPE_BASES = ["product", "luxury", "editorial", "technical", "statement"];
+function design5ToTypeConfig(t) {
+  if (!t || typeof t !== "object" || !t.slots || typeof t.slots !== "object") return null;
+  const out = { treatment: TYPE_BASES.includes(t.base) ? t.base : "product" };
+  // clamp bodyBase to persist.clampType's [10,32] range so the emitted preset matches its hydrated form
+  // (an out-of-range designed bodyBase would otherwise differ preset-vs-doc after clampType).
+  if (Number.isFinite(t.bodyBase)) out.bodyBase = Math.max(10, Math.min(32, Math.round(t.bodyBase)));
+  const fonts = {}, voices = {};
+  for (const role of ["display", "heading", "body", "ui", "mono"]) {
+    const s = t.slots[role];
+    if (!s || typeof s !== "object") continue;
+    if (typeof s.font === "string" && s.font.trim()) fonts[role] = s.font.trim();
+    const v = {};
+    if (Number.isFinite(s.trackingEm)) v.tracking = s.trackingEm; // clampType range [-0.5, 1]
+    if (Number.isFinite(s.leading)) v.leading = s.leading; //         clampType range [0.8, 3]
+    if (Number.isFinite(s.weight)) v.weight = s.weight; //            clampType range [100, 1000]
+    if (Object.keys(v).length) voices[TYPE_VOICE_OF[role]] = v;
+  }
+  if (Object.keys(fonts).length) out.fonts = fonts;
+  if (Object.keys(voices).length) out.voices = voices;
+  // only a genuine design (≥1 custom font) yields a config — a bare/empty `type` is a no-op (identity).
+  return out.fonts ? out : null;
+}
+
 // ── build one category → { volumes, presets, strip } ─────────────────────────────────────────────
 function buildCategory(doc) {
   const volumes = {}, presets = [], strip = [];
@@ -172,6 +204,10 @@ function buildCategory(doc) {
           groups: ["d", "s", "a"].filter((k) => hy[k]).map((k) => ({ hier: k, pct: hy[k].pct, note: clean(hy[k].text) })),
         },
         ...DEFAULT_CONTROLS, ...VIVID_MIDS,
+        // per-palette TYPOGRAPHY — opening this preset (openConfigAsSet → hydrate → clampType) sets the
+        // doc's `type`, so the Fonts picker + scale + every export carry this palette's designed system.
+        // Absent when the spec palette has no `type` (falls back to the global default treatment).
+        ...(design5ToTypeConfig(p.type) ? { type: design5ToTypeConfig(p.type) } : {}),
         // neutral first (derived from the character palettes' key colors), then the named families.
         palettes: (() => { const pals = mapColors(p.swatches || []); return [deriveNeutralPalette(pals), ...pals]; })(),
       });
