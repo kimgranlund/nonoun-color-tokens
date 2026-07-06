@@ -5235,9 +5235,15 @@ function dsColorRoles(state) {
   const brand = brandPal;
   const brandBase = tokens.find((t) => t.name === brand.n) || tokens.find((t) => t.name === cn);
   const alias = { name: "primary", light: brandBase.light, dark: brandBase.dark };
+  // The Stitch-required `primary` is a DISTINCT extra key only when no grammar family is already
+  // named `primary`. A theme that renames its brand family (e.g. the dancefloor golden) needs the
+  // alias; a theme that keeps the canonical `primary` name (the role-table defaults) already emits
+  // `primary` as a grammar token — re-emitting it would DUPLICATE the YAML key (a Stitch prelint
+  // error) and over-count the inventory. Emit/count the alias only in the distinct case.
+  const aliasDistinct = !tokens.some((t) => t.name === alias.name);
 
   const families = [chrome.n, ...others.map((p) => p.n), ...intents.map((p) => p.n)];
-  return { chrome, poles, tokens, alias, families };
+  return { chrome, poles, tokens, alias, aliasDistinct, families };
 }
 
 // dsFactor — leading as a unitless multiplier of size (§9.2: never px). dsTypeLayer — the full voice·step
@@ -5262,7 +5268,7 @@ function exportDesignSystemTokens(state, typeSc, geomSc) {
   if (!ds) return JSON.stringify({ $note: "Design System export needs at least one enabled palette." }, null, 2);
   const colors = {}, colorsDark = {};
   for (const t of ds.tokens) { colors[t.name] = t.light.hex; colorsDark[t.name] = t.dark.hex; }
-  colors[ds.alias.name] = ds.alias.light.hex; colorsDark[ds.alias.name] = ds.alias.dark.hex;
+  if (ds.aliasDistinct) { colors[ds.alias.name] = ds.alias.light.hex; colorsDark[ds.alias.name] = ds.alias.dark.hex; }
   const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. \`colors\` light / \`colorsDark\` dark. Values hex (parser-unverified carrier); the DESIGN.md frontmatter carries the same colors as OKLCH. type.scale lineHeight is a unitless multiplier of size (leading factor — never px); letter-spacing, where present, is em/%. Every on-pair is measured ≥4.5:1 in both schemes.`;
   return JSON.stringify({
     $generator: "Ultimate Tokens by NONOUN",
@@ -5296,9 +5302,11 @@ function exportDesignSystemSpine(state, typeSc, geomSc) {
   const colorLines = [];
   for (const t of ds.tokens) { colorLines.push(`  ${t.name}: "${t.light.oklch}"`); colorLines.push(`  ${t.name}-dark: "${t.dark.oklch}"`); }
   const brandName = ds.families.find((f) => /primary|brand/.test(f)) || cn;
-  colorLines.push(`  # Stitch-compat alias of ${brandName} (its required \`primary\`); agents use ${brandName}`);
-  colorLines.push(`  ${ds.alias.name}: "${ds.alias.light.oklch}"`);
-  colorLines.push(`  ${ds.alias.name}-dark: "${ds.alias.dark.oklch}"`);
+  if (ds.aliasDistinct) {
+    colorLines.push(`  # Stitch-compat alias of ${brandName} (its required \`primary\`); agents use ${brandName}`);
+    colorLines.push(`  ${ds.alias.name}: "${ds.alias.light.oklch}"`);
+    colorLines.push(`  ${ds.alias.name}-dark: "${ds.alias.dark.oklch}"`);
+  }
 
   // ── frontmatter: typography (curated levels) ──
   const flat = {};
@@ -5659,7 +5667,7 @@ function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
   const pfx = cssPrefixOf(state);
   const name = (state && state.name) || "Design System";
   const date = opts.date || "on every build";
-  const nGrammar = ds.tokens.length, nTotal = nGrammar + 1; // + the primary alias
+  const nGrammar = ds.tokens.length, nTotal = nGrammar + (ds.aliasDistinct ? 1 : 0); // + the primary alias (only when distinct)
   const previews = exportDesignSystemComponents(state, typeSc, geomSc);
   const mutedSig = ds.families.filter((f) => /muted/.test(f));
   // DIVERGENCE: on-colors equal across schemes (authorial, called out — never silently overridden).
@@ -5685,7 +5693,9 @@ function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
     "- 🟢 Contrast: all declared fill/on-pairs ≥ 4.5:1, both schemes, all-pairs policy (R1 measured — dark-scheme",
     "  foregrounds are near-black, not white; a light fill in the dead zone is stepped one ramp step)",
   ];
-  const schemeParityLine = `- 🟢 Scheme parity: identical ${nTotal}-key inventory (${nGrammar} grammar tokens + the \`primary\` Stitch-compat alias); schemes ride as \`-dark\` siblings`;
+  const schemeParityLine = ds.aliasDistinct
+    ? `- 🟢 Scheme parity: identical ${nTotal}-key inventory (${nGrammar} grammar tokens + the \`primary\` Stitch-compat alias); schemes ride as \`-dark\` siblings`
+    : `- 🟢 Scheme parity: identical ${nTotal}-key inventory (${nGrammar} grammar tokens; the brand family is already named \`primary\`, so it doubles as the Stitch-required key — no separate alias); schemes ride as \`-dark\` siblings`;
   // Stitch ships DESIGN.md ONLY (no hex file), so name the sibling the OKLCH round-trips against.
   const carrierLine = `- 🟢 OKLCH payload fidelity: every frontmatter value round-trips to 8-bit sRGB within ±1/255 per channel (measured max dev: ${carrierMaxDev}) — byte-equal to the hex carrier in \`../design-system-for-claude-code/tokens.json\``;
 
@@ -5702,8 +5712,11 @@ function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
       "carrier — Stitch's linter rejects it, so schemes ride as `-dark` siblings.", "",
       "- 🟢 `prelint.py check`: 0 errors — sections in Stitch canonical order (Overview · Colors · Typography · Layout ·",
       "  Elevation & Depth · Shapes · Components · Do's and Don'ts; Responsive Behavior + Agent Prompt Guide ride the",
-      "  unknown-section tolerance); every `{path.to.token}` reference resolves; `primary` compat alias present",
-      "  (satisfies `missing-primary`, so Stitch never auto-generates key colors)",
+      ...(ds.aliasDistinct
+        ? ["  unknown-section tolerance); every `{path.to.token}` reference resolves; `primary` compat alias present",
+           "  (satisfies `missing-primary`, so Stitch never auto-generates key colors)"]
+        : ["  unknown-section tolerance); every `{path.to.token}` reference resolves; the brand family is named `primary`",
+           "  (so it satisfies `missing-primary` directly — Stitch never auto-generates key colors)"]),
       ...contrastLines,
       schemeParityLine,
       carrierLine,
