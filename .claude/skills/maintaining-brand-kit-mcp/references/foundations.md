@@ -13,7 +13,7 @@ probably fighting one of these. The user-facing contract is owned by `mcp/README
   { $schema: "nonoun-brand-kit/1", name, generator: "Ultimate Tokens by NONOUN",
     stops:    [50, 100, …, 950],                       # the stop numbers (color only; on[0].ramp's stops)
     palettes: [ { name, slug, key, ramp: [ {stop, hex} ] } ],
-    roles:    { <slug>: { <roleKey>: { light: "#…", dark: "#…" } } },   # 59 keys per palette
+    roles:    { <slug>: { <roleKey>: { light: "#…", dark: "#…" } } },   # 53 keys per palette
     type:     <typeScale(doc.type)>,        # { treatment, label, fonts, roleOf, categories: {7 voices} }
     geometry: <geometryScale(doc)> }        # { treatment, label, density, radiusStyle, baseHeight,
                                             #   typed:true, sizes:{XS…2XL}, radii:{none…full}, space }
@@ -101,7 +101,7 @@ asserts this on the projection directly via `brandKit({color:true})` / `{type:tr
   used verbatim** (not slugged). `scheme` defaults to `light` (anything not exactly `"dark"` → light). The
   hex is `r[scheme] ?? r.light`.
 - **`get_semantic(scheme)`** → the flattened `{ "palette/roleKey": hex }` map for the scheme (`semanticFor`,
-  using `v[scheme] ?? v.light`). This is the per-palette 59-role layer resolved for one scheme.
+  using `v[scheme] ?? v.light`). This is the per-palette 53-role layer resolved for one scheme.
 - **`nearest_token(hex)`** → `{ palette, stop, hex, distance }` — the brand stop with the smallest squared-RGB
   distance to the input; `distance` is the rounded euclidean (`Math.round(Math.sqrt(best.d))`). distance 0 =
   an exact stop. This is the "reuse the system, don't invent a colour" tool; the `apply_brand` prompt tells

@@ -14,7 +14,7 @@ Design tokens, derived — not guessed.
 
 **Subhead**
 
-> Pick a key color. Ultimate Tokens derives an even, OKLCH-true system — 59 semantic roles, a type
+> Pick a key color. Ultimate Tokens derives an even, OKLCH-true system — 53 semantic roles, a type
 > scale, a geometry ramp — and exports it everywhere your product lives: CSS, Figma variables, and
 > your AI agents.
 
@@ -27,7 +27,7 @@ Design tokens, derived — not guessed.
 **H2** `One color in. A system out.`
 
 > Color is modeled where human vision is even — OKLCH-native, HEX derived only for output. A single
-> key color becomes a measured tonal ramp (050–950), mapped to 59 semantic roles: surfaces, on-colors,
+> key color becomes a measured tonal ramp (050–950), mapped to 53 semantic roles: surfaces, on-colors,
 > outlines, containers, scrims, inverse — resolved for light and dark in one pass. Keep your exact
 > brand color pinned; every other stop stays even around it.
 
@@ -56,7 +56,7 @@ Design tokens, derived — not guessed.
 > AI agents guess design values all day — a plausible hex, an approximate size. Give yours the real
 > ones instead. The Brand-Kit MCP serves your kit to any MCP client — Claude Code, Cursor — a
 > zero-dependency server pre-filled with exact roles and resolved tokens. The free Ultimate Tokens
-> Claude plugin teaches the agent which of the 59 roles goes on each surface, binding to your
+> Claude plugin teaches the agent which of the 53 roles goes on each surface, binding to your
 > project's real exported variables. Serve the values; apply them correctly.
 
 ## Section · Ownership

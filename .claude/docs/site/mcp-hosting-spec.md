@@ -134,7 +134,7 @@ token** (generated in the app) is the documented fallback for any client that ca
 - **When:** while signed in **and** Pro/Studio, saving a set pushes its **resolved** kit (`brandKit(doc,
   systems)`) to `POST /api/kits/<kitId>` (the web-only `_kitSync` seam). The app still keeps the local
   localStorage copy — the cloud copy is what the hosted MCP serves.
-- **What:** the same `brand-kit.json` the downloadable server consumes (palettes, ramps, 59 roles light+dark,
+- **What:** the same `brand-kit.json` the downloadable server consumes (palettes, ramps, 53 roles light+dark,
   type, geometry, name) → KV `kit:<kitId>`; the metadata row (owner, name, updatedAt) → D1.
 - **Active kit:** the app marks one kit "active for MCP" (or all are exposed via `list_kits`). Single-brand
   users get their one kit; agencies/Studio scope with the `kit` arg.

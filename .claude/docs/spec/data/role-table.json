@@ -76,7 +76,7 @@
       950
     ]
   },
-  "rolesPerPalette": 59,
+  "rolesPerPalette": 53,
   "roleTable": [
     {
       "key": "primary",
@@ -187,24 +187,6 @@
       "dark": "500-400"
     },
     {
-      "key": "onSurfaceVariantHover",
-      "suffix": "-on-surface-variant-hover",
-      "light": "850",
-      "dark": "150"
-    },
-    {
-      "key": "onSurfaceVariantActive",
-      "suffix": "-on-surface-variant-active",
-      "light": "900",
-      "dark": "100"
-    },
-    {
-      "key": "onSurfaceVariantDisabled",
-      "suffix": "-on-surface-variant-disabled",
-      "light": "500-300",
-      "dark": "500-300"
-    },
-    {
       "key": "placeholder",
       "suffix": "-placeholder",
       "light": "650",
@@ -239,24 +221,6 @@
       "suffix": "-outline-disabled",
       "light": "500-200",
       "dark": "500-200"
-    },
-    {
-      "key": "outlineVariantHover",
-      "suffix": "-outline-variant-hover",
-      "light": "500-400",
-      "dark": "500-400"
-    },
-    {
-      "key": "outlineVariantActive",
-      "suffix": "-outline-variant-active",
-      "light": "500-500",
-      "dark": "500-500"
-    },
-    {
-      "key": "outlineVariantDisabled",
-      "suffix": "-outline-variant-disabled",
-      "light": "500-100",
-      "dark": "500-100"
     },
     {
       "key": "container",

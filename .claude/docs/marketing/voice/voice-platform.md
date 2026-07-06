@@ -91,7 +91,7 @@ change — don't improvise a register.
 | **Social / short-form** | One claim per post, compressed to its verbs, always with a real render | "Stop hand-nudging hex." |
 | **In-app microcopy** | Calm and actionable — states, limits, next steps; sells only at a ceiling (below) | "You're at the Free limit of 2 brand kits." |
 | **Palette stories (Color Categories)** | Curatorial — governed by the palette rubric at `.claude/docs/spec/colors/color-model-function.md`, not by §5's adjective rules; observed detail over adjective stacking | "Sampled at the hour the plaster goes amber." |
-| **Machine-facing (MCP tool descriptions, agent-read strings)** | Exact contracts — what the tool returns, when to call it; no persona performance for an audience of parsers | "Returns the 59-role semantic layer, light + dark, resolved hex + oklch." |
+| **Machine-facing (MCP tool descriptions, agent-read strings)** | Exact contracts — what the tool returns, when to call it; no persona performance for an audience of parsers | "Returns the 53-role semantic layer, light + dark, resolved hex + oklch." |
 | **Email / support** | Warm, brief, human — a maker answering mail, signed as one | "Anything at all: support@…" |
 | **Limits, errors & when-we're-wrong** | Plain and generous — no blame, no dark patterns; refunds granted gracefully, outages owned in first person | "Your kits are safe. You're simply back to the Free limits." |
 | **Policies / legal-lite** | Short declarative sentences a human can read once; rights stated as plainly as restrictions | "Tokens and design systems you create are entirely yours." |
@@ -124,7 +124,7 @@ countdown theatre is not.
   - The action line: **"Pick a key color; ship a whole system."** — semicolon, not period.
   - Prices: **$39/year** · **$149/year** · **$19/seat/year** in prose; **$39/yr** only where
     characters are rationed (social). Never "just/only $…", never strike-through theatre.
-  - Counts in digits: **2 brand kits**, **59 semantic roles**, **5 seats**.
+  - Counts in digits: **2 brand kits**, **53 semantic roles**, **5 seats**.
   - **Light and Dark** capitalized as mode names; lowercase as adjectives ("a dark scheme").
   - "Brand kit" is the document; **Brand-Kit MCP** (hyphenated, capitalized) is the product.
   - The interpunct **·** separates list items in compact rows; **→** is the CTA arrow; **▶** marks

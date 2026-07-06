@@ -20,7 +20,7 @@ Perceptual color, type & geometry tokens — written straight into Figma variabl
 **Description**
 
 > Ultimate Tokens is a perceptual design-token generator, running entirely inside Figma. Pick a key
-> color and it derives an even, OKLCH-true tonal ramp, mapped to 59 semantic roles across light and
+> color and it derives an even, OKLCH-true tonal ramp, mapped to 53 semantic roles across light and
 > dark — then writes the whole system into your file's variable collections: Color Primitives, Color
 > Modes, aliased so a raw-color edit cascades to every role.
 >
@@ -32,7 +32,7 @@ Perceptual color, type & geometry tokens — written straight into Figma variabl
 > 1. Open the plugin and compose your kit — color palettes, a type scale, a geometry ramp.
 > 2. Choose which systems to apply (Color · Typography · Geometry).
 > 3. Apply. The plugin creates or updates the variable collections and binds the semantic layer —
->    raw primitives at the bottom, 59 aliased roles on top, light and dark as modes.
+>    raw primitives at the bottom, 53 aliased roles on top, light and dark as modes.
 > 4. Edit a primitive later and the cascade carries it to every role that references it.
 >
 > The same kit exports beyond Figma from the web app: CSS custom properties, W3C design tokens

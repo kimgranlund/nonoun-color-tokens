@@ -14,7 +14,7 @@ Your design tokens, served to your AI agents — so they build with your exact r
 **Short description (directories / README)**
 
 > Download a zero-dependency MCP server pre-filled with your brand kit. Point Claude Code, Cursor, or
-> any MCP agent at it and the agent reads your palettes, ramps, the 59-role semantic layer in light
+> any MCP agent at it and the agent reads your palettes, ramps, the 53-role semantic layer in light
 > and dark, your type scale, and your geometry — exact values, resolved tokens, no guessing.
 
 **The pitch (long form)**
@@ -39,12 +39,12 @@ claude mcp add brand-kit -- node /path/to/brand-kit-server.mjs
 **What the agent can ask (feature bullets)**
 
 ```
-• get_semantic — the 59-role semantic layer, light + dark
+• get_semantic — the 53-role semantic layer, light + dark
 • get_type / get_geometry — the composed scales
 • resolve_token / nearest_token — exact lookups, no approximations
 • brand:// resources + an apply_brand prompt
 ```
 
 **Cross-reference.** The MCP *serves* the values; the [Ultimate Tokens Claude plugin](claude-plugin.md)
-teaches the agent *how to apply them* — which of the 59 roles goes on each surface. Both are free and
+teaches the agent *how to apply them* — which of the 53 roles goes on each surface. Both are free and
 available today.

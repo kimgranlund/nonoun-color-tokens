@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `nonoun-color-tokens` is a perceptual **color + design-token generator**: one Vite web app that is also a
 self-contained `<nonoun-color-tokens>` web component, a **Figma plugin** (a semantic-variable binder), and
 an **MCP brand-kit** server. A brand kit is **one document** with three composing systems, surfaced as
-**sections of one editor**: **Color** (palettes → 59 semantic roles) · **Typography** · **Geometry**
+**sections of one editor**: **Color** (palettes → 53 semantic roles) · **Typography** · **Geometry**
 (its per-step text size composes *from* the Type UI scale).
 
 Canonical specs + rubrics: `.claude/docs/spec/` (e.g. `.claude/docs/spec/data/role-table.json` is the role answer key).
@@ -24,7 +24,7 @@ Canonical specs + rubrics: `.claude/docs/spec/` (e.g. `.claude/docs/spec/data/ro
 
 ## Layout
 
-- `src/engine/` — the **pure** engines (ESM, **no DOM**): `semantic.js` (the 59-role table) · `type.mjs` ·
+- `src/engine/` — the **pure** engines (ESM, **no DOM**): `semantic.js` (the 53-role table) · `type.mjs` ·
   `geometry.mjs` · `exports.js` (CSS/DTCG/Tailwind/shadcn) · `derive`/`tonal`/`hct`/`okhsl`.
 - `src/ui/` — `app.js` (the `HctApp` custom element, ~all UI) · `styles.css` · `model.mjs`
   (`projectView` + `geometryScale` — where Geometry composes Type) · `persist.js` · generated
@@ -46,7 +46,7 @@ Canonical specs + rubrics: `.claude/docs/spec/` (e.g. `.claude/docs/spec/data/ro
 - **Sections.** `this.section` (`color`|`typography`|`geometry`) routes `renderCenter`/`renderLeftPane`/
   `renderRightPane`. A section = a canvas header + a pannable `.canvas-scene` (the full dataset) + left
   analysis cards + a right inspector.
-- **59 semantic roles / palette.** `.claude/docs/spec/data/role-table.json` deep-equals `semanticRoles`; the
+- **53 semantic roles / palette.** `.claude/docs/spec/data/role-table.json` deep-equals `semanticRoles`; the
   Figma `code.js` table mirrors it (parity-gated) — so a role-count change moves several files in lockstep.
 - **Quote interpolated font-family names** with digits/spaces — `font-family:'Source Serif 4', serif`.
   Unquoted, WebKit/Safari drops the declaration (the digit is invalid); Chrome tolerates it.

@@ -6,7 +6,7 @@ description: >
   tool/resource", "expose X to agents via MCP", "the MCP opt-in is wrong".
   Covers the zero-dep JSON-RPC stdio server + core (brand-kit-core.mjs owns the
   tools/resources surface; the hosted Worker serves the same core) that serve a
-  generated NONOUN brand kit (palettes · ramps · the per-palette 59 semantic
+  generated NONOUN brand kit (palettes · ramps · the per-palette 53 semantic
   roles · type · geometry) to AI agents offline, plus the in-app packaging.
   Also fires on "the brand-kit MCP server", "the Download Brand-Kit MCP",
   "get_type / get_geometry / get_semantic / resolve_token / nearest_token",
@@ -21,7 +21,7 @@ surface (`SERVER` · `buildSurface(kit)` · `handle(msg, surface)`) — and `mcp
 STDIO entry that frames newline-delimited **JSON-RPC 2.0** around it for AI agents (Claude Code / Cursor /
 VS Code / ChatGPT). The hosted Cloudflare Worker (spec: `.claude/docs/site/mcp-hosting-spec.md`) imports the
 SAME core — parity by construction (`test/mcp/core.mjs`). The server reads a sibling `brand-kit.json`; the
-core exposes the palettes, perceptual ramps, the semantic layer (per palette **59** roles, light + dark), the
+core exposes the palettes, perceptual ramps, the semantic layer (per palette **53** roles, light + dark), the
 typography scale, and the geometry scale as MCP **resources + tools + a prompt** — so an agent builds with
 the brand's exact tokens instead of guessing a colour. **No `npm install`** — pure Node.
 
@@ -132,7 +132,7 @@ request arrives.
 | `references/best-practices.md` | the non-obvious do/don't (stdout-is-sacred, gate-in-lockstep, regenerate-the-asset, README-is-hand-mirrored, serve-don't-compute) + a worked walkthrough adding `nonoun-brand-kit:get_geometry` |
 | `references/rubric.md` | score the change before calling it done — stdio hygiene + opt-in gating + asset regen + test coverage are the gates |
 | `mcp/README.md` | the user-facing doc (de-staled) — what it exposes, how to add it to Claude Code / a project `.mcp.json`. Cite, keep in sync. |
-| `.claude/skills/adding-semantic-roles` | the roles that flow into `nonoun-brand-kit:get_semantic` / `nonoun-brand-kit:resolve_token` / `brand://semantic/*` — cite for the per-palette role model (59 today) |
+| `.claude/skills/adding-semantic-roles` | the roles that flow into `nonoun-brand-kit:get_semantic` / `nonoun-brand-kit:resolve_token` / `brand://semantic/*` — cite for the per-palette role model (53 today) |
 | `.claude/skills/geometry-system` + `.claude/skills/type-scale` + `src/engine/type.mjs` (`typeScale`) · `src/engine/geometry.mjs` (`geomScale`) | the type + geometry scales `nonoun-brand-kit:get_type` / `nonoun-brand-kit:get_geometry` serve verbatim — cite the `geometry-system` skill (the size ramp / centering law) + the `type-scale` skill (the seven voices) + the engine for the shapes; don't re-derive them |
 
 ## Peer skills

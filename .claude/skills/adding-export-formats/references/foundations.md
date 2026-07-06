@@ -16,7 +16,7 @@ everything any color format needs and RETURNS `{ name, n, hue, stops, byStop, sc
 - `byStop` — a `Map(stopNumber → rgb)` (used internally for ref resolution).
 - `scrims` — `{ 500: { [step]: { rgb, alphaPct, frac, hex } } }`, the 11-step 500 translucency ramp
   (`SCRIM_STEPS = [50,100,200,…,950]`, alpha% = step/10).
-- `roles` — the **59 resolved semantic roles**. Each is `{ key, suffix, lightRef, darkRef, light, dark }`
+- `roles` — the **53 resolved semantic roles**. Each is `{ key, suffix, lightRef, darkRef, light, dark }`
   where `light`/`dark` are `{ rgb, frac, hex }` ends **already resolved** through a LOCAL `resolveRef`
   closure. `frac === 1` for a solid; `frac < 1` for a scrim-backed role (e.g. an outline/container on the
   500 ramp).

@@ -49,8 +49,8 @@ Fields live on the chrome palette (`neutral` below):
 | Part | Role |
 |---|---|
 | field background | `--c-neutral-surface-low` (recessed) or `--c-neutral-surface` (flush) |
-| border, rest | `--c-neutral-outline-variant` |
-| border, hover | `--c-neutral-outline-variant-hover` |
+| border, rest | `--c-neutral-outline-variant` (the quiet divider) |
+| border, hover | `--c-neutral-outline-hover` — interactive states step onto the primary outline ramp |
 | border, focus | `--c-neutral-outline-active` — plus the focus ring (navigation.md) |
 | value text | `--c-neutral-on-surface` |
 | **placeholder** | `--c-neutral-placeholder` — the dedicated role; never fake it with opacity |

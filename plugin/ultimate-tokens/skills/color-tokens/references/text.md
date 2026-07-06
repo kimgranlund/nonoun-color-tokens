@@ -10,8 +10,8 @@ plus their states — resist inventing intermediate grays.
 | default body, headings, values — **the default is full ink** | `--c-neutral-on-surface` |
 | secondary: captions, meta, timestamps, helper text, inactive labels | `--c-neutral-on-surface-variant` |
 | placeholder (form fields only) | `--c-neutral-placeholder` |
-| disabled text anywhere | `--c-neutral-on-surface-disabled` (secondary: `-on-surface-variant-disabled`) |
-| interactive text hover/pressed (a text row, a link-like label) | `-on-surface-hover` / `-on-surface-active` (variant: `-on-surface-variant-hover` / `-active`) |
+| disabled text anywhere | `--c-neutral-on-surface-disabled` (both tiers — disabled ink is one translucent wash) |
+| interactive text hover/pressed (a text row, a link-like label) | `-on-surface-hover` / `-on-surface-active` (the secondary tier has no per-state token — apply a `hover:` opacity modifier to `-on-surface-variant`) |
 | text on the inverse surface (tooltips, toasts) | `--c-neutral-inverse-on-surface` |
 
 Headings are hierarchy-by-typography (size/weight from the typography tokens), not by color — a
