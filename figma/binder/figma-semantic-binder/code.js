@@ -46,10 +46,12 @@ const FLOAT_PLANS = JSON.parse("[]"); /* __NONOUN_FLOAT_PLANS__ */
 // SAME collections idempotently if a user runs both against one file.
 const FLOAT_REGISTRY_KEY = "nonoun-color-tokens-float-collections";
 
-// MIRRORS figma/plugin/code.js applyFloatPlans (a pure data executor — no planner, so no parity gate;
-// keep byte-identical to the flagship on change). readFloatRegistry/writeFloatRegistry/
-// ensureFloatCollection/varsByName/applyFloatPlans are ported VERBATIM — they use only figma.variables.*
-// + figma.root.get/setPluginData, both available to any plugin (no color-specific state).
+// MIRRORS figma/plugin/code.js's float executor: readFloatRegistry/writeFloatRegistry/
+// ensureFloatCollection/varsByName/applyFloatPlans are ported VERBATIM — a pure DATA executor (no
+// planner to spec-gate against), using only figma.variables.* + figma.root.get/setPluginData, both
+// available to any plugin (no color-specific state). The executable bodies MUST stay byte-identical to
+// the flagship (the surrounding comments may differ); the `floatparity` gate in test/figma/binder.mjs
+// enforces it by comparing comment-stripped bodies, so running both converges on ONE collection set.
 function readFloatRegistry() {
   const raw = figma.root.getPluginData(FLOAT_REGISTRY_KEY);
   if (!raw) return {};
@@ -311,7 +313,7 @@ async function main() {
   parts.push(
     rawColl
       ? "Bound " + bound + " colour role" + (bound === 1 ? "" : "s") + (missing.length ? (", " + missing.length + " skipped (raw colour missing)") : "")
-      : "color skipped — no Color Primitives",
+      : 'Colour skipped — no "Color Primitives" collection',
   );
   if (fp) parts.push(fp.collections + " breakpoint collection" + (fp.collections === 1 ? "" : "s") + ", " + fp.variables + " sized var" + (fp.variables === 1 ? "" : "s"));
   figma.notify(parts.join(" · "));
