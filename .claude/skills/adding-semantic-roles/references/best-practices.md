@@ -48,9 +48,9 @@ The non-obvious do/don'ts (each one is a real trap in this repo), then a worked 
 
 - **Pick refs from a neighbour in the same group**, mirroring its light/dark grammar: accent states step
   along the ramp mode-mirrored (hover = prime ±1 step → `650/350`, active = prime ±2 → `750/250`);
-  outline/container/scrim states step along the 500 ramp (`light === dark`); disabled is a faint translucent
-  wash (`500-200` / `500-400` etc.) because there is no neutral/desaturate primitive in the per-palette
-  model. An out-of-range or unpadded ref fails `refs-canonical`. Use a scrim step that is in `SCRIM_STEPS`
+  outline/container/scrim states step along the 500 ramp (`light === dark`); disabled is a translucent
+  500-ramp wash (`500-100`–`500-600`: accent `-disabled` 600, `on{N}Disabled` 400, outline 200, container
+  100) because there is no neutral/desaturate primitive in the per-palette model. An out-of-range or unpadded ref fails `refs-canonical`. Use a scrim step that is in `SCRIM_STEPS`
   (`50,100,200,300,400,500,600,700,800,900,950`) — that satisfies both the general and the scrim-specific
   check (foundations §2).
 - **Do NOT add resolved colors anywhere.** A role is refs only; the color is derived. The CSS/OKLCH/DTCG/

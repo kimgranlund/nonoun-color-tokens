@@ -92,9 +92,9 @@ Both are fixed to the light end in *both* modes, for *all* palettes.
   (alpha 5–95%). The 7 strength roles bind to a 7-step subset; steps 700–950 carry no role.
 - **Many roles** resolve onto this ramp, mode-independent (light === dark): the 7
   `scrim*` strengths (weakest→strongest = steps 50/100/200/300/400/500/600, a sequential 5–60% ladder),
-  plus `outline` (600), `outlineVariant` (300), `container/Low/High` (200/100/300), and all the
-  interaction-state families — `outline`/`outlineVariant`/`container` Hover·Active·Disabled, plus
-  `{n}Disabled` (200) and `on{N}Disabled` (400).
+  plus `outline` (600), `outlineVariant` (300), `container/Low/High` (200/100/300), and the
+  interaction-state families — `outline`/`container` Hover·Active·Disabled, plus
+  `{n}Disabled` (600) and `on{N}Disabled` (400).
 
 > **A scrim is a sub-variant of the palette** — based on the 500 stop, it tracks the palette as
 > hue/chroma/skew/lift change. This 500-ramp revision **supersedes** the former 3-base model

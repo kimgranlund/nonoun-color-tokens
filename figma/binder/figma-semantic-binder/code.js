@@ -151,10 +151,10 @@ function roleTable(n) {
     { key: n + "High", suffix: "-high", light: "650", dark: "400" },
 
     // 1b. ACCENT INTERACTION STATES — hover/active are prime ±1/±2 steps (mode-mirrored); disabled a
-    //     faint translucent wash (no neutral primitive in the per-palette ref model). Lockstep w/ semantic.js.
+    //     translucent wash of the palette's 500 at 60% (no neutral primitive in the per-palette ref model). Lockstep w/ semantic.js.
     { key: n + "Hover", suffix: "-hover", light: "650", dark: "350" },
     { key: n + "Active", suffix: "-active", light: "750", dark: "250" },
-    { key: n + "Disabled", suffix: "-disabled", light: "500-200", dark: "500-200" },
+    { key: n + "Disabled", suffix: "-disabled", light: "500-600", dark: "500-600" },
 
     // 2. ON-ACCENT — name-prefixed; fixed to the light end in BOTH modes (OD-001).
     { key: "on" + N, suffix: "-on-" + n, light: "50", dark: "50" },

@@ -123,8 +123,8 @@
     {
       "key": "primaryDisabled",
       "suffix": "-disabled",
-      "light": "500-200",
-      "dark": "500-200"
+      "light": "500-600",
+      "dark": "500-600"
     },
     {
       "key": "onPrimary",

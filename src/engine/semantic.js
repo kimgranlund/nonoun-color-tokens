@@ -94,11 +94,11 @@ export function semanticRoles(paletteName) {
   //     and consistent across every palette for free. Emphasis grows by DARKENING on light surfaces and
   //     LIGHTENING on dark (mode-mirrored): hover = prime ±1 step, active = prime ±2 (same direction, so
   //     pressed reads "more" than hover). DISABLED is NOT a tonal sibling — there is no neutral/desaturate
-  //     primitive in the per-palette ref model, so it is a faint translucent wash of the palette's own 500
-  //     (a low-alpha scrim reads inert over any surface; light === dark, like outline/container).
+  //     primitive in the per-palette ref model, so it is a translucent wash of the palette's own 500 at 60%
+  //     (a mid-alpha scrim reads clearly inert without vanishing on any surface; light === dark, like outline/container).
   role(`${n}Hover`, '-hover', '650', '350'); // prime +1 step toward emphasis (darker light / lighter dark)
   role(`${n}Active`, '-active', '750', '250'); // prime +2 steps — pressed is "more" than hover
-  role(`${n}Disabled`, '-disabled', '500-200', '500-200'); // faint 20% wash — inert, mode-independent
+  role(`${n}Disabled`, '-disabled', '500-600', '500-600'); // 60% wash — inert but legible, mode-independent
 
   // 2. ON-ACCENT — name-prefixed; fixed to the light end in BOTH modes (OD-001).
   role(`on${N}`, `-on-${n}`, '50', '50');
