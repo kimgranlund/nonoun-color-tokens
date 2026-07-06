@@ -243,6 +243,16 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   // no light-dark() in the carrier (Stitch rejects it) — inherited from the shared spine, asserted here too.
   if (/^\s+[a-z0-9-]+(?:-dark)?:\s*"light-dark\(/mi.test(byName["DESIGN.md"])) FAIL("design-system-stitch", "light-dark() in the Stitch frontmatter carrier");
 
+  // NO DUPLICATE YAML KEY — the `primary` Stitch alias must not collide with a grammar family already
+  // named `primary`. C(ALL) is the canonical-defaults theme whose brand family IS `primary`, so a naive
+  // always-append alias emits `primary:`/`primary-dark:` twice — a duplicate key the Stitch prelint rejects
+  // (theme-generality regression: the golden's renamed brand family hid this). Each must appear exactly once.
+  const fm = (byName["DESIGN.md"].match(/^---\n([\s\S]*?)\n---/) || [, ""])[1];
+  for (const k of ["primary", "primary-dark"]) {
+    const n = (fm.match(new RegExp(`^  ${k}:`, "gm")) || []).length;
+    if (n !== 1) FAIL("design-system-stitch", `frontmatter \`${k}:\` appears ${n}× (expected exactly 1 — a duplicate YAML key fails the Stitch prelint)`);
+  }
+
   // Stitch-profile README receipt: distinct header + the single-file / byte-identical / lint framing.
   const rm = byName["README.md"];
   if (!/design-system-for-google-stitch — Stitch profile export/.test(rm)) FAIL("design-system-stitch", "README is not the Stitch profile receipt");
