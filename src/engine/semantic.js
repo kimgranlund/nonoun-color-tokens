@@ -143,7 +143,7 @@ export function semanticRoles(paletteName) {
   //     `hover:`/`active:` opacity modifier on the base outlineVariant covers it.
   role('outlineHover', '-outline-hover', '500-700', '500-700');
   role('outlineActive', '-outline-active', '500-800', '500-800');
-  role('outlineDisabled', '-outline-disabled', '500-200', '500-200');
+  role('outlineDisabled', '-outline-disabled', '500-400', '500-400'); // 40% — the disabled content tier (matches on-surface/label), still receding below the 60% resting outline
 
   // 5. CONTAINER — shared; on the 500 scrim ramp (light === dark).
   role('container', '-container', '500-200', '500-200');

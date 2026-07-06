@@ -188,7 +188,7 @@ function roleTable(n) {
     //     outlineVariant (the weaker divider) carries NONE. Lockstep w/ semantic.js.
     { key: "outlineHover", suffix: "-outline-hover", light: "500-700", dark: "500-700" },
     { key: "outlineActive", suffix: "-outline-active", light: "500-800", dark: "500-800" },
-    { key: "outlineDisabled", suffix: "-outline-disabled", light: "500-200", dark: "500-200" },
+    { key: "outlineDisabled", suffix: "-outline-disabled", light: "500-400", dark: "500-400" },
 
     // 5. CONTAINER — shared; on the 500 scrim ramp (light === dark).
     { key: "container", suffix: "-container", light: "500-200", dark: "500-200" },

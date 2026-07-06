@@ -219,8 +219,8 @@
     {
       "key": "outlineDisabled",
       "suffix": "-outline-disabled",
-      "light": "500-200",
-      "dark": "500-200"
+      "light": "500-400",
+      "dark": "500-400"
     },
     {
       "key": "container",
