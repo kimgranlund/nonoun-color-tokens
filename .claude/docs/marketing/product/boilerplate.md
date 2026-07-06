@@ -27,7 +27,7 @@ Derive OKLCH-true color, type & geometry systems from one source. Export to CSS,
 > Ultimate Tokens is a perceptual design-token generator. Pick a key color and it derives an even,
 > OKLCH-true tonal ramp, mapped to 59 semantic roles across light and dark. Compose a type scale and
 > a geometry system from the same source, then export everything — CSS, DTCG, Tailwind, shadcn, Figma
-> variables, MCP, a Claude Design bundle — perfectly in sync. Free to start.
+> variables, MCP, a design system for Claude, Stitch, or Figma Make — perfectly in sync. Free to start.
 
 **Long (the full paragraph, about pages / press)**
 
@@ -38,8 +38,9 @@ Derive OKLCH-true color, type & geometry systems from one source. Export to CSS,
 > ramp built on one centering law. Every export — CSS custom properties, W3C design tokens, Tailwind,
 > shadcn, Figma variables, and a Brand-Kit MCP server your AI agents read directly, each under whichever
 > naming convention your team already uses — is the same decision, exported twice; it cannot drift. The
-> same kit also exports as a Claude Design bundle — `tokens.json`, a `DESIGN.md` generation prompt, and
-> preview cards — that a vision-capable Claude reads to generate on-brand screens from your system. It
+> same kit also exports as a design system — `tokens.json`, a `DESIGN.md` generation prompt, and preview
+> cards — in a target each for Claude (`claude.ai/design` and Claude Code), Google Stitch, and Figma
+> Make, so whichever AI design tool you reach for generates on-brand screens from your system. It
 > runs in the browser, works offline, needs no sign-up,
 > and your work never leaves your machine but the license check. Free to start; Pro is $39/year;
 > Studio covers teams.

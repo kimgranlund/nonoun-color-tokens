@@ -45,7 +45,7 @@ Design tokens, derived — not guessed.
 **H2** `Every export, the same decision`
 
 > CSS custom properties. W3C design tokens. Tailwind. shadcn. Figma variables with a raw→role cascade.
-> A re-importable config. A Claude Design bundle for generating on-brand UI with Claude. They aren't kept
+> A re-importable config. A design system your AI design tool — Claude (`claude.ai/design` and Claude Code), Google Stitch, or Figma Make — reads to generate on-brand UI. They aren't kept
 > in sync — they're derived from one source, so they cannot drift. Emit every one under your own naming: the default, a Material 3-style `--md-sys-*` root, or a
 > `--{brand}-*` prefix, so the tokens land in the convention your codebase already uses.
 
@@ -72,7 +72,7 @@ Design tokens, derived — not guessed.
 **H2** `Free to start. Pro when you outgrow it.`
 
 > **Free** — the full generator, 2 brand kits, core exports, the offline Figma plugin, the MCP
-> download, the Claude Design export.
+> download, the design-system export.
 > **Pro — $39/year, per user** — unlimited kits, the complete export suite, advanced treatments,
 > updates and support.
 > **Studio — $149/year for 5 seats** (+$19/seat/year) — Pro for the whole team, one account.

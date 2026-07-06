@@ -23,8 +23,8 @@ within a minute of clicking. Posture: **social/short-form** (§4). Facts:
 • Install the Ultimate Tokens plugin and your coding agent builds with your
   exact roles — which of the 59 goes where, not a guessed hex. Free.
   → /plugin marketplace add kimgranlund/nonoun-color-tokens
-• Export a Claude Design bundle; Claude generates on-brand screens from your
-  system. Free, every tier. → {{APP_URL}}
+• Export a design system to Claude, Google Stitch, or Figma Make; each
+  generates on-brand UI from your kit. Free, every tier. → {{APP_URL}}
 • Export your tokens under your own names — Ultimate, Material 3-style
   --md-sys-*, or a --{brand}-* root. They land in the convention you already
   run. → {{APP_URL}}
@@ -58,13 +58,13 @@ within a minute of clicking. Posture: **social/short-form** (§4). Facts:
 > component or migrates a whole UI. Free, MIT, parity-gated against the generator so its guidance
 > can't drift from the tokens. → `/plugin marketplace add kimgranlund/nonoun-color-tokens`
 
-## Claude Design export launch post
+## Design-system export launch post
 
-> Ultimate Tokens now exports a Claude Design bundle. Point Claude Design (`claude.ai/design`) at it and
-> Claude generates on-brand product screens from your system: `tokens.json` (light + dark roles, plus
-> type, spacing, radii), a `DESIGN.md` generation prompt carrying your kit's own guardrails, and 7
-> self-contained preview cards. Derive the system once; generate the app on-brand. Free, on every tier.
-> → {{APP_URL}}
+> Ultimate Tokens now exports a design system for the AI design tools you already reach for. One core —
+> a `DESIGN.md` generation prompt plus a `tokens.json` carrier (light + dark roles, type, spacing, radii;
+> on-colours measured to WCAG-AA) — lands as three targets in the Download-All `.zip`: one for Claude at
+> `claude.ai/design` and Claude Code, one for Google Stitch, one for Figma Make. Derive the system once; each tool
+> generates on-brand UI from it — not a fresh guess. Free, on every tier. → {{APP_URL}}
 
 ## Channel notes
 
