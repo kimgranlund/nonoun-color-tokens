@@ -170,10 +170,11 @@ try {
   await evalJS(`${el}.setSection("typography")`); await sleep(300);
   ok(await evalJS(`(()=>{return ${el}.section==="typography" && ${el}.querySelectorAll(".type-spec-line").length===53 && ${el}.querySelectorAll(".type-spec-group").length===11})()`), "Typography section shows the full 53-step specimen across the 11 named voices");
   ok(await evalJS(`(()=>{return !!${el}.querySelector(".tyi-voices") && ${el}.querySelectorAll(".an-card").length>=4})()`), "Typography section: right-pane inspector + left-rail analysis cards render");
-  // entering the section injects the SELF-HOSTED base64 @font-face <style> — no CDN, so it renders the real
-  // faces offline + in the Figma plugin (networkAccess:none). Confirm there's NO Google Fonts CDN request.
+  // entering the section injects the SELF-HOSTED base64 @font-face <style> (TIER 1) — no CDN, so the 4 base
+  // faces render offline + in the Figma plugin (networkAccess:none).
   ok(await evalJS(`(()=>{const s=document.getElementById("nonoun-type-fonts");return !!s && s.tagName==="STYLE" && /@font-face/.test(s.textContent) && /base64/.test(s.textContent) && /Inter Tight/.test(s.textContent)})()`), "Typography injects the self-hosted base64 @font-face (renders offline + in the Figma plugin)");
-  ok(await evalJS(`(()=>{return ![...document.querySelectorAll("link[href]")].some(l=>/fonts\\.(googleapis|gstatic)\\.com/.test(l.href))})()`), "no Google Fonts CDN request (offline-proof + Figma networkAccess:none compliant)");
+  // On a self-hosted treatment (the default), TIER 2 loads nothing — the 4 base faces never hit the CDN.
+  ok(await evalJS(`(()=>{return ![...document.querySelectorAll("link[href]")].some(l=>/fonts\\.(googleapis|gstatic)\\.com/.test(l.href))})()`), "self-hosted base faces need no Google Fonts CDN request");
   // all four embedded faces must actually APPLY in real layout (the DOM is what the app renders) — measured
   // by a width delta vs monospace at the weights the specimen uses. NB: document.fonts.check() and canvas
   // measureText give false negatives for variable fonts in Chromium, so we measure real DOM layout instead.
@@ -186,6 +187,17 @@ try {
   const tyShot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(resolve(OUT, "typography.png"), Buffer.from(tyShot.data, "base64"));
   console.log("  · screenshot → smoke-out/typography.png (Luxury / Source Serif 4)");
+
+  // TIER 2 (web-app only): picking a palette face that ISN'T self-hosted lazy-loads it from the Google Fonts
+  // CSS API, so the specimen renders the REAL typeface when you click between palette families. Set a
+  // non-bundled display family and confirm the <link> is injected (link injection is synchronous + network-
+  // independent — the assertion holds even if the CDN is slow; the load itself is logged, not asserted, since
+  // document.fonts.check is a known false-negative for variable faces).
+  await evalJS(`${el}.commit((d)=>{ d.type = { treatment: "luxury", bodyBase: 16, fonts: { display: "Bodoni Moda" } }; })`); await sleep(400);
+  ok(await evalJS(`(()=>[...document.querySelectorAll("link[href]")].some(l=>/fonts\\.googleapis\\.com\\/css2\\?family=Bodoni\\+Moda/.test(l.href)))()`), "TIER 2: a non-bundled palette face lazy-loads from Google Fonts (web app)");
+  const bodoniLoaded = await evalJS(`(async()=>{try{await document.fonts.ready;return document.fonts.check('48px "Bodoni Moda"')}catch{return false}})()`, true);
+  console.log("  · Bodoni Moda loaded (document.fonts.check, best-effort):", bodoniLoaded);
+  await evalJS(`${el}.commit((d)=>{ d.type = { treatment: "luxury", bodyBase: 16 }; })`); await sleep(300); // restore the self-hosted specimen
 
   // Typography breakpoint MODES (Phase 5): the Mode control adds a named bodyBase variant; switching it
   // re-resolves the whole specimen at the mode's body size.

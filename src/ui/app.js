@@ -211,13 +211,18 @@ function ensureAppTheme() {
 }
 
 // ── typography web fonts (lazy) ─────────────────────────────────────────────────
-// The Typography treatments name four highly-rated, free Google Fonts — Inter, Inter Tight (geometric
-// sans), Source Serif 4 (high-contrast serif), and JetBrains Mono. They're SELF-HOSTED: the Latin subset
-// is inlined as base64 @font-face (src/ui/type-fonts.js, ~230KB), injected LAZILY (only when the Typography
-// section first opens). `data:` URIs are inline, not network requests, so the specimen renders in the REAL
-// faces EVERYWHERE — online, offline, and inside the Figma plugin (manifest networkAccess:"none", where any
-// CDN is hard-blocked). No external request at all (no Google Fonts CDN), so it's offline-proof, privacy-
-// clean, and store-compliant. The fixed specimen samples are Latin, fully covered by the subset.
+// FONT LOADING runs in two tiers.
+// TIER 1 — SELF-HOSTED (always): the five base treatments name four free Google Fonts — Inter, Inter Tight
+// (geometric sans), Source Serif 4 (high-contrast serif), JetBrains Mono. Their Latin subset is inlined as
+// base64 @font-face (src/ui/type-fonts.js, ~230KB), injected lazily (ensureTypeFonts, first Typography open).
+// `data:` URIs are inline, not network requests, so these render EVERYWHERE — online, offline, and inside
+// the Figma plugin (manifest networkAccess:"none", where any CDN is hard-blocked): offline-proof, privacy-
+// clean, store-compliant.
+// TIER 2 — WEB-APP ONLY (lazy CDN): per-palette typography draws on ~200 further faces, far too heavy to
+// embed. In the WEB app they are lazy-loaded from the Google Fonts CSS API on demand (ensureWebFonts) so the
+// live specimen renders the REAL face when you click between palette families. This tier IS a runtime CDN
+// request, so it is GATED OFF in the Figma plugin (this.inFigma) — there (and offline) an unbundled face
+// falls back to the generic. Every EXPORT carries the real family name regardless of what the preview loads.
 const TYPE_FONTS_LINK_ID = "nonoun-type-fonts";
 function ensureTypeFonts() {
   if (typeof document === "undefined" || !document.head) return;
@@ -239,6 +244,35 @@ function ensureTypeFonts() {
         ff.load().catch(() => { /* offline/blocked — the generic fallback holds */ });
       } catch { /* ignore a malformed face */ }
     }
+  }
+}
+
+// ensureWebFonts (TIER 2, web-app only) — lazily load the per-palette faces that are NOT self-hosted from
+// the Google Fonts CSS API, one <link> per family (idempotent by id). GATED OFF in the Figma plugin
+// (networkAccess:"none") — call with this.inFigma. A family's config weight is served by requesting the full
+// variable range; a static/single-master face 400s that request, so we retry the default instance (the
+// typeface still renders; the browser synthesises the weight). A non-Google family 404s harmlessly and the
+// generic fallback holds.
+const SELF_HOSTED_FONTS = new Set(["Inter", "Inter Tight", "Source Serif 4", "JetBrains Mono"]);
+const GENERIC_FONTS = new Set(["serif", "sans-serif", "monospace", "system-ui", "ui-serif", "ui-sans-serif", "ui-monospace", "cursive", "fantasy", "inherit", "initial", "—"]);
+function ensureWebFont(fam) {
+  const id = "nonoun-wf-" + fam.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  if (document.getElementById(id)) return; // load each family exactly once
+  const base = "https://fonts.googleapis.com/css2?family=" + encodeURIComponent(fam).replace(/%20/g, "+");
+  const add = (href, onFail) => {
+    const link = document.createElement("link");
+    link.id = id; link.rel = "stylesheet"; link.href = href;
+    if (onFail) link.onerror = () => { link.remove(); onFail(); };
+    document.head.appendChild(link);
+  };
+  add(base + ":wght@100..900&display=swap", () => add(base + "&display=swap")); // full range → default instance on 400
+}
+function ensureWebFonts(fonts, inFigma) {
+  if (inFigma) return; // TIER 2 is web-app only — the Figma plugin stays on the self-hosted subset
+  if (typeof document === "undefined" || !document.head || !document.createElement) return;
+  for (const raw of Object.values(fonts || {})) {
+    const fam = (raw || "").trim();
+    if (fam && !SELF_HOSTED_FONTS.has(fam) && !GENERIC_FONTS.has(fam.toLowerCase())) ensureWebFont(fam);
   }
 }
 
@@ -3713,6 +3747,7 @@ class HctApp extends HTMLElement {
     ensureTypeFonts();
     const cfg = this._activeType();
     const scale = this._activeTypeScale();
+    ensureWebFonts(scale.fonts, this.inFigma); // TIER 2: lazy-load this palette's non-bundled faces (web app only)
     const t = TYPE_TREATMENTS.find((x) => x.id === cfg.treatment) || TYPE_TREATMENTS[0];
     const PARA = TYPE_PARA(scale.treatment);
     const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -4261,6 +4296,7 @@ class HctApp extends HTMLElement {
   // fuzz generator, so it is FLAGGED out-of-scope, not faked.
   renderTypeInspector(view) {
     ensureTypeFonts();
+    ensureWebFonts(this._activeTypeScale().fonts, this.inFigma); // TIER 2: the inspector specimen + examples render the real faces
     const seg = this.typeSegment === "fonts" || this.typeSegment === "specimen" ? this.typeSegment : "scale";
     const body = seg === "fonts" ? this.typeFontsTab() : seg === "specimen" ? this.typeSpecimenTab(view) : this.typeScaleTab();
     const tabs = [{ id: "scale", label: "Scale" }, { id: "fonts", label: "Fonts" }, { id: "specimen", label: "Specimen" }];
@@ -4381,7 +4417,7 @@ class HctApp extends HTMLElement {
               placeholder: treatment.fonts[role],
               "aria-label": (ROLE_LABEL[role] || role) + " font family",
               "data-fk": "tyfont:" + role,
-              title: custom ? "Custom family — exports as-is; the specimen falls back if it isn't installed/bundled" : "From the " + treatment.label + " treatment",
+              title: custom ? "Custom family — exports as-is; the web-app specimen loads it from Google Fonts (falls back if it isn't a Google font)" : "From the " + treatment.label + " treatment",
               style: `font-family:'${family}', ${generic}`,
               onchange: (e) => this._setTypeFont(role, e.target.value),
             }),
@@ -4389,7 +4425,7 @@ class HctApp extends HTMLElement {
           );
         }),
       ),
-      h("p", { class: "insp-sub tyi-future" }, "Custom families export in the CSS / DTCG / Figma tokens; the live specimen falls back to a generic if the font isn't installed or bundled."),
+      h("p", { class: "insp-sub tyi-future" }, "Custom families export in the CSS / DTCG / Figma tokens. In the web app the specimen loads each face from Google Fonts on demand; a face that isn't a Google font (or the Figma plugin, which stays offline) falls back to the closest generic."),
     );
   }
 
