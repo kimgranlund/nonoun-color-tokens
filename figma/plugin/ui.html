@@ -2774,6 +2774,27 @@ const DEFAULT_TYPE = { treatment: "product", bodyBase: 16 };
 // family per role (config.fonts in typeScale); it exports + renders if installed, else falls back to a generic.
 const BUNDLED_FONTS = ["Inter", "Inter Tight", "Source Serif 4", "JetBrains Mono"];
 
+// genericFor(family, role) — the CSS generic a font-family stack should end with, so an unloaded/uninstalled
+// face (the Figma plugin, offline, or the brief font-display swap) falls back to the RIGHT style, not always
+// sans. A plain `/serif/.test(name)` mislabels almost every serif (Bodoni Moda, Sabon, Playfair, Prata…) and
+// every typewriter/mono face (Courier Prime, Prestige Elite, VT323…) as sans, because the category rarely
+// lives in the name. So: the mono ROLE forces monospace (a code slot needs mono metrics regardless of face);
+// otherwise a curated set (idiosyncratic names) + keyword rules classify the family. Validated against all
+// 202 designed families. Unknowns default to sans-serif.
+const FONT_GENERIC_SERIF = new Set(["bodoni", "bodoni moda", "sabon", "prata", "spectral", "lora", "bitter", "kazimir", "signifier", "fournier", "plantin", "miller", "miller text", "caledonia", "new caledonia", "charter", "chaparral", "cheltenham", "cheltenham bold", "cooper old style", "cardo", "mrs eaves", "mrs eaves xl", "tiempos text", "freight text", "sentinel", "archer", "giza", "serifa", "rockwell", "abril fatface", "rozha one", "chonburi", "sorts mill goudy", "goudy text", "fette fraktur", "graffonti", "kaufmann", "bello", "davida", "aachen bold", "rosewood", "ultra", "cooper black", "broadway", "p22 secession", "stardos stencil", "amiri", "aref ruqaa", "shippori mincho", "gt sectra", "gt sectra display", "iowan old style", "williams caslon text", "im fell english", "bembo book", "cormorant", "fraunces", "newsreader", "crimson pro", "alegreya", "ff tisa", "itc souvenir", "itc benguiat", "itc serif gothic", "clarendon", "zilla slab", "times new roman", "georgia", "didot", "trajan", "cinzel", "playfair display", "bookman old style", "adobe jenson", "arnold bocklin", "arnold boecklin", "american typewriter", "itc american typewriter", "lxgw wenkai"]);
+const FONT_GENERIC_SANS = new Set(["optima", "optima nova", "futura", "jost", "gill sans", "frutiger", "univers", "interstate", "verlag", "gotham", "knockout", "neutraface", "eurostile", "eurostile bold extended", "monument extended", "druk", "druk text", "druk condensed", "clash display", "satoshi", "sohne", "söhne", "marianne", "familjen grotesk", "hanken grotesk", "untitled sans", "pretendard", "national park", "oswald", "architype bayer", "bungee", "data 70", "forma djr", "forma djr micro", "forma djr text", "helvetica now text", "zen kaku gothic antique", "zen kaku gothic new", "cronos", "kanit", "reem kufi", "baloo 2", "mukta", "sarabun", "highway gothic (fhwa series)", "neuzeit grotesk", "copperplate gothic", "alternate gothic"]);
+const FONT_GENERIC_MONO = new Set(["courier", "courier prime", "prestige elite", "letter gothic", "nitti", "ff trixie", "trixie", "vt323", "ocr-a", "ocr-b"]);
+function genericFor(family, role) {
+  if (role === "mono") return "monospace";
+  const k = String(family || "").toLowerCase().trim();
+  if (FONT_GENERIC_MONO.has(k)) return "monospace";
+  if (FONT_GENERIC_SANS.has(k)) return "sans-serif";
+  if (FONT_GENERIC_SERIF.has(k)) return "serif";
+  if (/\bmono\b|\bcode\b|courier|consol|typewriter/.test(k)) return "monospace";
+  if (/serif|\bslab\b|garamond|caslon|didot|minion|schoolbook|mincho|goudy|fraktur|\bfell\b/.test(k)) return "serif";
+  return "sans-serif";
+}
+
 // `overrides` (optional) — a flat per-cell SIZE override map keyed "<voiceName>|<stepName>", already
 // mode-selected by the caller. When a positive number exists for a step, it REPLACES the derived size and
 // the line-height RE-DERIVES from it (lineHeight = round(size · leading)); tracking + weight stay as the
@@ -3041,7 +3062,7 @@ function typeTokensFigmaPrimitives(scale) {
   };
 }
 
-return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, typeScale, dimUnit, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes, typeTokensFigmaPrimitives };
+return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, typeScale, dimUnit, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes, typeTokensFigmaPrimitives };
 })();
 __M.geometry = (function(){
 // geometry.mjs — the GEOMETRY / dimensional engine: the spatial analog of the color & type engines.
@@ -7467,7 +7488,7 @@ const { MCP_BRAND_KIT } = __M.mcpAssets;
 const { TYPE_FONTS_CSS } = __M.typeFonts;
 const { CATEGORY_INDEX, loadCategory } = __M.categoryIndex;
 const { deriveNeutral, deriveRelative, RELATIONSHIPS } = __M.derive;
-const { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS } = __M.type;
+const { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor } = __M.type;
 const { geomScale, geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } = __M.geometry;
 const { zipStore } = __M.zip;
 const { modeApplyPlan, validateModeInterchange } = __M.modeApplyPlan;
@@ -7699,13 +7720,24 @@ function ensureWebFont(fam) {
   };
   add(base + ":wght@100..900&display=swap", () => add(base + "&display=swap")); // full range → default instance on 400
 }
+function ensureWebFontPreconnect() {
+  if (document.getElementById("nonoun-wf-pc-gstatic")) return; // once (gstatic is appended last)
+  for (const [host, id, cors] of [["https://fonts.googleapis.com", "nonoun-wf-pc-gapis", false], ["https://fonts.gstatic.com", "nonoun-wf-pc-gstatic", true]]) {
+    const l = document.createElement("link"); // preconnect links must be direct <head> children
+    l.id = id; l.rel = "preconnect"; l.href = host;
+    if (cors) l.crossOrigin = "anonymous";
+    document.head.appendChild(l);
+  }
+}
 function ensureWebFonts(fonts, inFigma) {
   if (inFigma) return; // TIER 2 is web-app only — the Figma plugin stays on the self-hosted subset
   if (typeof document === "undefined" || !document.head || !document.createElement) return;
-  for (const raw of Object.values(fonts || {})) {
-    const fam = (raw || "").trim();
-    if (fam && !SELF_HOSTED_FONTS.has(fam) && !GENERIC_FONTS.has(fam.toLowerCase())) ensureWebFont(fam);
-  }
+  const need = Object.values(fonts || {})
+    .map((r) => (r || "").trim())
+    .filter((fam) => fam && !SELF_HOSTED_FONTS.has(fam) && !GENERIC_FONTS.has(fam.toLowerCase()));
+  if (!need.length) return; // a purely self-hosted config makes ZERO CDN contact (not even a preconnect)
+  ensureWebFontPreconnect(); // warm the Google Fonts connections only when we're actually loading a face
+  for (const fam of need) ensureWebFont(fam);
 }
 
 // setColorScheme — flip the document's color-scheme so EVERY light-dark() token —
@@ -9389,7 +9421,7 @@ class HctApp extends HTMLElement {
       { class: "ty-roles" },
       ...ROLES.map(([role, label]) => {
         const fam = scale.fonts[role] || "—";
-        const generic = role === "mono" || /mono/i.test(fam) ? "monospace" : /serif/i.test(fam) ? "serif" : "sans-serif";
+        const generic = genericFor(fam, role);
         return h("div", { class: "ty-role" }, h("span", { class: "ty-role-k" }, label), h("span", { class: "ty-role-fam", style: `font-family:'${fam}', ${generic}` }, fam));
       }),
     );
@@ -11188,7 +11220,7 @@ class HctApp extends HTMLElement {
       if (!s) return false;
       const role = scale.roleOf[cat] || "body";
       const fam = scale.fonts[role] || "Inter";
-      const generic = role === "mono" || /mono/i.test(fam) ? "monospace" : /serif/i.test(fam) ? "serif" : "sans-serif";
+      const generic = genericFor(fam, role);
       const token = `type-${kebab(cat)}-${kebab(step)}`;
       const tt = s.textTransform && s.textTransform !== "none" ? `text-transform:${s.textTransform};` : "";
       const faceStyle =
@@ -11834,7 +11866,7 @@ class HctApp extends HTMLElement {
         "div",
         { class: "tyi-fonts" },
         ...Object.entries(scale.fonts).map(([role, family]) => {
-          const generic = role === "mono" || /mono/i.test(family) ? "monospace" : /serif/i.test(family) ? "serif" : "sans-serif";
+          const generic = genericFor(family, role);
           const custom = !!(cfg.fonts && cfg.fonts[role]);
           return h(
             "div",
@@ -11964,7 +11996,7 @@ class HctApp extends HTMLElement {
     const main = roles.find((r) => r.suffix === "");
     const onMain = roles.find((r) => r.suffix === "-on-" + sl);
     const hStep = scale.categories["Heading"].MD, bStep = scale.categories.Body.MD;
-    const fam = (cat) => { const fm = scale.fonts[scale.roleOf[cat]] || "Inter"; const g = /mono/i.test(fm) ? "monospace" : /serif/i.test(fm) ? "serif" : "sans-serif"; return `'${fm}', ${g}`; };
+    const fam = (cat) => { const role = scale.roleOf[cat]; const fm = scale.fonts[role] || "Inter"; return `'${fm}', ${genericFor(fm, role)}`; };
     return h(
       "div",
       { class: "example-card tyi-example", style: "background:" + pick(byKey.surface) },
@@ -13451,7 +13483,7 @@ class HctApp extends HTMLElement {
     if (!s) return false;
     const role = scale.roleOf[cat] || "body";
     const fam = scale.fonts[role] || "Inter";
-    const generic = role === "mono" || /mono/i.test(fam) ? "monospace" : /serif/i.test(fam) ? "serif" : "sans-serif";
+    const generic = genericFor(fam, role);
     const tt = s.textTransform && s.textTransform !== "none" ? `text-transform:${s.textTransform};` : "";
     return h(
       "div",

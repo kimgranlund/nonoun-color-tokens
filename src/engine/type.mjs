@@ -121,6 +121,27 @@ export const DEFAULT_TYPE = { treatment: "product", bodyBase: 16 };
 // family per role (config.fonts in typeScale); it exports + renders if installed, else falls back to a generic.
 export const BUNDLED_FONTS = ["Inter", "Inter Tight", "Source Serif 4", "JetBrains Mono"];
 
+// genericFor(family, role) — the CSS generic a font-family stack should end with, so an unloaded/uninstalled
+// face (the Figma plugin, offline, or the brief font-display swap) falls back to the RIGHT style, not always
+// sans. A plain `/serif/.test(name)` mislabels almost every serif (Bodoni Moda, Sabon, Playfair, Prata…) and
+// every typewriter/mono face (Courier Prime, Prestige Elite, VT323…) as sans, because the category rarely
+// lives in the name. So: the mono ROLE forces monospace (a code slot needs mono metrics regardless of face);
+// otherwise a curated set (idiosyncratic names) + keyword rules classify the family. Validated against all
+// 202 designed families. Unknowns default to sans-serif.
+const FONT_GENERIC_SERIF = new Set(["bodoni", "bodoni moda", "sabon", "prata", "spectral", "lora", "bitter", "kazimir", "signifier", "fournier", "plantin", "miller", "miller text", "caledonia", "new caledonia", "charter", "chaparral", "cheltenham", "cheltenham bold", "cooper old style", "cardo", "mrs eaves", "mrs eaves xl", "tiempos text", "freight text", "sentinel", "archer", "giza", "serifa", "rockwell", "abril fatface", "rozha one", "chonburi", "sorts mill goudy", "goudy text", "fette fraktur", "graffonti", "kaufmann", "bello", "davida", "aachen bold", "rosewood", "ultra", "cooper black", "broadway", "p22 secession", "stardos stencil", "amiri", "aref ruqaa", "shippori mincho", "gt sectra", "gt sectra display", "iowan old style", "williams caslon text", "im fell english", "bembo book", "cormorant", "fraunces", "newsreader", "crimson pro", "alegreya", "ff tisa", "itc souvenir", "itc benguiat", "itc serif gothic", "clarendon", "zilla slab", "times new roman", "georgia", "didot", "trajan", "cinzel", "playfair display", "bookman old style", "adobe jenson", "arnold bocklin", "arnold boecklin", "american typewriter", "itc american typewriter", "lxgw wenkai"]);
+const FONT_GENERIC_SANS = new Set(["optima", "optima nova", "futura", "jost", "gill sans", "frutiger", "univers", "interstate", "verlag", "gotham", "knockout", "neutraface", "eurostile", "eurostile bold extended", "monument extended", "druk", "druk text", "druk condensed", "clash display", "satoshi", "sohne", "söhne", "marianne", "familjen grotesk", "hanken grotesk", "untitled sans", "pretendard", "national park", "oswald", "architype bayer", "bungee", "data 70", "forma djr", "forma djr micro", "forma djr text", "helvetica now text", "zen kaku gothic antique", "zen kaku gothic new", "cronos", "kanit", "reem kufi", "baloo 2", "mukta", "sarabun", "highway gothic (fhwa series)", "neuzeit grotesk", "copperplate gothic", "alternate gothic"]);
+const FONT_GENERIC_MONO = new Set(["courier", "courier prime", "prestige elite", "letter gothic", "nitti", "ff trixie", "trixie", "vt323", "ocr-a", "ocr-b"]);
+export function genericFor(family, role) {
+  if (role === "mono") return "monospace";
+  const k = String(family || "").toLowerCase().trim();
+  if (FONT_GENERIC_MONO.has(k)) return "monospace";
+  if (FONT_GENERIC_SANS.has(k)) return "sans-serif";
+  if (FONT_GENERIC_SERIF.has(k)) return "serif";
+  if (/\bmono\b|\bcode\b|courier|consol|typewriter/.test(k)) return "monospace";
+  if (/serif|\bslab\b|garamond|caslon|didot|minion|schoolbook|mincho|goudy|fraktur|\bfell\b/.test(k)) return "serif";
+  return "sans-serif";
+}
+
 // `overrides` (optional) — a flat per-cell SIZE override map keyed "<voiceName>|<stepName>", already
 // mode-selected by the caller. When a positive number exists for a step, it REPLACES the derived size and
 // the line-height RE-DERIVES from it (lineHeight = round(size · leading)); tracking + weight stay as the

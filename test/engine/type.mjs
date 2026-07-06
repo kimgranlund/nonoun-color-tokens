@@ -314,6 +314,15 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(!nCol.variables["weight-style/Body"] && nCol.variables["weight/Body"], "an unnamed voice keeps its numeric weight primitive but gets no style var");
 }
 
+// ── genericFor: the CSS generic a font stack falls back to (serif/sans/mono) when the face isn't loaded/
+//    installed. The old `/serif/.test(name)` mislabelled nearly every serif + typewriter face as sans.
+ok(T.genericFor("Bodoni Moda") === "serif" && T.genericFor("Playfair Display") === "serif" && T.genericFor("Sabon") === "serif" && T.genericFor("Times New Roman") === "serif" && T.genericFor("Clarendon") === "serif" && T.genericFor("American Typewriter") === "serif", "genericFor: serif/slab faces → serif (even with no 'serif' in the name)");
+ok(T.genericFor("Futura") === "sans-serif" && T.genericFor("Jost") === "sans-serif" && T.genericFor("Optima") === "sans-serif" && T.genericFor("Gill Sans") === "sans-serif" && T.genericFor("Inter") === "sans-serif" && T.genericFor("Kanit") === "sans-serif", "genericFor: sans faces → sans-serif");
+ok(T.genericFor("Courier Prime") === "monospace" && T.genericFor("Prestige Elite") === "monospace" && T.genericFor("VT323") === "monospace" && T.genericFor("IBM Plex Mono") === "monospace", "genericFor: mono/typewriter faces → monospace (even with no 'mono' in the name)");
+ok(T.genericFor("Playfair Display", "mono") === "monospace", "genericFor: the mono ROLE forces monospace regardless of the face (code slot needs mono metrics)");
+ok(T.genericFor("Space Mono") === "monospace" && T.genericFor("Space Grotesk") === "sans-serif" && T.genericFor("Zilla Slab") === "serif", "genericFor: keyword rules (mono→mono, grotesk→sans, slab→serif)");
+ok(T.genericFor("Some Unknown Face") === "sans-serif" && T.genericFor("") === "sans-serif" && T.genericFor(undefined) === "sans-serif", "genericFor: unknown/empty → sans-serif default");
+
 if (fails.length) { console.error(`type FAIL (${fails.length}):\n  ` + fails.join("\n  ")); process.exit(1); }
 console.log("type PASS — modular scale, optical tracking, treatments, CSS + DTCG + Figma-modes emit");
 process.exit(0);
