@@ -744,6 +744,9 @@ ok(
   "(x) applyToFigma posts {pluginMessage:{type:'apply', dtcg}} — the UI→sandbox bridge contract",
 );
 ok(!posted.pluginMessage.rebuildSemantic, "(x) a normal apply does NOT set rebuildSemantic (existing variable positions kept)");
+// the LIVE path: the posted message also carries floatPlans (_figmaFloatPlans()) — the sandbox's
+// applyFloatPlans creates the Typography/Geometry breakpoint collections from this, alongside dtcg.
+ok(Array.isArray(posted.pluginMessage.floatPlans), "(x) applyToFigma's posted message carries a floatPlans array (the live Type/Geometry apply path)");
 // the opt-in Regroup path posts rebuildSemantic:true so code.js re-creates Color Modes in grouped order
 posted = null;
 const realConfirm = globalThis.confirm;
@@ -1489,6 +1492,22 @@ ok(app._figmaFloatPlans().every((p) => p.collection !== "Typography") && app._fi
 app.exportSystems = { color: true, type: false, geometry: false };
 ok(app._figmaFloatPlans().length === 0, "(ty-fig) Type + Geometry OFF → no float plans applied");
 app.exportSystems = { color: true, type: true, geometry: true }; // restore
+// (t-bake) downloadFigmaPlugin BAKES this project's breakpoint plans into the downloaded code.js — the
+// standalone binder has no postMessage channel to this UI, so app.js string-replaces the FLOAT_PLANS
+// injection anchor at download time (with type+geometry ON + the 768 breakpoint set up above, the baked
+// plans are non-empty). The code.js download is deferred a real 150ms (see downloadFigmaPlugin).
+{
+  let capturedCode = null;
+  const realDl2 = app.download.bind(app);
+  app.download = (content, name) => { if (name === "code.js") capturedCode = content; };
+  app.downloadFigmaPlugin();
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  app.download = realDl2;
+  ok(!!capturedCode, "(t-bake) downloadFigmaPlugin emits a code.js (after its deferred setTimeout)");
+  ok(!!capturedCode && !capturedCode.includes("__NONOUN_FLOAT_PLANS__"), "(t-bake) the emitted code.js has the FLOAT_PLANS anchor comment replaced (no longer present)");
+  ok(!!capturedCode && /JSON\.parse\("\[\{/.test(capturedCode), "(t-bake) the emitted code.js's FLOAT_PLANS is a JSON.parse'd non-empty array literal");
+  ok(app._figmaFloatPlans().length > 0, "(t-bake) with type+geometry ON + a breakpoint configured, _figmaFloatPlans() (what gets baked) is non-empty");
+}
 // Phase 2: common-breakpoint quick-pick chips flank the min-width field (the number field stays for custom).
 const tPresets = () => walk(app, (e) => e.classList && e.classList.contains("mode-preset"));
 ok(tPresets().length === 5, `(ty-bp) the breakpoint editor offers the 5 standard width quick-picks (got ${tPresets().length})`);

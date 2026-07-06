@@ -32,6 +32,101 @@ const PALETTES = [
   "warning",
 ];
 
+// ── breakpoint-moded Type/Geometry (baked at download time) ──────────────────────────────
+// Color modes are ALIASES to already-imported raw primitives (the cascade above), so they can only be
+// bound live. Type/Geometry breakpoint modes are pure LITERAL float values — nothing to alias — so they
+// can be carried as DATA: app.js's downloadFigmaPlugin() string-replaces this anchor with the current
+// project's _figmaFloatPlans() at download time. Default [] = the generic/asset form (no breakpoints
+// baked in) — a no-op, so the checked-in binder stays palette-agnostic.
+const FLOAT_PLANS = JSON.parse("[]"); /* __NONOUN_FLOAT_PLANS__ */
+
+// FLOAT_REGISTRY_KEY — the PROVENANCE registry for the breakpoint-moded Type/Geometry collections, a
+// name→collectionId map stored in root pluginData (travels with the .fig, like the palette set). Kept
+// as the SAME key string as figma/plugin/code.js so the flagship plugin and this binder converge on the
+// SAME collections idempotently if a user runs both against one file.
+const FLOAT_REGISTRY_KEY = "nonoun-color-tokens-float-collections";
+
+// MIRRORS figma/plugin/code.js's float executor: readFloatRegistry/writeFloatRegistry/
+// ensureFloatCollection/varsByName/applyFloatPlans are ported VERBATIM — a pure DATA executor (no
+// planner to spec-gate against), using only figma.variables.* + figma.root.get/setPluginData, both
+// available to any plugin (no color-specific state). The executable bodies MUST stay byte-identical to
+// the flagship (the surrounding comments may differ); the `floatparity` gate in test/figma/binder.mjs
+// enforces it by comparing comment-stripped bodies, so running both converges on ONE collection set.
+function readFloatRegistry() {
+  const raw = figma.root.getPluginData(FLOAT_REGISTRY_KEY);
+  if (!raw) return {};
+  try { const r = JSON.parse(raw); return r && typeof r === "object" ? r : {}; } catch (e) { return {}; }
+}
+function writeFloatRegistry(reg) { figma.root.setPluginData(FLOAT_REGISTRY_KEY, JSON.stringify(reg)); }
+
+// ensureFloatCollection — OUR managed Type/Geometry collection for `name`, by PROVENANCE (the registry's
+// stored id), creating + registering it if absent. Unlike ensureCollection (color, below), it NEVER
+// adopts a same-named collection it didn't create — so applyFloatPlans' rename/prune can't ever hit a
+// user's own "Typography"/"Geometry". A user manual-rename survives (we track id, not name); a
+// user-deleted one is re-created. `reg` is mutated in place; the caller persists it once via writeFloatRegistry.
+async function ensureFloatCollection(name, reg) {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const known = reg[name] && cols.find((c) => c.id === reg[name]);
+  if (known) return known;
+  const made = figma.variables.createVariableCollection(name);
+  reg[name] = made.id;
+  return made;
+}
+
+async function varsByName(collectionId) {
+  const all = await figma.variables.getLocalVariablesAsync();
+  const m = {};
+  for (const v of all) if (v.variableCollectionId === collectionId) m[v.name] = v;
+  return m;
+}
+
+// applyFloatPlans — execute the UI-computed apply PLANS that figma/binder/mode-apply-plan.mjs produces
+// (one entry per collection: { collection, modes, defaultMode:"Base", addModes, variables:[{name,type,
+// values:[{mode,value}]}] }). The plan is pure DATA the UI already ran validateModeInterchange + ordering
+// over, so this stays a thin EXECUTOR — there is no planner to inline or parity-gate (unlike the color
+// cascade above, which mirrors the role table). Idempotent: collections, modes, and variables are
+// reconciled BY NAME and stale ones pruned, so re-applying after a breakpoint/voice change converges the
+// file to exactly the current plan (never doubling, never leaving a removed breakpoint's mode behind).
+async function applyFloatPlans(plans) {
+  let collections = 0, variables = 0;
+  const reg = readFloatRegistry(); // provenance: only ever touch a collection NONOUN created (see ensureFloatCollection)
+  for (const plan of (Array.isArray(plans) ? plans : [])) {
+    if (!plan || !plan.collection || !Array.isArray(plan.modes) || !plan.modes.length) continue;
+    const coll = await ensureFloatCollection(plan.collection, reg);
+    // The collection's DEFAULT mode (Figma rejects removing it) — rename it to the plan's first mode ("Base");
+    // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a NONOUN-created
+    // collection they coincide, but a foreign same-named collection's default may not be the first mode, and
+    // pruning it would throw. (The headless mock has no defaultModeId → falls back to modes[0].)
+    const defaultId = coll.defaultModeId || coll.modes[0].modeId;
+    coll.renameMode(defaultId, plan.defaultMode);
+    const findMode = (nm) => coll.modes.find((m) => m.name.toLowerCase() === String(nm).toLowerCase());
+    const modeId = {};
+    modeId[plan.defaultMode] = defaultId;
+    for (const nm of plan.addModes) { const ex = findMode(nm); modeId[nm] = ex ? ex.modeId : coll.addMode(nm); }
+    // prune stale modes (a breakpoint the user removed) — never the default, never the last remaining mode.
+    const wanted = new Set(plan.modes.map((m) => String(m).toLowerCase()));
+    for (const m of coll.modes.slice()) {
+      if (m.modeId === defaultId) continue;
+      if (!wanted.has(m.name.toLowerCase()) && coll.modes.length > 1) coll.removeMode(m.modeId);
+    }
+    // variables: create-or-reuse by name; write every mode's value; prune orphans scoped to THIS collection.
+    const byName = await varsByName(coll.id);
+    const current = new Set();
+    for (const v of plan.variables) {
+      const vr = byName[v.name] || figma.variables.createVariable(v.name, coll, v.type || "FLOAT");
+      for (const pair of v.values) {
+        const mid = modeId[pair.mode];
+        if (mid != null && Number.isFinite(Number(pair.value))) vr.setValueForMode(mid, Number(pair.value));
+      }
+      byName[v.name] = vr; current.add(v.name); variables++;
+    }
+    for (const name of Object.keys(byName)) if (!current.has(name)) byName[name].remove();
+    collections++;
+  }
+  writeFloatRegistry(reg); // persist the name→id provenance map (any newly-created collections)
+  return { collections: collections, variables: variables };
+}
+
 // refKey: mirror of semantic.js / bind-plan.mjs. Solid stops zero-pad to 3 digits
 // ("50" -> "050"); scrim refs ("500-200") keep the "-step" suffix and pad the base stop.
 function refKey(ref) {
@@ -159,53 +254,69 @@ function targetName(paletteName, ref) {
 async function main() {
   const collections = await figma.variables.getLocalVariableCollectionsAsync();
   const rawColl = collections.find((c) => c.name === RAW_COLLECTION);
-  if (!rawColl) {
+
+  // Color and Type/Geometry breakpoints are INDEPENDENT — neither aborts the other. Color needs a live
+  // "Color Primitives" collection to alias against (skipped, not fatal, when absent); the breakpoint
+  // collections are baked data (FLOAT_PLANS) that need nothing from the file.
+  let bound = 0;
+  const missing = [];
+  if (rawColl) {
+    // 1. Index the Color Primitives variables by name.
+    const allVars = await figma.variables.getLocalVariablesAsync();
+    const rawVars = {};
+    for (const v of allVars) {
+      if (v.variableCollectionId === rawColl.id) rawVars[v.name] = v;
+    }
+
+    // 2. Create/find the Color Modes collection with Light + Dark modes.
+    let sem = collections.find((c) => c.name === SEMANTIC_COLLECTION);
+    if (!sem) sem = figma.variables.createVariableCollection(SEMANTIC_COLLECTION);
+    const lightMode = sem.modes[0].modeId;
+    const darkMode = (sem.modes[1] && sem.modes[1].modeId) || sem.addMode("Dark");
+
+    // 3. For each palette and role, resolve lt/dt = rawVars["{n}/{refKey(...)}"] and alias both
+    //    modes by reference (the cascade). Mirrors bind-plan.mjs.bindingPlan.
+    for (const n of PALETTES) {
+      for (const r of roleTable(n)) {
+        const ltName = targetName(n, r.light);
+        const dtName = targetName(n, r.dark);
+        const lt = rawVars[ltName];
+        const dt = rawVars[dtName];
+        if (!lt) { missing.push(ltName); continue; }
+        if (!dt) { missing.push(dtName); continue; }
+
+        const semName = n + "/" + r.key;
+        const refreshed = await figma.variables.getLocalVariablesAsync();
+        const semVar =
+          refreshed.find((v) => v.variableCollectionId === sem.id && v.name === semName) ||
+          figma.variables.createVariable(semName, sem, "COLOR");
+
+        semVar.setValueForMode(lightMode, figma.variables.createVariableAlias(lt));
+        semVar.setValueForMode(darkMode, figma.variables.createVariableAlias(dt));
+        bound++;
+      }
+    }
+  }
+
+  // 4. Type/Geometry breakpoint-moded FLOAT collections — baked at download time (see FLOAT_PLANS above).
+  //    A no-op (fp stays null) for the generic/asset checked-in binder, whose FLOAT_PLANS is [].
+  let fp = null;
+  if (FLOAT_PLANS.length) fp = await applyFloatPlans(FLOAT_PLANS);
+
+  if (!rawColl && !fp) {
     figma.notify('No "Color Primitives" collection found — apply your palette in Color Tokens first, then run the Binder.', { error: true });
     figma.closePlugin();
     return;
   }
 
-  // 1. Index the Color Primitives variables by name.
-  const allVars = await figma.variables.getLocalVariablesAsync();
-  const rawVars = {};
-  for (const v of allVars) {
-    if (v.variableCollectionId === rawColl.id) rawVars[v.name] = v;
-  }
-
-  // 2. Create/find the Color Modes collection with Light + Dark modes.
-  let sem = collections.find((c) => c.name === SEMANTIC_COLLECTION);
-  if (!sem) sem = figma.variables.createVariableCollection(SEMANTIC_COLLECTION);
-  const lightMode = sem.modes[0].modeId;
-  const darkMode = (sem.modes[1] && sem.modes[1].modeId) || sem.addMode("Dark");
-
-  // 3. For each palette and role, resolve lt/dt = rawVars["{n}/{refKey(...)}"] and alias both
-  //    modes by reference (the cascade). Mirrors bind-plan.mjs.bindingPlan.
-  let bound = 0;
-  const missing = [];
-  for (const n of PALETTES) {
-    for (const r of roleTable(n)) {
-      const ltName = targetName(n, r.light);
-      const dtName = targetName(n, r.dark);
-      const lt = rawVars[ltName];
-      const dt = rawVars[dtName];
-      if (!lt) { missing.push(ltName); continue; }
-      if (!dt) { missing.push(dtName); continue; }
-
-      const semName = n + "/" + r.key;
-      const refreshed = await figma.variables.getLocalVariablesAsync();
-      const semVar =
-        refreshed.find((v) => v.variableCollectionId === sem.id && v.name === semName) ||
-        figma.variables.createVariable(semName, sem, "COLOR");
-
-      semVar.setValueForMode(lightMode, figma.variables.createVariableAlias(lt));
-      semVar.setValueForMode(darkMode, figma.variables.createVariableAlias(dt));
-      bound++;
-    }
-  }
-
-  figma.notify(
-    "Bound " + bound + " roles" + (missing.length ? (", " + missing.length + " skipped (raw colour missing)") : "")
+  const parts = [];
+  parts.push(
+    rawColl
+      ? "Bound " + bound + " colour role" + (bound === 1 ? "" : "s") + (missing.length ? (", " + missing.length + " skipped (raw colour missing)") : "")
+      : 'Colour skipped — no "Color Primitives" collection',
   );
+  if (fp) parts.push(fp.collections + " breakpoint collection" + (fp.collections === 1 ? "" : "s") + ", " + fp.variables + " sized var" + (fp.variables === 1 ? "" : "s"));
+  figma.notify(parts.join(" · "));
   figma.closePlugin();
 }
 

@@ -6733,10 +6733,21 @@ class HctApp extends HTMLElement {
 
   // downloadFigmaPlugin — the Color Tokens Semantic Binder plugin's two files (manifest.json +
   // code.js). Drop both into one folder, then Figma → Plugins → Development → Import
-  // plugin from manifest. It creates the raw→semantic alias cascade native import can't.
+  // plugin from manifest. It creates the raw→semantic alias cascade native import can't — AND bakes
+  // this project's Type/Geometry breakpoint apply plans (_figmaFloatPlans, already validated + ordered)
+  // into the downloaded code.js by replacing its injection anchor, so the standalone binder (no
+  // postMessage channel to this UI) can still create the Typography/Geometry breakpoint-moded
+  // collections the live "Apply to Figma" path gets for free. JSON-string-parse pattern: the plans are
+  // JSON.stringify'd TWICE so the result is a bulletproof-escaped JS string literal the binder
+  // JSON.parses at runtime (no JS-literal injection hazard).
   downloadFigmaPlugin() {
+    const anchor = 'JSON.parse("[]"); /* __NONOUN_FLOAT_PLANS__ */';
+    const plans = this._figmaFloatPlans(); // [] when type+geometry both off / no breakpoints
+    const injected = FIGMA_PLUGIN.code.includes(anchor)
+      ? FIGMA_PLUGIN.code.replace(anchor, "JSON.parse(" + JSON.stringify(JSON.stringify(plans)) + "); /* injected */")
+      : FIGMA_PLUGIN.code; // defensive: anchor not found — ship the plugin unchanged rather than fail the download
     this.download(FIGMA_PLUGIN.manifest, "manifest.json");
-    setTimeout(() => this.download(FIGMA_PLUGIN.code, "code.js"), 150);
+    setTimeout(() => this.download(injected, "code.js"), 150);
   }
 
   // downloadBrandKitMcp — hand the user a ready-to-run Brand-Kit MCP package as one .zip: the zero-dep
