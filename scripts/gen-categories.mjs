@@ -161,7 +161,9 @@ const TYPE_BASES = ["product", "luxury", "editorial", "technical", "statement"];
 function design5ToTypeConfig(t) {
   if (!t || typeof t !== "object" || !t.slots || typeof t.slots !== "object") return null;
   const out = { treatment: TYPE_BASES.includes(t.base) ? t.base : "product" };
-  if (Number.isFinite(t.bodyBase)) out.bodyBase = t.bodyBase;
+  // clamp bodyBase to persist.clampType's [10,32] range so the emitted preset matches its hydrated form
+  // (an out-of-range designed bodyBase would otherwise differ preset-vs-doc after clampType).
+  if (Number.isFinite(t.bodyBase)) out.bodyBase = Math.max(10, Math.min(32, Math.round(t.bodyBase)));
   const fonts = {}, voices = {};
   for (const role of ["display", "heading", "body", "ui", "mono"]) {
     const s = t.slots[role];

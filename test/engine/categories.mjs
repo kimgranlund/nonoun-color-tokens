@@ -12,6 +12,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SPECDIR = join(HERE, "..", "..", ".claude", "docs", "spec", "colors", "categories");
 const CATS = ["architecture", "cuisine", "film", "literature", "music", "nature", "travel"];
 const ROLES = ["display", "heading", "body", "ui", "mono"];
+// slot ROLE → the primary voice the mapper (gen-categories.design5ToTypeConfig) shapes with the slot's
+// tracking/leading/weight. Kept in lockstep with TYPE_VOICE_OF there — the fidelity gate below leans on it.
+const VOICE_OF = { display: "Display", heading: "Heading", body: "Body", ui: "UI", mono: "Kicker" };
 // the make11 / clampType voice allowlist — a voice NOT here is SILENTLY DROPPED by clampType on hydrate,
 // so the mapper emitting an off-list name (e.g. "Mono") would lose that voice with no error. Keep in lockstep.
 const VOICES = ["Display", "Heading", "Sub-heading", "Kicker", "Lead", "Body", "Quote", "Caption", "UI", "Code", "Legal"];
@@ -35,8 +38,15 @@ for (const slug of CATS) {
   totalPresets += PRESETS.length;
 
   PRESETS.forEach((p, i) => {
+    const sd = specPals[i]?.type?.slots;
+    // a spec palette is "designed" iff its type carries ≥1 font — exactly when the mapper yields a config
+    // (gen-categories returns null otherwise). Gate on the IFF, not on "100% seeded", so a future
+    // un-designed palette doesn't redden this suite for a non-bug.
+    const specDesigned = !!(sd && ROLES.some((r) => typeof sd[r]?.font === "string" && sd[r].font.trim()));
     const t = p.type;
-    if (!t) { FAIL("hastype", `${slug}[${i}] "${p.name}" has no type`); return; }
+    if (specDesigned && !t) { FAIL("hastype", `${slug}[${i}] spec is designed but preset dropped its type`); return; }
+    if (!specDesigned && t) { FAIL("hastype", `${slug}[${i}] preset has type but the spec palette isn't designed`); return; }
+    if (!t) return; // legitimately un-designed → falls back to the global default (covered by the negative control)
     totalTyped++;
     // (a) 5 non-empty font roles
     for (const r of ROLES) if (typeof t.fonts?.[r] !== "string" || !t.fonts[r].trim()) FAIL("fonts", `${slug}[${i}] missing font role ${r}`);
@@ -47,9 +57,17 @@ for (const slug of CATS) {
     if (!vk.length) FAIL("voices", `${slug}[${i}] no voices`);
     for (const v of vk) if (!VOICES.includes(v)) FAIL("voices", `${slug}[${i}] off-allowlist voice "${v}" (clampType would drop it)`);
     if (!vk.includes("Kicker")) FAIL("kicker", `${slug}[${i}] mono did not map to Kicker`);
-    // (d) generator FAITHFUL to the spec: preset fonts == the spec palette's design fonts
-    const sd = specPals[i]?.type?.slots;
-    if (sd) for (const r of ROLES) if (sd[r]?.font && sd[r].font !== t.fonts[r]) FAIL("faithful", `${slug}[${i}] ${r}: preset ${t.fonts[r]} != spec ${sd[r].font}`);
+    // (d) generator FAITHFUL to the spec: preset fonts AND the mapped primary-voice tracking/leading/weight
+    //     match the spec palette's design VALUES (not just fonts) — so an in-range-but-wrong param, or a
+    //     dropped non-Kicker voice at generation, can't ship green (the guard PR2's mass param change needs).
+    if (sd) for (const r of ROLES) {
+      const s = sd[r]; if (!s) continue;
+      if (s.font && s.font !== t.fonts[r]) FAIL("faithful", `${slug}[${i}] ${r} font: preset ${t.fonts[r]} != spec ${s.font}`);
+      const vv = t.voices?.[VOICE_OF[r]] || {};
+      if (Number.isFinite(s.trackingEm) && vv.tracking !== s.trackingEm) FAIL("faithful", `${slug}[${i}] ${r} tracking: preset ${vv.tracking} != spec ${s.trackingEm}`);
+      if (Number.isFinite(s.leading) && vv.leading !== s.leading) FAIL("faithful", `${slug}[${i}] ${r} leading: preset ${vv.leading} != spec ${s.leading}`);
+      if (Number.isFinite(s.weight) && vv.weight !== s.weight) FAIL("faithful", `${slug}[${i}] ${r} weight: preset ${vv.weight} != spec ${s.weight}`);
+    }
     // (e) typeScale RESOLVES the design fonts (the picker reads scale.fonts[role])
     const sc = typeScale(t);
     if (!eq(sc.fonts, t.fonts)) FAIL("resolve", `${slug}[${i}] typeScale.fonts != type.fonts`);
