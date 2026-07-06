@@ -140,8 +140,10 @@ rest of the body to begin after it so the card truncates on a complete thought
 > Color Primitives and Color Modes, aliased so a raw-color edit cascades to every role. Or serve it to your
 > AI coding agents over **MCP**, so they build with your exact tokens instead of guessing a hex; the free
 > Ultimate Tokens **Claude plugin** teaches the agent which of the 59 roles to apply where. Or export a
-> **Claude Design** bundle — `tokens.json`, a `DESIGN.md` generation prompt, and preview cards — that a
-> vision-capable Claude reads to generate on-brand screens from your system, free on every tier.
+> **design system** for the AI design tools you use — `tokens.json`, a `DESIGN.md` generation prompt, and
+> preview cards, in a target each for **Claude** (`claude.ai/design` and Claude Code), **Google Stitch**,
+> and **Figma Make** — so whichever one you reach for generates on-brand screens from your system, free on
+> every tier.
 >
 > ### What Pro unlocks
 > Free gives you the full generator and two brand kits — enough to ship a real system. **Pro removes the
@@ -206,7 +208,7 @@ bullets + FAQ only.
 • Figma variables — semantic binding cascade + breakpoint modes
 • Brand-Kit MCP — feed your exact tokens to Claude, Cursor, VS Code
 • Free Claude plugin — your coding agent applies your exact roles, not a guess
-• Claude Design bundle — hand your kit to Claude to generate on-brand screens (free)
+• Design-system export — hand your kit to Claude, Google Stitch, or Figma Make to generate on-brand UI (free)
 • Free Figma plugin, fully offline
 • Your data stays in your browser / your file
 ```
@@ -255,8 +257,8 @@ bullets + FAQ only.
 >
 > **What can I export?**
 > CSS custom properties, W3C design tokens (DTCG), Tailwind, and shadcn — plus Figma variables, a
-> Brand-Kit MCP server for AI agents, and a Claude Design bundle a vision-capable Claude reads to generate
-> on-brand screens.
+> Brand-Kit MCP server for AI agents, and a design-system export in a target each for Claude
+> (`claude.ai/design` and Claude Code), Google Stitch, and Figma Make to generate on-brand UI.
 >
 > **Can I match my team's variable names?**
 > Yes. Pick a naming convention in **Settings → Export** and every export — colour, type, and geometry —
@@ -269,10 +271,11 @@ bullets + FAQ only.
 > (`/plugin marketplace add kimgranlund/nonoun-color-tokens`) — it teaches the agent which of the 59
 > semantic roles belongs on each surface, binding to your project's real exported variables.
 >
-> **Can Claude generate a UI from my kit?**
-> Yes — export the **Claude Design** bundle (free on every tier). It's `tokens.json`, a `DESIGN.md`
-> generation prompt carrying your kit's own guardrails, and preview cards: the three layers a
-> vision-capable Claude reads at `claude.ai/design` to generate on-brand screens from your system.
+> **Can an AI design tool generate a UI from my kit?**
+> Yes — export a design system (free on every tier). One core — a `DESIGN.md` generation prompt carrying
+> your kit's own guardrails plus a `tokens.json` carrier — lands as a target for each of three tools:
+> **Claude** (both `claude.ai/design`, where a vision-capable Claude reads it, and Claude Code), **Google
+> Stitch**, and **Figma Make**. Each generates on-brand screens from your system.
 >
 > **Where is my data stored?**
 > In your browser and your Figma file. Nothing is uploaded; the only network call is the one that validates

@@ -47,8 +47,9 @@ collections.
   films, biomes… and carrying their story. Open any one as an editable copy. Each category's data is
   lazy-loaded.
 - **Exports.** CSS (Hex or **OKLCH**), **Tailwind v4**, **shadcn/ui**, **Figma** variables,
-  **Figma UI3** (Material), **DTCG**, **JSON**, a **Claude Design** bundle (`tokens.json` +
-  `DESIGN.md` + preview components, for generating on-brand UI with Claude), a re-importable parametric
+  **Figma UI3** (Material), **DTCG**, **JSON**, a **design-system export** (`DESIGN.md` +
+  `tokens.json` + preview cards, in a target each for Claude (`claude.ai/design` and Claude Code),
+  Google Stitch, and Figma Make to generate on-brand UI), a re-importable parametric
   **Config**, and a **Download-all `.zip`**. An **Include** toggle row picks which token systems — **Color · Typography ·
   Geometry** — ride the Download-All `.zip` and the Brand-Kit MCP.
 - **Typography.** The type analog of the color engine — a few params → a **systematic type scale** of
