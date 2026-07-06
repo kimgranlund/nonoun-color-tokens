@@ -5,7 +5,7 @@ description: >
   color/hue/palette/role for a button, control, text, card, modal, nav, toast, border, or state
   ("which color should this use", "what token for this background/text", "add hover/disabled colors",
   "wire the color theme", "make the colors work in dark mode", "why is this the wrong color"). The
-  consumption guide for the 59-role semantic COLOR layer: how to find and bind the project's exported
+  consumption guide for the 53-role semantic COLOR layer: how to find and bind the project's exported
   palettes, the pairing laws that keep every foreground on a legal background, the state families, and
   per-surface role maps for interactive elements, text, containers, feedback, and navigation. Never
   guess a hex and never use a raw stop — this names the semantic role for every job. Scope is COLOR
@@ -14,7 +14,7 @@ description: >
 
 # Using Ultimate Tokens color roles
 
-An Ultimate Tokens export gives every palette the same **59 semantic roles** as CSS custom
+An Ultimate Tokens export gives every palette the same **53 semantic roles** as CSS custom
 properties. Your job is never to invent a color — it is to pick the right **role** from the right
 **palette**. Raw stops exist only as the substrate the roles reference.
 

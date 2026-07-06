@@ -73,7 +73,7 @@ const favHref = "data:image/svg+xml;base64," + Buffer.from(readFileSync(`${ROOT}
 // The GitHub Pages demo origin — og:image/og:url must be ABSOLUTE for scrapers, and the pages
 // workflow ships public/icons/ + public/favicon/ alongside the single-file demo so they resolve.
 const SITE = "https://kimgranlund.github.io/nonoun-color-tokens/";
-const DESC = "Perceptual design tokens — color ramps with 59 semantic roles, typography and geometry, exported to CSS, Tailwind v4, shadcn/ui, Figma and DTCG.";
+const DESC = "Perceptual design tokens — color ramps with 53 semantic roles, typography and geometry, exported to CSS, Tailwind v4, shadcn/ui, Figma and DTCG.";
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="${favHref}">

@@ -12,7 +12,7 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 | Maker | **NONOUN** (always uppercase) | brand mark, `public/icons/` |
 | Internal id (never customer-facing) | `nonoun-color-tokens` | `package.json` |
 | Live app | `https://kimgranlund.github.io/nonoun-color-tokens/` (until `app.nonoun.io`) | README badge |
-| Semantic roles per palette | **59**, resolved for Light + Dark | `.claude/docs/spec/data/role-table.json` `rolesPerPalette` |
+| Semantic roles per palette | **53**, resolved for Light + Dark | `.claude/docs/spec/data/role-table.json` `rolesPerPalette` |
 | Default palettes | **8** | `role-table.json` `defaults` |
 | Tonal ramp | **050–950** (19 display stops; 25 in exports with the extra stops) | `src/engine/tonal.js` `STOPS`/`EXPORT_STOPS` |
 | Color model | **OKLCH-native** source of truth; HCT/CAM16 + OKHSL modeling; HEX derived for output only | `src/engine/` |
@@ -43,7 +43,8 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 
 **Rules of use**
 
-1. Copy cites these values verbatim — "59 semantic roles", never "almost 60", never a remembered 53.
+1. Copy cites these values verbatim — "53 semantic roles" (per `role-table.json` `rolesPerPalette`),
+   never "over 50", never a remembered 59 (the pre-trim count, before the six `-variant` state roles came out).
 2. A feature behind a flag that isn't live (hosted MCP; enforcement pre-flip) is **never marketed as
    available**; "when live" phrasing or omission only.
 3. When the product changes a value, update this sheet **in the same change**, then sweep **every

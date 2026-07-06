@@ -18,7 +18,7 @@ const BANNED = [
 
 // Pinned facts (fact-sheet.md). A number next to these nouns must be the pinned value.
 const PINNED = [
-  { re: /\b(\d+)(?:[-\s]+)(?:semantic[-\s]+)?roles?\b/gi, want: "59", name: "semantic roles" },
+  { re: /\b(\d+)(?:[-\s]+)(?:semantic[-\s]+)?roles?\b/gi, want: "53", name: "semantic roles" },
   { re: /\b(\d+)\s+categories\b/gi, want: "7", name: "color categories" },
   { re: /\b(\d+)\s+(?:curated\s+)?palettes\s+(?:in\s+)?total\b/gi, want: "336", name: "total curated palettes" },
   { re: /\b(\d+)\s+composing\s+systems?\b/gi, want: "3", name: "composing systems" },

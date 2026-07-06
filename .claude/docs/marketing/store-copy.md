@@ -130,7 +130,7 @@ rest of the body to begin after it so the card truncates on a complete thought
 
 > ### Tokens, derived — not guessed
 > Ultimate Tokens turns a few perceptual decisions into a complete design system. Pick a key color and it
-> derives an even, OKLCH-true tonal ramp. Map it to **59 semantic roles** across light and dark. Compose a
+> derives an even, OKLCH-true tonal ramp. Map it to **53 semantic roles** across light and dark. Compose a
 > type scale and a geometry system from the same source — every step measured, not hand-nudged.
 >
 > ### One source, every export
@@ -139,7 +139,7 @@ rest of the body to begin after it so the card truncates on a complete thought
 > `--md-sys-*` root, or a `--{brand}-*` prefix your codebase already uses. Bind it to **Figma variables** —
 > Color Primitives and Color Modes, aliased so a raw-color edit cascades to every role. Or serve it to your
 > AI coding agents over **MCP**, so they build with your exact tokens instead of guessing a hex; the free
-> Ultimate Tokens **Claude plugin** teaches the agent which of the 59 roles to apply where. Or export a
+> Ultimate Tokens **Claude plugin** teaches the agent which of the 53 roles to apply where. Or export a
 > **design system** for the AI design tools you use — `tokens.json`, a `DESIGN.md` generation prompt, and
 > preview cards, in a target each for **Claude** (`claude.ai/design` and Claude Code), **Google Stitch**,
 > and **Figma Make** — so whichever one you reach for generates on-brand screens from your system, free on
@@ -201,7 +201,7 @@ bullets + FAQ only.
 
 ```
 • OKLCH-native — perceptually even ramps; HEX derived only for output
-• 59 semantic roles per palette, light + dark
+• 53 semantic roles per palette, light + dark
 • Three composing systems — Color · Typography · Geometry
 • Exports: CSS · DTCG · Tailwind · shadcn
 • Your own naming — Ultimate, Material 3-style --md-sys-*, or a --{brand}-* root
@@ -218,7 +218,7 @@ bullets + FAQ only.
 | | Free | Pro | Studio |
 |---|---|---|---|
 | The full generator (Color · Type · Geometry) | ✓ | ✓ | ✓ |
-| 59 semantic roles, light + dark | ✓ | ✓ | ✓ |
+| 53 semantic roles, light + dark | ✓ | ✓ | ✓ |
 | Figma plugin (offline) | ✓ | ✓ | ✓ |
 | Brand kits | Up to 2 | **Unlimited** | **Unlimited** |
 | Export suite | Core | **Complete** | **Complete** |
@@ -268,7 +268,7 @@ bullets + FAQ only.
 > **Can my AI coding agent use the kit?**
 > Two ways, both free. Download the **Brand-Kit MCP** server and point Claude Code, Cursor, or any MCP
 > agent at it to read your exact roles and resolved tokens. Or install the **Ultimate Tokens Claude plugin**
-> (`/plugin marketplace add kimgranlund/nonoun-color-tokens`) — it teaches the agent which of the 59
+> (`/plugin marketplace add kimgranlund/nonoun-color-tokens`) — it teaches the agent which of the 53
 > semantic roles belongs on each surface, binding to your project's real exported variables.
 >
 > **Can an AI design tool generate a UI from my kit?**

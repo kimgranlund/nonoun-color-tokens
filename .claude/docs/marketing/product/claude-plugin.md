@@ -15,7 +15,7 @@ Teach your coding agent to build with your exact tokens — which role goes wher
 **Short description (marketplace / README)**
 
 > A free Claude Code plugin that teaches a coding agent to *consume* an exported Ultimate Tokens kit
-> inside your own project. Three skills — **color-tokens** (which of the 59 semantic roles goes on
+> inside your own project. Three skills — **color-tokens** (which of the 53 semantic roles goes on
 > every surface), **typography-tokens** (the eleven-voice scale, role × level), **geometry-tokens**
 > (the two-tier dimensional system) — plus a **`token-integrator`** agent that wires a component or
 > migrates a whole UI onto the kit. Every skill is parity-gated against the generator's engines, so
@@ -29,7 +29,7 @@ Teach your coding agent to build with your exact tokens — which role goes wher
 > tokens first-class context the agent applies, not a convention it has to infer.
 >
 > Install it into Claude Code and it adds three consumption skills and an integration agent. Ask the
-> agent to style a component and the right skill activates: **color-tokens** enforces which of the 59
+> agent to style a component and the right skill activates: **color-tokens** enforces which of the 53
 > roles belongs on each surface and the on-colour pairing law; **typography-tokens** picks the voice
 > by the text's function and the level by its hierarchy, then derives the size from that level;
 > **geometry-tokens** applies the control-and-container dimensional system and the radius scale. The
@@ -56,7 +56,7 @@ Teach your coding agent to build with your exact tokens — which role goes wher
 **What it teaches the agent (feature bullets)**
 
 ```
-• color-tokens — which of the 59 semantic roles goes where; the on-colour pairing law, per state
+• color-tokens — which of the 53 semantic roles goes where; the on-colour pairing law, per state
 • typography-tokens — the eleven-voice scale, role × level (size derived, never guessed)
 • geometry-tokens — the two-tier dimensional system + the Material-3-aligned radius scale
 • token-integrator — binds to your real exported variables; wires a component or migrates a UI

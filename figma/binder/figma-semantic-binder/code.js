@@ -136,7 +136,7 @@ function refKey(ref) {
   return s.slice(0, dash).padStart(3, "0") + s.slice(dash);
 }
 
-// roleTable(n) — the 59 roles for a palette, name-substituted exactly as semantic.js /
+// roleTable(n) — the 53 roles for a palette, name-substituted exactly as semantic.js /
 // bind-plan.mjs produce them: accent + on-accent keys carry the palette name; shared roles do
 // not. Refs are the canonical values from data/role-table.json (validated semantic-mapping).
 // `key` is the semantic variable name part ("{n}/{key}"); `light`/`dark` feed targetName.
@@ -170,14 +170,11 @@ function roleTable(n) {
     { key: "onSurface", suffix: "-on-surface", light: "950", dark: "50" },
     { key: "onSurfaceVariant", suffix: "-on-surface-variant", light: "750", dark: "250" },
 
-    // 3b. ON-SURFACE INTERACTION STATES — shared. onSurface holds at the ceiling (950/50); onSurfaceVariant
-    //     intensifies +1/+2 step; disabled a translucent inert label on the 500 ramp. Lockstep w/ semantic.js.
+    // 3b. ON-SURFACE INTERACTION STATES — shared. onSurface holds at the ceiling (950/50); disabled a
+    //     translucent inert label on the 500 ramp. onSurfaceVariant carries NO states. Lockstep w/ semantic.js.
     { key: "onSurfaceHover", suffix: "-on-surface-hover", light: "950", dark: "50" },
     { key: "onSurfaceActive", suffix: "-on-surface-active", light: "950", dark: "50" },
     { key: "onSurfaceDisabled", suffix: "-on-surface-disabled", light: "500-400", dark: "500-400" },
-    { key: "onSurfaceVariantHover", suffix: "-on-surface-variant-hover", light: "850", dark: "150" },
-    { key: "onSurfaceVariantActive", suffix: "-on-surface-variant-active", light: "900", dark: "100" },
-    { key: "onSurfaceVariantDisabled", suffix: "-on-surface-variant-disabled", light: "500-300", dark: "500-300" },
 
     // placeholder — field placeholder text: one mirrored step MORE muted than onSurfaceVariant (650/350);
     // a SOLID stop (translucent placeholder text is the classic a11y failure), fixed per mode.
@@ -185,18 +182,13 @@ function roleTable(n) {
 
     // 4. OUTLINE — shared; on the 500 scrim ramp (light === dark).
     { key: "outline", suffix: "-outline", light: "500-600", dark: "500-600" },
-    { key: "outlineVariant", suffix: "-outline-variant", light: "500-300", dark: "500-300" },
+    { key: "outlineVariant", suffix: "-outline-variant", light: "500-300", dark: "500-300" }, // no interaction states
 
     // 4b. OUTLINE INTERACTION STATES — one strength stronger per state; disabled a faint border.
+    //     outlineVariant (the weaker divider) carries NONE. Lockstep w/ semantic.js.
     { key: "outlineHover", suffix: "-outline-hover", light: "500-700", dark: "500-700" },
     { key: "outlineActive", suffix: "-outline-active", light: "500-800", dark: "500-800" },
     { key: "outlineDisabled", suffix: "-outline-disabled", light: "500-200", dark: "500-200" },
-
-    // 4c. OUTLINE-VARIANT INTERACTION STATES — the weaker divider's states, one emphasis step fainter than
-    //     4b throughout (base 300 → hover 400 → active 500; disabled the faintest 100). Mode-independent.
-    { key: "outlineVariantHover", suffix: "-outline-variant-hover", light: "500-400", dark: "500-400" },
-    { key: "outlineVariantActive", suffix: "-outline-variant-active", light: "500-500", dark: "500-500" },
-    { key: "outlineVariantDisabled", suffix: "-outline-variant-disabled", light: "500-100", dark: "500-100" },
 
     // 5. CONTAINER — shared; on the 500 scrim ramp (light === dark).
     { key: "container", suffix: "-container", light: "500-200", dark: "500-200" },

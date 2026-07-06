@@ -42,7 +42,7 @@ directly for a small job, or as an orchestrator for a large one.
 
 They are your standing reference; invoke the one a task needs and follow its laws:
 
-- **`color-tokens`** — which of the 59 roles goes where (buttons + states, text hierarchy,
+- **`color-tokens`** — which of the 53 roles goes where (buttons + states, text hierarchy,
   containers/elevation, intents/scrims, navigation, focus). The pairing law and on-colour discipline.
 - **`typography-tokens`** — role = the text's function, level = its hierarchy depth (size derived,
   never chosen); the body-vs-ui split; line vs

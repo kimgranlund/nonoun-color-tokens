@@ -3,14 +3,14 @@ name: adding-semantic-roles
 description: >
   Use when adding or changing a semantic color role/token in nonoun-color-tokens —
   "add a semantic role", "add hover/active/disabled states", "change a role's ref",
-  any edit to src/engine/semantic.js, or a red count gate ("59 vs N"). Walks the
+  any edit to src/engine/semantic.js, or a red count gate ("53 vs N"). Walks the
   lockstep parity procedure so the answer key, Figma copy, count literals, and
   spec prose all move together.
 ---
 
 # Adding (or changing) a semantic role — nonoun-color-tokens
 
-Each palette resolves **59** roles (`semanticRoles(n)` in `src/engine/semantic.js`). The role set lives in
+Each palette resolves **53** roles (`semanticRoles(n)` in `src/engine/semantic.js`). The role set lives in
 ONE place but is **mirrored and counted in eight others**; the classic break is a half-applied count (one
 gate left at the old number — usually `test/ui/shell.mjs`). This skill is the lockstep procedure + the
 exact parity sites. The taxonomy/rationale is owned by `.claude/docs/spec` — point to it, don't re-derive it.
@@ -49,11 +49,11 @@ colors→containers→surfaces→scrims); and on-color roles can be **re-pointed
    sandbox can't import the `.mjs`). Add the identical row(s) so the binder CREATES the variable. The
    binder parity gate (`test/figma/binder.mjs`) compares the derived ref-target SET, so a row whose refs are
    already covered by another role will NOT flag a missing row — add it by discipline anyway.
-5. **Count-gate literals** (grep the current count — `59` today): update every one —
-   `test/engine/semantic.mjs` (`ROLES.length !== 59`), `test/engine/exports.mjs` (`< 59 * enabledCount`),
-   `test/figma/binder.mjs` (`!== 59 * NAMES.length`), `test/figma/plugin.mjs` (the `59 roles ×…` failure
-   *message* — `semExpect` itself is derived, not a literal), `test/ui/shell.mjs` (`p.roles.length !== 59`
-   — **easy to miss**, it lives under `ui/`), `test/ui/headless-boot.mjs` (the `(s4)` `=== 59` Figma-Light
+5. **Count-gate literals** (grep the current count — `53` today): update every one —
+   `test/engine/semantic.mjs` (`ROLES.length !== 53`), `test/engine/exports.mjs` (`< 53 * enabledCount`),
+   `test/figma/binder.mjs` (`!== 53 * NAMES.length`), `test/figma/plugin.mjs` (the `53 roles ×…` failure
+   *message* — `semExpect` itself is derived, not a literal), `test/ui/shell.mjs` (`p.roles.length !== 53`
+   — **easy to miss**, it lives under `ui/`), `test/ui/headless-boot.mjs` (the `(s4)` `=== 53` Figma-Light
    role count).
    If you changed the SCRIM count, also fix the scrim asserts: the `scrims.length !== 7` assert in
    `test/engine/semantic.mjs` and the `=== 7` group assert `(z)` in `headless-boot.mjs`.
@@ -81,8 +81,8 @@ Run the cheap pure verifiers first, then the full suite. Each prints `pass`/`FAI
 
 ```
 node test/engine/semantic.mjs    # deep-equal answer key + refs-canonical + on-colors + scrim count
-node test/engine/exports.mjs     # >= 59 × enabled leaves per mode
-node test/figma/binder.mjs       # bindingPlan length = 59 × palettes; runtime roleTable ref-set parity
+node test/engine/exports.mjs     # >= 53 × enabled leaves per mode
+node test/figma/binder.mjs       # bindingPlan length = 53 × palettes; runtime roleTable ref-set parity
 node test/figma/plugin.mjs       # semExpect cascade (derived from the bundle) — message names the count
 npm test                         # all of the above + headless-boot (s4) + shell + persist
 ```

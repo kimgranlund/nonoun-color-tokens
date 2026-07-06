@@ -4,7 +4,7 @@
 // Exit 0=pass / 1=fail; validate.py mints the signal from this status.
 //
 // Module ESM contract (./semantic.js):
-//   semanticRoles(paletteName) -> [{ key, suffix, light, dark }]   (59 rows)
+//   semanticRoles(paletteName) -> [{ key, suffix, light, dark }]   (53 rows)
 //   refKey(ref) -> padded ref ("50"->"050", "500-200"->"500-200")
 import { readFileSync } from "node:fs";
 import * as S from "../../src/engine/semantic.js";
@@ -24,8 +24,8 @@ const validPrim = (ref) => {
   return EXPORT_STOPS.includes(parseInt(ref, 10));
 };
 
-// ── hpg-semantic-roles: exactly 59 roles; exactly 7 scrims, all on the 500 ramp (alpha% = step/10) ─
-if (ROLES.length !== 59) FAIL("roles", `got ${ROLES.length} roles, want 59`);
+// ── hpg-semantic-roles: exactly 53 roles; exactly 7 scrims, all on the 500 ramp (alpha% = step/10) ─
+if (ROLES.length !== 53) FAIL("roles", `got ${ROLES.length} roles, want 53`);
 const scrims = ROLES.filter((r) => /^scrim/.test(r.key));
 if (scrims.length !== 7) FAIL("roles", `got ${scrims.length} scrim roles, want 7`);
 for (const s of scrims) {

@@ -25,7 +25,7 @@ Derive OKLCH-true color, type & geometry systems from one source. Export to CSS,
 **Medium (~60 words, cards / intros)**
 
 > Ultimate Tokens is a perceptual design-token generator. Pick a key color and it derives an even,
-> OKLCH-true tonal ramp, mapped to 59 semantic roles across light and dark. Compose a type scale and
+> OKLCH-true tonal ramp, mapped to 53 semantic roles across light and dark. Compose a type scale and
 > a geometry system from the same source, then export everything — CSS, DTCG, Tailwind, shadcn, Figma
 > variables, MCP, a design system for Claude, Stitch, or Figma Make — perfectly in sync. Free to start.
 
@@ -33,7 +33,7 @@ Derive OKLCH-true color, type & geometry systems from one source. Export to CSS,
 
 > Ultimate Tokens by NONOUN turns a few perceptual decisions into a complete design system. Color is
 > modeled where human vision is even — OKLCH-native, HEX derived only for output — so a single key
-> color becomes a measured tonal ramp and 59 semantic roles, resolved for light and dark in one pass.
+> color becomes a measured tonal ramp and 53 semantic roles, resolved for light and dark in one pass.
 > Typography and geometry compose from the same source: eleven type voices on a modular scale, a size
 > ramp built on one centering law. Every export — CSS custom properties, W3C design tokens, Tailwind,
 > shadcn, Figma variables, and a Brand-Kit MCP server your AI agents read directly, each under whichever
@@ -52,4 +52,4 @@ Derive OKLCH-true color, type & geometry systems from one source. Export to CSS,
 - *Studios:* "One brand kit per client, every export in sync — Studio covers 5 seats for $149/year."
 - *AI-tooling readers:* "Point Claude Code, Cursor, or any MCP agent at your kit and it builds with
   your exact roles instead of guessing a hex — or install the free Ultimate Tokens Claude plugin so
-  the agent knows which of the 59 roles belongs on each surface."
+  the agent knows which of the 53 roles belongs on each surface."

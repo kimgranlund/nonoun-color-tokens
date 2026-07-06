@@ -27,9 +27,9 @@ The non-obvious do/don'ts (each one is a real trap in this repo), then a worked 
 
 ### Which prose is current vs historical
 
-- **Bump CURRENT counts:** `.claude/docs/spec/references/knowledge-03-semantic-system.md` (the "59 roles" headers),
-  `.claude/docs/spec/rubrics/parity-checklist.md` (P1: `semanticRoles('primary').length === 59`), and `CLAUDE.md`
-  (the "59 semantic roles" mentions), plus the `src/ui/app.js` inspector label (grep `semantic roles`).
+- **Bump CURRENT counts:** `.claude/docs/spec/references/knowledge-03-semantic-system.md` (the "53 roles" headers),
+  `.claude/docs/spec/rubrics/parity-checklist.md` (P1: `semanticRoles('primary').length === 53`), and `CLAUDE.md`
+  (the "53 semantic roles" mentions), plus the `src/ui/app.js` inspector label (grep `semantic roles`).
 - **LEAVE historical counts untouched:** the "36 vs 37" `surfaceHighest`-divergence anecdote in knowledge-03
   (line ~132) and `references/decomposition.md`; `.claude/docs/spec/CHANGELOG.md` entries (which say "37"); OD/ADR
   decision records ("37 (not 51)"); and color-data files (e.g. `nature.json`). Those record what WAS true at
@@ -72,7 +72,8 @@ historical reference.
 ## Worked walkthrough — the interaction-states addition (condensed)
 
 Adding hover/active/disabled across accent, on-accent, outline, outline-variant, and container (the change
-that grew the table to 53):
+that grew the table to 53 — a HISTORICAL waypoint; today's count is also 53 but a different composition,
+after the two `-variant` state families were later trimmed back out, so don't read this 53 as the current set):
 
 1. **`semantic.js`** — added the `role(...)` calls in each group (e.g. group 1b accent states
    `${n}Hover`/`${n}Active`/`${n}Disabled` with ramp-stepped refs `650/350`, `750/250`, and the

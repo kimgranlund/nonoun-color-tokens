@@ -25,7 +25,7 @@
   ≥ chroma at 950 for a saturated palette).
 
 ## AC-S · Semantic system
-- **AC-S1** `semanticRoles(n)` returns exactly **59** roles for every palette.
+- **AC-S1** `semanticRoles(n)` returns exactly **53** roles for every palette.
 - **AC-S2** Exactly **7** roles are scrim STRENGTHS (`scrimWeakest…scrimStrongest`), all on base 500. Many other roles (e.g. `{n}Disabled`, `outline*`, `outlineVariant*`, `container*`) also resolve onto the 500 scrim ramp.
 - **AC-S3** `on{N}` light===dark===`050` and `on{N}Variant` light===dark===`200` for every
   palette.
@@ -51,7 +51,7 @@
 
 ## AC-P · Plugin
 - **AC-P1** Plugin `roleTable(n)` is byte-identical in structure to the generator's
-  (same 59 keys, same refs).
+  (same 53 keys, same refs).
 - **AC-P2** Every `{n}/{refKey}` binding target exists among real `Color Primitives` variable
   names (including `{n}/500-{step}` scrims).
 - **AC-P3** `code.js` and `manifest.json` parse; `networkAccess` is `none`.
