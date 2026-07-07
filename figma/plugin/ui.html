@@ -5274,16 +5274,17 @@ function dsTypeLayer(typeSc) {
 const dsSpacing = (geomSc) => (geomSc && geomSc.space ? Object.keys(geomSc.space).sort((a, b) => a - b).map((k) => geomSc.space[k]) : []);
 const dsRadii = (geomSc) => { const r = {}; if (geomSc && geomSc.radii) for (const [k, v] of Object.entries(geomSc.radii)) r[k] = v; return r; };
 
-// exportDesignSystemTokens — the tokens.json carrier (Claude profile): hex `colors`/`colorsDark`, the
-// full type scale (leading factors), the spacing array, and the radii ladder. Hex is the proven carrier
-// (§6.2); the DESIGN.md frontmatter carries the SAME colors as OKLCH (carrier equality holds by construction).
+// exportDesignSystemTokens — the tokens.json carrier (Claude profile): OKLCH `colors`/`colorsDark`, the
+// full type scale (leading factors), the spacing array, and the radii ladder. Colors are high-resolution
+// OKLCH (never bare hex) — the SAME payload the DESIGN.md frontmatter carries, so carrier equality (§8 G3)
+// is byte-identical by construction, not just within ±1/255. A consumer derives 8-bit hex from OKLCH.
 function exportDesignSystemTokens(state, typeSc, geomSc) {
   const ds = dsColorRoles(state);
   if (!ds) return JSON.stringify({ $note: "Design System export needs at least one enabled palette." }, null, 2);
   const colors = {}, colorsDark = {};
-  for (const t of ds.tokens) { colors[t.name] = t.light.hex; colorsDark[t.name] = t.dark.hex; }
-  if (ds.aliasDistinct) { colors[ds.alias.name] = ds.alias.light.hex; colorsDark[ds.alias.name] = ds.alias.dark.hex; }
-  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. \`colors\` light / \`colorsDark\` dark. Values hex (parser-unverified carrier); the DESIGN.md frontmatter carries the same colors as OKLCH. type.scale lineHeight is a unitless multiplier of size (leading factor — never px); letter-spacing, where present, is em/%. Every on-pair is measured ≥4.5:1 in both schemes.`;
+  for (const t of ds.tokens) { colors[t.name] = t.light.oklch; colorsDark[t.name] = t.dark.oklch; }
+  if (ds.aliasDistinct) { colors[ds.alias.name] = ds.alias.light.oklch; colorsDark[ds.alias.name] = ds.alias.dark.oklch; }
+  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. \`colors\` light / \`colorsDark\` dark. Values are high-resolution OKLCH (never bare hex) — identical to the DESIGN.md frontmatter; alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px); letter-spacing, where present, is em/%. Every on-pair is measured ≥4.5:1 in both schemes.`;
   return JSON.stringify({
     $generator: "Ultimate Tokens by NONOUN",
     $note: note,
@@ -5302,7 +5303,7 @@ const dsFontStack = (name, generic) => (name ? `'${name}', ${generic}` : generic
 
 // dsSpine — the universal-dialect DESIGN.md (§5): YAML frontmatter (OKLCH colors + `-dark` siblings +
 // curated type + named spacing/rounded + components) then the 8 Stitch-canonical sections + Responsive
-// Behavior + Agent Prompt Guide. Frontmatter colors ≡ tokens.json hex (carrier equality, one source).
+// Behavior + Agent Prompt Guide. Frontmatter colors ≡ tokens.json OKLCH (one source, byte-identical).
 function exportDesignSystemSpine(state, typeSc, geomSc) {
   const ds = dsColorRoles(state);
   if (!ds) return "# Design System\n\n_Needs at least one enabled palette._\n";
@@ -5686,12 +5687,13 @@ function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
   const mutedSig = ds.families.filter((f) => /muted/.test(f));
   // DIVERGENCE: on-colors equal across schemes (authorial, called out — never silently overridden).
   const div = ds.tokens.filter((t) => /-on-/.test(t.name) && t.light.hex.toUpperCase() === t.dark.hex.toUpperCase());
-  const divLines = div.map((t) => `- ℹ️ DIVERGENCE (authorial, called out per the standing rule): \`${t.name}\` = \`${t.light.hex}\` in both schemes — a light fill that takes a near-black label in both schemes (rationale in this bundle's Colors guidance); the design-system gate flags it on every run and it is disclosed here.`);
+  const divLines = div.map((t) => `- ℹ️ DIVERGENCE (authorial, called out per the standing rule): \`${t.name}\` = \`${t.light.oklch}\` in both schemes — a light fill that takes a near-black label in both schemes (rationale in this bundle's Colors guidance); the design-system gate flags it on every run and it is disclosed here.`);
   const scaleSteps = typeSc && typeSc.categories ? Object.values(typeSc.categories).reduce((a, s) => a + Object.keys(s).length, 0) : 0;
-  // Carrier equality — measure the SAME round-trip the §8 G3 gate does: parse each frontmatter OKLCH
-  // AND the tokens.json hex to sRGB8, take the max per-channel deviation over RGB (integer bytes) and
-  // ALPHA (pyRound(a·255), half-to-even — matching the gate; the translucent outline-variant's 30% vs
-  // its 8-digit-hex byte is the 1-LSB worst case). The gate asserts ≤1; the receipt cites what it measured.
+  // OKLCH payload fidelity — the round-trip a consumer runs: parse each OKLCH value AND the 8-bit hex it
+  // derives to sRGB8, take the max per-channel deviation over RGB (integer bytes) and ALPHA (pyRound(a·255),
+  // half-to-even — matching the §8 gate; the translucent outline-variant's 30% vs its 8-digit-hex byte is
+  // the 1-LSB worst case). The frontmatter and tokens.json now BOTH carry this OKLCH, so G3 measures dev 0
+  // between the two carriers; this cites the OKLCH→8-bit fidelity the ±1/255 claim rests on.
   let carrierMaxDev = 0;
   for (const t of ds.tokens) for (const end of [t.light, t.dark]) {
     const got = oklchToSrgb8(end.oklch), want = hexToSrgb8(end.hex);
@@ -5710,8 +5712,8 @@ function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
   const schemeParityLine = ds.aliasDistinct
     ? `- 🟢 Scheme parity: identical ${nTotal}-key inventory (${nGrammar} grammar tokens + the \`primary\` Stitch-compat alias); schemes ride as \`-dark\` siblings`
     : `- 🟢 Scheme parity: identical ${nTotal}-key inventory (${nGrammar} grammar tokens; the brand family is already named \`primary\`, so it doubles as the Stitch-required key — no separate alias); schemes ride as \`-dark\` siblings`;
-  // Stitch ships DESIGN.md ONLY (no hex file), so name the sibling the OKLCH round-trips against.
-  const carrierLine = `- 🟢 OKLCH payload fidelity: every frontmatter value round-trips to 8-bit sRGB within ±1/255 per channel (measured max dev: ${carrierMaxDev}) — byte-equal to the hex carrier in \`../design-system-for-claude-code/tokens.json\``;
+  // Stitch ships DESIGN.md ONLY, so name the sibling the OKLCH is identical to (tokens.json is OKLCH too).
+  const carrierLine = `- 🟢 OKLCH payload fidelity: every frontmatter value round-trips to 8-bit sRGB within ±1/255 per channel (measured max dev: ${carrierMaxDev}) — identical to the OKLCH carrier in \`../design-system-for-claude-code/tokens.json\``;
 
   // ── Stitch profile: DESIGN.md-only upload set; a Stitch-lint-framed receipt ──
   if (profile === "google-stitch") {
@@ -5795,12 +5797,12 @@ function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
     `${ds.families.map((f) => `\`${f}\``).join("/")}; token names match the \`css-oklch\`/\`css-hex\` semantic layer`,
     "verbatim; the spine's \"Token naming\" section teaches the grammar and prefix adaptivity.", "",
     "Encoding standard: **OKLCH payload** in DESIGN.md frontmatter (Stitch-linter-verified notation);",
-    "`tokens.json` stays **hex** (parser-unverified carrier); previews and emitted UI use the",
-    "**`color-scheme` + `light-dark()`** runtime idiom.", "",
+    "`tokens.json` carries the SAME **OKLCH** payload (high-resolution, never bare hex); previews and",
+    "emitted UI use the **`color-scheme` + `light-dark()`** runtime idiom.", "",
     ...contrastLines,
     mutedSig.length ? `- 🟢 Signature roles present: ${mutedSig.map((f) => `\`${f}\``).join(", ")} — F2 fixed; prose–token accord holds` : "- 🟢 Prose–token accord holds (every role appears in prose, a component, or a preview)",
     schemeParityLine,
-    `- 🟢 Carrier equality, notation-aware: OKLCH frontmatter ≡ hex \`tokens.json\` within ±1/255 per channel (measured max dev: ${carrierMaxDev})`,
+    `- 🟢 Carrier equality: OKLCH frontmatter ≡ OKLCH \`tokens.json\` (identical payload); every value round-trips to 8-bit sRGB within ±1/255 per channel (measured max dev: ${carrierMaxDev})`,
     `- 🟢 Previews: \`@dsCard\` first line, single \`:root\` block — \`color-scheme: light dark\` + ${nGrammar} \`light-dark(oklch, oklch)\` custom properties, no media-query fork`,
     ...divLines,
     `- ℹ️ \`tokens.json\` ships the full ${scaleSteps}-step type scale (generator schema); the DESIGN.md frontmatter carries the ${DS_TYPE_LEVELS.length}-level consumption selection`, "",

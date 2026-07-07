@@ -195,7 +195,9 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
     if (!Object.keys(tj.colors).some((k) => /-on-/.test(k))) FAIL("design-system", "no `{family}-on-{family}` on-color (grammar)");
     if (!Object.keys(tj.colors).some((k) => /-surface$/.test(k))) FAIL("design-system", "no neutral `-surface` slot (grammar)");
     if (Object.keys(tj.colorsDark).join() !== Object.keys(tj.colors).join()) FAIL("design-system", "colorsDark keys differ from colors (scheme parity)");
-    for (const [k, v] of Object.entries(tj.colors)) if (!/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v)) FAIL("design-system", `colors.${k} not #rrggbb(aa): ${v}`);
+    // Colors are high-resolution OKLCH, never bare hex (standing rule: a design-system export never ships a bare
+    // hex color). Both schemes; alpha < 1 rides as `oklch(L C H / A)`, still matched by the `oklch(` prefix.
+    for (const map of [["colors", tj.colors], ["colorsDark", tj.colorsDark]]) for (const [k, v] of Object.entries(map[1])) if (!/^oklch\(/i.test(v)) FAIL("design-system", `${map[0]}.${k} is not high-resolution OKLCH (bare hex is not allowed): ${v}`);
     if (!tj.type || !tj.type.scale || !Object.keys(tj.type.scale).length) FAIL("design-system", "type.scale empty");
     else for (const s of Object.values(tj.type.scale)) { if (!(s.size > 0 && s.weight > 0)) FAIL("design-system", "type.scale step not numeric"); if (!(s.lineHeight > 0 && s.lineHeight <= 4)) FAIL("design-system", `type.scale lineHeight not a factor (${s.lineHeight})`); }
     if (!Array.isArray(tj.spacing) || tj.spacing.some((v) => typeof v !== "number")) FAIL("design-system", "spacing not a numeric array");
@@ -211,7 +213,10 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
 
   // the §8 gate CATCHES a broken bundle (a constant dark on-color) — proves npm test would fail on the F1 defect.
   if (tj) {
-    const bad = JSON.parse(JSON.stringify(tj)); const onKey = Object.keys(bad.colorsDark).find((k) => { const m = k.match(/^(.+)-on-\1$/); return m && bad.colorsDark[k].toUpperCase() !== "#FFFFFF"; }); bad.colorsDark[onKey] = "#FFFFFF";
+    // Inject the F1 defect — a constant white dark on-color — into the OKLCH carrier: it diverges from the
+    // OKLCH frontmatter (G3) and, as white on a light dark-scheme fill, fails the on-pair contrast (G1). #FFFFFF
+    // is valid input (the gate's parseColor accepts hex OR oklch), so this is a deliberate, gate-tripping break.
+    const bad = JSON.parse(JSON.stringify(tj)); const onKey = Object.keys(bad.colorsDark).find((k) => /^(.+)-on-\1$/.test(k)); bad.colorsDark[onKey] = "#FFFFFF";
     const g = dsBundleGates({ designMd: md, tokensJson: bad, previews: asPreviews });
     if (g.fails === 0) FAIL("design-system", "the §8 gate does not catch a constant dark on-color (F1)");
   }
