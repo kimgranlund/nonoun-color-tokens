@@ -750,12 +750,42 @@ const dsFactor = (line, size) => (size > 0 ? Number((line / size).toFixed(3)) : 
 function dsTypeLayer(typeSc) {
   const type = { fonts: { ...(typeSc && typeSc.fonts) }, scale: {} };
   if (typeSc && typeSc.categories) for (const [cName, steps] of Object.entries(typeSc.categories))
-    for (const [sName, s] of Object.entries(steps))
-      type.scale[`${cName.toLowerCase()}-${sName.toLowerCase()}`] = { size: s.size, lineHeight: dsFactor(s.lineHeight, s.size), weight: s.weight };
+    for (const [sName, s] of Object.entries(steps)) {
+      const entry = { size: s.size, lineHeight: dsFactor(s.lineHeight, s.size), weight: s.weight };
+      // tracking rides as an em FACTOR (unitless number, per the G8 relative-leading/tracking rule),
+      // only where the voice actually tracks — so the carrier is complete, not just size/leading/weight.
+      if (s.letterSpacing) entry.letterSpacing = Number((s.letterSpacing / s.size).toFixed(4));
+      type.scale[`${cName.toLowerCase()}-${sName.toLowerCase()}`] = entry;
+    }
   return type;
 }
 const dsSpacing = (geomSc) => (geomSc && geomSc.space ? Object.keys(geomSc.space).sort((a, b) => a - b).map((k) => geomSc.space[k]) : []);
 const dsRadii = (geomSc) => { const r = {}; if (geomSc && geomSc.radii) for (const [k, v] of Object.entries(geomSc.radii)) r[k] = v; return r; };
+
+// dsSemanticLayer — the FULL semantic role layer (every role of every enabled palette, not the reduced
+// consumption grammar): { "{family}{-role-suffix}": oklch } per scheme. This is the complete opt-in
+// color set a consumer can bind beyond the measured `colors` grammar; values are OKLCH like everything else.
+function dsSemanticLayer(state) {
+  const semantic = {}, semanticDark = {};
+  for (const p of derivedAll(state)) for (const r of p.roles) {
+    semantic[`${p.n}${r.suffix}`] = roleOklch(r.light);
+    semanticDark[`${p.n}${r.suffix}`] = roleOklch(r.dark);
+  }
+  return { semantic, semanticDark };
+}
+// dsGeometryLayer — the FULL geometry system (the control size ramp + composition ladders), beyond the
+// bare `spacing`/`radii` arrays: sizes (per-size height/icon/caret/font/gap/padding/edgePadding/
+// radiusPill/minWidth), insets, gaps, borders, focus ring, density. All px numbers (unit stated in $note).
+function dsGeometryLayer(geomSc) {
+  if (!geomSc) return null;
+  const sizes = {};
+  if (geomSc.sizes) for (const [k, v] of Object.entries(geomSc.sizes)) sizes[k.toLowerCase()] = { ...v };
+  return {
+    density: geomSc.density, radiusDefault: geomSc.radiusDefault,
+    sizes, insets: { ...geomSc.insets }, gaps: { ...geomSc.gaps },
+    borders: { ...geomSc.borders }, focus: { ...geomSc.focus },
+  };
+}
 
 // exportDesignSystemTokens — the tokens.json carrier (Claude profile): OKLCH `colors`/`colorsDark`, the
 // full type scale (leading factors), the spacing array, and the radii ladder. Colors are high-resolution
@@ -767,12 +797,15 @@ export function exportDesignSystemTokens(state, typeSc, geomSc) {
   const colors = {}, colorsDark = {};
   for (const t of ds.tokens) { colors[t.name] = t.light.oklch; colorsDark[t.name] = t.dark.oklch; }
   if (ds.aliasDistinct) { colors[ds.alias.name] = ds.alias.light.oklch; colorsDark[ds.alias.name] = ds.alias.dark.oklch; }
-  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. \`colors\` light / \`colorsDark\` dark. Values are high-resolution OKLCH (never bare hex) — identical to the DESIGN.md frontmatter; alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px); letter-spacing, where present, is em/%. Every on-pair is measured ≥4.5:1 in both schemes.`;
+  const { semantic, semanticDark } = dsSemanticLayer(state);
+  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. Two color tiers: \`colors\`/\`colorsDark\` are the MEASURED consumption grammar (every on-pair ≥4.5:1 in both schemes — the set the DESIGN.md teaches); \`semantic\`/\`semanticDark\` are the FULL semantic role layer (every role of every palette) for consumers that need the complete set. Values are high-resolution OKLCH (never bare hex); alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px) and letterSpacing, where present, an em factor. \`geometry\` is the full dimensional system (control size ramp, insets, gaps, borders, focus ring; px numbers); \`spacing\`/\`radii\` remain the compact ladders.`;
   return JSON.stringify({
     $generator: "Ultimate Tokens by NONOUN",
     $note: note,
     colors, colorsDark,
+    semantic, semanticDark,
     type: dsTypeLayer(typeSc), spacing: dsSpacing(geomSc), radii: dsRadii(geomSc),
+    geometry: dsGeometryLayer(geomSc),
   }, null, 2);
 }
 
@@ -1128,8 +1161,9 @@ function dsSpineBody(ds, state, ctx) {
   const agent = [
     "## Agent Prompt Guide", "",
     `You are generating UI for **${name}**. Work in this order:`, "",
-    "1. **Tokens first** — colors, type, spacing, radii from the frontmatter (Claude Design also receives",
-    "   `tokens.json` with the same values as `colors`/`colorsDark` maps); never invent a value.",
+    "1. **Tokens first** — colors, type, spacing, radii from the frontmatter; never invent a value. If a",
+    "   `tokens.json` arrived beside this file, it carries these same values plus the FULL extended layers",
+    "   (`semantic`/`semanticDark`, the complete `geometry` system) — prefer it for exhaustive lookups.",
     "2. **Roles, then scheme** — pick the semantic role; both ends are provided, so never hand-roll a dark",
     "   variant. Define the roles once as custom properties with native scheme switching — `color-scheme`",
     "   on `:root` is required or the dark end never fires:", "",
@@ -1208,17 +1242,18 @@ export function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
   const schemeParityLine = ds.aliasDistinct
     ? `- 🟢 Scheme parity: identical ${nTotal}-key inventory (${nGrammar} grammar tokens + the \`primary\` Stitch-compat alias); schemes ride as \`-dark\` siblings`
     : `- 🟢 Scheme parity: identical ${nTotal}-key inventory (${nGrammar} grammar tokens; the brand family is already named \`primary\`, so it doubles as the Stitch-required key — no separate alias); schemes ride as \`-dark\` siblings`;
-  // Stitch ships DESIGN.md ONLY, so name the sibling the OKLCH is identical to (tokens.json is OKLCH too).
-  const carrierLine = `- 🟢 OKLCH payload fidelity: every frontmatter value round-trips to 8-bit sRGB within ±1/255 per channel (measured max dev: ${carrierMaxDev}) — identical to the OKLCH carrier in \`../design-system-for-claude-code/tokens.json\``;
+  // SELF-CONTAINED (standing rule): a receipt never references a path outside its own shipped folder —
+  // the consuming harness may have ONLY this folder. Cite what was measured, not where a sibling lives.
+  const carrierLine = `- 🟢 OKLCH payload fidelity: every frontmatter value round-trips to 8-bit sRGB within ±1/255 per channel (measured max dev: ${carrierMaxDev})`;
 
   // ── Stitch profile: DESIGN.md-only upload set; a Stitch-lint-framed receipt ──
   if (profile === "google-stitch") {
     return [
       `# ${folder} — Stitch profile export`, "",
-      `Google Stitch upload set for **${name}**, per the Stitch profile`,
-      "(`design-system-files-for-llms.md` §10.1). Generated by Ultimate Tokens · NONOUN.", "",
-      "**Contents:** `DESIGN.md` only — Stitch consumes a single file. It is byte-identical",
-      "with `../design-system-for-claude-code/DESIGN.md`: one canonical core, two uploads.", "",
+      `Google Stitch upload set for **${name}**, per the Ultimate Tokens Stitch profile.`,
+      "Generated by Ultimate Tokens · NONOUN.", "",
+      "**Contents:** `DESIGN.md` only — Stitch consumes a single file. It is rendered from the",
+      "same canonical core as this kit's other platform exports; this folder is complete on its own.", "",
       `## Profile receipt (checks run ${date})`, "",
       "Values are **OKLCH** (the adopted payload standard); `light-dark()` stays out of this",
       "carrier — Stitch's linter rejects it, so schemes ride as `-dark` siblings.", "",
@@ -1234,10 +1269,10 @@ export function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
       carrierLine,
       "- 🟡 `npx @google/design.md lint`: 0 errors — `orphaned-tokens` warnings on the per-role `-dark` siblings (the",
       "  OKLCH schema carries no scheme axis to reference them) plus the prose-only chrome tokens are a documented",
-      "  spec cost, not a defect; reproduced by the `design-system-reviewer` on the byte-identical Claude Code DESIGN.md",
+      "  spec cost, not a defect (the `-dark` siblings and prose-only chrome tokens are deliberate carrier design)",
       ...divLines,
       "- 🟢 Standalone: passes every offline check with no sibling files present.", "",
-      "One canonical core, three uploads — see `../design-system-for-claude-code/`.", "",
+      "One canonical core, rendered per platform — this folder is complete on its own.", "",
     ].join("\n");
   }
 
@@ -1245,10 +1280,11 @@ export function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
   if (profile === "figma-make") {
     return [
       `# ${folder} — Figma Make profile export`, "",
-      `Figma Make kit guidelines for **${name}**, per the Figma Make profile`,
-      "(`design-system-files-for-llms.md` §10.4). Generated by Ultimate Tokens · NONOUN.", "",
+      `Figma Make kit guidelines for **${name}**, per the Ultimate Tokens Figma Make profile.`,
+      "Generated by Ultimate Tokens · NONOUN.", "",
       "**Contents:** `guidelines/` — `Guidelines.md` (entry + routing + hard rules), `setup.md`",
-      "(wiring), `styles.css` (compiled shadcn stylesheet + `@theme inline`),",
+      "(wiring), `styles.css` (compiled shadcn stylesheet + `@theme inline`, with the FULL token",
+      "layers appended below the projection: complete semantic color roles, geometry, typescale),",
       "`foundations/{color,typography,spacing}.md`, `components/{overview,button}.md`. Drop the",
       "`guidelines/` folder into the Make kit.", "",
       `## Profile receipt (checks run ${date})`, "",
@@ -1276,22 +1312,23 @@ export function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
       "  Make's preferred stack), not `light-dark()` — a deliberate, named departure from the",
       "  sibling platforms' runtime idiom; `foundations/color.md`'s runtime block carries the",
       "  equivalent `light-dark()` expression for tooling that prefers it.", "",
-      "One canonical core, three uploads — see `../design-system-for-claude-code/`.", "",
+      "One canonical core, rendered per platform — this folder is complete on its own.", "",
     ].join("\n");
   }
 
   // ── Claude Code profile (default): the full DESIGN.md + tokens.json + previews bundle ──
   return [
     `# ${folder} — Claude profile export`, "",
-    `Claude Design / Claude Code consumption bundle for **${name}**, per the Claude profile`,
-    "(`design-system-files-for-llms.md` §10.2). Generated by Ultimate Tokens · NONOUN.", "",
-    "**Contents:** `DESIGN.md` (the universal-dialect core — byte-identical with",
-    "`../design-system-for-google-stitch/DESIGN.md`), `tokens.json` (structured role maps,",
-    `\`colors\`/\`colorsDark\`), \`components/*.html\` (${previews.length} self-contained \`@dsCard\` previews).`, "",
+    `Claude Design / Claude Code consumption bundle for **${name}**, per the Ultimate Tokens Claude profile.`,
+    "Generated by Ultimate Tokens · NONOUN.", "",
+    "**Contents:** `DESIGN.md` (the universal-dialect core, rendered from the same canonical core",
+    "as this kit's other platform exports), `tokens.json` (the machine carrier: the measured",
+    "`colors`/`colorsDark` grammar + the FULL `semantic`/`semanticDark` role layer + `type` +",
+    `\`spacing\`/\`radii\` + the full \`geometry\` system), \`components/*.html\` (${previews.length} self-contained \`@dsCard\` previews).`, "",
     `## Profile receipt (checks run ${date})`, "",
     `Naming standard: **Ultimate Tokens grammar** — \`--{prefix}-{family}-{slot}\`, prefix \`${pfx}\`, families`,
-    `${ds.families.map((f) => `\`${f}\``).join("/")}; token names match the \`css-oklch\`/\`css-hex\` semantic layer`,
-    "verbatim; the spine's \"Token naming\" section teaches the grammar and prefix adaptivity.", "",
+    `${ds.families.map((f) => `\`${f}\``).join("/")}; the FULL semantic layer ships in this folder's \`tokens.json\``,
+    "(`semantic`/`semanticDark`); the spine's \"Token naming\" section teaches the grammar and prefix adaptivity.", "",
     "Encoding standard: **OKLCH payload** in DESIGN.md frontmatter (Stitch-linter-verified notation);",
     "`tokens.json` carries the SAME **OKLCH** payload (high-resolution, never bare hex); previews and",
     "emitted UI use the **`color-scheme` + `light-dark()`** runtime idiom.", "",
@@ -1302,7 +1339,7 @@ export function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
     `- 🟢 Previews: \`@dsCard\` first line, single \`:root\` block — \`color-scheme: light dark\` + ${nGrammar} \`light-dark(oklch, oklch)\` custom properties, no media-query fork`,
     ...divLines,
     `- ℹ️ \`tokens.json\` ships the full ${scaleSteps}-step type scale (generator schema); the DESIGN.md frontmatter carries the ${DS_TYPE_LEVELS.length}-level consumption selection`, "",
-    "Supersedes `../_superseded-claude-design/` (pre-fix bundle, retained for reference).", "",
+    "This folder is complete on its own — every reference above resolves inside it.", "",
   ].join("\n");
 }
 
@@ -1438,6 +1475,12 @@ function dsMakeSetupMd(typeSc) {
     "- Use shadcn ui's own installed components (`<Button>`, `<Card>`, `<Badge>`, `<Input>`, …)",
     "  styled by these tokens. Do NOT hand-roll component CSS that duplicates what an installed",
     "  shadcn component already provides — see `components/*.md` for the variant mapping.",
+    "", "## Full token layers", "",
+    "Below the shadcn projection, `styles.css` also carries the FULL token layers as custom",
+    "properties: the complete semantic color roles (every role of every palette; light in `:root`,",
+    "dark under `.dark`), the full geometry system (control size ramp, insets, gaps, borders,",
+    "focus ring), and the full typescale. The shadcn mapping stays the default consumption path;",
+    "reach for the full layers when a design needs a role or dimension the projection omits.",
     "", "## Fonts", "",
     `\`styles.css\`'s \`@theme inline\` block sets \`--font-sans\` (${body}), \`--font-serif\``,
     `(${display}, used for display/headings), and \`--font-mono\` (${mono}). Load them however`,
@@ -1649,6 +1692,60 @@ function dsMakeButtonMd() {
 }
 
 // exportDesignSystemMakeBundle — the design-system-for-figma-make/ folder: `guidelines/` (the routed
+// dsFullLayersCss — the FULL token layers appended to the Make `styles.css` BELOW the shadcn projection
+// (which stays the consumption mapping the guidelines teach). Color rides the kit's `.dark`-class
+// convention (`:root` light + `.dark` overrides — light-dark() would not flip with Make's toggle);
+// geometry + typescale are mode-independent `:root` custom properties. Non-color layers strip a trailing
+// `-color` from the kit prefix (`md-sys-color` → `md-sys-size-*` / `md-sys-typescale-*`) so the grammar
+// matches the standalone geometry/typography exports. APPEND-ONLY: everything lands after the
+// `@theme inline` block, so the D10 carrier parse (dsShadcnRuntimeMap: first `:root` → `.dark` →
+// `@theme inline`) is untouched.
+export function dsFullLayersCss(state, typeSc, geomSc) {
+  const pfx = cssPrefixOf(state);
+  const basePfx = pfx.replace(/-color$/, "");
+  const L = [], D = [];
+  for (const p of derivedAll(state)) for (const r of p.roles) {
+    L.push(`  --${pfx}-${p.n}${r.suffix}: ${roleOklch(r.light)};`);
+    D.push(`  --${pfx}-${p.n}${r.suffix}: ${roleOklch(r.dark)};`);
+  }
+  const dims = [];
+  if (geomSc) {
+    dims.push(`  --${basePfx}-density: ${geomSc.density};`);
+    if (geomSc.sizes) for (const [sz, s] of Object.entries(geomSc.sizes)) {
+      const z = sz.toLowerCase();
+      dims.push(`  --${basePfx}-size-${z}-height: ${s.height}px; --${basePfx}-size-${z}-icon: ${s.icon}px; --${basePfx}-size-${z}-caret: ${s.caret}px; --${basePfx}-size-${z}-font: ${s.font}px; --${basePfx}-size-${z}-gap: ${s.gap}px; --${basePfx}-size-${z}-pad: ${s.padding}px; --${basePfx}-size-${z}-pad-edge: ${s.edgePadding}px; --${basePfx}-size-${z}-radius: ${s.radiusPill}px; --${basePfx}-size-${z}-min: ${s.minWidth}px;`);
+    }
+    if (geomSc.radii) for (const [k, v] of Object.entries(geomSc.radii)) dims.push(`  --${basePfx}-radius-${k}: ${v}px;`);
+    if (geomSc.radiusDefault != null) dims.push(`  --${basePfx}-radius-default: ${geomSc.radiusDefault}px;`);
+    if (geomSc.space) Object.keys(geomSc.space).sort((a, b) => a - b).forEach((k, i) => dims.push(`  --${basePfx}-space-${i}: ${geomSc.space[k]}px;`));
+    if (geomSc.insets) for (const [k, v] of Object.entries(geomSc.insets)) dims.push(`  --${basePfx}-inset-${kebab(k)}: ${v}px;`);
+    if (geomSc.gaps) for (const [k, v] of Object.entries(geomSc.gaps)) dims.push(`  --${basePfx}-gap-${kebab(k)}: ${v}px;`);
+    if (geomSc.borders) for (const [k, v] of Object.entries(geomSc.borders)) dims.push(`  --${basePfx}-border-${kebab(k)}: ${v}px;`);
+    if (geomSc.focus) dims.push(`  --${basePfx}-focus-ring-width: ${geomSc.focus.ringWidth}px; --${basePfx}-focus-ring-offset: ${geomSc.focus.ringOffset}px;`);
+  }
+  const type = [];
+  if (typeSc) {
+    if (typeSc.fonts) for (const [role, fam] of Object.entries(typeSc.fonts)) type.push(`  --${basePfx}-font-${role}: '${fam}';`);
+    if (typeSc.categories) for (const [cName, steps] of Object.entries(typeSc.categories))
+      for (const [sName, s] of Object.entries(steps)) {
+        const key = `${cName.toLowerCase()}-${sName.toLowerCase()}`;
+        const track = s.letterSpacing ? ` --${basePfx}-typescale-${key}-tracking: ${Number((s.letterSpacing / s.size).toFixed(4))}em;` : "";
+        type.push(`  --${basePfx}-typescale-${key}-size: ${s.size}px; --${basePfx}-typescale-${key}-line: ${dsFactor(s.lineHeight, s.size)}; --${basePfx}-typescale-${key}-weight: ${s.weight};${track}`);
+      }
+  }
+  return [
+    "", "/* ── Ultimate Tokens · FULL token layers (generated) ─────────────────────────",
+    "   The shadcn projection above remains the consumption mapping the guidelines teach.",
+    "   Below: the complete semantic color layer (every role of every palette; light in",
+    "   :root, dark under the kit's `.dark` class), the full geometry system, and the",
+    "   full typescale — for anything the projection does not cover. */",
+    ":root {", ...L, "}",
+    ".dark {", ...D, "}",
+    ":root {", ...dims, ...type, "}", "",
+  ].join("\n");
+}
+const kebab = (s) => s.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+
 // tree Make reads) + `README.md` (the figma-make profile receipt, folder root, NOT under guidelines/).
 // Empty when no palette is enabled (nothing to upload) — mirrors the Stitch bundle.
 export function exportDesignSystemMakeBundle(state, typeSc, geomSc, opts = {}) {
@@ -1664,11 +1761,16 @@ export function exportDesignSystemMakeBundle(state, typeSc, geomSc, opts = {}) {
   // and a contradiction with the contrast-verified grammar table). "contrast" flips the dark foregrounds
   // to the near-black pole (≥5.1), matching the canonical core. One core, one measured on-color policy.
   const shadcnCss = exportShadcn({ ...state, onColorMode: "contrast" });
+  // styles.css = the shadcn projection (the D10 carrier, parsed as-is) + the FULL token layers appended
+  // below it — so the one imported stylesheet carries the complete opted-in set (color/geometry/type).
+  const stylesCss = shadcnCss + dsFullLayersCss(state, typeSc, geomSc);
   return [
     { name: "guidelines/Guidelines.md", data: dsMakeGuidelinesMd(name, story) },
     { name: "guidelines/setup.md", data: dsMakeSetupMd(typeSc) },
-    { name: "guidelines/styles.css", data: shadcnCss },
-    { name: "guidelines/foundations/color.md", data: dsMakeColorMd(ds, pfx, shadcnCss) },
+    { name: "guidelines/styles.css", data: stylesCss },
+    // color.md's paste-ready runtime block parses the SHIPPED styles.css text (appendix-safe parse),
+    // preserving the "same parse of the same carrier" D10 discipline.
+    { name: "guidelines/foundations/color.md", data: dsMakeColorMd(ds, pfx, stylesCss) },
     { name: "guidelines/foundations/typography.md", data: dsMakeTypographyMd(typeSc) },
     { name: "guidelines/foundations/spacing.md", data: dsMakeSpacingMd(geomSc) },
     { name: "guidelines/components/overview.md", data: dsMakeOverviewMd() },

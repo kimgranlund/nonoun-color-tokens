@@ -202,7 +202,21 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
     else for (const s of Object.values(tj.type.scale)) { if (!(s.size > 0 && s.weight > 0)) FAIL("design-system", "type.scale step not numeric"); if (!(s.lineHeight > 0 && s.lineHeight <= 4)) FAIL("design-system", `type.scale lineHeight not a factor (${s.lineHeight})`); }
     if (!Array.isArray(tj.spacing) || tj.spacing.some((v) => typeof v !== "number")) FAIL("design-system", "spacing not a numeric array");
     if (!tj.radii || Object.values(tj.radii).some((v) => typeof v !== "number")) FAIL("design-system", "radii not numeric");
+    // FULL layers: semantic = every role of every enabled palette (53 x N), OKLCH, scheme parity; geometry = the full system.
+    const semN = Object.keys(tj.semantic || {}).length;
+    if (semN < 53 * ALL.length) FAIL("design-system", `semantic layer too small (${semN} < ${53 * ALL.length})`);
+    if (Object.keys(tj.semanticDark || {}).join() !== Object.keys(tj.semantic || {}).join()) FAIL("design-system", "semanticDark keys differ from semantic (scheme parity)");
+    for (const map of [["semantic", tj.semantic], ["semanticDark", tj.semanticDark]]) for (const [k, v] of Object.entries(map[1] || {})) if (!/^oklch\(/i.test(v)) { FAIL("design-system", `${map[0]}.${k} is not OKLCH: ${v}`); break; }
+    const geo = tj.geometry || {};
+    if (!geo.sizes || !geo.sizes.md || !(geo.sizes.md.height > 0 && geo.sizes.md.icon > 0)) FAIL("design-system", "geometry.sizes.md missing/non-numeric");
+    for (const grp of ["insets", "gaps", "borders", "focus"]) if (!geo[grp] || Object.values(geo[grp]).some((v) => typeof v !== "number")) FAIL("design-system", `geometry.${grp} missing/non-numeric`);
+    if (!Object.values(tj.type.scale).some((st) => typeof st.letterSpacing === "number")) FAIL("design-system", "no type.scale step carries letterSpacing (tracking dropped)");
   }
+
+  // SELF-CONTAINMENT (standing rule): no emitted file may reference a path outside its shipped folder —
+  // the consuming harness may have ONLY that folder. Gate every design-system bundle file.
+  const UNREACHABLE = /\.\.\/design-system|\.\.\/_superseded|design-system-files-for-llms/;
+  for (const f of files) if (UNREACHABLE.test(f.data)) FAIL("design-system", `${f.name} references a path outside the shipped folder (unreachable for the consumer)`);
 
   // DESIGN.md: the canonical sections, the grammar teaching, and light-dark() ONLY in the runtime block.
   const md = byName["DESIGN.md"];
@@ -262,9 +276,14 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   const rm = byName["README.md"];
   if (!/design-system-for-google-stitch — Stitch profile export/.test(rm)) FAIL("design-system-stitch", "README is not the Stitch profile receipt");
   if (!/`DESIGN\.md` only/.test(rm)) FAIL("design-system-stitch", "Stitch receipt missing the single-file note");
-  if (!/byte-identical/.test(rm)) FAIL("design-system-stitch", "Stitch receipt missing the byte-identical note");
+  if (!/same canonical core/.test(rm)) FAIL("design-system-stitch", "Stitch receipt missing the one-canonical-core note");
+  if (!/complete on its own/.test(rm)) FAIL("design-system-stitch", "Stitch receipt missing the self-containment note");
   if (!/prelint\.py check`: 0 errors/.test(rm)) FAIL("design-system-stitch", "Stitch receipt missing the prelint 0-errors gate");
   if (!/orphaned-tokens/.test(rm)) FAIL("design-system-stitch", "Stitch receipt missing the orphaned-tokens lint note");
+
+  // SELF-CONTAINMENT: the upload set must never reference a path outside its shipped folder.
+  const UNREACHABLE_S = /\.\.\/design-system|\.\.\/_superseded|design-system-files-for-llms/;
+  for (const f of stitch) if (UNREACHABLE_S.test(f.data)) FAIL("design-system-stitch", `${f.name} references a path outside the shipped folder`);
 
   // disabled-palette: all-off → empty upload set (nothing to upload), no throw.
   const off = X.exportDesignSystemStitchBundle(C(RT.defaults.map((p) => ({ ...p, on: false }))), tsc, gsc);
@@ -291,7 +310,11 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   // forces onColorMode:"contrast" so the dark foregrounds are the contrast-passing pole, like dsColorRoles;
   // raw "fixed"-mode shadcn ships white foregrounds that fail AA on the brightened dark fills).
   const styles = byName["guidelines/styles.css"];
-  if (styles !== X.exportShadcn({ ...C(ALL), onColorMode: "contrast" })) FAIL("design-system-make", "styles.css is not byte-equal to exportShadcn(state) in the measured (contrast) on-color mode");
+  const shadcnPart = X.exportShadcn({ ...C(ALL), onColorMode: "contrast" });
+  if (!styles.startsWith(shadcnPart)) FAIL("design-system-make", "styles.css does not START with exportShadcn(state) in the measured (contrast) on-color mode (the D10 carrier prefix)");
+  if (!styles.includes("FULL token layers")) FAIL("design-system-make", "styles.css missing the appended full token layers");
+  // the appendix must land AFTER the @theme block so the D10 parse (first :root -> .dark -> @theme) is untouched
+  if (styles.indexOf("FULL token layers") < styles.indexOf("@theme inline {")) FAIL("design-system-make", "full-layer appendix must come after @theme inline (D10 parse safety)");
   // R1 guard — the dark-scheme fill foregrounds must be the near-black ink pole, NEVER fixed white (which
   // fails AA on the brightened dark fills). Locks the measured on-color mode against a silent revert.
   const darkBlock = styles.slice(styles.indexOf(".dark"));
@@ -299,6 +322,11 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
     const m = new RegExp(`--${role}:\\s*(oklch\\([^)]*\\))`).exec(darkBlock);
     if (m && /oklch\(1\s+0\b/.test(m[1])) FAIL("design-system-make", `styles.css dark --${role} is fixed white (AA-failing) — R1 measured on-color regressed`);
   }
+
+  // SELF-CONTAINMENT: no file may reference a path outside the shipped folder (`../styles.css` WITHIN
+  // guidelines/ is fine — same shipped tree; sibling design-system folders are not).
+  const UNREACHABLE_M = /\.\.\/design-system|\.\.\/_superseded|design-system-files-for-llms/;
+  for (const f of make) if (UNREACHABLE_M.test(f.data)) FAIL("design-system-make", `${f.name} references a path outside the shipped folder`);
 
   // D6 — Guidelines.md hard rules (>=1 "Do NOT" + the literal word "IMPORTANT").
   const gmd = byName["guidelines/Guidelines.md"];
