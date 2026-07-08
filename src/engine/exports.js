@@ -1029,6 +1029,10 @@ function dsSpineBody(ds, state, ctx) {
     accent ? famBullet(accent, "highlights, tags, and accents.") : "",
     ...mutedSig.filter((f) => f !== metal).map((f) => famBullet(f, "a signature brand light — small, loud reads (featured/live markers), never a field of color.")),
     metal ? famBullet(metal, "a light metallic fill in both schemes with a near-black label: chips, tags, meta badges.") : "",
+    // catch-all: families the named pickers miss (e.g. a `tertiary` with no "accent" in its name) still
+    // get a role bullet — every family that ships tokens gets a usage boundary (prose–token accord).
+    ...fams.filter((f) => f !== cn && ![brand, secondary, accent, metal, ...mutedSig, ...intents].includes(f))
+      .map((f) => famBullet(f, `a supporting brand family — quieter emphasis and category accents; never competes with \`${ref(brand)}\` for the primary action.`)),
     ...intents.map((f) => famBullet(f, "status only — intent colors carry meaning, never decoration.")),
   ].filter(Boolean).join("\n");
 
@@ -1282,11 +1286,12 @@ export function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
       ...contrastLines,
       "- 🟢 D3 scheme parity: every grammar-token table row in `foundations/color.md` states light",
       "  AND dark",
-      "- 🟢 D10 carrier equality: `styles.css` is the shadcn projection of the kit's resolved roles",
-      "  under its own `onColorMode` setting (kit fidelity — the same values the app shows); each",
-      "  shadcn token is a `var()` LINK into the appended design-token layer (one source of truth per",
-      "  value); the paste-ready `light-dark()` block in `foundations/color.md` re-expresses that SAME",
-      "  carrier, resolved and measured against it token-for-token",
+      "- 🟢 D10 carrier equality BY CONSTRUCTION: every shadcn token in `styles.css` is a `var()` LINK",
+      "  resolving into the appended design-token layer (one source of truth per value — the kit's",
+      "  resolved roles under its own `onColorMode`); the paste-ready `light-dark()` block in",
+      "  `foundations/color.md` re-expresses that SAME carrier, resolved and measured token-for-token.",
+      "  To re-measure independently: `make_guidelines_check.py guidelines/ --compare <this kit's",
+      "  tokens.json export>` (D10 reports the sRGB-triple comparison).",
       "- 🟢 D4 runtime block + trap: one `light-dark()` block ships in `foundations/color.md` with",
       "  `color-scheme: light dark` declared in the same file",
       "- 🟢 D5 states as values: `components/button.md` names `hover` and carries a `-hover` token",
@@ -1321,7 +1326,8 @@ export function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
     ...contrastLines,
     mutedSig.length ? `- 🟢 Signature roles present: ${mutedSig.map((f) => `\`${f}\``).join(", ")} — F2 fixed; prose–token accord holds` : "- 🟢 Prose–token accord holds (every role appears in prose, a component, or a preview)",
     schemeParityLine,
-    `- 🟢 Carrier equality: OKLCH frontmatter ≡ OKLCH \`tokens.json\` (identical payload); every value round-trips to 8-bit sRGB within ±1/255 per channel (measured max dev: ${carrierMaxDev})`,
+    "- 🟢 Carrier equality: OKLCH frontmatter ≡ OKLCH `tokens.json` — the identical payload (G3 dev 0 by construction)",
+    `- 🟢 OKLCH→8-bit fidelity: every value round-trips to sRGB within ±1/255 per channel (measured max dev: ${carrierMaxDev} — a consumer deriving hex reproduces the kit)`,
     `- 🟢 Previews: \`@dsCard\` first line, single \`:root\` block — \`color-scheme: light dark\` + ${nGrammar} \`light-dark(oklch, oklch)\` custom properties, no media-query fork`,
     ...divLines,
     `- ℹ️ \`tokens.json\` ships the full ${scaleSteps}-step type scale (generator schema); the DESIGN.md frontmatter carries the ${DS_TYPE_LEVELS.length}-level consumption selection`, "",
