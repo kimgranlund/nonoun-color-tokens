@@ -4540,7 +4540,7 @@ __M.exports = (function(){
 
 const { paletteStops, EXPORT_STOPS, DEFAULT_CONTROLS } = __M.tonal;
 const { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAccentRef } = __M.semantic;
-const { oklchToSrgb8, hexToSrgb8, pyRound } = __M.dsGates; // §8 carrier primitives — the receipt cites the SAME round-trip the G3 gate measures
+const { oklchToSrgb8, hexToSrgb8, pyRound, dsBundleGates } = __M.dsGates; // §8 carrier primitives + the gate itself — the receipt cites the SAME run the gate measures
 
 // WCAG relative luminance of an [r,g,b] (0..255) triple — for the opt-in contrast on-color pick.
 const relLumExp = (rgb) => {
@@ -5155,101 +5155,34 @@ const dsChrome = (palettes) =>
   palettes.find((p) => /neutral|gray|grey|slate|stone|zinc|mono/.test(p.name.toLowerCase())) || palettes[0];
 const dsRole = (p, suffix) => p && p.roles.find((r) => r.suffix === suffix);
 
-// R1 — the measured on-color + (rarely stepped) fill, per fill per scheme (§7). The two text poles
-// are the chrome family's on-surface ends (ink = its light end / paper = its dark end; the ramp
-// desaturates to near-neutral at the extremes, so these are the theme's near-black + near-white).
-//   1. If a pole already clears 4.5:1 on the NATURAL fill, take the better-contrasting one — no step.
-//      A deliberately-light signature fill (mirror silver) keeps its identity and takes a near-black
-//      label; a saturated fill keeps its color and takes white.
-//   2. DEAD ZONE — a mid-luminance fill where NEITHER near-black nor near-white clears 4.5 (the poles
-//      aren't pure black/white, so a band exists). Step the fill toward the scheme's fill-text pole
-//      (darken in light / lighten in dark) until that pole clears 4.5 (Studio 54 light success 550→600).
-const DS_LOW_CHROMA = 0.04; // a near-neutral NON-chrome family reads as metal/silver/grey
-const DS_METAL_INK = 7;     // a light-metallic fill takes a crisp near-black label
-function dsFillOn(p, poles, scheme, allowMetal) {
-  const prime = dsRole(p, "");
-  const nat = scheme === "light" ? prime.light : prime.dark; // {rgb, frac, hex}
-  const preferred = scheme === "light" ? poles.paper : poles.ink; // the scheme's fill-text pole
-  const other = scheme === "light" ? poles.ink : poles.paper;
-  const stops = Object.keys(p.stops).map(Number).sort((a, b) => a - b);
-  const startStop = Number(scheme === "light" ? prime.lightRef : prime.darkRef);
-  const at = (s) => p.byStop.get(s);
-  const idx = stops.indexOf(startStop);
+// KIT FIDELITY — the export projects the kit's RESOLVED semantic roles verbatim. `onColorMode` is a
+// user setting in the Settings panel ("fixed" = uniform brand labels, ADR-003 explicitly accepting
+// sub-4.5 pairs on light accents; "contrast" = the role table re-points each on-color to the end that
+// maximizes WCAG contrast against its own fill, per state). derivedAll(state) already applies the
+// setting, so the export NEVER second-guesses it: no synthetic text poles, no dead-zone fill stepping,
+// no metallic re-fills, no re-measured state fills. Contrast is MEASURED and DISCLOSED in the profile
+// receipt (the §8 G1 findings), never silently corrected — what ships is what the user designed.
 
-  // Light-metallic families — a near-neutral NON-chrome family (mirror silver, a grey accent) reads
-  // as metal, not as a button: a dark-grey fill + white text looks disabled and betrays the metal the
-  // prose sells (R5). Render a LIGHT fill with a near-black label: lighten from the prime until the ink
-  // pole clears DS_METAL_INK; the dark scheme brightens one tier further (a metallic reflects more on a
-  // dark surface). The chrome family is exempt (its low chroma is the neutral room, not an accent).
-  const primeChroma = rgbToOklch(prime.light.rgb).C; // OKLCH chroma (scheme-independent classifier)
-  if (allowMetal && primeChroma < DS_LOW_CHROMA && idx >= 0) {
-    let j = idx;
-    for (; j > 0; j--) if (dsContrast(poles.ink, at(stops[j])) >= DS_METAL_INK) break;
-    if (scheme === "dark") j = Math.max(0, j - 1);
-    return { fillRgb: at(stops[j]), onRgb: poles.ink };
-  }
-
-  // 1. a pole clears 4.5 on the natural fill → take the better one, no step.
-  const cP = dsContrast(preferred, nat.rgb), cO = dsContrast(other, nat.rgb);
-  if (cP >= DS_AA || cO >= DS_AA) return { fillRgb: nat.rgb, onRgb: cP >= cO ? preferred : other };
-  // 2. dead zone — neither pole clears 4.5 on the natural fill: step toward the fill-text pole.
-  const dir = scheme === "light" ? +1 : -1; // light: darken the fill (higher stop); dark: lighten it
-  if (idx >= 0) for (let j = idx + dir; j >= 0 && j < stops.length; j += dir) {
-    if (dsContrast(preferred, at(stops[j])) >= DS_AA) return { fillRgb: at(stops[j]), onRgb: preferred };
-  }
-  return { fillRgb: nat.rgb, onRgb: cP >= cO ? preferred : other }; // fallback: best available
-}
-
-// dsStateFills — the MEASURED hover/active fills for one family in one scheme (§7 R3). The grammar
-// requires ONE `{family}-on-{family}` that clears 4.5:1 on the base AND every emitted state fill —
-// but the role table's mode-mirrored state direction (hover darkens in light / lightens in dark)
-// assumes the scheme's fill-text pole. A bright brand fill that takes the INK label in light (the
-// measured pole) breaks that assumption: the table's darker hover moves AGAINST the ink label
-// (a real AA failure the default theme masked by pole-direction luck). So: keep the table's state
-// ref when it still clears 4.5 with the CHOSEN on-color; otherwise step from the measured base fill
-// in the label's contrast direction (ink label → lighter stops; paper label → darker), hover one
-// passing step out, active one further. At a ramp end the state holds the last passing stop (a
-// no-op state beats a failing one).
-function dsStateFills(p, scheme, fillRgb, onRgb) {
-  const stops = Object.keys(p.stops).map(Number).sort((a, b) => a - b);
-  const at = (s) => p.byStop.get(s);
-  const pass = (rgb) => rgb && dsContrast(onRgb, rgb) >= DS_AA;
-  const tableEnd = (suffix) => { const r = dsRole(p, suffix); return r ? r[scheme].rgb : null; };
-  const tHover = tableEnd("-hover"), tActive = tableEnd("-active");
-  if (pass(tHover) && pass(tActive)) return { hoverRgb: tHover, activeRgb: tActive }; // table holds — keep it
-  // find the measured base fill on the ramp (dsFillOn may have stepped it); fall back to the prime ref.
-  let idx = stops.findIndex((s) => { const c = at(s); return c && rgbEq3(c, fillRgb); });
-  if (idx < 0) { const prime = dsRole(p, ""); idx = stops.indexOf(Number(scheme === "light" ? prime.lightRef : prime.darkRef)); }
-  // label's contrast direction: a dark (ink) label wants LIGHTER fills (lower stops, dir −1),
-  // a light (paper) label darker fills (higher stops, dir +1).
-  const dir = dsContrast([0, 0, 0], onRgb) < dsContrast([255, 255, 255], onRgb) ? -1 : +1;
-  const stepTo = (from) => { for (let j = from + dir; j >= 0 && j < stops.length; j += dir) if (pass(at(stops[j]))) return j; return from; };
-  const h = stepTo(idx), a = stepTo(h);
-  return { hoverRgb: at(stops[h]) || fillRgb, activeRgb: at(stops[a]) || fillRgb };
-}
-const rgbEq3 = (a, b) => { const ar = a.rgb || a, br = b.rgb || b; return ar[0] === br[0] && ar[1] === br[1] && ar[2] === br[2]; };
-
-// dsColorRoles(state) → the reduced consumption set (§6.5/§7): { chrome, poles, tokens:[{name,
-// light,dark}], alias }. Each end = { rgb, frac, hex, oklch }. tokens.json, the DESIGN.md
-// frontmatter, and every preview :root all read from this one source. Null when no palette enabled.
+// dsColorRoles(state) → the reduced consumption set (§6.5/§7): { chrome, tokens:[{name, light,dark}],
+// alias }. Each end = { rgb, frac, hex, oklch } — the kit's role ends VERBATIM. tokens.json, the
+// DESIGN.md frontmatter, and every preview :root all read from this one source. Null when no palette
+// enabled. The reduced set is a NAME reduction of the semantic layer, never a value adjustment.
 function dsColorRoles(state) {
   const palettes = derivedAll(state);
   if (!palettes.length) return null;
   const chrome = dsChrome(palettes);
   const onSurf = dsRole(chrome, "-on-surface");
   if (!onSurf) return null;
-  const poles = { ink: onSurf.light.rgb, paper: onSurf.dark.rgb };
 
   const endOf = (e) => {
     const frac = e.frac == null ? 1 : e.frac;
     return { rgb: e.rgb, frac, hex: e.hex != null ? e.hex : (frac === 1 ? hexOf(e.rgb) : hex8(e.rgb, frac)), oklch: roleOklch({ rgb: e.rgb, frac }) };
   };
-  const rgbEnd = (rgb) => endOf({ rgb, frac: 1 });
   const tokens = [];
   const push = (name, l, d) => tokens.push({ name, light: l, dark: d });
   const slot = (p, suffix, name) => { const r = dsRole(p, suffix); if (r) push(name, endOf(r.light), endOf(r.dark)); };
 
-  // ── chrome family: the neutral-duty surface + state slots ──
+  // ── chrome family: the neutral-duty surface + accent + state slots (all role-table verbatim) ──
   const cn = chrome.n;
   slot(chrome, "-background", `${cn}-background`);
   slot(chrome, "-surface", `${cn}-surface`);
@@ -5257,17 +5190,13 @@ function dsColorRoles(state) {
   slot(chrome, "-on-surface", `${cn}-on-surface`);
   slot(chrome, "-on-surface-variant", `${cn}-on-surface-variant`);
   slot(chrome, "-outline-variant", `${cn}-outline-variant`);
-  const chL = dsFillOn(chrome, poles, "light", false), chD = dsFillOn(chrome, poles, "dark", false);
-  push(`${cn}`, rgbEnd(chL.fillRgb), rgbEnd(chD.fillRgb));
-  // hover/active are MEASURED against the chosen on-color (dsStateFills) — the table ref where it
-  // holds, a step in the label's contrast direction where it doesn't.
-  const chSL = dsStateFills(chrome, "light", chL.fillRgb, chL.onRgb), chSD = dsStateFills(chrome, "dark", chD.fillRgb, chD.onRgb);
-  push(`${cn}-hover`, rgbEnd(chSL.hoverRgb), rgbEnd(chSD.hoverRgb));
-  push(`${cn}-active`, rgbEnd(chSL.activeRgb), rgbEnd(chSD.activeRgb));
+  slot(chrome, "", `${cn}`);
+  slot(chrome, "-hover", `${cn}-hover`);
+  slot(chrome, "-active", `${cn}-active`);
   slot(chrome, "-disabled", `${cn}-disabled`); // the 500-600 inert wash — a real token, not a preview opacity
-  push(`${cn}-on-${cn}`, rgbEnd(chL.onRgb), rgbEnd(chD.onRgb));
+  slot(chrome, `-on-${cn}`, `${cn}-on-${cn}`);
 
-  // ── every other family: base fill + its button states + measured on-color (§7 R2) ──
+  // ── every other family: base fill + its button states + the kit's on-color (§7 R2) ──
   // EVERY fill family carries `-hover` and `-disabled` (so any intent can be a real button — the preview
   // renders them from these tokens, never a brightness()/opacity() fake). Only the brand family also
   // carries `-active` (the primary action the DESIGN.md prose names with its active step); the chrome
@@ -5279,15 +5208,11 @@ function dsColorRoles(state) {
   const rank = (p) => { const t = p.name.toLowerCase(); const i = intentOrder.findIndex((k) => t.includes(k)); return i < 0 ? 99 : i; };
   const intents = palettes.filter((p) => p !== chrome && isIntent(p)).sort((a, b) => rank(a) - rank(b));
   for (const p of [...others, ...intents]) {
-    const fl = dsFillOn(p, poles, "light", true), fd = dsFillOn(p, poles, "dark", true);
-    push(`${p.n}`, rgbEnd(fl.fillRgb), rgbEnd(fd.fillRgb));
-    // states MEASURED against the chosen on-color (never the raw table ref when it would fail AA —
-    // a bright fill takes the ink label, and the table's darker light-mode hover moves against it).
-    const sL = dsStateFills(p, "light", fl.fillRgb, fl.onRgb), sD = dsStateFills(p, "dark", fd.fillRgb, fd.onRgb);
-    push(`${p.n}-hover`, rgbEnd(sL.hoverRgb), rgbEnd(sD.hoverRgb));
-    if (p === brandPal) push(`${p.n}-active`, rgbEnd(sL.activeRgb), rgbEnd(sD.activeRgb));
+    slot(p, "", `${p.n}`);
+    slot(p, "-hover", `${p.n}-hover`);
+    if (p === brandPal) slot(p, "-active", `${p.n}-active`);
     slot(p, "-disabled", `${p.n}-disabled`);
-    push(`${p.n}-on-${p.n}`, rgbEnd(fl.onRgb), rgbEnd(fd.onRgb));
+    slot(p, `-on-${p.n}`, `${p.n}-on-${p.n}`);
   }
 
   // ── Stitch-compat alias: `primary` = the brand-base fill (satisfies the required `primary` role).
@@ -5303,7 +5228,7 @@ function dsColorRoles(state) {
   const aliasDistinct = !tokens.some((t) => t.name === alias.name);
 
   const families = [chrome.n, ...others.map((p) => p.n), ...intents.map((p) => p.n)];
-  return { chrome, poles, tokens, alias, aliasDistinct, families };
+  return { chrome, tokens, alias, aliasDistinct, families };
 }
 
 // dsFactor — leading as a unitless multiplier of size (§9.2: never px). dsTypeLayer — the full voice·step
@@ -5361,7 +5286,7 @@ function exportDesignSystemTokens(state, typeSc, geomSc) {
   for (const t of ds.tokens) { colors[t.name] = t.light.oklch; colorsDark[t.name] = t.dark.oklch; }
   if (ds.aliasDistinct) { colors[ds.alias.name] = ds.alias.light.oklch; colorsDark[ds.alias.name] = ds.alias.dark.oklch; }
   const { semantic, semanticDark } = dsSemanticLayer(state);
-  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. Two color tiers: \`colors\`/\`colorsDark\` are the MEASURED consumption grammar (every on-pair ≥4.5:1 in both schemes — the set the DESIGN.md teaches); \`semantic\`/\`semanticDark\` are the FULL semantic role layer (every role of every palette) for consumers that need the complete set. Values are high-resolution OKLCH (never bare hex); alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px) and letterSpacing, where present, an em factor. \`geometry\` is the full dimensional system (control size ramp, insets, gaps, borders, focus ring; px numbers); \`spacing\`/\`radii\` remain the compact ladders.`;
+  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. Two color tiers: \`colors\`/\`colorsDark\` are the reduced consumption grammar (the set the DESIGN.md teaches — the kit's resolved role values VERBATIM, per its onColorMode setting; contrast is measured and disclosed in README.md); \`semantic\`/\`semanticDark\` are the FULL semantic role layer (every role of every palette) for consumers that need the complete set. Values are high-resolution OKLCH (never bare hex); alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px) and letterSpacing, where present, an em factor. \`geometry\` is the full dimensional system (control size ramp, insets, gaps, borders, focus ring; px numbers); \`spacing\`/\`radii\` remain the compact ladders.`;
   return JSON.stringify({
     $generator: "Ultimate Tokens by NONOUN",
     $note: note,
@@ -5631,7 +5556,8 @@ function dsSpineBody(ds, state, ctx) {
   const colors = [
     "## Colors", "",
     "Reason over **roles**, never raw hexes. Each role names its light value; the frontmatter carries the",
-    "`-dark` sibling. All fill/on-pairs are contrast-verified ≥ 4.5:1 in both schemes.", "",
+    "`-dark` sibling. Fill/on-pairs follow the kit's `onColorMode` setting; contrast is measured", "",
+    "and disclosed in the bundle receipt — values are the kit's own, never silently corrected.", "",
     "### Token naming", "",
     `Every color token follows the **Ultimate Tokens grammar**: \`--{prefix}-{family}-{slot}\`. This`,
     `project's prefix is \`${pfx}\`; its families are ${fams.map((f) => `\`${f}\``).join(", ")}. Construct names, do not invent them:`, "",
@@ -5685,7 +5611,7 @@ function dsSpineBody(ds, state, ctx) {
     `- **Buttons.** \`button-primary\` per the frontmatter; **hover** \`${ref(brand + "-hover")}\`, **active**`,
     `  \`${ref(brand + "-active")}\` (each ships both scheme ends); **focus** a 2px \`${ref(brand)}\` outline at 2px`,
     `  offset; **disabled** \`${ref(brand + "-disabled")}\` (the inert 60% wash, mode-independent). EVERY fill family`,
-    "  carries its own `-hover` and `-disabled` — any intent is a real button; every state fill is measured ≥4.5:1 with the family's `on-{family}`, stepping in the label's contrast direction.",
+    "  carries its own `-hover` and `-disabled` — any intent is a real button; state fills and labels are the kit's role values under its `onColorMode` setting.",
     `- **Inputs.** \`${ref(cn + "-surface")}\` field, 1px \`${ref(cn + "-outline-variant")}\`, \`${ref(cn + "-on-surface")}\` text,`,
     `  \`${ref(cn + "-on-surface-variant")}\` placeholder; **focus** swaps the border to \`${ref(brand)}\` plus a 2px ring.`,
     `- **Cards.** \`${ref(cn + "-surface")}\` on \`${ref(cn + "-background")}\`, 1px \`${ref(cn + "-outline-variant")}\`, \`{rounded.lg}\`.`,
@@ -5798,10 +5724,28 @@ function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
   }
 
   // ── gate lines shared by every profile (the carrier IS the same canonical core) ──
-  const contrastLines = [
-    "- 🟢 Contrast: all declared fill/on-pairs ≥ 4.5:1, both schemes, all-pairs policy (R1 measured — dark-scheme",
-    "  foregrounds are near-black, not white; a light fill in the dead zone is stepped one ramp step)",
-  ];
+  // KIT FIDELITY: contrast is MEASURED over every derivable on/fill pair (the §8 G1 derivation run on
+  // this very bundle's carriers) and DISCLOSED — never silently corrected. `onColorMode` is the user's
+  // setting: "fixed" is the uniform-brand-label choice whose sub-4.5 pairs are an accepted brand
+  // override (ADR-003); "contrast" re-points labels per fill inside the role table itself.
+  const onMode = state && state.onColorMode === "contrast" ? "contrast" : "fixed";
+  const gateRun = dsBundleGates({
+    designMd: exportDesignSystemSpine(state, typeSc, geomSc),
+    tokensJson: exportDesignSystemTokens(state, typeSc, geomSc),
+    previews: previews.map((p) => ({ name: p.name.replace("components/", ""), html: p.data })),
+  });
+  const g1Fails = gateRun.findings.filter((f) => f.level === "ERROR" && f.gate === "G1");
+  const g1Pass = gateRun.findings.filter((f) => f.level === "PASS" && f.gate === "G1").map((f) => f.msg);
+  const contrastLines = g1Fails.length === 0
+    ? [
+        `- 🟢 Contrast: every derivable fill/on-pair ≥ 4.5:1 in both schemes, measured on this bundle's carriers (${g1Pass.join("; ") || "all pairs pass"}) — under the kit's \`onColorMode: ${onMode}\``,
+      ]
+    : [
+        `- 🟡 Contrast measured: ${g1Fails.length} derivable fill/on-pair(s) below 4.5:1 under the kit's \`onColorMode: ${onMode}\` — the uniform brand on-colors the user set (an accepted brand override, ADR-003); values ship VERBATIM and the misses are disclosed, never silently corrected:`,
+        ...g1Fails.slice(0, 8).map((f) => `  - ${f.msg}`),
+        ...(g1Fails.length > 8 ? [`  - … ${g1Fails.length - 8} more (run the §8 gate for the full list)`] : []),
+        "  Switching the kit to `onColorMode: contrast` re-points each label to its measured end.",
+      ];
   const schemeParityLine = ds.aliasDistinct
     ? `- 🟢 Scheme parity: identical ${nTotal}-key inventory (${nGrammar} grammar tokens + the \`primary\` Stitch-compat alias); schemes ride as \`-dark\` siblings`
     : `- 🟢 Scheme parity: identical ${nTotal}-key inventory (${nGrammar} grammar tokens; the brand family is already named \`primary\`, so it doubles as the Stitch-required key — no separate alias); schemes ride as \`-dark\` siblings`;
@@ -5859,9 +5803,8 @@ function exportDesignSystemReceipt(state, typeSc, geomSc, opts = {}) {
       ...contrastLines,
       "- 🟢 D3 scheme parity: every grammar-token table row in `foundations/color.md` states light",
       "  AND dark",
-      "- 🟢 D10 carrier equality: `styles.css` is the shadcn projection in the MEASURED on-color mode",
-      "  (R1 — the dark-scheme fill foregrounds are the contrast-passing near-black pole, matching the",
-      "  canonical core, NOT the config's fixed white which fails AA on the brightened dark fills); each",
+      "- 🟢 D10 carrier equality: `styles.css` is the shadcn projection of the kit's resolved roles",
+      "  under its own `onColorMode` setting (kit fidelity — the same values the app shows); each",
       "  shadcn token is a `var()` LINK into the appended design-token layer (one source of truth per",
       "  value); the paste-ready `light-dark()` block in `foundations/color.md` re-expresses that SAME",
       "  carrier, resolved and measured against it token-for-token",
@@ -5935,7 +5878,7 @@ function exportDesignSystemStitchBundle(state, typeSc, geomSc, opts = {}) {
 // FIGMA MAKE profile — a routed guidelines/ tree (design-system-for-figma-make/, Phase 4).
 // Figma Make validates NOTHING itself (no linter, no schema) — make_guidelines_check.py
 // (D1–D6, D10, D11) is the gate of record. Reuses the SAME canonical core as the other two
-// profiles: dsColorRoles for the contrast-verified grammar tokens (R1, ≥4.5:1 by construction),
+// profiles: dsColorRoles for the grammar tokens (the kit's resolved roles verbatim — kit fidelity),
 // exportShadcn in the MEASURED on-color mode (onColorMode:"contrast") for styles.css (the D10 carrier —
 // so its dark foregrounds pass AA like the core, never fixed white), dsTypeLayer/dsSpacing/dsRadii for
 // the scale tables. Theme-general throughout — no brand-specific names/values are hardcoded.
@@ -6069,7 +6012,7 @@ function dsMakeSetupMd(typeSc) {
 
 // dsMakeColorMd — shadcn/Tailwind class prose (fill/on pairs, states as modifiers) PLUS a
 // contrast-verified grammar-token reference table (D2/D3 carrier — dsColorRoles tokens are
-// measured >=4.5:1 both schemes by construction, R1) PLUS the D4 paste-ready light-dark()
+// the kit's resolved role values verbatim) PLUS the D4 paste-ready light-dark()
 // runtime block (parsed from the SAME styles.css text via dsShadcnRuntimeMap — the D10 carrier).
 function dsMakeColorMd(ds, pfx, shadcnCss) {
   const rt = dsShadcnRuntimeMap(shadcnCss);
@@ -6111,9 +6054,9 @@ function dsMakeColorMd(ds, pfx, shadcnCss) {
     "- Do NOT use `destructive` decoratively — status only, never an ordinary button.",
     "- States are Tailwind modifiers on the base class, not separate roles:",
     "  `hover:bg-primary/90`, `active:bg-primary/80`.", "",
-    "## Grammar token reference (contrast-verified, both schemes ≥ 4.5:1)", "",
-    "The Ultimate Tokens grammar (`--{prefix}-{family}[-slot]`) is the measured canonical source behind",
-    "the classes above — each family's fill/on-fill pair verified ≥ 4.5:1 in both schemes. Families mapped",
+    "## Grammar token reference (light + dark, the kit's resolved values)", "",
+    "The Ultimate Tokens grammar (`--{prefix}-{family}[-slot]`) is the canonical source behind the",
+    "classes above — the kit's resolved role values under its `onColorMode` setting. Families mapped",
     "to a utility class above (the surfaces · `primary`/`secondary`/`accent`/`destructive`) are bound by",
     "that class; a family below with NO utility class (e.g. the muted signature families, `success`/",
     "`warning`) is a **reference hue** — bind it via `var(--{prefix}-{family})` or add a shadcn role to",
@@ -6332,20 +6275,12 @@ function exportDesignSystemMakeBundle(state, typeSc, geomSc, opts = {}) {
   const pfx = cssPrefixOf(state);
   const name = (state && state.name) || "Design System";
   const story = (state && state.story) || {};
-  // R1 (measured on-colors, ≥4.5:1 in BOTH schemes) governs every target of this overhaul, so the
-  // shadcn projection is forced to the MEASURED on-color mode — exactly what dsColorRoles does for the
-  // Claude Code/Stitch targets. Without this, the config's `onColorMode: "fixed"` keeps white foregrounds
-  // in dark mode (contrast ~3.3 on the brightened fills — a real AA failure a consuming agent would ship,
-  // and a contradiction with the contrast-verified grammar table). "contrast" flips the dark foregrounds
-  // to the near-black pole (≥5.1), matching the canonical core. One core, one measured on-color policy.
-  // One contrast-mode state feeds BOTH the projection and the appended full layer, so every shadcn
-  // token can be a var() LINK into the design-token layer and resolve to the identical measured value.
-  // aliasPrefix wires the links; radii/fonts seed --radius and the @theme font slots from the real
-  // scales (previously omitted — the radius silently fell back to shadcn's 0.625rem default and the
-  // font vars setup.md promises were absent).
-  const contrastState = { ...state, onColorMode: "contrast" };
-  const shadcnCss = exportShadcn(contrastState, { aliasPrefix: pfx, radii: dsRadii(geomSc), fonts: (typeSc && typeSc.fonts) || {} });
-  const stylesCss = shadcnCss + dsFullLayersCss(contrastState, typeSc, geomSc);
+  // KIT FIDELITY: the projection and the appended full layer read the SAME state under the user's own
+  // `onColorMode` (never forced to "contrast" — that setting is the user's, ADR-003), so every shadcn
+  // token can be a var() LINK into the design-token layer and resolve to the identical kit value.
+  // aliasPrefix wires the links; radii/fonts seed --radius and the @theme font slots from the real scales.
+  const shadcnCss = exportShadcn(state, { aliasPrefix: pfx, radii: dsRadii(geomSc), fonts: (typeSc && typeSc.fonts) || {} });
+  const stylesCss = shadcnCss + dsFullLayersCss(state, typeSc, geomSc);
   return [
     { name: "guidelines/Guidelines.md", data: dsMakeGuidelinesMd(name, story) },
     { name: "guidelines/setup.md", data: dsMakeSetupMd(typeSc) },
