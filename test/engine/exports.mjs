@@ -225,6 +225,20 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   if (/^\s+[a-z0-9-]+(?:-dark)?:\s*"light-dark\(/mi.test(md)) FAIL("design-system", "light-dark() in a frontmatter carrier (Stitch rejects it)");
   if (!/color-scheme: light dark/.test(md) || !/light-dark\(oklch/.test(md)) FAIL("design-system", "no color-scheme + light-dark(oklch) runtime block");
 
+  // BRIGHT-BRAND regression fixture (the real ADIA kit params): base fills luminous enough that the
+  // MEASURED light-scheme label is the INK pole. The role table's mode-mirrored hover (darker in light)
+  // then moves AGAINST the ink label — pre-fix, 7/8 families failed AA on the light hover pair (the
+  // default theme masked it: its labels are white, so darkening hover *gains* contrast). dsStateFills
+  // must keep every emitted state pair ≥4.5 for THIS shape too, not just the default.
+  {
+    const BRIGHT = { curve: "logistic", tension: 0, lmin: 4, lmax: 100, damp: 80, dampCurve: 1.2, dampAmp: 90, dampBias: -30, hueSpace: "oklch", relChroma: false, chromaFloor: 40, toneMode: "perceptual", vibrancy: 0, onColorMode: "fixed", accentRef: "single", theme: "auto", palettes: [{ name: "Neutral", hue: 225, chroma: 10, skew: -20, lift: 0, hueShift: 15, hueSameDir: false, on: true, cuspPull: 0 }, { name: "Primary", hue: 225, chroma: 85, skew: -20, lift: 0, hueShift: 10, hueSameDir: false, on: true, cuspPull: 26 }, { name: "Secondary", hue: 205, chroma: 40, skew: 0, lift: 0, hueShift: 20, hueSameDir: false, on: true, cuspPull: 25 }, { name: "Tertiary", hue: 285, chroma: 45, skew: -20, lift: 0, hueShift: 20, hueSameDir: false, on: true }, { name: "Info", hue: 265, chroma: 45, skew: -20, lift: 0, hueShift: 20, hueSameDir: false, on: true }, { name: "Success", hue: 150, chroma: 40, skew: -20, lift: -5, hueShift: 0, hueSameDir: false, on: true }, { name: "Warning", hue: 75, chroma: 50, skew: 40, lift: 15, hueShift: 30, hueSameDir: true, on: true, cuspPull: 100 }, { name: "Danger", hue: 25, chroma: 40, skew: -20, lift: -5, hueShift: 0, hueSameDir: false, on: true, cuspPull: 0 }] };
+    const bf = X.exportDesignSystemBundle(BRIGHT, tsc, gsc);
+    const bByName = Object.fromEntries(bf.map((f) => [f.name, f.data]));
+    const bPrev = bf.filter((f) => f.name.startsWith("components/")).map((p) => ({ name: p.name.replace("components/", ""), html: p.data }));
+    const bg = dsBundleGates({ designMd: bByName["DESIGN.md"], tokensJson: bByName["tokens.json"], previews: bPrev });
+    if (bg.fails > 0) FAIL("design-system", `bright-brand fixture: §8 gates ${bg.fails} fail(s) — ${bg.findings.filter((f) => f.level === "ERROR").slice(0, 4).map((f) => f.msg).join(" | ")}`);
+  }
+
   // the §8 gate CATCHES a broken bundle (a constant dark on-color) — proves npm test would fail on the F1 defect.
   if (tj) {
     // Inject the F1 defect — a constant white dark on-color — into the OKLCH carrier: it diverges from the
@@ -310,17 +324,30 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   // forces onColorMode:"contrast" so the dark foregrounds are the contrast-passing pole, like dsColorRoles;
   // raw "fixed"-mode shadcn ships white foregrounds that fail AA on the brightened dark fills).
   const styles = byName["guidelines/styles.css"];
-  const shadcnPart = X.exportShadcn({ ...C(ALL), onColorMode: "contrast" });
-  if (!styles.startsWith(shadcnPart)) FAIL("design-system-make", "styles.css does not START with exportShadcn(state) in the measured (contrast) on-color mode (the D10 carrier prefix)");
+  // The projection is exportShadcn in contrast mode with the LINKING opts the bundle passes: aliasPrefix
+  // (every color value a var() into the token layer), radii (--radius from the real geometry, never the
+  // 0.625rem fallback), fonts (the @theme font slots setup.md promises).
+  const shadcnPart = X.exportShadcn({ ...C(ALL), onColorMode: "contrast" }, { aliasPrefix: "c", radii: Object.fromEntries(Object.entries(gsc.radii)), fonts: tsc.fonts });
+  if (!styles.startsWith(shadcnPart)) FAIL("design-system-make", "styles.css does not START with the aliased contrast-mode shadcn projection");
+  if (!/--primary:\s*var\(--c-primary\);/.test(styles)) FAIL("design-system-make", "shadcn tokens are not LINKED (var()) to the design-token layer");
+  if (/--radius:\s*0\.625rem/.test(styles)) FAIL("design-system-make", "--radius fell back to the shadcn default instead of the geometry md corner");
+  if (!/--font-sans:/.test(styles)) FAIL("design-system-make", "@theme font slots missing (setup.md promises them)");
   if (!styles.includes("FULL token layers")) FAIL("design-system-make", "styles.css missing the appended full token layers");
   // the appendix must land AFTER the @theme block so the D10 parse (first :root -> .dark -> @theme) is untouched
   if (styles.indexOf("FULL token layers") < styles.indexOf("@theme inline {")) FAIL("design-system-make", "full-layer appendix must come after @theme inline (D10 parse safety)");
+  // every var() link must RESOLVE to a concrete value in both schemes (the map contract survives aliasing)
+  const rmap = X.dsShadcnRuntimeMap(styles);
+  for (const tok of ["--background", "--primary", "--primary-foreground", "--destructive", "--border"]) {
+    const e = rmap[tok];
+    if (!e || !/^(oklch\(|#)/.test(e.light) || !/^(oklch\(|#)/.test(e.dark)) FAIL("design-system-make", `${tok} does not resolve to concrete values through the link layer`);
+  }
   // R1 guard — the dark-scheme fill foregrounds must be the near-black ink pole, NEVER fixed white (which
-  // fails AA on the brightened dark fills). Locks the measured on-color mode against a silent revert.
-  const darkBlock = styles.slice(styles.indexOf(".dark"));
-  for (const role of ["primary-foreground", "secondary-foreground", "destructive-foreground"]) {
-    const m = new RegExp(`--${role}:\\s*(oklch\\([^)]*\\))`).exec(darkBlock);
-    if (m && /oklch\(1\s+0\b/.test(m[1])) FAIL("design-system-make", `styles.css dark --${role} is fixed white (AA-failing) — R1 measured on-color regressed`);
+  // fails AA on the brightened dark fills). Under aliasing the shadcn block holds var() links, so the
+  // guard reads the RESOLVED map (vacuous-grep is exactly how the original bug hid).
+  for (const role of ["--primary-foreground", "--secondary-foreground", "--destructive-foreground"]) {
+    const e = rmap[role];
+    if (!e) FAIL("design-system-make", `${role} missing from the resolved runtime map`);
+    else if (/oklch\(1\s+0\b/.test(e.dark)) FAIL("design-system-make", `resolved dark ${role} is fixed white (AA-failing) — R1 measured on-color regressed`);
   }
 
   // SELF-CONTAINMENT: no file may reference a path outside the shipped folder (`../styles.css` WITHIN
