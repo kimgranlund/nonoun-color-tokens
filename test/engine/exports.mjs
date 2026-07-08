@@ -183,9 +183,29 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   if (previews.length < 5) FAIL("design-system", `too few previews (${previews.length})`);
   const asPreviews = previews.map((p) => ({ name: p.name.replace("components/", ""), html: p.data }));
 
-  // §8 GATES — the ported platform-agnostic verifier must report ZERO fails on the emitted bundle.
+  // §8 GATES — KIT FIDELITY: G1 (contrast) is a MEASUREMENT of the kit's own onColorMode choice
+  // (fixed = uniform brand labels, sub-4.5 pairs accepted per ADR-003) and is DISCLOSED in the
+  // receipt; every OTHER gate (G0 parse, G2 parity, G3 carrier equality, G5 refs, G6 sections,
+  // G7 roles, G8 leading) stays a hard ZERO.
   const gate = dsBundleGates({ designMd: byName["DESIGN.md"], tokensJson: byName["tokens.json"], previews: asPreviews });
-  if (gate.fails > 0) FAIL("design-system", `§8 gates: ${gate.fails} fail(s) — ${gate.findings.filter((f) => f.level === "ERROR").map((f) => f.msg).join(" | ")}`);
+  const nonG1 = gate.findings.filter((f) => f.level === "ERROR" && f.gate !== "G1");
+  if (nonG1.length > 0) FAIL("design-system", `§8 non-G1 gates: ${nonG1.length} fail(s) — ${nonG1.map((f) => `[${f.gate}] ${f.msg}`).join(" | ")}`);
+  const g1Count = gate.findings.filter((f) => f.level === "ERROR" && f.gate === "G1").length;
+  const receipt = byName["README.md"];
+  if (g1Count > 0) {
+    if (!/🟡 Contrast measured/.test(receipt)) FAIL("design-system", "G1 misses exist but the receipt has no 🟡 contrast disclosure");
+    if (!receipt.includes(`${g1Count} derivable fill/on-pair(s) below 4.5:1`)) FAIL("design-system", `receipt disclosure count does not match the gate (${g1Count})`);
+    if (!/ADR-003/.test(receipt)) FAIL("design-system", "contrast disclosure missing the ADR-003 brand-override citation");
+  } else if (!/🟢 Contrast/.test(receipt)) FAIL("design-system", "all pairs pass but the receipt has no 🟢 contrast line");
+
+  // KIT FIDELITY — the reduced grammar is a NAME reduction of the semantic layer: values VERBATIM.
+  {
+    const tjF = JSON.parse(byName["tokens.json"]);
+    for (const [nm, sem] of [["primary", "primary"], ["primary-on-primary", "primary-on-primary"], ["primary-hover", "primary-hover"], ["neutral-background", "neutral-background"]]) {
+      if (tjF.colors[nm] !== tjF.semantic[sem]) FAIL("design-system", `colors.${nm} !== semantic.${sem} — the export adjusted a kit value (fidelity broken)`);
+      if (tjF.colorsDark[nm] !== tjF.semanticDark[sem]) FAIL("design-system", `colorsDark.${nm} !== semanticDark.${sem} — the export adjusted a kit value (fidelity broken)`);
+    }
+  }
 
   // tokens.json shape: grammar-named colors + `primary` alias, scheme parity, numeric type/space/radii, leading FACTOR
   let tj = null;
@@ -236,17 +256,23 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
     const bByName = Object.fromEntries(bf.map((f) => [f.name, f.data]));
     const bPrev = bf.filter((f) => f.name.startsWith("components/")).map((p) => ({ name: p.name.replace("components/", ""), html: p.data }));
     const bg = dsBundleGates({ designMd: bByName["DESIGN.md"], tokensJson: bByName["tokens.json"], previews: bPrev });
-    if (bg.fails > 0) FAIL("design-system", `bright-brand fixture: §8 gates ${bg.fails} fail(s) — ${bg.findings.filter((f) => f.level === "ERROR").slice(0, 4).map((f) => f.msg).join(" | ")}`);
+    const bNonG1 = bg.findings.filter((f) => f.level === "ERROR" && f.gate !== "G1");
+    if (bNonG1.length > 0) FAIL("design-system", `bright-brand fixture: non-G1 gates ${bNonG1.length} fail(s) — ${bNonG1.slice(0, 4).map((f) => `[${f.gate}] ${f.msg}`).join(" | ")}`);
+    // fidelity: the bright kit's values ship VERBATIM (fixed-mode G1 misses are the kit's own, disclosed)
+    const bTj = JSON.parse(bByName["tokens.json"]);
+    if (bTj.colors["primary"] !== bTj.semantic["primary"] || bTj.colors["primary-on-primary"] !== bTj.semantic["primary-on-primary"]) FAIL("design-system", "bright-brand fixture: export adjusted a kit value (fidelity broken)");
+    const bG1 = bg.findings.filter((f) => f.level === "ERROR" && f.gate === "G1").length;
+    if (bG1 > 0 && !bByName["README.md"].includes(`${bG1} derivable fill/on-pair(s) below 4.5:1`)) FAIL("design-system", "bright-brand fixture: receipt does not disclose the measured G1 count");
   }
 
   // the §8 gate CATCHES a broken bundle (a constant dark on-color) — proves npm test would fail on the F1 defect.
   if (tj) {
-    // Inject the F1 defect — a constant white dark on-color — into the OKLCH carrier: it diverges from the
-    // OKLCH frontmatter (G3) and, as white on a light dark-scheme fill, fails the on-pair contrast (G1). #FFFFFF
-    // is valid input (the gate's parseColor accepts hex OR oklch), so this is a deliberate, gate-tripping break.
-    const bad = JSON.parse(JSON.stringify(tj)); const onKey = Object.keys(bad.colorsDark).find((k) => /^(.+)-on-\1$/.test(k)); bad.colorsDark[onKey] = "#FFFFFF";
+    // Inject a carrier-divergence defect into the OKLCH tokens.json: a value no kit token plausibly is
+    // (#123456), so it MUST diverge from the OKLCH frontmatter and trip G3. (The old #FFFFFF injection went
+    // vacuous under kit fidelity — fixed-mode dark on-colors can BE white, making white a no-op mutation.)
+    const bad = JSON.parse(JSON.stringify(tj)); const onKey = Object.keys(bad.colorsDark).find((k) => /^(.+)-on-\1$/.test(k)); bad.colorsDark[onKey] = "#123456";
     const g = dsBundleGates({ designMd: md, tokensJson: bad, previews: asPreviews });
-    if (g.fails === 0) FAIL("design-system", "the §8 gate does not catch a constant dark on-color (F1)");
+    if (!g.findings.some((f) => f.level === "ERROR" && f.gate === "G3")) FAIL("design-system", "the §8 gate does not catch a constant dark on-color (F1 — G3 carrier divergence)");
   }
 
   // disabled-palette fallback: all-off → tokens.json-only with a $note, no throw
@@ -341,13 +367,15 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
     const e = rmap[tok];
     if (!e || !/^(oklch\(|#)/.test(e.light) || !/^(oklch\(|#)/.test(e.dark)) FAIL("design-system-make", `${tok} does not resolve to concrete values through the link layer`);
   }
-  // R1 guard — the dark-scheme fill foregrounds must be the near-black ink pole, NEVER fixed white (which
-  // fails AA on the brightened dark fills). Under aliasing the shadcn block holds var() links, so the
-  // guard reads the RESOLVED map (vacuous-grep is exactly how the original bug hid).
-  for (const role of ["--primary-foreground", "--secondary-foreground", "--destructive-foreground"]) {
-    const e = rmap[role];
-    if (!e) FAIL("design-system-make", `${role} missing from the resolved runtime map`);
-    else if (/oklch\(1\s+0\b/.test(e.dark)) FAIL("design-system-make", `resolved dark ${role} is fixed white (AA-failing) — R1 measured on-color regressed`);
+  // KIT-FIDELITY guard — the resolved shadcn foregrounds must equal the kit's own on-role values
+  // (tokens.json semantic layer, same state): the projection may never re-measure or re-point a label.
+  {
+    const tjm = JSON.parse(X.exportDesignSystemTokens(C(ALL), tsc, gsc));
+    for (const [tok, sem] of [["--primary-foreground", "primary-on-primary"], ["--primary", "primary"], ["--background", "neutral-background"]]) {
+      const e = rmap[tok];
+      if (!e) { FAIL("design-system-make", `${tok} missing from the resolved runtime map`); continue; }
+      if (e.light !== tjm.semantic[sem] || e.dark !== tjm.semanticDark[sem]) FAIL("design-system-make", `resolved ${tok} != the kit's ${sem} role — the projection adjusted a kit value (fidelity broken)`);
+    }
   }
 
   // SELF-CONTAINMENT: no file may reference a path outside the shipped folder (`../styles.css` WITHIN
@@ -388,9 +416,9 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   for (const m of colorMd.matchAll(tokenRowRe)) tokenRows++;
   if (tokenRows === 0) FAIL("design-system-make", "no `--token` grammar rows found in foundations/color.md (D2 needs >=1)");
 
-  // D10 (measured, not left UNMEASURED) — the runtime block's tokens equal a sibling built from the
-  // SAME canonical shadcn parse the emitter uses: exportShadcn in the MEASURED (contrast) on-color mode.
-  const rtMap = X.dsShadcnRuntimeMap(X.exportShadcn({ ...C(ALL), onColorMode: "contrast" }));
+  // D10 (measured, not left UNMEASURED) — the runtime block's tokens equal the SHIPPED styles.css
+  // parse (kit fidelity: same state, same carrier, links resolved — never a re-forced mode).
+  const rtMap = X.dsShadcnRuntimeMap(styles);
   if (Object.keys(rtMap).length === 0) FAIL("design-system-make", "dsShadcnRuntimeMap parsed no tokens");
   for (const [tok, { light, dark }] of Object.entries(rtMap))
     if (!colorMd.includes(`${tok}: light-dark(${light}, ${dark})`)) FAIL("design-system-make", `color.md runtime block diverges from the shadcn carrier for ${tok}`);
