@@ -352,6 +352,20 @@ if (applyFloatPlans) {
   }
 }
 
+// ── list-fonts: the UI asks which families Figma can use; the sandbox answers with families only ──
+{
+  const F5 = mockFigma();
+  new Function("figma", "__html__", "module", code)(F5.figma, "<html>", undefined);
+  await F5.figma.ui._h({ type: "list-fonts" });
+  const msg = F5.figma.ui._posted.find((m) => m && m.type === "fonts-listed");
+  if (!msg) FAIL("fonts", "list-fonts posted no {fonts-listed} message");
+  else {
+    if (!Array.isArray(msg.families) || msg.families.indexOf("Inter") < 0) FAIL("fonts", "fonts-listed carries no family list");
+    if (new Set(msg.families).size !== msg.families.length) FAIL("fonts", "fonts-listed families are not deduped (one entry per family, not per face)");
+    if (msg.families.some((f) => typeof f !== "string")) FAIL("fonts", "fonts-listed must carry family NAMES only");
+  }
+}
+
 // ── apply FAILURE posts {apply-error} so the UI can clear its optimistic "Applying…" toast ──
 {
   const F4 = mockFigma();
@@ -361,7 +375,7 @@ if (applyFloatPlans) {
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "floatapply", "floatidem", "floatprune", "floatprov", "applysys", "applydone", "config", "read"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "floatapply", "floatidem", "floatprune", "floatprov", "applysys", "applydone", "config", "read", "fonts"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

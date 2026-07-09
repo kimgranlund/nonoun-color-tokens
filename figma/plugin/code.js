@@ -66,6 +66,7 @@ const ACTIONS = {
   "save-config": "save the palette set",
   "load-config": "load the palette set",
   "read-variables": "read this file's variables",
+  "list-fonts": "read Figma's font list",
   "load-sets": "load your palettes",
   "save-sets": "save your palettes",
 };
@@ -114,6 +115,13 @@ figma.ui.onmessage = async (msg) => {
       const config = readConfig();
       figma.ui.postMessage({ type: "config-loaded", config });
       if (!config) figma.notify("No saved palette set in this file");
+    } else if (msg.type === "list-fonts") {
+      // the UI asks which font FAMILIES this Figma can actually use, so the Fonts panel can mark a
+      // family that will be substituted (see applyStylePlans' scaffold path). Families only — the
+      // face list is large and the panel needs presence, not weights.
+      var fams = {};
+      for (const f of await figma.listAvailableFontsAsync()) { const fn = f.fontName || f; fams[fn.family] = 1; }
+      figma.ui.postMessage({ type: "fonts-listed", families: Object.keys(fams) });
     } else if (msg.type === "read-variables") {
       const live = await readRawColors(); // read-only reference for the drift diff
       figma.ui.postMessage({ type: "variables-read", found: live.found, raw: live.raw });

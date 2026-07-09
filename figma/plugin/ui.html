@@ -1457,6 +1457,14 @@ a.account-manage:hover { text-decoration: underline; }
 .icon-tile small { color: var(--c-on-surface-variant); }
 .icon-tile-lic { opacity: .7; }
 .icon-custom-name, .icon-custom-variant { min-width: 180px; }
+
+
+/* Fonts panel — per-role availability badge (two truths: 'in Figma' vs 'renders here') */
+.tyi-font-badge { font-size: 10px; line-height: 1; padding: 3px 6px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--c-outline-variant); color: var(--c-on-surface-variant); cursor: help; }
+.tyi-font-badge.is-ok { color: var(--c-success-on-success); background: var(--c-success); border-color: transparent; }
+.tyi-font-badge.is-sub, .tyi-font-badge.is-fallback { color: var(--c-warning-on-warning); background: var(--c-warning); border-color: transparent; }
+.tyi-font-badge.is-unknown { opacity: .6; }
 </style></head>
 <body><nonoun-color-tokens></nonoun-color-tokens>
 <script type="module">
@@ -8580,6 +8588,9 @@ class HctApp extends HTMLElement {
     this.category = null; // open Category category slug within the gallery hub (null = hub). UI-session only.
     this._categoryData = {}; // slug → { VOLUMES, PRESETS } cache for lazily-loaded category modules
     this.inFigma = false; // set true by the Figma bridge (gen-ui.mjs) on figma-init → reveals "Add Variables → Figma"
+    this._figmaFonts = null;          // Set of family names Figma can use (asked once, inFigma only)
+    this._figmaFontsRequested = false;
+    this._faceCache = new Map();      // family → does it actually RENDER here (web probe, cleared on font change)
     this.liveVars = null; // { "{n}/{key}": hex } read from the file (read-only drift reference); null = not read
     this.liveVarsFound = false; // whether the file has a raw-colors collection (gates the gallery import row)
     this.fileConfig = null; // the LOSSLESS parametric config embedded in the Figma file (root pluginData), if any
@@ -12487,6 +12498,7 @@ class HctApp extends HTMLElement {
       { class: "insp-body" },
       h("h3", { class: "insp-title" }, icon("type"), "Fonts"),
       h("div", { class: "insp-sub" }, "Pick a bundled font or type any family for each role."),
+      this._fontsPanelSideEffects(),
       h(
         "div",
         { class: "tyi-fonts" },
@@ -12511,6 +12523,7 @@ class HctApp extends HTMLElement {
               onchange: (e) => this._setTypeFont(role, e.target.value),
             }),
             h("datalist", { id: "tyfonts-" + role }, ...opts.map((f) => h("option", { value: f }))),
+            (() => { const st = this._fontStatus(family); return h("span", { class: "tyi-font-badge is-" + st.state, title: st.title, "data-fk": "tyfontbadge:" + role }, st.label); })(),
           );
         }),
       ),
@@ -12518,9 +12531,86 @@ class HctApp extends HTMLElement {
     );
   }
 
+  // ── font availability ────────────────────────────────────────────────────────────────────────
+  // TWO different truths, never conflated:
+  //   inFigma → can Figma USE this family? (its own font list; a miss means text styles get a
+  //             placeholder face, family still variable-bound — see applyStylePlans' scaffold path)
+  //   web     → does the face actually RENDER here? (bundled offline, or loaded from Google Fonts)
+  // Ask Figma once; the sandbox answers with `fonts-listed`.
+  _requestFigmaFonts() {
+    if (!this.inFigma || this._figmaFontsRequested) return;
+    this._figmaFontsRequested = true;
+    try { parent.postMessage({ pluginMessage: { type: "list-fonts" } }, "*"); } catch (e) { /* not in a frame */ }
+  }
+  receiveFigmaFonts(families) {
+    this._figmaFonts = new Set(Array.isArray(families) ? families : []);
+    this.render();
+  }
+
+  // _faceRenders(fam) — does this family actually paint, or is the browser silently substituting a
+  // generic? `document.fonts.check` FALSE-NEGATIVES on variable fonts, so measure DOM width instead:
+  // a family that is applied renders at a different width than the bare generic it falls back to.
+  // Unmeasurable (no DOM / headless shim) ⇒ assume it renders — never cry wolf.
+  _faceRenders(fam) {
+    if (!fam) return true;
+    if (SELF_HOSTED_FONTS.has(fam) || GENERIC_FONTS.has(fam.toLowerCase())) return true;
+    if (this._faceCache.has(fam)) return this._faceCache.get(fam);
+    let out = true;
+    if (typeof document !== "undefined" && document.body && document.createElement) {
+      try {
+        const width = (stack) => {
+          const el = document.createElement("span");
+          el.textContent = "mmmmmmmmmmlliWWWW0O";
+          el.style.cssText = "position:absolute;left:-9999px;top:-9999px;white-space:nowrap;font-size:72px;font-family:" + stack;
+          document.body.appendChild(el);
+          const w = el.offsetWidth;
+          el.remove();
+          return w;
+        };
+        // quote the family — an unquoted name with a digit/space is invalid in a strict parser (Safari)
+        const gens = ["monospace", "serif", "sans-serif"];
+        const pairs = gens.map((gen) => [width(gen), width(`'${fam}', ${gen}`)]);
+        // NOT measurable (headless shim / display:none / layout not yet flushed → every width 0)?
+        // Assume it renders. A "falls back" badge must be EARNED by a real measurement, never by a
+        // silent zero — the false negative this guard exists to prevent.
+        out = pairs.every(([base]) => !(base > 0))
+          ? true
+          : pairs.some(([base, test]) => base > 0 && test > 0 && Math.abs(test - base) > 0.5);
+      } catch (e) { out = true; }
+    }
+    this._faceCache.set(fam, out);
+    return out;
+  }
+
+  // _fontsPanelSideEffects — ask Figma for its font list (once), and in the web app re-render once the
+  // lazily-injected Google faces settle, so a badge flips "falls back" → "loaded" rather than lying.
+  _fontsPanelSideEffects() {
+    this._requestFigmaFonts();
+    if (!this.inFigma && !this._fontsReadyHooked && typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+      this._fontsReadyHooked = true;
+      document.fonts.ready.then(() => { this._faceCache.clear(); this.render(); }).catch(() => {});
+    }
+    return false; // renders nothing
+  }
+
+  // _fontStatus(family) → the badge for one role: { state, label, title }.
+  _fontStatus(family) {
+    if (this.inFigma) {
+      if (!this._figmaFonts) return { state: "unknown", label: "checking…", title: "Asking Figma which font families it can use." };
+      if (this._figmaFonts.has(family)) return { state: "ok", label: "in Figma", title: "Figma has this family — its text styles render in the real face." };
+      return { state: "sub", label: "not in Figma", title: "Figma doesn't have this family. Its text styles are built on a placeholder face, but the family stays bound to the font variable — install the font and they adopt it, no re-apply." };
+    }
+    if (SELF_HOSTED_FONTS.has(family)) return { state: "ok", label: "bundled", title: "Embedded in the app — renders offline, and inside the Figma plugin." };
+    if (GENERIC_FONTS.has(String(family).toLowerCase())) return { state: "ok", label: "generic", title: "A CSS generic family." };
+    return this._faceRenders(family)
+      ? { state: "ok", label: "loaded", title: "Loaded from Google Fonts — the specimen renders the real face." }
+      : { state: "fallback", label: "falls back", title: "Not loaded (not a Google font, or still loading) — the specimen renders the closest generic. Exports still carry the exact family name." };
+  }
+
   // _setTypeFont(role, value) — set/clear a per-role custom font on doc.type.fonts. Empty OR the treatment
   // default clears the override (so a default round-trips clean). Fonts are mode-independent → always the base.
   _setTypeFont(role, value) {
+    this._faceCache.clear(); this._fontsReadyHooked = false; // a new family must be re-probed
     this.commit((doc) => {
       const t = doc.type || { ...DEFAULT_TYPE };
       const treatment = TYPE_TREATMENTS.find((x) => x.id === t.treatment) || TYPE_TREATMENTS[0];
@@ -15105,6 +15195,9 @@ customElements.define("nonoun-color-tokens", HctApp);
     // gallery sets: code.js read the user's "Your Palettes" from figma.clientStorage (the localStorage
     // the sandboxed iframe can't persist). Hand them to the generator to restore the gallery.
     if(m.type==="sets-loaded"){ var c=app(); if(c&&typeof c.receiveStoredSets==="function") c.receiveStoredSets(m.sets); }
+    // font availability: code.js listed Figma's usable font families; the Fonts panel marks any family
+    // that isn't there (its text styles get a placeholder face, family stays variable-bound).
+    if(m.type==="fonts-listed"){ var f=app(); if(f&&typeof f.receiveFigmaFonts==="function") f.receiveFigmaFonts(m.families); }
     // apply completion: the async variable write actually FINISHED (or failed) in the sandbox — the UI's
     // optimistic "Applying…" toast can't know when, so code.js signals back → a real "Applied N…" / error toast.
     if(m.type==="apply-done"){ var d=app(); if(d&&typeof d.onApplyDone==="function") d.onApplyDone(m); }

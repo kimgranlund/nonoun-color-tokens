@@ -1475,6 +1475,23 @@ ok(app.doc.type.fonts && app.doc.type.fonts.body === "Custom Sans" && app._activ
 ok(hydSet(serSet(app.doc)).type.fonts.body === "Custom Sans", "(tyf) the custom font round-trips through persist");
 app._setTypeFont("body", ""); flushRaf();
 ok(!app.doc.type.fonts, "(tyf) clearing the only override removes doc.type.fonts (reverts to the treatment)");
+// (tyfa) font AVAILABILITY badges — two different truths, never conflated.
+app.render(); flushRaf();
+ok(app.querySelectorAll(".tyi-font-badge").length === 5, `(tyfa) one availability badge per font role (got ${app.querySelectorAll(".tyi-font-badge").length})`);
+// web: the 4 self-hosted faces are "bundled"; an unmeasurable env never cries wolf (assumes it renders)
+ok(!app.inFigma && app._fontStatus("Inter").label === "bundled" && app._fontStatus("Inter").state === "ok", "(tyfa) a self-hosted face reads 'bundled' in the web app");
+ok(app._fontStatus("Bodoni Moda").state === "ok", "(tyfa) with no DOM measurement available the probe assumes the face renders (never a false 'falls back')");
+// figma: the ONLY truth is Figma's own font list — asked once, answered via the bridge
+app.inFigma = true; app._figmaFonts = null; app._figmaFontsRequested = false;
+ok(app._fontStatus("Inter").state === "unknown" && app._fontStatus("Inter").label === "checking…", "(tyfa) before Figma answers, availability is 'checking…' not a guess");
+app.receiveFigmaFonts(["Inter", "Roboto"]); flushRaf();
+ok(app._fontStatus("Inter").state === "ok" && app._fontStatus("Inter").label === "in Figma", "(tyfa) a family Figma has reads 'in Figma'");
+{
+  const st = app._fontStatus("Broadway");
+  ok(st.state === "sub" && st.label === "not in Figma" && /placeholder face/.test(st.title) && /variable/.test(st.title), "(tyfa) a family Figma LACKS reads 'not in Figma' and explains the placeholder + variable-bound self-heal");
+}
+ok(app._fontStatus("Inter").label !== "bundled", "(tyfa) inside Figma, 'bundled' (a web-app truth) is never shown — the two truths stay separate");
+app.inFigma = false; app._figmaFonts = null; app._figmaFontsRequested = false; app.render(); flushRaf();
 app.typeSegment = "scale"; app.render(); flushRaf();
 // (tyv) Scale tab — per-voice tuning: select a voice → its shaping sliders expand; _setTypeVoice writes
 // doc.type.voices + flows to the scale + persist; reset clears. (Voices are mode-independent → the base.)

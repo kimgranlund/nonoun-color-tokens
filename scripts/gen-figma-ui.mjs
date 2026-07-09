@@ -37,6 +37,9 @@ const BRIDGE = `
     // gallery sets: code.js read the user's "Your Palettes" from figma.clientStorage (the localStorage
     // the sandboxed iframe can't persist). Hand them to the generator to restore the gallery.
     if(m.type==="sets-loaded"){ var c=app(); if(c&&typeof c.receiveStoredSets==="function") c.receiveStoredSets(m.sets); }
+    // font availability: code.js listed Figma's usable font families; the Fonts panel marks any family
+    // that isn't there (its text styles get a placeholder face, family stays variable-bound).
+    if(m.type==="fonts-listed"){ var f=app(); if(f&&typeof f.receiveFigmaFonts==="function") f.receiveFigmaFonts(m.families); }
     // apply completion: the async variable write actually FINISHED (or failed) in the sandbox — the UI's
     // optimistic "Applying…" toast can't know when, so code.js signals back → a real "Applied N…" / error toast.
     if(m.type==="apply-done"){ var d=app(); if(d&&typeof d.onApplyDone==="function") d.onApplyDone(m); }

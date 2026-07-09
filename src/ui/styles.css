@@ -1442,3 +1442,11 @@ a.account-manage:hover { text-decoration: underline; }
 .icon-tile small { color: var(--c-on-surface-variant); }
 .icon-tile-lic { opacity: .7; }
 .icon-custom-name, .icon-custom-variant { min-width: 180px; }
+
+
+/* Fonts panel — per-role availability badge (two truths: 'in Figma' vs 'renders here') */
+.tyi-font-badge { font-size: 10px; line-height: 1; padding: 3px 6px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--c-outline-variant); color: var(--c-on-surface-variant); cursor: help; }
+.tyi-font-badge.is-ok { color: var(--c-success-on-success); background: var(--c-success); border-color: transparent; }
+.tyi-font-badge.is-sub, .tyi-font-badge.is-fallback { color: var(--c-warning-on-warning); background: var(--c-warning); border-color: transparent; }
+.tyi-font-badge.is-unknown { opacity: .6; }
