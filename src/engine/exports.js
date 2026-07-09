@@ -19,6 +19,7 @@
 
 import { paletteStops, EXPORT_STOPS, DEFAULT_CONTROLS } from "./tonal.js";
 import { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAccentRef } from "./semantic.js";
+import { iconSystem, iconSystemLabel } from "./icon-systems.mjs";
 import { oklchToSrgb8, hexToSrgb8, pyRound, dsBundleGates } from "./ds-gates.js"; // §8 carrier primitives + the gate itself — the receipt cites the SAME run the gate measures
 
 // WCAG relative luminance of an [r,g,b] (0..255) triple — for the opt-in contrast on-color pick.
@@ -765,7 +766,7 @@ export function exportDesignSystemTokens(state, typeSc, geomSc) {
   for (const t of ds.tokens) { colors[t.name] = t.light.oklch; colorsDark[t.name] = t.dark.oklch; }
   if (ds.aliasDistinct) { colors[ds.alias.name] = ds.alias.light.oklch; colorsDark[ds.alias.name] = ds.alias.dark.oklch; }
   const { semantic, semanticDark } = dsSemanticLayer(state);
-  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. Two color tiers: \`colors\`/\`colorsDark\` are the reduced consumption grammar (the set the DESIGN.md teaches — the kit's resolved role values VERBATIM, per its onColorMode setting; contrast is measured and disclosed in README.md); \`semantic\`/\`semanticDark\` are the FULL semantic role layer (every role of every palette) for consumers that need the complete set. Values are high-resolution OKLCH (never bare hex); alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px) and letterSpacing, where present, an em factor. \`geometry\` is the full dimensional system (control size ramp, insets, gaps, borders, focus ring; px numbers); \`spacing\`/\`radii\` remain the compact ladders.`;
+  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. Two color tiers: \`colors\`/\`colorsDark\` are the reduced consumption grammar (the set the DESIGN.md teaches — the kit's resolved role values VERBATIM, per its onColorMode setting; contrast is measured and disclosed in README.md); \`semantic\`/\`semanticDark\` are the FULL semantic role layer (every role of every palette) for consumers that need the complete set. Values are high-resolution OKLCH (never bare hex); alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px) and letterSpacing, where present, an em factor. \`geometry\` is the full dimensional system (control size ramp, insets, gaps, borders, focus ring; px numbers); \`spacing\`/\`radii\` remain the compact ladders. \`icons\` names the icon library + its stroke variant this kit binds to, with the size ramp it renders at (from geometry) — bind to it, never substitute another set.`;
   return JSON.stringify({
     $generator: "Ultimate Tokens by NONOUN",
     $note: note,
@@ -773,7 +774,18 @@ export function exportDesignSystemTokens(state, typeSc, geomSc) {
     semantic, semanticDark,
     type: dsTypeLayer(typeSc), spacing: dsSpacing(geomSc), radii: dsRadii(geomSc),
     geometry: dsGeometryLayer(geomSc),
+    icons: dsIconLayer(state, geomSc),
   }, null, 2);
+}
+
+// dsIconLayer — the ICON facet: the library + its stroke/fill variant the kit binds to, plus the SIZE
+// ramp it renders at (read from geometry, never redefined here — `sizes.<size>.icon` composes with the
+// control heights by the centering law). Always present: an agent must never have to pick a library.
+function dsIconLayer(state, geomSc) {
+  const ic = iconSystem((state && state.icons) || {});
+  const sizes = {};
+  if (geomSc && geomSc.sizes) for (const [k, v] of Object.entries(geomSc.sizes)) if (Number.isFinite(v.icon)) sizes[k.toLowerCase()] = v.icon;
+  return { family: ic.name, ...(ic.variant ? { variant: ic.variant } : {}), ...(ic.license ? { license: ic.license } : {}), ...(ic.url ? { url: ic.url } : {}), sizes };
 }
 
 // The consumption typography selection (§9.2: the 9–15 band a single screen draws on). Theme-independent
@@ -875,7 +887,7 @@ export function exportDesignSystemSpine(state, typeSc, geomSc) {
     "---",
   ].join("\n");
 
-  const body = dsSpineBody(ds, state, { pfx, name, story, cn, brand, secondary, accent, metal, usedLevels, radii });
+  const body = dsSpineBody(ds, state, { pfx, name, story, cn, brand, secondary, accent, metal, usedLevels, radii, geomSc });
   return `${frontmatter}\n\n${body}\n`;
 }
 
@@ -1009,7 +1021,7 @@ export function exportDesignSystemComponents(state, typeSc, geomSc) {
 // the Colors section teaches the naming grammar, and the Agent Prompt Guide carries the runtime
 // `color-scheme` + `light-dark()` idiom (light-dark ONLY here, never in a carrier — §6.4).
 function dsSpineBody(ds, state, ctx) {
-  const { pfx, name, story, cn, brand, secondary, accent, metal, usedLevels, radii } = ctx;
+  const { pfx, name, story, cn, brand, secondary, accent, metal, usedLevels, radii, geomSc } = ctx;
   const has = (n) => ds.tokens.some((t) => t.name === n) || n === ds.alias.name;
   const ref = (n) => `{colors.${n}}`;
   const cap = (s) => s.split(/[-\s]/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
@@ -1086,6 +1098,26 @@ function dsSpineBody(ds, state, ctx) {
     "Soft-but-engineered: chips and tags `{rounded.xs}`, inputs `{rounded.sm}`, buttons `{rounded.md}`, cards",
     "and panels `{rounded.lg}`, modals `{rounded.xl}`, pills and avatars `{rounded.full}`. One radius language",
     "per view — rounded and sharp corners do not mix.",
+  ].join("\n");
+
+  // Iconography — an EXTRA section (canonical-order gate reads only the 8 canonical headings; extras ride
+  // the unknown-section tolerance). Prose, not frontmatter: the icon system is a binding RULE, not a token
+  // with a value, and a frontmatter key would trip the Stitch schema linter's unknown-key check.
+  const ic = iconSystem((state && state.icons) || {});
+  const iconSizes = geomSc && geomSc.sizes
+    ? Object.entries(geomSc.sizes).filter(([, v]) => Number.isFinite(v.icon)).map(([k, v]) => `${k.toLowerCase()} ${v.icon}px`).join(" · ")
+    : "";
+  const iconography = [
+    "## Iconography", "",
+    `**${iconSystemLabel(ic)}**${ic.license ? ` (${ic.license})` : ""} is this system's icon set${ic.url ? ` — \`${ic.url}\`` : ""}.`,
+    ic.variant
+      ? `Use the **${ic.variant}** ${ic.id === "phosphor" || ic.id === "tabler" || ic.id === "remix" ? "weight" : "style"} everywhere; mixing weights across one view reads as two systems.`
+      : "It ships one style — keep stroke width uniform across a view.",
+    "",
+    iconSizes ? `Icon SIZES come from the control ramp, never from the glyph: ${iconSizes}. An icon centers in a square cell of side = its control's height, so it scales with the control, not on its own.` : "Icon sizes come from the control ramp — an icon scales with its control, never on its own.",
+    "",
+    "Do NOT substitute another icon set, and do NOT mix emoji into the icon layer — an icon carries meaning in the",
+    "system's own hand; an emoji imports someone else's.",
   ].join("\n");
 
   const components = [
@@ -1168,7 +1200,7 @@ function dsSpineBody(ds, state, ctx) {
     `Deliberately refused: ${refuses}`,
   ].join("\n");
 
-  return [overview, colors, typography, layout, elevation, shapes, components, donts, responsive, agent].join("\n\n");
+  return [overview, colors, typography, layout, elevation, shapes, iconography, components, donts, responsive, agent].join("\n\n");
 }
 
 // exportDesignSystemReceipt — the README.md profile receipt (§4). Every 🟢 cites a check; DIVERGENCE

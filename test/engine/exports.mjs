@@ -231,6 +231,11 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
     if (!geo.sizes || !geo.sizes.md || !(geo.sizes.md.height > 0 && geo.sizes.md.icon > 0)) FAIL("design-system", "geometry.sizes.md missing/non-numeric");
     for (const grp of ["insets", "gaps", "borders", "focus"]) if (!geo[grp] || Object.values(geo[grp]).some((v) => typeof v !== "number")) FAIL("design-system", `geometry.${grp} missing/non-numeric`);
     if (!Object.values(tj.type.scale).some((st) => typeof st.letterSpacing === "number")) FAIL("design-system", "no type.scale step carries letterSpacing (tracking dropped)");
+    // ICONS — always present (an agent must never pick its own library); sizes come FROM geometry, never
+    // redefined, so the icon ramp must equal the geometry ramp's per-size icon px.
+    if (!tj.icons || tj.icons.family !== "Phosphor" || tj.icons.variant !== "regular") FAIL("design-system", `tokens.icons is not the default Phosphor·regular: ${JSON.stringify(tj.icons)}`);
+    const geoIcons = Object.fromEntries(Object.entries(gsc.sizes).map(([k, v]) => [k.toLowerCase(), v.icon]));
+    if (JSON.stringify(tj.icons.sizes) !== JSON.stringify(geoIcons)) FAIL("design-system", "tokens.icons.sizes diverges from the geometry ramp (icon sizes must never be redefined)");
   }
 
   // SELF-CONTAINMENT (standing rule): no emitted file may reference a path outside its shipped folder —
@@ -240,7 +245,11 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
 
   // DESIGN.md: the canonical sections, the grammar teaching, and light-dark() ONLY in the runtime block.
   const md = byName["DESIGN.md"];
-  for (const sec of ["## Overview", "## Colors", "## Typography", "## Components", "## Do's and Don'ts", "## Responsive Behavior", "## Agent Prompt Guide"]) if (!md.includes(sec)) FAIL("design-system", `spine missing ${sec}`);
+  for (const sec of ["## Overview", "## Colors", "## Typography", "## Iconography", "## Components", "## Do's and Don'ts", "## Responsive Behavior", "## Agent Prompt Guide"]) if (!md.includes(sec)) FAIL("design-system", `spine missing ${sec}`);
+  // the icon system is a binding RULE in PROSE, never a frontmatter key (a frontmatter `icons:` trips the
+  // Stitch schema linter's unknown-key check; the extra prose section rides its unknown-section tolerance).
+  if (/^icons:/m.test(md.split("---")[1] || "")) FAIL("design-system", "icons must not appear as a frontmatter key (Stitch unknown-key)");
+  if (!md.includes("Phosphor") || !/Icon SIZES come from the control ramp/.test(md)) FAIL("design-system", "the Iconography section does not name the library + fence sizes to the control ramp");
   if (!md.includes("### Token naming")) FAIL("design-system", "spine missing the Token naming grammar section");
   if (/^\s+[a-z0-9-]+(?:-dark)?:\s*"light-dark\(/mi.test(md)) FAIL("design-system", "light-dark() in a frontmatter carrier (Stitch rejects it)");
   if (!/color-scheme: light dark/.test(md) || !/light-dark\(oklch/.test(md)) FAIL("design-system", "no color-scheme + light-dark(oklch) runtime block");

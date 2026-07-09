@@ -19,6 +19,7 @@ import {
   peakC,
 } from "../engine/hct.js";
 import { oklchToRgb } from "../engine/okhsl.js";
+import { iconSystem } from "../engine/icon-systems.mjs";
 import {
   paletteStops,
   effHue,
@@ -245,6 +246,12 @@ export function figmaBundle(doc) {
 export function brandKit(doc, systems) {
   const sys = systems || { color: true, type: true, geometry: true };
   const kit = { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Ultimate Tokens by NONOUN" };
+  // the ICON facet — always served: an agent must never have to pick a library. Sizes ride the geometry
+  // system (below) when it is included; this names the library + its stroke/fill character.
+  {
+    const ic = iconSystem(doc.icons || {});
+    kit.icons = { family: ic.name, ...(ic.variant ? { variant: ic.variant } : {}), ...(ic.license ? { license: ic.license } : {}), ...(ic.url ? { url: ic.url } : {}) };
+  }
   if (sys.color) {
     const view = projectView(doc);
     const on = view.palettes.filter((p) => p.on);
