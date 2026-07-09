@@ -670,6 +670,12 @@ ok(sizeColor < sizeAll, `(mc5) deselecting type+geometry shrinks the Download-Al
 app.exportSystems = { color: false, type: true, geometry: false };
 app.downloadAllZip(mcView); const sizeType = allZip.length;
 ok(sizeType > 0 && sizeType !== sizeColor, `(mc6) a type-only bundle differs from a colour-only bundle (${sizeType} vs ${sizeColor})`);
+// (mc6b) the Styles opt-out gates the figma/styles.plan.json artifact (plans are large — the delta is real)
+app.exportSystems = { color: true, type: true, geometry: false, styles: true };
+app.downloadAllZip(mcView); const sizeStyles = allZip.length;
+app.exportSystems = { color: true, type: true, geometry: false, styles: false };
+app.downloadAllZip(mcView); const sizeNoStyles = allZip.length;
+ok(sizeStyles > sizeNoStyles, `(mc6b) toggling Styles off drops the styles.plan.json artifact (${sizeStyles} > ${sizeNoStyles})`);
 
 // the guard: the LAST selected system cannot be turned off
 app.exportSystems = { color: false, type: true, geometry: false };
@@ -1062,7 +1068,7 @@ const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
 // design-system-for-figma-make/ bundle: guidelines/{Guidelines.md, setup.md, styles.css,
 // foundations/{color,typography,spacing}.md, components/{overview,button}.md} + README.md (9, a routed tree),
 // all riding systems.color) + 4 figma-aliased + 5 typography (incl. figma/ + figma/ moded + figma/ primitives) + 4 geometry + config = 45.
-ok(eocdSig && entries === 45, `(ee) the EOCD reports 45 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (5) + geometry (4) + config (got ${entries})`);
+ok(eocdSig && entries === 46, `(ee) the EOCD reports 46 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (5) + geometry (4) + figma/styles.plan.json (1) + config (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
 const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "design-system-for-claude-code/DESIGN.md", "design-system-for-claude-code/tokens.json", "design-system-for-claude-code/components/colors.html", "design-system-for-claude-code/README.md", "design-system-for-google-stitch/DESIGN.md", "design-system-for-google-stitch/README.md", "design-system-for-figma-make/guidelines/Guidelines.md", "design-system-for-figma-make/guidelines/setup.md", "design-system-for-figma-make/guidelines/styles.css", "design-system-for-figma-make/guidelines/foundations/color.md", "design-system-for-figma-make/guidelines/foundations/typography.md", "design-system-for-figma-make/guidelines/foundations/spacing.md", "design-system-for-figma-make/guidelines/components/overview.md", "design-system-for-figma-make/guidelines/components/button.md", "design-system-for-figma-make/README.md", "nonoun-color-tokens-my-set-config.json",
   "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt",

@@ -13359,6 +13359,25 @@ class HctApp extends HTMLElement {
         { name: "figma/dimension.modes.variables.json", data: JSON.stringify(geomTokensFigmaModes(gsc, this._geomModeScales()), null, 2) },
       );
     }
+    // figma/styles.plan.json — the plugin-free STYLES import artifact (rides the Styles opt-out chip,
+    // compositional with the system toggles like the apply path): the same pure plans the in-Figma
+    // apply executes, so external tooling (or a later plugin-free import) can create the bound
+    // swatches without re-deriving anything. paints → Color Modes bindings; texts → Typography/Font
+    // Primitives bindings + literal fallbacks; fontPrimitives → the ordered ensure-plan.
+    if (sys.styles !== false && (sys.color || sys.type)) {
+      const stScale = sys.type ? this._typeScaleFor("base") : null;
+      let stFamilies = [];
+      if (sys.color) {
+        const tree = this.figmaBundle()["Light_tokens.json"];
+        const enabled = (this.doc.palettes || []).filter((p) => p && p.on !== false);
+        stFamilies = Object.keys(tree).filter((k) => k[0] !== "$").map((n, i) => ({ n, name: (enabled[i] && enabled[i].name) || n }));
+      }
+      const stPlans = stylePlans({ families: stFamilies, scale: stScale, include: { color: !!sys.color, type: !!sys.type } });
+      if (stPlans.paints.length || stPlans.texts.length) {
+        const artifact = { $schema: "nonoun-figma-styles.plan.v1", ...stPlans, ...(stPlans.texts.length && stScale ? { fontPrimitives: primitivesApplyPlan(typeTokensFigmaPrimitives(stScale)) } : {}) };
+        files.push({ name: "figma/styles.plan.json", data: JSON.stringify(artifact, null, 2) });
+      }
+    }
     // the re-importable parametric config — ALWAYS (it carries the colour + type + geometry params).
     files.push({ name: `nonoun-color-tokens-${s}-config.json`, data: JSON.stringify(serialize(this.doc), null, 2) });
     const bytes = zipStore(files);
