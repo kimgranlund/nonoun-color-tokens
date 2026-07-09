@@ -36,8 +36,9 @@ Derive OKLCH-true color, type & geometry systems from one source. Export to CSS,
 > color becomes a measured tonal ramp and 53 semantic roles, resolved for light and dark in one pass.
 > Typography and geometry compose from the same source: eleven type voices on a modular scale, a size
 > ramp built on one centering law. Every export — CSS custom properties, W3C design tokens, Tailwind,
-> shadcn, Figma variables, and a Brand-Kit MCP server your AI agents read directly, each under whichever
-> naming convention your team already uses — is the same decision, exported twice; it cannot drift. The
+> shadcn, Figma variables (with bound paint & text style swatches), and a Brand-Kit MCP server your AI
+> agents read directly, each under whichever naming convention your team already uses — is the same
+> decision, exported twice; it cannot drift. The
 > same kit also exports as a design system — `tokens.json`, a `DESIGN.md` generation prompt, and preview
 > cards — in a target each for Claude (`claude.ai/design` and Claude Code), Google Stitch, and Figma
 > Make, so whichever AI design tool you reach for generates on-brand screens from your system. It

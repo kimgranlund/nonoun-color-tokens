@@ -137,7 +137,9 @@ rest of the body to begin after it so the card truncates on a complete thought
 > Ship the whole kit without a hand-off: **CSS custom properties**, **W3C design tokens (DTCG)**,
 > **Tailwind**, and **shadcn** — under your own naming, whether that's the default, a Material 3-style
 > `--md-sys-*` root, or a `--{brand}-*` prefix your codebase already uses. Bind it to **Figma variables** —
-> Color Primitives and Color Modes, aliased so a raw-color edit cascades to every role. Or serve it to your
+> Color Primitives and Color Modes, aliased so a raw-color edit cascades to every role — with **style
+> swatches** bound to those variables: a paint style per semantic role, a text style per type step, each
+> tracking Light and Dark automatically. Or serve it to your
 > AI coding agents over **MCP**, so they build with your exact tokens instead of guessing a hex; the free
 > Ultimate Tokens **Claude plugin** teaches the agent which of the 53 roles to apply where. Or export a
 > **design system** for the AI design tools you use — `tokens.json`, a `DESIGN.md` generation prompt, and
@@ -205,7 +207,7 @@ bullets + FAQ only.
 • Three composing systems — Color · Typography · Geometry
 • Exports: CSS · DTCG · Tailwind · shadcn
 • Your own naming — Ultimate, Material 3-style --md-sys-*, or a --{brand}-* root
-• Figma variables — semantic binding cascade + breakpoint modes
+• Figma variables — semantic binding cascade + breakpoint modes, plus bound paint & text style swatches
 • Brand-Kit MCP — feed your exact tokens to Claude, Cursor, VS Code
 • Free Claude plugin — your coding agent applies your exact roles, not a guess
 • Design-system export — hand your kit to Claude, Google Stitch, or Figma Make to generate on-brand UI (free)
@@ -256,9 +258,10 @@ bullets + FAQ only.
 > No — the Figma plugin is free and runs fully offline. Pro lives in the web app.
 >
 > **What can I export?**
-> CSS custom properties, W3C design tokens (DTCG), Tailwind, and shadcn — plus Figma variables, a
-> Brand-Kit MCP server for AI agents, and a design-system export in a target each for Claude
-> (`claude.ai/design` and Claude Code), Google Stitch, and Figma Make to generate on-brand UI.
+> CSS custom properties, W3C design tokens (DTCG), Tailwind, and shadcn — plus Figma variables (with
+> bound paint & text style swatches), a Brand-Kit MCP server for AI agents, and a design-system export in
+> a target each for Claude (`claude.ai/design` and Claude Code), Google Stitch, and Figma Make to generate
+> on-brand UI.
 >
 > **Can I match my team's variable names?**
 > Yes. Pick a naming convention in **Settings → Export** and every export — colour, type, and geometry —

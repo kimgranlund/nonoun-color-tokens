@@ -44,8 +44,8 @@ Design tokens, derived — not guessed.
 
 **H2** `Every export, the same decision`
 
-> CSS custom properties. W3C design tokens. Tailwind. shadcn. Figma variables with a raw→role cascade.
-> A re-importable config. A design system your AI design tool — Claude (`claude.ai/design` and Claude Code), Google Stitch, or Figma Make — reads to generate on-brand UI. They aren't kept
+> CSS custom properties. W3C design tokens. Tailwind. shadcn. Figma variables with a raw→role cascade,
+> plus paint & text styles bound to them. A re-importable config. A design system your AI design tool — Claude (`claude.ai/design` and Claude Code), Google Stitch, or Figma Make — reads to generate on-brand UI. They aren't kept
 > in sync — they're derived from one source, so they cannot drift. Emit every one under your own naming: the default, a Material 3-style `--md-sys-*` root, or a
 > `--{brand}-*` prefix, so the tokens land in the convention your codebase already uses.
 

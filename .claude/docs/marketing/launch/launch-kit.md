@@ -50,6 +50,22 @@ within a minute of clicking. Posture: **social/short-form** (§4). Facts:
 > straight into your variable collections — 53 semantic roles, light + dark modes, raw→role cascade.
 > Fully offline, fully free. → (Community link)
 
+## Figma styles launch post
+
+> Apply → Figma now writes styles, not just variables. Every token gets a Figma style bound to the
+> variable behind it — a paint style per semantic role, a text style per type voice and step — so a
+> style tracks Light and Dark on its own. That's 424 paint styles on the default 8-palette kit (53
+> roles × 8). Free, part of the Figma apply; turn off the "Styles" toggle for variables only.
+> → (Community link)
+
+**Short variant** (one claim)
+
+```
+• Apply to Figma now drops style swatches bound to your variables — a paint
+  style per role, a text style per type step, each tracking Light + Dark on
+  its own. Free, part of the apply. → (Community link)
+```
+
 ## Claude plugin launch post
 
 > The Ultimate Tokens Claude plugin is live. Install it into Claude Code and your coding agent builds
