@@ -12,6 +12,7 @@ import { figmaBundle, defaultDocument } from "../../src/ui/model.mjs";
 import * as TYPE from "../../src/engine/type.mjs";
 import * as GEOM from "../../src/engine/geometry.mjs";
 import { modeApplyPlan } from "../../figma/binder/mode-apply-plan.mjs";
+import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
 
 const HERE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "figma", "plugin"); // the generator-as-plugin lives in figma/plugin/
 const fails = [];
@@ -70,6 +71,21 @@ function mockFigma() {
     root: { _pd: {}, setPluginData(k, v) { this._pd[k] = String(v); }, getPluginData(k) { return this._pd[k] || ""; } },
     ui: { _h: null, _posted: [], postMessage(m) { this._posted.push(m); }, set onmessage(fn) { this._h = fn; }, get onmessage() { return this._h; } },
     clientStorage: { _s: {}, async setAsync(k, v) { this._s[k] = v; }, async getAsync(k) { return this._s[k]; } },
+    // ── styles (paint + text) — the styles executor's surface ──
+    _styles: [],
+    async getLocalPaintStylesAsync() { return this._styles.filter((s) => s._kind === "PAINT"); },
+    async getLocalTextStylesAsync() { return this._styles.filter((s) => s._kind === "TEXT"); },
+    async getStyleByIdAsync(sid) { return this._styles.find((s) => s.id === sid) || null; },
+    createPaintStyle() { const st = { _kind: "PAINT", id: "s" + id++, name: "", paints: [], remove: function () { const i = figma._styles.indexOf(this); if (i >= 0) figma._styles.splice(i, 1); } }; this._styles.push(st); return st; },
+    createTextStyle() {
+      const st = { _kind: "TEXT", id: "s" + id++, name: "", fontName: null, fontSize: 0, lineHeight: null, letterSpacing: null, paragraphSpacing: 0, textCase: "ORIGINAL", _bound: {},
+        setBoundVariable: function (field, v) { this._bound[field] = v.id; },
+        remove: function () { const i = figma._styles.indexOf(this); if (i >= 0) figma._styles.splice(i, 1); } };
+      this._styles.push(st); return st;
+    },
+    // loadFontAsync resolves only for the faces the "installed" families expose (Regular/Bold/Medium
+    // everywhere; the executor's candidate walk must cope with a missing exotic face name).
+    async loadFontAsync(f) { if (!f || !f.family) throw new Error("no family"); if (["Regular", "Bold", "Medium", "Light", "SemiBold"].indexOf(f.style) < 0) throw new Error("no face " + f.style); },
     variables: {
       async getLocalVariableCollectionsAsync() { return collections.slice(); },
       createVariableCollection(name) {
@@ -94,18 +110,20 @@ function mockFigma() {
         variables.push(v); return v;
       },
       createVariableAlias(v) { return { type: "VARIABLE_ALIAS", id: v.id }; },
+      setBoundVariableForPaint(paint, field, v) { return Object.assign({}, paint, { boundVariables: { [field]: { type: "VARIABLE_ALIAS", id: v.id } } }); },
     },
   };
   return { figma, collections, variables };
 }
 
 // ── END-TO-END contract: figmaBundle() -> applyBundle() on the mock ──────────────
-let applyBundle, applyFloatPlans;
+let applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans;
 const F = mockFigma();
 try {
-  const load = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyFloatPlans };");
+  const load = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans };");
   const loaded = load(F.figma, "<html>", undefined); // closes over the MOCK figma
   applyBundle = loaded.applyBundle; applyFloatPlans = loaded.applyFloatPlans;
+  applyFontPrimitives = loaded.applyFontPrimitives; applyStylePlans = loaded.applyStylePlans;
 } catch (e) { FAIL("parse", "code.js failed to load: " + e.message); }
 
 if (applyBundle) {
@@ -336,6 +354,64 @@ for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cas
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
+// ── STYLES apply: paint styles bound to Color Modes vars; text styles set + bound; registry prune ──
+// Runs on the SAME mock F: applyBundle already created Color Modes, the float e2e already created the
+// Typography collection (base "product/16" scale) — exactly the state a real apply leaves behind.
+if (applyStylePlans && applyFontPrimitives) {
+  try {
+    const scale = TYPE.typeScale({ treatment: "product", bodyBase: 16, voices: { Display: { weights: [{ name: "Medium", weight: 500 }] } } });
+    const bundle = figmaBundle(defaultDocument());
+    const fams = Object.keys(bundle["Light_tokens.json"]).filter((n) => n[0] !== "$");
+    const families = fams.map((n) => ({ n, name: n.charAt(0).toUpperCase() + n.slice(1) }));
+    const plans = stylePlans({ families, scale });
+
+    const pr = await applyFontPrimitives(primitivesApplyPlan(TYPE.typeTokensFigmaPrimitives(scale)));
+    if (!pr || !pr.variables) FAIL("styles", "applyFontPrimitives created nothing");
+    const prim = F.collections.find((c) => c.name === "Font Primitives");
+    if (!prim) FAIL("styles", "no Font Primitives collection created");
+    else {
+      const fontAlias = F.variables.find((v) => v.variableCollectionId === prim.id && v.name === "font/Display");
+      const target = fontAlias && Object.values(fontAlias.values)[0];
+      if (!fontAlias || !target || target.type !== "VARIABLE_ALIAS") FAIL("styles", "font/Display is not aliased to its family primitive");
+    }
+
+    const sr = await applyStylePlans(plans);
+    const sem = F.collections.find((c) => c.name === "Color Modes");
+    const semIds = new Set(F.variables.filter((v) => v.variableCollectionId === sem.id).map((v) => v.id));
+    const paintStyles = F.figma._styles.filter((x) => x._kind === "PAINT");
+    if (sr.paints !== plans.paints.length || paintStyles.length !== plans.paints.length) FAIL("styles", `paint styles ${paintStyles.length}/${sr.paints}, expected ${plans.paints.length}`);
+    const unbound = paintStyles.filter((x) => !(x.paints[0] && x.paints[0].boundVariables && x.paints[0].boundVariables.color && semIds.has(x.paints[0].boundVariables.color.id)));
+    if (unbound.length) FAIL("styles", `${unbound.length} paint styles not bound to a Color Modes variable (e.g. ${unbound[0] && unbound[0].name})`);
+    if (!paintStyles.some((x) => /^[A-Z][a-z]+\/scrims\/scrim$/.test(x.name))) FAIL("styles", "no Family/scrims/scrim grouped paint style");
+    if (!paintStyles.some((x) => /^[A-Z][a-z]+\/surfaces\/surface$/.test(x.name))) FAIL("styles", "no Family/surfaces/surface grouped paint style");
+
+    const textStyles = F.figma._styles.filter((x) => x._kind === "TEXT");
+    if (sr.texts !== plans.texts.length || textStyles.length !== plans.texts.length) FAIL("styles", `text styles ${textStyles.length}/${sr.texts}, expected ${plans.texts.length}`);
+    const core = textStyles.find((x) => x.name === "Display/md");
+    const sib = textStyles.find((x) => x.name === "Display/md/Medium");
+    if (!core || !sib) FAIL("styles", "Display/md core or Display/md/Medium sibling text style missing");
+    if (core && (!core.fontName || core.fontName.style !== "Bold")) FAIL("styles", `Display core face = ${core && core.fontName && core.fontName.style}, want Bold (700 candidates)`);
+    if (sib && (!sib.fontName || sib.fontName.style !== "Medium")) FAIL("styles", `Display sibling face = ${sib && sib.fontName && sib.fontName.style}, want Medium`);
+    if (core && (!core.lineHeight || core.lineHeight.unit !== "PERCENT")) FAIL("styles", "text style lineHeight is not literal PERCENT");
+    if (core && !core._bound.fontSize) FAIL("styles", "core fontSize not bound to the Typography variable");
+    if (core && !core._bound.fontFamily) FAIL("styles", "core fontFamily not bound to the Font Primitives alias");
+    if (sib && !sib._bound.fontWeight) FAIL("styles", "sibling fontWeight not bound to weight/<voice>/<slug>");
+
+    // registry + idempotency + provenance-scoped prune
+    const reg = JSON.parse(F.figma.root.getPluginData("nonoun-color-tokens-styles"));
+    if (Object.keys(reg.paints).length !== plans.paints.length || Object.keys(reg.texts).length !== plans.texts.length) FAIL("styles", "style registry does not record every created style");
+    const userStyle = F.figma.createPaintStyle(); userStyle.name = "My Own/keep-me";
+    const before = F.figma._styles.length;
+    await applyStylePlans(plans);
+    if (F.figma._styles.length !== before) FAIL("styles", "re-apply is not idempotent (style count moved)");
+    const reduced = stylePlans({ families, scale: TYPE.typeScale({ treatment: "product", bodyBase: 16 }) }); // siblings dropped
+    const sr2 = await applyStylePlans(reduced);
+    if (F.figma._styles.some((x) => x.name === "Display/md/Medium")) FAIL("styles", "prune did not remove the dropped sibling style");
+    if (!F.figma._styles.some((x) => x.name === "My Own/keep-me")) FAIL("styles", "prune touched a USER style (provenance violated)");
+    if (!sr2.pruned) FAIL("styles", "prune count not reported");
+  } catch (e) { FAIL("styles", "styles apply threw: " + e.message); }
+}
+
 if (fails.length) { console.error(`\nFAIL: ${fails.length} gate failure(s)`); process.exit(1); }
-console.log("\nPASS: figma-plugin-app — manifest + offline code.js + bridged ui.html + the figmaBundle→variables cascade + the Type/Geometry breakpoint-mode apply");
+console.log("\nPASS: figma-plugin-app — manifest + offline code.js + bridged ui.html + the figmaBundle→variables cascade + the Type/Geometry breakpoint-mode apply + the styles apply (bound paints/texts, registry prune)");
 process.exit(0);

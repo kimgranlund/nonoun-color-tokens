@@ -98,3 +98,23 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
 
   return { paints, texts };
 }
+
+// primitivesApplyPlan — flatten the Font Primitives interchange (typeTokensFigmaPrimitives) into the
+// ordered, single-mode apply plan the plugin executor consumes: LITERALS FIRST (STRING/FLOAT with their
+// "Value"), then aliases — each alias guaranteed to follow its target (an alias whose target is absent
+// is dropped HERE, planner-side, so the executor can never dangle). Null when there is nothing to apply.
+export function primitivesApplyPlan(interchange) {
+  const coll = interchange && interchange.collections && interchange.collections["Font Primitives"];
+  const vars = coll && coll.variables && typeof coll.variables === "object" ? coll.variables : null;
+  if (!vars) return null;
+  const literals = [], aliases = [];
+  for (const name of Object.keys(vars).sort()) {
+    const v = vars[name];
+    if (!v) continue;
+    if (v.type === "ALIAS" && typeof v.target === "string") aliases.push({ name, type: "ALIAS", target: v.target });
+    else if ((v.type === "STRING" || v.type === "FLOAT") && v.values && v.values.Value !== undefined) literals.push({ name, type: v.type, value: v.values.Value });
+  }
+  const litNames = new Set(literals.map((l) => l.name));
+  const variables = [...literals, ...aliases.filter((a) => litNames.has(a.target))];
+  return variables.length ? { collection: "Font Primitives", mode: "Value", variables } : null;
+}

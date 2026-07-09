@@ -88,13 +88,23 @@ figma.ui.onmessage = async (msg) => {
         try { fr = await applyFloatPlans(msg.floatPlans); }
         catch (e) { console.error("[Ultimate Tokens] type/geometry apply failed:", e); }
       }
+      // STYLES (opt-out): paint + text styles bound to the variables just applied. Own try — a styles
+      // failure never masks the variable apply that already succeeded.
+      let sr = null;
+      if (msg.stylePlans && ((msg.stylePlans.paints || []).length || (msg.stylePlans.texts || []).length)) {
+        try {
+          if (msg.fontPrimitives) await applyFontPrimitives(msg.fontPrimitives);
+          sr = await applyStylePlans(msg.stylePlans);
+        } catch (e) { console.error("[Ultimate Tokens] styles apply failed:", e); }
+      }
       const parts = [];
       if (r) parts.push(`${r.raw} primitives + ${r.semantic} semantic variables (Light / Dark)` + (r.rebuilt ? ", regrouped" : "") + (r.pruned ? `, ${r.pruned} stale pruned` : ""));
       if (fr && fr.collections) parts.push(`${fr.variables} type/geometry variable${fr.variables === 1 ? "" : "s"} across ${fr.collections} collection${fr.collections === 1 ? "" : "s"}`);
+      if (sr && (sr.paints || sr.texts)) parts.push(`${sr.paints + sr.texts} style${sr.paints + sr.texts === 1 ? "" : "s"} (${sr.paints} color · ${sr.texts} text)` + (sr.pruned ? `, ${sr.pruned} stale pruned` : ""));
       figma.notify(parts.length ? "Applied " + parts.join(" · ") : "Nothing to apply — every system is toggled off.");
       // Signal the iframe UI that the async write actually COMPLETED (its optimistic "Applying…" toast alone
       // can't know when the sandbox finishes) → onApplyDone shows a real "Applied N…" toast + closes the gate.
-      figma.ui.postMessage({ type: "apply-done", raw: r ? r.raw : 0, semantic: r ? r.semantic : 0, floatVars: fr ? fr.variables : 0, floatCollections: fr ? fr.collections : 0 });
+      figma.ui.postMessage({ type: "apply-done", raw: r ? r.raw : 0, semantic: r ? r.semantic : 0, floatVars: fr ? fr.variables : 0, floatCollections: fr ? fr.collections : 0, paintStyles: sr ? sr.paints : 0, textStyles: sr ? sr.texts : 0 });
     } else if (msg.type === "save-config") {
       writeConfig(msg.config);
       figma.notify("Palette set saved into this file");
@@ -186,6 +196,163 @@ async function varsByName(collectionId) {
   const m = {};
   for (const v of all) if (v.variableCollectionId === collectionId) m[v.name] = v;
   return m;
+}
+
+// ── STYLES: Font Primitives + paint/text styles bound to the variables ─────────────────────────
+// The UI computes the plans (figma/binder/style-plan.mjs — pure, parity-gated); this executor runs
+// them verbatim. Provenance: STYLE_REGISTRY_KEY records the style ids WE created (name → id), so
+// pruning can never touch a user's own styles — the float-registry discipline, applied to styles.
+const STYLE_REGISTRY_KEY = "nonoun-color-tokens-styles";
+function readStyleRegistry() {
+  try {
+    const raw = figma.root.getPluginData(STYLE_REGISTRY_KEY);
+    const reg = raw ? JSON.parse(raw) : null;
+    return reg && typeof reg === "object" ? { paints: reg.paints || {}, texts: reg.texts || {} } : { paints: {}, texts: {} };
+  } catch (e) { return { paints: {}, texts: {} }; }
+}
+function writeStyleRegistry(reg) { figma.root.setPluginData(STYLE_REGISTRY_KEY, JSON.stringify(reg)); }
+
+// applyFontPrimitives — ensure the single-mode "Font Primitives" collection (family STRINGs, weight
+// FLOATs, font/<voice> aliases) the text styles bind into. The plan (primitivesApplyPlan) is ordered
+// literals-first, so every alias target already exists when the alias is written.
+async function applyFontPrimitives(plan) {
+  if (!plan || !plan.collection || !Array.isArray(plan.variables) || !plan.variables.length) return null;
+  const reg = readFloatRegistry(); // same provenance store as Typography/Geometry (name → collection id)
+  const coll = await ensureFloatCollection(plan.collection, reg);
+  const defaultId = coll.defaultModeId || coll.modes[0].modeId;
+  coll.renameMode(defaultId, plan.mode || "Value");
+  const byName = await varsByName(coll.id);
+  const current = new Set();
+  let count = 0;
+  for (const v of plan.variables) {
+    if (!v || !v.name) continue;
+    if (v.type === "ALIAS") {
+      const target = byName[v.target];
+      if (!target) continue; // planner guarantees order; a missing target is a malformed plan — skip, never throw
+      const vr = byName[v.name] || figma.variables.createVariable(v.name, coll, target.type || "STRING");
+      vr.setValueForMode(defaultId, figma.variables.createVariableAlias(target));
+      byName[v.name] = vr; current.add(v.name); count++;
+    } else {
+      const vr = byName[v.name] || figma.variables.createVariable(v.name, coll, v.type || "STRING");
+      vr.setValueForMode(defaultId, v.type === "FLOAT" ? Number(v.value) : String(v.value));
+      byName[v.name] = vr; current.add(v.name); count++;
+    }
+  }
+  for (const name of Object.keys(byName)) if (!current.has(name)) byName[name].remove();
+  writeFloatRegistry(reg);
+  return { variables: count };
+}
+
+// the Figma style-string candidates per ladder weight — tried in order against loadFontAsync until one
+// exists in the family (static families name faces, they don't expose numeric weights).
+const WEIGHT_STYLE_CANDIDATES = {
+  100: ["Thin", "Hairline"], 200: ["ExtraLight", "Extra Light", "UltraLight", "Ultra Light"],
+  300: ["Light"], 400: ["Regular", "Normal", "Book"], 500: ["Medium"],
+  600: ["SemiBold", "Semi Bold", "Semibold", "DemiBold", "Demi Bold"], 700: ["Bold"],
+  800: ["ExtraBold", "Extra Bold", "UltraBold", "Ultra Bold"], 900: ["Black", "Heavy"],
+};
+function weightStyleCandidates(literal) {
+  const out = [];
+  if (literal && typeof literal.styleName === "string" && literal.styleName) out.push(literal.styleName);
+  const w = literal && Number.isFinite(literal.weight) ? Math.max(100, Math.min(900, Math.round(literal.weight / 100) * 100)) : 400;
+  const ladder = WEIGHT_STYLE_CANDIDATES[w] || [];
+  for (const c of ladder) if (out.indexOf(c) < 0) out.push(c);
+  if (out.indexOf("Regular") < 0) out.push("Regular");
+  return out;
+}
+
+// applyStylePlans — paint styles bound to the Color Modes variables; text styles set from the plan's
+// literals then BOUND per field to the Typography / Font Primitives variables where the target exists
+// (per-field graceful fallback: an absent variable or an unsupported binding leaves the literal value).
+// lineHeight/letterSpacing stay LITERAL PERCENT in v1 — the Typography vars carry them as % of size,
+// and a FLOAT binding on those fields reads as px, which would mis-set them.
+async function applyStylePlans(sp) {
+  const out = { paints: 0, texts: 0, pruned: 0, missingVars: 0 };
+  const reg = readStyleRegistry();
+
+  // ── paint styles → Color Modes variables ──
+  const paints = Array.isArray(sp.paints) ? sp.paints : [];
+  if (paints.length) {
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const sem = cols.find(function (c) { return c.name === SEMANTIC_COLLECTION; });
+    const semVars = sem ? await varsByName(sem.id) : {};
+    const local = await figma.getLocalPaintStylesAsync();
+    const byName = {};
+    for (const st of local) byName[st.name] = st;
+    const current = {};
+    for (const p of paints) {
+      const variable = semVars[p.varName];
+      if (!variable) { out.missingVars++; continue; }
+      let st = byName[p.name];
+      if (!st && reg.paints[p.name]) { try { st = await figma.getStyleByIdAsync(reg.paints[p.name]); } catch (e) { st = null; } }
+      if (!st) st = figma.createPaintStyle();
+      st.name = p.name;
+      st.paints = [figma.variables.setBoundVariableForPaint({ type: "SOLID", color: { r: 0, g: 0, b: 0 }, opacity: 1 }, "color", variable)];
+      current[p.name] = st.id; out.paints++;
+    }
+    for (const name of Object.keys(reg.paints)) {
+      if (current[name]) continue;
+      try { const st = await figma.getStyleByIdAsync(reg.paints[name]); if (st) { st.remove(); out.pruned++; } } catch (e) { /* already gone */ }
+    }
+    reg.paints = current;
+  }
+
+  // ── text styles → Typography + Font Primitives variables ──
+  const texts = Array.isArray(sp.texts) ? sp.texts : [];
+  if (texts.length) {
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const typoColl = cols.find(function (c) { return c.name === "Typography"; });
+    const primColl = cols.find(function (c) { return c.name === "Font Primitives"; });
+    const typoVars = typoColl ? await varsByName(typoColl.id) : {};
+    const primVars = primColl ? await varsByName(primColl.id) : {};
+    const local = await figma.getLocalTextStylesAsync();
+    const byName = {};
+    for (const st of local) byName[st.name] = st;
+    const current = {};
+    for (const t of texts) {
+      const lit = t.literal || {};
+      if (!lit.family || !Number.isFinite(lit.size)) continue;
+      let st = byName[t.name];
+      if (!st && reg.texts[t.name]) { try { st = await figma.getStyleByIdAsync(reg.texts[t.name]); } catch (e) { st = null; } }
+      if (!st) st = figma.createTextStyle();
+      st.name = t.name;
+      // font face: try the style-name candidates until one loads (static families name faces).
+      let loaded = null;
+      for (const cand of weightStyleCandidates(lit)) {
+        try { await figma.loadFontAsync({ family: lit.family, style: cand }); loaded = cand; break; }
+        catch (e) { /* try the next face name */ }
+      }
+      if (!loaded) continue; // family unavailable in this file — skip, never throw (report via texts count)
+      st.fontName = { family: lit.family, style: loaded };
+      st.fontSize = lit.size;
+      if (Number.isFinite(lit.lineHeight) && lit.size > 0) st.lineHeight = { unit: "PERCENT", value: (lit.lineHeight / lit.size) * 100 };
+      if (Number.isFinite(lit.letterSpacing) && lit.size > 0) st.letterSpacing = { unit: "PERCENT", value: (lit.letterSpacing / lit.size) * 100 };
+      if (Number.isFinite(lit.paragraphSpacing)) st.paragraphSpacing = lit.paragraphSpacing;
+      try { st.textCase = lit.textCase === "uppercase" ? "UPPER" : "ORIGINAL"; } catch (e) { /* older API */ }
+      // per-field bindings — only where the target variable exists; an unsupported field falls back to
+      // the literal already set above.
+      const bind = t.bind || {};
+      const bindField = function (field, pool) {
+        const target = bind[field] && pool[bind[field]];
+        if (!target) return;
+        try { st.setBoundVariable(field, target); } catch (e) { /* field not bindable in this API — literal stands */ }
+      };
+      bindField("fontSize", typoVars);
+      bindField("paragraphSpacing", typoVars);
+      bindField("fontFamily", primVars);
+      bindField("fontStyle", primVars);
+      bindField("fontWeight", primVars);
+      current[t.name] = st.id; out.texts++;
+    }
+    for (const name of Object.keys(reg.texts)) {
+      if (current[name]) continue;
+      try { const st = await figma.getStyleByIdAsync(reg.texts[name]); if (st) { st.remove(); out.pruned++; } } catch (e) { /* already gone */ }
+    }
+    reg.texts = current;
+  }
+
+  writeStyleRegistry(reg);
+  return out;
 }
 
 // ── the apply ───────────────────────────────────────────────────────────────────
@@ -319,4 +486,4 @@ async function applyFloatPlans(plans) {
 }
 
 // Exposed for the headless verifier (a no-op inside Figma's VM).
-if (typeof module !== "undefined") module.exports = { applyBundle, applyFloatPlans, rgbaOf, aliasTarget, childKeys };
+if (typeof module !== "undefined") module.exports = { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, weightStyleCandidates, rgbaOf, aliasTarget, childKeys };

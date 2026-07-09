@@ -5,7 +5,7 @@
 // semantic color vars; typeTokensFigmaModes/Primitives for the type vars) — so a drift in
 // either the planner or the emitters turns the gate red, whichever moved.
 import { readFileSync } from "node:fs";
-import { stylePlans, styleGroupOf } from "../../figma/binder/style-plan.mjs";
+import { stylePlans, styleGroupOf, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
 import { exportUI3 } from "../../src/engine/exports.js";
 import { typeScale, typeTokensFigmaModes, typeTokensFigmaPrimitives, siblingWeightDefaults } from "../../src/engine/type.mjs";
 
@@ -89,6 +89,21 @@ const plans = stylePlans({ families, scale });
   const bare = stylePlans({ families, scale: typeScale({ treatment: "product" }) });
   ok(bare.texts.every((t) => !t.bind.fontStyle && !t.bind.fontWeight && !t.literal.styleName), "no styleName/weights config ⇒ no fontStyle/fontWeight bindings (identity)");
   ok(stylePlans({}).paints.length === 0 && stylePlans({}).texts.length === 0, "empty inputs ⇒ empty plan, no throw");
+}
+
+// ── primitivesApplyPlan: ordered flatten of the Font Primitives interchange ──
+{
+  const plan = primitivesApplyPlan(typeTokensFigmaPrimitives(scale));
+  ok(!!plan && plan.collection === "Font Primitives" && plan.mode === "Value", "primitives plan targets the Font Primitives collection, single Value mode");
+  const names = plan.variables.map((v) => v.name);
+  const idx = (n) => names.indexOf(n);
+  ok(plan.variables.every((v) => v.type !== "ALIAS" || idx(v.target) > -1 && idx(v.target) < idx(v.name)), "every alias follows its target (literals first)");
+  ok(names.includes("weight/Display/medium") && names.includes("weight-style/Display/medium"), "sibling primitives ride the plan");
+  const fontAlias = plan.variables.find((v) => v.name === "font/Display");
+  ok(!!fontAlias && fontAlias.type === "ALIAS" && typeof fontAlias.target === "string", "font/<voice> aliases survive the flatten");
+  const dangling = primitivesApplyPlan({ collections: { "Font Primitives": { modes: ["Value"], variables: { "font/X": { type: "ALIAS", target: "family/missing" } } } } });
+  ok(dangling === null, "an alias with no target is dropped planner-side (nothing left ⇒ null)");
+  ok(primitivesApplyPlan(null) === null && primitivesApplyPlan({}) === null, "empty interchange ⇒ null, no throw");
 }
 
 if (fails.length) { console.error(`style-plan FAIL (${fails.length}):\n  ` + fails.join("\n  ")); process.exit(1); }
