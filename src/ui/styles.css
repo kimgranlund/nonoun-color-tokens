@@ -1430,3 +1430,15 @@ a.account-manage:hover { text-decoration: underline; }
   input[type="range"]::-webkit-slider-thumb { background: Highlight; border: 1px solid ButtonText; }
   input[type="range"]::-moz-range-thumb { background: Highlight; border: 1px solid ButtonText; }
 }
+
+
+/* Settings › Icons — the library grid (one tile per icon system) */
+.icon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.icon-tile { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left;
+  padding: 10px 12px; border-radius: var(--radius-sm, 8px); border: 1px solid var(--c-outline-variant);
+  background: var(--c-surface); color: var(--c-on-surface); cursor: pointer; }
+.icon-tile:hover { background: var(--c-surface-high); }
+.icon-tile.on { border-color: var(--c-primary); box-shadow: inset 0 0 0 1px var(--c-primary); }
+.icon-tile small { color: var(--c-on-surface-variant); }
+.icon-tile-lic { opacity: .7; }
+.icon-custom-name, .icon-custom-variant { min-width: 180px; }

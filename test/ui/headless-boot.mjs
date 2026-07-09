@@ -1412,6 +1412,26 @@ ok(app.querySelectorAll(".settings-nav-item").length >= 3, `(set) Settings has t
 ok((txtOfSet(app.querySelector(".settings-pagehead")) || "").includes("Token mapping"), "(set) the page header reflects the active section (Token mapping)");
 app.settingsSection = "appearance"; app.render(); flushRaf();
 ok((txtOfSet(app.querySelector(".settings-pagehead")) || "").includes("Appearance") && app.querySelectorAll(".settings-row").length >= 2, "(set) switching nav to Appearance swaps the panel (theme + canvas rows)");
+// (ico) Settings › Icons — the library grid (9 tiles), default Phosphor·regular, variant control,
+// the Custom escape hatch, and the geometry fence (sizes are NOT redefined here).
+app.settingsSection = "icons"; app.render(); flushRaf();
+ok((txtOfSet(app.querySelector(".settings-pagehead")) || "").includes("Icons"), "(ico) the Icons nav item swaps in the Icons panel");
+ok(app.querySelectorAll(".icon-tile").length === 9, `(ico) the grid renders one tile per icon system + Custom (got ${app.querySelectorAll(".icon-tile").length})`);
+ok(!app.doc.icons && app._iconSystem().id === "phosphor" && app._iconSystem().variant === "regular", "(ico) an untouched kit resolves to the default Phosphor · regular with NO doc.icons key");
+ok(app.querySelectorAll(".icon-tile").filter((t) => t.classList.contains("on")).length === 1, "(ico) exactly one tile is selected");
+app._setIconSystem("material-symbols"); flushRaf();
+ok(app.doc.icons.id === "material-symbols" && app.doc.icons.variant === "outlined", "(ico) picking a library seeds its DEFAULT variant");
+app._setIconVariant("sharp"); flushRaf();
+ok(app._iconSystem().variant === "sharp", "(ico) the variant control writes the library's own style name");
+app.render(); flushRaf();
+ok(app.querySelectorAll(".settings-seg").length >= 1, "(ico) a library WITH variants renders the Style control");
+app._setIconSystem("lucide"); app.render(); flushRaf();
+ok(!app._iconSystem().variant, "(ico) a variant-less library (Lucide) resolves to no variant");
+app._setIconSystem("custom"); app._setIconCustom("name", "Streamline"); flushRaf();
+ok(app._iconSystem().id === "custom" && app._iconSystem().name === "Streamline", "(ico) the Custom tile carries a typed set name verbatim");
+app.render(); flushRaf();
+ok(!!app.querySelector(".icon-custom-name"), "(ico) Custom reveals the set-name input");
+app._setIconSystem("phosphor"); flushRaf(); // restore the default for the assertions below
 app.settingsSection = "mapping"; app.render(); flushRaf(); // restore for the assertions below
 // (set) mapping segments use SHORT labels — the 550/450 · 050/200 · WCAG detail moved into the descriptions;
 // the section header is the (caps eyebrow) settings-group-title, consistent with the nav group label.

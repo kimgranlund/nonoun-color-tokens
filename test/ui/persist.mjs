@@ -132,6 +132,22 @@ if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "cl
   if (Rw.type.voices.Body && "weights" in Rw.type.voices.Body) FAIL("type-voices", "an empty weights list must NOT materialize a weights key");
   if ("voices" in Rf0.type) FAIL("type-voices", "an absent voices override must NOT materialize a voices key (round-trip identity)");
 
+  // ── icons: the icon-system facet. Identity-gated (default system+variant ⇒ absent); unknown id drops;
+  // a non-default choice round-trips; custom needs a name and keeps it verbatim.
+  const Ri0 = U.hydrate(U.serialize(inDomainState()));
+  if ("icons" in Ri0) FAIL("icons", "an absent icons facet must NOT materialize an icons key (round-trip identity)");
+  if ("icons" in U.hydrate(U.serialize({ ...inDomainState(), icons: { id: "phosphor", variant: "regular" } }))) FAIL("icons", "the DEFAULT system at its default variant must round-trip as ABSENT (identity gate)");
+  if ("icons" in U.hydrate(U.serialize({ ...inDomainState(), icons: { id: "bogus-set" } }))) FAIL("icons", "an unknown icon-system id must drop");
+  const Ri1 = U.hydrate(U.serialize({ ...inDomainState(), icons: { id: "phosphor", variant: "duotone" } }));
+  if (!deepEq(Ri1.icons, { id: "phosphor", variant: "duotone" })) FAIL("icons", `a non-default variant did not round-trip: ${JSON.stringify(Ri1.icons)}`);
+  const Ri2 = U.hydrate(U.serialize({ ...inDomainState(), icons: { id: "lucide", variant: "nonsense" } }));
+  if (!deepEq(Ri2.icons, { id: "lucide" })) FAIL("icons", `a variant-less library must drop the variant: ${JSON.stringify(Ri2.icons)}`);
+  const Ri3 = U.hydrate(U.serialize({ ...inDomainState(), icons: { id: "material-symbols", variant: "nonsense" } }));
+  if (!deepEq(Ri3.icons, { id: "material-symbols", variant: "outlined" })) FAIL("icons", `an invalid variant must fall back to the library default: ${JSON.stringify(Ri3.icons)}`);
+  if ("icons" in U.hydrate(U.serialize({ ...inDomainState(), icons: { id: "custom", name: "  " } }))) FAIL("icons", "a custom system with no name must drop");
+  const Ri4 = U.hydrate(U.serialize({ ...inDomainState(), icons: { id: "custom", name: "  Streamline  ", variantName: " Core " } }));
+  if (!deepEq(Ri4.icons, { id: "custom", name: "Streamline", variantName: "Core" })) FAIL("icons", `custom name/variant did not round-trip trimmed: ${JSON.stringify(Ri4.icons)}`);
+
   // OUT-OF-RANGE values clamp to the nearest bound (type size [1,512], geom height [8,256]).
   const C = U.hydrate(U.serialize({ ...inDomainState(),
     type: { treatment: "product", bodyBase: 16, tokenOverrides: { "Body|MD|base": 9999, "Body|SM|base": 0.4 } },

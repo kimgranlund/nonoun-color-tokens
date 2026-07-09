@@ -1,3 +1,5 @@
+import { ICON_SYSTEMS, DEFAULT_ICON_SYSTEM } from "../engine/icon-systems.mjs";
+
 // persist.js — UI state persistence for the HCT Palette Generator.
 //
 // A PURE serialize/hydrate transform pair over the tool's `State` (spec-draft §7,
@@ -246,9 +248,31 @@ export function hydrate(snapshot) {
     geometry: clampGeometry(s.geometry),
     palettes,
     ...clampExport(s.export),
+    ...clampIcons(s.icons),
     ...(typeof s.vol === "string" && s.vol ? { vol: s.vol } : {}),
     ...(story ? { story } : {}),
   };
+}
+
+// clampIcons — the OPTIONAL icon-system facet { id, variant?, name?, variantName? } (Settings › Icons).
+// A BRAND decision like a font family: the kit names the library + its stroke/fill variant so a consuming
+// agent binds to it. Identity-gated like every other optional block: the DEFAULT system at its DEFAULT
+// variant round-trips as ABSENT (so an untouched kit's config is byte-identical), and an unknown id drops
+// the whole block. `custom` keeps the user's typed name/variantName verbatim (trimmed + capped).
+function clampIcons(ic) {
+  if (!ic || typeof ic !== "object") return {};
+  const sys = ICON_SYSTEMS.find((x) => x.id === ic.id);
+  if (!sys) return {};
+  if (sys.id === "custom") {
+    const name = typeof ic.name === "string" ? ic.name.trim().slice(0, 60) : "";
+    const variantName = typeof ic.variantName === "string" ? ic.variantName.trim().slice(0, 40) : "";
+    if (!name) return {}; // a custom system with no name carries nothing — drop it
+    return { icons: { id: "custom", name, ...(variantName ? { variantName } : {}) } };
+  }
+  const variant = sys.variants.includes(ic.variant) ? ic.variant : sys.defaultVariant;
+  // the default system at its default variant is the ABSENT state (identity gate)
+  if (sys.id === DEFAULT_ICON_SYSTEM && variant === sys.defaultVariant) return {};
+  return { icons: { id: sys.id, ...(variant ? { variant } : {}) } };
 }
 
 // clampExport — the OPTIONAL export-format prefs { unit?, colorPrefix?, typePrefix?, geomPrefix? }

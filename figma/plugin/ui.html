@@ -1445,6 +1445,18 @@ a.account-manage:hover { text-decoration: underline; }
   input[type="range"]::-webkit-slider-thumb { background: Highlight; border: 1px solid ButtonText; }
   input[type="range"]::-moz-range-thumb { background: Highlight; border: 1px solid ButtonText; }
 }
+
+
+/* Settings › Icons — the library grid (one tile per icon system) */
+.icon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.icon-tile { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left;
+  padding: 10px 12px; border-radius: var(--radius-sm, 8px); border: 1px solid var(--c-outline-variant);
+  background: var(--c-surface); color: var(--c-on-surface); cursor: pointer; }
+.icon-tile:hover { background: var(--c-surface-high); }
+.icon-tile.on { border-color: var(--c-primary); box-shadow: inset 0 0 0 1px var(--c-primary); }
+.icon-tile small { color: var(--c-on-surface-variant); }
+.icon-tile-lic { opacity: .7; }
+.icon-custom-name, .icon-custom-variant { min-width: 180px; }
 </style></head>
 <body><nonoun-color-tokens></nonoun-color-tokens>
 <script type="module">
@@ -3682,7 +3694,70 @@ function lemonDeactivation(json) {
 
 return { FLAG_KEYS, TIER_FLAGS, TIERS_ENFORCED, resolveFlags, flagOf, entitlementActive, resolveTier, clampProfile, lemonEntitlement, lemonActivation, lemonDeactivation };
 })();
+__M.iconSystems = (function(){
+// icon-systems.mjs — the ICON SYSTEM facet of a brand kit. Pure, no DOM (an engine module).
+//
+// An icon system is a BRAND decision, exactly like a font family: the kit names the library and its
+// stroke/fill variant so a consuming agent binds to it instead of inventing one. It is NOT a token
+// ladder — icon SIZES already live in the geometry ramp (`geomScale().sizes.<size>.icon` → 14/16/18/
+// 20/24/28px, composed with control heights by the centering law). So this module carries the
+// registry + the resolver only, and the exports/MCP read the resolved value.
+//
+// The registry is metadata about real, permissively-licensed libraries; `variants` are the library's
+// OWN style names (not ours). A library with no style variants (Lucide, Feather, Bootstrap Icons)
+// has an empty list — the UI hides the variant control and the resolved variant is null.
+
+const DEFAULT_ICON_SYSTEM = "phosphor"; // the app dogfoods Phosphor (see src/ui/icons.js)
+
+const ICON_SYSTEMS = [
+  { id: "phosphor", name: "Phosphor", license: "MIT", url: "https://phosphoricons.com",
+    note: "6 weights, 9k+ glyphs", variants: ["thin", "light", "regular", "bold", "fill", "duotone"], defaultVariant: "regular" },
+  { id: "lucide", name: "Lucide", license: "ISC", url: "https://lucide.dev",
+    note: "one stroke style; width is a prop", variants: [], defaultVariant: null },
+  { id: "material-symbols", name: "Material Symbols", license: "Apache-2.0", url: "https://fonts.google.com/icons",
+    note: "variable axes (fill · weight · grade)", variants: ["outlined", "rounded", "sharp"], defaultVariant: "outlined" },
+  { id: "heroicons", name: "Heroicons", license: "MIT", url: "https://heroicons.com",
+    note: "24px outline/solid · 20px mini · 16px micro", variants: ["outline", "solid", "mini", "micro"], defaultVariant: "outline" },
+  { id: "tabler", name: "Tabler Icons", license: "MIT", url: "https://tabler.io/icons",
+    note: "outline + filled", variants: ["outline", "filled"], defaultVariant: "outline" },
+  { id: "feather", name: "Feather", license: "MIT", url: "https://feathericons.com",
+    note: "one stroke style", variants: [], defaultVariant: null },
+  { id: "remix", name: "Remix Icon", license: "Apache-2.0", url: "https://remixicon.com",
+    note: "line + fill", variants: ["line", "fill"], defaultVariant: "line" },
+  { id: "bootstrap", name: "Bootstrap Icons", license: "MIT", url: "https://icons.getbootstrap.com",
+    note: "one set", variants: [], defaultVariant: null },
+  // CUSTOM — the escape hatch (mirrors the Fonts panel, where any family name may be typed). The kit
+  // carries the user's own `name`/`variant` strings verbatim; no metadata to keep current.
+  { id: "custom", name: "Custom", license: null, url: null, note: "name any set", variants: [], defaultVariant: null },
+];
+
+const iconSystemById = (id) => ICON_SYSTEMS.find((s) => s.id === id) || null;
+
+// iconSystem(config) — resolve `doc.icons` ({ id, variant?, name?, variantName? }) to the value every
+// consumer reads: { id, name, variant, license, url, note }. Unknown/absent id ⇒ the default system;
+// an invalid variant ⇒ that library's default. `custom` carries the user's typed name/variant verbatim
+// (falling back to the label when empty), so a kit always names SOMETHING an agent can bind to.
+function iconSystem(config = {}) {
+  const c = config && typeof config === "object" ? config : {};
+  const sys = iconSystemById(c.id) || iconSystemById(DEFAULT_ICON_SYSTEM);
+  if (sys.id === "custom") {
+    const name = typeof c.name === "string" && c.name.trim() ? c.name.trim().slice(0, 60) : "Custom";
+    const variant = typeof c.variantName === "string" && c.variantName.trim() ? c.variantName.trim().slice(0, 40) : null;
+    return { id: "custom", name, variant, license: null, url: null, note: null };
+  }
+  const variant = sys.variants.includes(c.variant) ? c.variant : sys.defaultVariant;
+  return { id: sys.id, name: sys.name, variant, license: sys.license, url: sys.url, note: sys.note };
+}
+
+// iconSystemLabel — "Phosphor · regular" / "Lucide" (a variant-less library) — the one-line form the
+// DESIGN.md prose, the tokens.json note, and the MCP guide all use.
+const iconSystemLabel = (resolved) => (resolved.variant ? `${resolved.name} · ${resolved.variant}` : resolved.name);
+
+return { DEFAULT_ICON_SYSTEM, ICON_SYSTEMS, iconSystemById, iconSystem, iconSystemLabel };
+})();
 __M.persist = (function(){
+const { ICON_SYSTEMS, DEFAULT_ICON_SYSTEM } = __M.iconSystems;
+
 // persist.js — UI state persistence for the HCT Palette Generator.
 //
 // A PURE serialize/hydrate transform pair over the tool's `State` (spec-draft §7,
@@ -3931,9 +4006,31 @@ function hydrate(snapshot) {
     geometry: clampGeometry(s.geometry),
     palettes,
     ...clampExport(s.export),
+    ...clampIcons(s.icons),
     ...(typeof s.vol === "string" && s.vol ? { vol: s.vol } : {}),
     ...(story ? { story } : {}),
   };
+}
+
+// clampIcons — the OPTIONAL icon-system facet { id, variant?, name?, variantName? } (Settings › Icons).
+// A BRAND decision like a font family: the kit names the library + its stroke/fill variant so a consuming
+// agent binds to it. Identity-gated like every other optional block: the DEFAULT system at its DEFAULT
+// variant round-trips as ABSENT (so an untouched kit's config is byte-identical), and an unknown id drops
+// the whole block. `custom` keeps the user's typed name/variantName verbatim (trimmed + capped).
+function clampIcons(ic) {
+  if (!ic || typeof ic !== "object") return {};
+  const sys = ICON_SYSTEMS.find((x) => x.id === ic.id);
+  if (!sys) return {};
+  if (sys.id === "custom") {
+    const name = typeof ic.name === "string" ? ic.name.trim().slice(0, 60) : "";
+    const variantName = typeof ic.variantName === "string" ? ic.variantName.trim().slice(0, 40) : "";
+    if (!name) return {}; // a custom system with no name carries nothing — drop it
+    return { icons: { id: "custom", name, ...(variantName ? { variantName } : {}) } };
+  }
+  const variant = sys.variants.includes(ic.variant) ? ic.variant : sys.defaultVariant;
+  // the default system at its default variant is the ABSENT state (identity gate)
+  if (sys.id === DEFAULT_ICON_SYSTEM && variant === sys.defaultVariant) return {};
+  return { icons: { id: sys.id, ...(variant ? { variant } : {}) } };
 }
 
 // clampExport — the OPTIONAL export-format prefs { unit?, colorPrefix?, typePrefix?, geomPrefix? }
@@ -7830,6 +7927,7 @@ const { geomScale, geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geomT
 const { zipStore } = __M.zip;
 const { modeApplyPlan, validateModeInterchange } = __M.modeApplyPlan;
 const { stylePlans, primitivesApplyPlan } = __M.stylePlan;
+const { ICON_SYSTEMS, iconSystem, iconSystemById, iconSystemLabel } = __M.iconSystems;
 const { icon, brandMark } = __M.icons;
 
 // ── Multi-set storage ─────────────────────────────────────────────────────────
@@ -13651,12 +13749,33 @@ class HctApp extends HTMLElement {
   // The Settings nav model: grouped, labeled sections (the left rail). Each item id → a panel.
   _settingsNav() {
     return [
-      { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }, { id: "export", label: "Export" }] },
+      { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }, { id: "icons", label: "Icons" }, { id: "export", label: "Export" }] },
       { group: "App", items: [{ id: "appearance", label: "Appearance" }] },
       { group: "Account", items: [{ id: "account", label: "Account" }] },
       { group: "About", items: [{ id: "about", label: "About" }] },
     ];
   }
+  // _iconSystem() — the RESOLVED icon system for this kit ({id,name,variant,license,url,note}). Absent
+  // doc.icons ⇒ the default (Phosphor · regular). The icon system is a brand facet like a font family;
+  // icon SIZES come from the geometry ramp (sizes.<size>.icon), never from here.
+  _iconSystem() { return iconSystem(this.doc.icons || {}); }
+  // _setIconSystem(id) — pick a library; seeds its default variant. Custom keeps/needs a typed name.
+  _setIconSystem(id) {
+    const sys = iconSystemById(id);
+    if (!sys) return;
+    this.commit((d) => {
+      if (sys.id === "custom") { d.icons = { id: "custom", name: (d.icons && d.icons.name) || "" }; return; }
+      d.icons = { id: sys.id, ...(sys.defaultVariant ? { variant: sys.defaultVariant } : {}) };
+    });
+  }
+  // _setIconVariant(v) — the library's own style name (thin/bold/fill…, outlined/rounded/sharp…).
+  _setIconVariant(v) { this.commit((d) => { d.icons = { ...(d.icons || {}), variant: v }; }); }
+  // _setIconCustom(field, value) — the Custom escape hatch: any set name + an optional variant string.
+  _setIconCustom(field, value) {
+    const v = String(value || "").trim().slice(0, field === "name" ? 60 : 40);
+    this.commit((d) => { d.icons = { ...(d.icons || {}), id: "custom", [field]: v }; });
+  }
+
   // _exportUnit — the CSS unit for the type/geometry exports (Settings › Export). Doc-bound + persisted so it
   // travels with the kit; defaults to "px" (the pre-setting output). Figma exports ignore it (they're numeric).
   _exportUnit() { return this.doc.export && ["px", "rem", "em"].includes(this.doc.export.unit) ? this.doc.export.unit : "px"; }
@@ -13718,6 +13837,55 @@ class HctApp extends HTMLElement {
           this._settingRow("Canvas preview", "The scheme the canvas previews in — independent of the chrome.", schemes, this.canvasTheme,
             (id) => { this.canvasTheme = id; this.render(); }, "setcanvastheme"),
         ])],
+      };
+    }
+    if (sec === "icons") {
+      const cur = this._iconSystem();
+      const sel = (d.icons && d.icons.id) || cur.id;
+      const sys = iconSystemById(sel);
+      const isCustom = sel === "custom";
+      // the GRID — one tile per library; the tile carries the name, its licence/shape note, and the
+      // selected state. We can't render another library's glyphs offline (the app inlines Phosphor only),
+      // so a tile states its character in words rather than faking a preview.
+      const grid = h(
+        "div",
+        { class: "icon-grid", role: "radiogroup", "aria-label": "Icon system" },
+        ...ICON_SYSTEMS.map((x) =>
+          h(
+            "button",
+            { type: "button", class: "icon-tile" + (sel === x.id ? " on" : ""), role: "radio",
+              "aria-checked": sel === x.id ? "true" : "false", "data-fk": "iconsys:" + x.id,
+              title: x.url || "Name any icon set",
+              onclick: () => this._setIconSystem(x.id) },
+            h("b", {}, x.name),
+            h("small", {}, x.note || ""),
+            x.license ? h("small", { class: "icon-tile-lic" }, x.license) : false,
+          ),
+        ),
+      );
+      const rows = [grid];
+      // variant control — only for libraries that HAVE style variants (Lucide/Feather/Bootstrap don't).
+      if (!isCustom && sys && sys.variants.length) {
+        rows.push(this._settingRow(
+          "Style", `${sys.name}'s own weight/fill names. This is the stroke character an agent binds to.`,
+          sys.variants.map((v) => ({ id: v, label: v })), cur.variant, (v) => this._setIconVariant(v), "iconvariant"));
+      }
+      if (isCustom) {
+        rows.push(h("div", { class: "settings-row" },
+          h("div", { class: "settings-row-text" }, h("b", {}, "Set name"), h("small", {}, "Any icon library — it ships in the kit verbatim.")),
+          h("input", { type: "text", class: "icon-custom-name", value: (d.icons && d.icons.name) || "", placeholder: "e.g. Streamline",
+            "data-fk": "iconcustom:name", "aria-label": "Custom icon set name", onchange: (e) => this._setIconCustom("name", e.target.value) })));
+        rows.push(h("div", { class: "settings-row" },
+          h("div", { class: "settings-row-text" }, h("b", {}, "Style"), h("small", {}, "Optional — the set's own weight/fill name.")),
+          h("input", { type: "text", class: "icon-custom-variant", value: (d.icons && d.icons.variantName) || "", placeholder: "e.g. Core",
+            "data-fk": "iconcustom:variant", "aria-label": "Custom icon style name", onchange: (e) => this._setIconCustom("variantName", e.target.value) })));
+      }
+      return {
+        title: "Icons", desc: "The icon system this kit binds to. Sizes come from the Geometry ramp — this names the library and its stroke character.",
+        body: [
+          this._settingsGroup(null, rows),
+          h("p", { class: "settings-note" }, `This kit specifies ${iconSystemLabel(cur)}. It ships in the design-system exports (DESIGN.md · tokens.json) and the Brand-Kit MCP, so a consuming agent binds to it instead of picking its own. Icon sizes stay geometry's job (the control ramp's icon step).`),
+        ],
       };
     }
     if (sec === "export") {

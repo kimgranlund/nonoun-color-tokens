@@ -40,6 +40,7 @@ import { geomScale, geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geom
 import { zipStore } from "./zip.mjs";
 import { modeApplyPlan, validateModeInterchange } from "../../figma/binder/mode-apply-plan.mjs";
 import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
+import { ICON_SYSTEMS, iconSystem, iconSystemById, iconSystemLabel } from "../engine/icon-systems.mjs";
 import { icon, brandMark } from "./icons.js";
 
 // ── Multi-set storage ─────────────────────────────────────────────────────────
@@ -5861,12 +5862,33 @@ class HctApp extends HTMLElement {
   // The Settings nav model: grouped, labeled sections (the left rail). Each item id → a panel.
   _settingsNav() {
     return [
-      { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }, { id: "export", label: "Export" }] },
+      { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }, { id: "icons", label: "Icons" }, { id: "export", label: "Export" }] },
       { group: "App", items: [{ id: "appearance", label: "Appearance" }] },
       { group: "Account", items: [{ id: "account", label: "Account" }] },
       { group: "About", items: [{ id: "about", label: "About" }] },
     ];
   }
+  // _iconSystem() — the RESOLVED icon system for this kit ({id,name,variant,license,url,note}). Absent
+  // doc.icons ⇒ the default (Phosphor · regular). The icon system is a brand facet like a font family;
+  // icon SIZES come from the geometry ramp (sizes.<size>.icon), never from here.
+  _iconSystem() { return iconSystem(this.doc.icons || {}); }
+  // _setIconSystem(id) — pick a library; seeds its default variant. Custom keeps/needs a typed name.
+  _setIconSystem(id) {
+    const sys = iconSystemById(id);
+    if (!sys) return;
+    this.commit((d) => {
+      if (sys.id === "custom") { d.icons = { id: "custom", name: (d.icons && d.icons.name) || "" }; return; }
+      d.icons = { id: sys.id, ...(sys.defaultVariant ? { variant: sys.defaultVariant } : {}) };
+    });
+  }
+  // _setIconVariant(v) — the library's own style name (thin/bold/fill…, outlined/rounded/sharp…).
+  _setIconVariant(v) { this.commit((d) => { d.icons = { ...(d.icons || {}), variant: v }; }); }
+  // _setIconCustom(field, value) — the Custom escape hatch: any set name + an optional variant string.
+  _setIconCustom(field, value) {
+    const v = String(value || "").trim().slice(0, field === "name" ? 60 : 40);
+    this.commit((d) => { d.icons = { ...(d.icons || {}), id: "custom", [field]: v }; });
+  }
+
   // _exportUnit — the CSS unit for the type/geometry exports (Settings › Export). Doc-bound + persisted so it
   // travels with the kit; defaults to "px" (the pre-setting output). Figma exports ignore it (they're numeric).
   _exportUnit() { return this.doc.export && ["px", "rem", "em"].includes(this.doc.export.unit) ? this.doc.export.unit : "px"; }
@@ -5928,6 +5950,55 @@ class HctApp extends HTMLElement {
           this._settingRow("Canvas preview", "The scheme the canvas previews in — independent of the chrome.", schemes, this.canvasTheme,
             (id) => { this.canvasTheme = id; this.render(); }, "setcanvastheme"),
         ])],
+      };
+    }
+    if (sec === "icons") {
+      const cur = this._iconSystem();
+      const sel = (d.icons && d.icons.id) || cur.id;
+      const sys = iconSystemById(sel);
+      const isCustom = sel === "custom";
+      // the GRID — one tile per library; the tile carries the name, its licence/shape note, and the
+      // selected state. We can't render another library's glyphs offline (the app inlines Phosphor only),
+      // so a tile states its character in words rather than faking a preview.
+      const grid = h(
+        "div",
+        { class: "icon-grid", role: "radiogroup", "aria-label": "Icon system" },
+        ...ICON_SYSTEMS.map((x) =>
+          h(
+            "button",
+            { type: "button", class: "icon-tile" + (sel === x.id ? " on" : ""), role: "radio",
+              "aria-checked": sel === x.id ? "true" : "false", "data-fk": "iconsys:" + x.id,
+              title: x.url || "Name any icon set",
+              onclick: () => this._setIconSystem(x.id) },
+            h("b", {}, x.name),
+            h("small", {}, x.note || ""),
+            x.license ? h("small", { class: "icon-tile-lic" }, x.license) : false,
+          ),
+        ),
+      );
+      const rows = [grid];
+      // variant control — only for libraries that HAVE style variants (Lucide/Feather/Bootstrap don't).
+      if (!isCustom && sys && sys.variants.length) {
+        rows.push(this._settingRow(
+          "Style", `${sys.name}'s own weight/fill names. This is the stroke character an agent binds to.`,
+          sys.variants.map((v) => ({ id: v, label: v })), cur.variant, (v) => this._setIconVariant(v), "iconvariant"));
+      }
+      if (isCustom) {
+        rows.push(h("div", { class: "settings-row" },
+          h("div", { class: "settings-row-text" }, h("b", {}, "Set name"), h("small", {}, "Any icon library — it ships in the kit verbatim.")),
+          h("input", { type: "text", class: "icon-custom-name", value: (d.icons && d.icons.name) || "", placeholder: "e.g. Streamline",
+            "data-fk": "iconcustom:name", "aria-label": "Custom icon set name", onchange: (e) => this._setIconCustom("name", e.target.value) })));
+        rows.push(h("div", { class: "settings-row" },
+          h("div", { class: "settings-row-text" }, h("b", {}, "Style"), h("small", {}, "Optional — the set's own weight/fill name.")),
+          h("input", { type: "text", class: "icon-custom-variant", value: (d.icons && d.icons.variantName) || "", placeholder: "e.g. Core",
+            "data-fk": "iconcustom:variant", "aria-label": "Custom icon style name", onchange: (e) => this._setIconCustom("variantName", e.target.value) })));
+      }
+      return {
+        title: "Icons", desc: "The icon system this kit binds to. Sizes come from the Geometry ramp — this names the library and its stroke character.",
+        body: [
+          this._settingsGroup(null, rows),
+          h("p", { class: "settings-note" }, `This kit specifies ${iconSystemLabel(cur)}. It ships in the design-system exports (DESIGN.md · tokens.json) and the Brand-Kit MCP, so a consuming agent binds to it instead of picking its own. Icon sizes stay geometry's job (the control ramp's icon step).`),
+        ],
       };
     }
     if (sec === "export") {
