@@ -676,6 +676,16 @@ app.exportSystems = { color: false, type: true, geometry: false };
 app.toggleExportSystem("type");
 ok(app.exportSystems.type === true, "(mc7) toggleExportSystem keeps at least one system selected");
 
+// STYLES (the Figma swatches overlay): a 4th chip, opt-OUT, exempt from the keep-one guard
+app.exportSystems = { color: true, type: true, geometry: true, styles: true };
+app.render(); flushRaf();
+ok(app.querySelectorAll(".sys-chip").length === 4, "(mc7b) the Include row renders 4 system chips (Color · Typography · Geometry · Styles)");
+app.exportSystems = { color: false, type: true, geometry: false, styles: true };
+app.toggleExportSystem("styles");
+ok(app.exportSystems.styles === false, "(mc7c) Styles toggles OFF even when only one token system is selected (overlay, not a system)");
+app.toggleExportSystem("styles");
+ok(app.exportSystems.styles === true, "(mc7d) Styles toggles back on");
+
 // the Typography / Geometry format tabs preview their OWN tokens (not the colour formats)
 app.exportSystems = { color: true, type: true, geometry: true };
 app.exportTab = "type-css"; app.render(); flushRaf();

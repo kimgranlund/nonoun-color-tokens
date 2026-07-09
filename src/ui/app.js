@@ -39,6 +39,7 @@ import { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, type
 import { geomScale, geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
 import { modeApplyPlan, validateModeInterchange } from "../../figma/binder/mode-apply-plan.mjs";
+import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
 import { icon, brandMark } from "./icons.js";
 
 // ── Multi-set storage ─────────────────────────────────────────────────────────
@@ -567,7 +568,7 @@ class HctApp extends HTMLElement {
     this.exportTab = "css";
     // which token SYSTEMS the Download-All .zip + the Brand-Kit MCP bundle (export-time opt-in, all on
     // by default). Color = the palettes/roles + every colour format; Type/Geometry = their CSS + DTCG.
-    this.exportSystems = { color: true, type: true, geometry: true };
+    this.exportSystems = { color: true, type: true, geometry: true, styles: true }; // styles = the Figma style swatches (opt-OUT)
     // New-Palette modal (a native <dialog>, like the export drawer). newPalCtx = Set of context
     // palette indices to derive from (initialized on open: all non-system palettes on).
     this.newPalOpen = false;
@@ -5284,12 +5285,14 @@ class HctApp extends HTMLElement {
           "div",
           { class: "drawer-systems" },
           h("span", { class: "drawer-systems-label" }, "Include"),
-          ...[["color", "Color"], ["type", "Typography"], ["geometry", "Geometry"]].map(([k, label]) =>
+          ...[["color", "Color"], ["type", "Typography"], ["geometry", "Geometry"], ["styles", "Styles"]].map(([k, label]) =>
             chip(label, {
               mode: "interactive",
               on: this.exportSystems[k] !== false,
               cls: "sys-chip",
-              title: `Include the ${label} system in Download-All & the Brand-Kit MCP`,
+              title: k === "styles"
+                ? "Create Figma STYLE swatches (paint + text styles) bound to the variables on Apply — one per semantic role and type step"
+                : `Include the ${label} system in Download-All & the Brand-Kit MCP`,
               onclick: () => this.toggleExportSystem(k),
             }),
           ),
@@ -5412,7 +5415,9 @@ class HctApp extends HTMLElement {
   // Keeps at least one system selected (an all-off bundle is degenerate).
   toggleExportSystem(k) {
     const on = this.exportSystems[k] !== false;
-    if (on && ["color", "type", "geometry"].filter((s) => this.exportSystems[s] !== false).length <= 1) {
+    // `styles` is an overlay on the selected systems (the Figma swatches opt-out), not a token system —
+    // the keep-one-system guard applies only to the three real systems.
+    if (k !== "styles" && on && ["color", "type", "geometry"].filter((s) => this.exportSystems[s] !== false).length <= 1) {
       this.toast("Keep at least one system selected");
       return;
     }
@@ -5619,6 +5624,25 @@ class HctApp extends HTMLElement {
       const sys = this.exportSystems || {};
       const msg = { type: "apply", config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans() };
       if (sys.color !== false) msg.dtcg = this.figmaBundle();
+      // STYLES (opt-out): the swatch layer bound to the variables — paint styles per semantic role
+      // (color on), text styles per voice×step×weight (type on). Pure plans (style-plan.mjs); the
+      // sandbox executes them verbatim after the variables land, so bindings always resolve.
+      if (sys.styles !== false && (sys.color !== false || sys.type !== false)) {
+        const scale = sys.type !== false ? this._typeScaleFor("base") : null;
+        let families = [];
+        if (sys.color !== false && msg.dtcg && msg.dtcg["Light_tokens.json"]) {
+          // the semantic tree keys ARE the variable-name family slugs, in enabled-palette order —
+          // pair each with its palette's display name for the style folder segment.
+          const enabled = (this.doc.palettes || []).filter((p) => p && p.on !== false);
+          families = Object.keys(msg.dtcg["Light_tokens.json"]).filter((k) => k[0] !== "$")
+            .map((n, i) => ({ n, name: (enabled[i] && enabled[i].name) || n }));
+        }
+        const plans = stylePlans({ families, scale, include: { color: sys.color !== false, type: sys.type !== false } });
+        if (plans.paints.length || plans.texts.length) {
+          msg.stylePlans = plans;
+          if (plans.texts.length) msg.fontPrimitives = primitivesApplyPlan(typeTokensFigmaPrimitives(scale));
+        }
+      }
       parent.postMessage({ pluginMessage: msg }, "*");
       // Optimistic "in progress" toast; the sandbox posts {apply-done} back when the write actually completes
       // (→ onApplyDone → a "done" toast), or {apply-error} on failure (→ onApplyError). See the ui.html bridge.
@@ -5632,8 +5656,12 @@ class HctApp extends HTMLElement {
   // is async in the plugin VM, so THIS is the real "done" signal (the applyToFigma toast is only optimistic).
   onApplyDone(m) {
     const n = (m && (Number(m.raw) || 0) + (Number(m.semantic) || 0) + (Number(m.floatVars) || 0)) || 0;
+    const st = (m && (Number(m.paintStyles) || 0) + (Number(m.textStyles) || 0)) || 0;
     this.applyGateOpen = false; // defensive: never leave the gate open past completion
-    this.toast(n ? `Applied ${n} variable${n === 1 ? "" : "s"} to Figma — check the Variables panel` : "Applied to Figma — check the Variables panel");
+    const varsPart = n ? `${n} variable${n === 1 ? "" : "s"}` : "";
+    const stylesPart = st ? `${st} style swatch${st === 1 ? "" : "es"}` : "";
+    const what = [varsPart, stylesPart].filter(Boolean).join(" + ");
+    this.toast(what ? `Applied ${what} to Figma — check the Variables & Styles panels` : "Applied to Figma — check the Variables panel");
   }
   onApplyError() {
     this.toast("Couldn't apply to Figma — please try again.");
@@ -5687,8 +5715,10 @@ class HctApp extends HTMLElement {
         "div",
         { class: "apply-gate-body" },
         h("p", { class: "apply-gate-lede" }, rebuild
-          ? "Regroup deletes and re-creates the Color Modes variables so they adopt the grouped order. Any layers or styles bound to them will detach and need reconnecting. (Color Primitives are untouched.)"
-          : "This creates or updates the Color Primitives + Color Modes variable collections in this file. Variables with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want)."),
+          ? "Regroup deletes and re-creates the Color Modes variables so they adopt the grouped order. Any layers or styles bound to them will detach and need reconnecting — the NONOUN style swatches are re-bound automatically on this same apply. (Color Primitives are untouched.)"
+          : (this.exportSystems && this.exportSystems.styles === false
+              ? "This creates or updates the Color Primitives + Color Modes variable collections in this file. Variables with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want)."
+              : "This creates or updates the Color Primitives + Color Modes variable collections in this file, plus the STYLE swatches bound to them (paint styles per semantic role, text styles per type step — toggle \u201CStyles\u201D in the drawer to opt out). Variables and NONOUN-created styles with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want).")),
         h(
           "div",
           { class: "apply-gate-warn" },
