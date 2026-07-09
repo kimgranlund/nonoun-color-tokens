@@ -336,6 +336,19 @@ function clampType(t) {
       const ra = num(v.ratio, 1, 2, false); if (ra !== undefined) o.ratio = ra;
       // styleName — the Figma weight-style string for non-variable families; trimmed, capped, non-empty only.
       if (typeof v.styleName === "string" && v.styleName.trim()) o.styleName = v.styleName.trim().slice(0, 60);
+      // weights — SIBLING weight variants [{name, weight}] around the voice's core (the styles feature).
+      // Capped at 8 per voice; each entry needs a finite clamped weight AND a non-empty name (name capped
+      // at 40 chars). Kept only when non-empty, so a config without siblings round-trips identically.
+      if (Array.isArray(v.weights)) {
+        const list = [];
+        for (const e of v.weights.slice(0, 8)) {
+          if (!e || typeof e !== "object") continue;
+          const w = num(e.weight, 100, 1000, true);
+          const nm = typeof e.name === "string" ? e.name.trim().slice(0, 40) : "";
+          if (w !== undefined && nm) list.push({ name: nm, weight: w });
+        }
+        if (list.length) o.weights = list;
+      }
       if (Object.keys(o).length) voices[name] = o;
     }
     if (Object.keys(voices).length) out.voices = voices;

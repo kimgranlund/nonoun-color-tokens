@@ -314,6 +314,47 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(!nCol.variables["weight-style/Body"] && nCol.variables["weight/Body"], "an unnamed voice keeps its numeric weight primitive but gets no style var");
 }
 
+// ── SIBLING WEIGHTS: siblingWeightDefaults + the voices[].weights channel + emitter coverage ──
+{
+  // defaults table — the ratified derivation (heavy → two below; ≤400 → one below + two above; mid → ±200)
+  const w = (list) => list.map((x) => x.weight).join(",");
+  ok(w(T.siblingWeightDefaults(900)) === "700,500", "defaults: core 900 → Bold 700 + Medium 500");
+  ok(w(T.siblingWeightDefaults(400)) === "300,500,600", "defaults: core 400 → Light 300 + Medium 500 + Semi-bold 600");
+  ok(w(T.siblingWeightDefaults(600)) === "400,800", "defaults: mid core 600 → ±200");
+  ok(w(T.siblingWeightDefaults(700)) === "500,900", "defaults: mid core 700 → ±200");
+  ok(w(T.siblingWeightDefaults(100)) === "200,300", "defaults: floor core 100 → above only (no 0 weight)");
+  ok(w(T.siblingWeightDefaults(440)) === "300,500,600", "defaults: non-ladder core snaps (440→400)");
+  ok(T.siblingWeightDefaults(900)[0].name === "Bold" && T.siblingWeightDefaults(400)[2].name === "Semi-bold", "defaults carry the ladder's semantic names");
+  ok(T.siblingWeightDefaults(NaN).length === 0, "defaults: non-finite core → empty");
+
+  // identity gate — no weights config ⇒ no `weights` key, emitters byte-identical
+  const base = T.typeScale({ treatment: "product" });
+  const withEmpty = T.typeScale({ treatment: "product", voices: { Display: { weights: [] }, Body: { weights: [{ name: "", weight: 700 }, { name: "Bad", weight: 0 }] } } });
+  ok(!("weights" in base) && !("weights" in withEmpty), "identity gate: absent/empty/invalid weights ⇒ no weights key on the scale");
+  ok(T.typeTokensCSS(base) === T.typeTokensCSS(withEmpty), "identity gate: CSS byte-identical without valid siblings");
+
+  // the channel — validation, slugs, dedupe
+  const sc = T.typeScale({ treatment: "product", voices: { Display: { weights: [{ name: "Bold", weight: 700 }, { name: "Semi-bold", weight: 600 }, { name: "bold ", weight: 650 }, { name: "Medium", weight: "500" }] }, Body: { weights: [{ name: "Light", weight: 300 }] } } });
+  ok(sc.weights && sc.weights.Display && sc.weights.Display.length === 3, "weights channel: valid entries kept, duplicate slug collapsed (bold vs Bold)");
+  ok(sc.weights.Display[0].slug === "bold" && sc.weights.Display[1].slug === "semi-bold" && sc.weights.Display[2].weight === 500, "weights channel: kebab slugs + numeric coercion");
+
+  // CSS — per-voice custom props, never per-step duplication
+  const css = T.typeTokensCSS(sc);
+  ok(css.includes("--type-display-weight-bold: 700;") && css.includes("--type-display-weight-semi-bold: 600;") && css.includes("--type-body-weight-light: 300;"), "CSS emits per-voice sibling weight props");
+  ok((css.match(/--type-display-weight-bold:/g) || []).length === 1, "CSS sibling props appear once per voice (not per step)");
+
+  // DTCG — a weights group of fontWeight tokens
+  const dtcg = T.typeTokensDTCG(sc);
+  ok(dtcg.weights && dtcg.weights.Display && dtcg.weights.Display.Bold && dtcg.weights.Display.Bold.$type === "fontWeight" && dtcg.weights.Display.Bold.$value === 700, "DTCG emits the weights group");
+  ok(!("weights" in T.typeTokensDTCG(base)), "DTCG identity: no siblings ⇒ no weights group");
+
+  // Figma primitives — FLOAT + STRING per sibling, core un-suffixed names unchanged
+  const col = T.typeTokensFigmaPrimitives(sc).collections["Font Primitives"];
+  ok(col.variables["weight/Display/bold"] && col.variables["weight/Display/bold"].type === "FLOAT" && col.variables["weight/Display/bold"].values.Value === 700, "primitives emit weight/<voice>/<slug> FLOAT per sibling");
+  ok(col.variables["weight-style/Display/bold"] && col.variables["weight-style/Display/bold"].values.Value === "Bold", "primitives emit weight-style/<voice>/<slug> STRING per sibling");
+  ok(col.variables["weight/Display"], "the core un-suffixed weight primitive is unchanged");
+}
+
 // ── genericFor: the CSS generic a font stack falls back to (serif/sans/mono) when the face isn't loaded/
 //    installed. The old `/serif/.test(name)` mislabelled nearly every serif + typewriter face as sans.
 ok(T.genericFor("Bodoni Moda") === "serif" && T.genericFor("Playfair Display") === "serif" && T.genericFor("Sabon") === "serif" && T.genericFor("Times New Roman") === "serif" && T.genericFor("Clarendon") === "serif" && T.genericFor("American Typewriter") === "serif", "genericFor: serif/slab faces → serif (even with no 'serif' in the name)");

@@ -125,6 +125,11 @@ if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "cl
   if (!deepEq(Rv.type.voices.Body, { weight: 600, leading: 1.8, ratio: 1.3, tracking: 0.01 })) FAIL("type-voices", `type.voices.Body did not round-trip: ${JSON.stringify(Rv.type.voices.Body)}`);
   if ("Bogus" in Rv.type.voices) FAIL("type-voices", "an unknown voice name must drop");
   if (Rv.type.voices.Display.weight !== 1000) FAIL("type-voices", `weight 99999 should clamp to 1000, got ${Rv.type.voices.Display.weight}`);
+  // SIBLING WEIGHTS round-trip: valid entries survive (name trimmed/capped, weight clamped); invalid drop;
+  // an empty/absent list never materializes a weights key (the hydrate identity gate).
+  const Rw = U.hydrate(U.serialize({ ...inDomainState(), type: { treatment: "product", bodyBase: 16, voices: { Display: { weights: [{ name: "Bold", weight: 700 }, { name: "  Medium ", weight: 99999 }, { name: "", weight: 500 }, { weight: 400 }] }, Body: { weights: [] } } } }));
+  if (!deepEq(Rw.type.voices.Display.weights, [{ name: "Bold", weight: 700 }, { name: "Medium", weight: 1000 }])) FAIL("type-voices", `sibling weights did not round-trip: ${JSON.stringify(Rw.type.voices.Display.weights)}`);
+  if (Rw.type.voices.Body && "weights" in Rw.type.voices.Body) FAIL("type-voices", "an empty weights list must NOT materialize a weights key");
   if ("voices" in Rf0.type) FAIL("type-voices", "an absent voices override must NOT materialize a voices key (round-trip identity)");
 
   // OUT-OF-RANGE values clamp to the nearest bound (type size [1,512], geom height [8,256]).

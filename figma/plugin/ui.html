@@ -2883,7 +2883,54 @@ function typeScale(config = {}) {
   if (voices) for (const [name, v] of Object.entries(voices)) {
     if (t.categories[name] && v && typeof v.styleName === "string" && v.styleName.trim()) styleNames[name] = v.styleName.trim();
   }
-  return { treatment: t.id, label: t.label, fonts, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories, ...(Object.keys(styleNames).length ? { styleNames } : {}) };
+  // per-voice SIBLING WEIGHTS (config.voices[v].weights) — named weight variants AROUND the voice's core
+  // weight ([{name:"Bold", weight:700}, …]; the core itself is never in the list). They ship as per-voice
+  // weight tokens (CSS custom props, DTCG fontWeight group, Figma weight/… primitives) and drive the
+  // Figma text-style variants (`Display/xl/Bold`). Validation: finite 1..1000 weight + non-empty name;
+  // the kebab slug is the token key (duplicate slugs collapse, first wins). Identity-gated: no valid
+  // entries ⇒ no `weights` key on the scale and every emitter is byte-identical.
+  const weights = {};
+  if (voices) for (const [name, v] of Object.entries(voices)) {
+    if (!t.categories[name] || !v || !Array.isArray(v.weights)) continue;
+    const list = [], seen = new Set();
+    for (const e of v.weights) {
+      if (!e || typeof e !== "object") continue;
+      const w = Math.round(Number(e.weight));
+      const nm = typeof e.name === "string" ? e.name.trim() : "";
+      if (!Number.isFinite(w) || w < 1 || w > 1000 || !nm) continue;
+      const slug = kebab(nm);
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      list.push({ name: nm, slug, weight: w });
+    }
+    if (list.length) weights[name] = list;
+  }
+  return { treatment: t.id, label: t.label, fonts, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories, ...(Object.keys(styleNames).length ? { styleNames } : {}), ...(Object.keys(weights).length ? { weights } : {}) };
+}
+
+// ── sibling-weight defaults ────────────────────────────────────────────────────────────────────
+// The canonical 9-stop weight ladder with its semantic names — the vocabulary the sibling-weight
+// UX snaps to and the default names the suggestions carry.
+const WEIGHT_LADDER = [100, 200, 300, 400, 500, 600, 700, 800, 900];
+const WEIGHT_NAMES = { 100: "Thin", 200: "Extra-light", 300: "Light", 400: "Regular", 500: "Medium", 600: "Semi-bold", 700: "Bold", 800: "Extra-bold", 900: "Black" };
+
+// siblingWeightDefaults(core) — the SUGGESTED sibling set around a voice's core weight, from the
+// ladder (never the core itself). Applied once when the user opts a voice in; after that the list
+// is user-owned (add/remove/rename) and never silently regenerated. The shape:
+//   heavy cores (≥800, e.g. Black 900) → two below:      900 → Bold 700 · Medium 500
+//   light-to-regular cores (≤400)      → one below + two above:  400 → Light 300 · Medium 500 · Semi-bold 600
+//   mid cores (500–700)                → one below + one above (±200, clamped): 600 → Regular 400 · Extra-bold 800
+function siblingWeightDefaults(core) {
+  const c = Number(core);
+  if (!Number.isFinite(c)) return [];
+  const snap = WEIGHT_LADDER.reduce((a, b) => (Math.abs(b - c) < Math.abs(a - c) ? b : a));
+  let picks;
+  if (snap >= 800) picks = [snap - 200, snap - 400];
+  else if (snap <= 400) picks = [snap - 100, snap + 100, snap + 200];
+  else picks = [snap - 200, snap + 200];
+  return picks
+    .filter((w) => w >= 100 && w <= 900 && w !== snap)
+    .map((w) => ({ name: WEIGHT_NAMES[w], weight: w }));
 }
 
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
@@ -2930,6 +2977,12 @@ function typeVarLines(scale, indent = "  ", unit = "px", pfx = "type") {
 function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   const lines = [":root {"];
   for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
+  // per-voice SIBLING WEIGHTS — one custom prop per named variant (`--type-display-weight-bold: 700`),
+  // per VOICE (never duplicated per step). Absent when the kit defines none (identity gate).
+  if (scale.weights) for (const [cName, list] of Object.entries(scale.weights)) {
+    const c = kebab(cName);
+    for (const wv of list) lines.push(`  --${prefix}-${c}-weight-${wv.slug}: ${wv.weight};`);
+  }
   lines.push(typeVarLines(scale, "  ", unit, prefix));
   lines.push("}");
   for (const [cName, steps] of Object.entries(scale.categories)) {
@@ -2971,7 +3024,14 @@ function typeTokensDTCG(scale, { unit = "px" } = {}) {
       };
     }
   }
-  return { fontFamily, typography };
+  // per-voice SIBLING WEIGHTS — a `weights` group of DTCG fontWeight tokens per voice
+  // ({ Display: { Bold: { $type:"fontWeight", $value:700 } } }). Absent when none (identity gate).
+  const weights = {};
+  if (scale.weights) for (const [cName, list] of Object.entries(scale.weights)) {
+    weights[cName] = {};
+    for (const wv of list) weights[cName][wv.name] = { $type: "fontWeight", $value: wv.weight };
+  }
+  return { fontFamily, typography, ...(Object.keys(weights).length ? { weights } : {}) };
 }
 
 // typeTokensFigmaModes — the type scale as a single Figma-variable COLLECTION ("Typography") with one MODE
@@ -3055,6 +3115,14 @@ function typeTokensFigmaPrimitives(scale) {
     // present only when the kit names one (scale.styleNames via config.voices[v].styleName).
     const sn = scale.styleNames && scale.styleNames[voice];
     if (sn) variables[`weight-style/${voice}`] = { type: "STRING", values: { Value: sn } };
+    // SIBLING WEIGHTS — one FLOAT + one STRING primitive per named variant (`weight/Display/bold`,
+    // `weight-style/Display/bold`); the core keeps the un-suffixed names above (backward compatible).
+    // These are the binding targets for the sibling text styles (`Display/xl/Bold`).
+    const sibs = scale.weights && scale.weights[voice];
+    if (sibs) for (const wv of sibs) {
+      variables[`weight/${voice}/${wv.slug}`] = { type: "FLOAT", values: { Value: wv.weight } };
+      variables[`weight-style/${voice}/${wv.slug}`] = { type: "STRING", values: { Value: wv.name } };
+    }
   }
   return {
     $schema: "figma-ui3-variables.primitives.schema.v1",
@@ -3062,7 +3130,7 @@ function typeTokensFigmaPrimitives(scale) {
   };
 }
 
-return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, typeScale, dimUnit, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes, typeTokensFigmaPrimitives };
+return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, typeScale, WEIGHT_LADDER, WEIGHT_NAMES, siblingWeightDefaults, dimUnit, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes, typeTokensFigmaPrimitives };
 })();
 __M.geometry = (function(){
 // geometry.mjs — the GEOMETRY / dimensional engine: the spatial analog of the color & type engines.
@@ -3945,6 +4013,19 @@ function clampType(t) {
       const ra = num(v.ratio, 1, 2, false); if (ra !== undefined) o.ratio = ra;
       // styleName — the Figma weight-style string for non-variable families; trimmed, capped, non-empty only.
       if (typeof v.styleName === "string" && v.styleName.trim()) o.styleName = v.styleName.trim().slice(0, 60);
+      // weights — SIBLING weight variants [{name, weight}] around the voice's core (the styles feature).
+      // Capped at 8 per voice; each entry needs a finite clamped weight AND a non-empty name (name capped
+      // at 40 chars). Kept only when non-empty, so a config without siblings round-trips identically.
+      if (Array.isArray(v.weights)) {
+        const list = [];
+        for (const e of v.weights.slice(0, 8)) {
+          if (!e || typeof e !== "object") continue;
+          const w = num(e.weight, 100, 1000, true);
+          const nm = typeof e.name === "string" ? e.name.trim().slice(0, 40) : "";
+          if (w !== undefined && nm) list.push({ name: nm, weight: w });
+        }
+        if (list.length) o.weights = list;
+      }
       if (Object.keys(o).length) voices[name] = o;
     }
     if (Object.keys(voices).length) out.voices = voices;
