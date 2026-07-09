@@ -141,13 +141,13 @@ try {
   await evalJS(`${el}.toggleDrawer(true)`); await sleep(400);
   ok(await evalJS(`(()=>{const d=${el}.querySelector("dialog.drawer");return !!d && d.open && Math.round(d.getBoundingClientRect().height) === innerHeight})()`), "export drawer opens as a full-height <dialog>");
   // Systems opt-in: Color / Typography / Geometry toggle chips govern Download-All + the Brand-Kit MCP.
-  ok(await evalJS(`(()=>{const c=[...${el}.querySelectorAll(".drawer-systems .chip")];return c.length===3 && c.every(b=>b.classList.contains("on"))})()`), "Export drawer shows 3 system toggles (Color/Typography/Geometry), all on by default");
+  ok(await evalJS(`(()=>{const c=[...${el}.querySelectorAll(".drawer-systems .chip")];return c.length===4 && c.every(b=>b.classList.contains("on"))})()`), "Export drawer shows 4 system toggles (Color/Typography/Geometry/Styles), all on by default");
   const drawerShot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(resolve(OUT, "export-systems.png"), Buffer.from(drawerShot.data, "base64"));
   console.log("  · screenshot → smoke-out/export-systems.png");
   // toggling Geometry off un-presses its chip (still ≥1 selected, so it sticks)
   ok(await evalJS(`(()=>{${el}.toggleExportSystem("geometry");const c=[...${el}.querySelectorAll(".drawer-systems .chip")].find(b=>b.textContent.trim()==="Geometry");return c && !c.classList.contains("on")})()`), "toggling Geometry off un-presses its chip");
-  await evalJS(`${el}.exportSystems={color:true,type:true,geometry:true};${el}.render()`); await sleep(80);
+  await evalJS(`${el}.exportSystems={color:true,type:true,geometry:true,styles:true};${el}.render()`); await sleep(80);
   await evalJS(`${el}.toggleDrawer(false)`); await sleep(200);
 
   // Apply-to-Figma consent gate: a centered "back up your variables first" road-block before writing.
