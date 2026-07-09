@@ -16,7 +16,9 @@ const categoryKey = (file) => (file === "index.js" ? "categoryIndex" : "category
 // which imports the index; the index's lazy thunks reference the category modules only at call time.
 const MODS = [
   ["hct", "src/engine/hct.js"], ["okhsl", "src/engine/okhsl.js"], ["semantic", "src/engine/semantic.js"],
-  ["tonal", "src/engine/tonal.js"], ["derive", "src/engine/derive.mjs"], ["type", "src/engine/type.mjs"], ["geometry", "src/engine/geometry.mjs"], ["flags", "src/engine/flags.js"], ["persist", "src/ui/persist.js"],
+  ["tonal", "src/engine/tonal.js"], ["derive", "src/engine/derive.mjs"], ["type", "src/engine/type.mjs"], ["geometry", "src/engine/geometry.mjs"], ["flags", "src/engine/flags.js"],
+  ["iconSystems", "src/engine/icon-systems.mjs"], // pure registry; BEFORE persist (which imports it)
+  ["persist", "src/ui/persist.js"],
   ["dsGates", "src/engine/ds-gates.js"], // zero-dep §8 carrier primitives; before `exports` (which imports them)
   ["exports", "src/engine/exports.js"], ["figmaPlugin", "src/ui/figma-plugin-assets.js"], ["mcpAssets", "src/ui/mcp-assets.js"], ["typeFonts", "src/ui/type-fonts.js"],
   ...CATEGORY_FILES.filter((f) => f !== "index.js").map((f) => [categoryKey(f), `${CATEGORY_DIR}/${f}`]),
@@ -24,7 +26,6 @@ const MODS = [
   ["zip", "src/ui/zip.mjs"],
   ["modeApplyPlan", "figma/binder/mode-apply-plan.mjs"],
   ["stylePlan", "figma/binder/style-plan.mjs"],
-  ["iconSystems", "src/engine/icon-systems.mjs"],
   ["icons", "src/ui/icons.js"],
   ["model", "src/ui/model.mjs"], ["app", "src/ui/app.js"],
 ];
