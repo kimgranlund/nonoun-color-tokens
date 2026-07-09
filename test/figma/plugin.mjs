@@ -83,9 +83,20 @@ function mockFigma() {
         remove: function () { const i = figma._styles.indexOf(this); if (i >= 0) figma._styles.splice(i, 1); } };
       this._styles.push(st); return st;
     },
-    // loadFontAsync resolves only for the faces the "installed" families expose (Regular/Bold/Medium
-    // everywhere; the executor's candidate walk must cope with a missing exotic face name).
-    async loadFontAsync(f) { if (!f || !f.family) throw new Error("no family"); if (["Regular", "Bold", "Medium", "Light", "SemiBold"].indexOf(f.style) < 0) throw new Error("no face " + f.style); },
+    // the "installed" font universe: a few families with REALISTIC face lists (note: no exact
+    // "SemiBold" on Inter Tight — nearest-weight resolution must cope) and italics to be skipped.
+    _fonts: { "Inter": ["Thin", "Light", "Regular", "Medium", "SemiBold", "Bold", "Black", "Italic", "Bold Italic"],
+              "Inter Tight": ["Light", "Regular", "Medium", "Bold", "Black"],
+              "Source Serif 4": ["Regular", "SemiBold", "Bold"],
+              "JetBrains Mono": ["Regular", "Medium", "Bold"] },
+    async listAvailableFontsAsync() {
+      const out = [];
+      for (const fam of Object.keys(this._fonts)) for (const st of this._fonts[fam]) out.push({ fontName: { family: fam, style: st } });
+      return out;
+    },
+    async loadFontAsync(f) {
+      if (!f || !f.family || !this._fonts[f.family] || this._fonts[f.family].indexOf(f.style) < 0) throw new Error("no face");
+    },
     variables: {
       async getLocalVariableCollectionsAsync() { return collections.slice(); },
       createVariableCollection(name) {
@@ -397,6 +408,15 @@ if (applyStylePlans && applyFontPrimitives) {
     if (core && !core._bound.fontFamily) FAIL("styles", "core fontFamily not bound to the Font Primitives alias");
     if (sib && !sib._bound.fontWeight) FAIL("styles", "sibling fontWeight not bound to weight/<voice>/<slug>");
 
+    // a family Figma does not have: skipped + reported, and NO default-valued style left behind.
+    // The ghost rides the FULL plan (a partial plan would legitimately prune the rest).
+    {
+      const before = F.figma._styles.length;
+      const ghost = await applyStylePlans({ paints: plans.paints, texts: plans.texts.concat([{ name: "Ghost/md", voice: "Ghost", step: "MD", bind: {}, literal: { family: "Nonexistent Face", weight: 700, size: 20, lineHeight: 24, letterSpacing: 0, textCase: "none" } }]) });
+      if (!ghost.missingFonts || ghost.missingFonts.indexOf("Nonexistent Face") < 0) FAIL("styles", "an unavailable family is not reported in missingFonts");
+      if (F.figma._styles.length !== before || F.figma._styles.some((x) => x.name === "Ghost/md")) FAIL("styles", "an unavailable family left a default-valued style behind (the Inter-Regular-12 bug)");
+    }
+
     // registry + idempotency + provenance-scoped prune
     const reg = JSON.parse(F.figma.root.getPluginData("nonoun-color-tokens-styles"));
     if (Object.keys(reg.paints).length !== plans.paints.length || Object.keys(reg.texts).length !== plans.texts.length) FAIL("styles", "style registry does not record every created style");
@@ -412,6 +432,10 @@ if (applyStylePlans && applyFontPrimitives) {
   } catch (e) { FAIL("styles", "styles apply threw: " + e.message); }
 }
 
-if (fails.length) { console.error(`\nFAIL: ${fails.length} gate failure(s)`); process.exit(1); }
+{
+  const f = fails.find((x) => x.startsWith("styles:"));
+  console.log(`  ${f ? "FAIL" : "pass"}  styles${f ? "  — " + f.slice(8) : ""}`);
+}
+if (fails.length) { console.error(`\nFAIL: ${fails.length} gate failure(s)\n  ` + fails.join("\n  ")); process.exit(1); }
 console.log("\nPASS: figma-plugin-app — manifest + offline code.js + bridged ui.html + the figmaBundle→variables cascade + the Type/Geometry breakpoint-mode apply + the styles apply (bound paints/texts, registry prune)");
 process.exit(0);

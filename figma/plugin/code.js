@@ -101,10 +101,11 @@ figma.ui.onmessage = async (msg) => {
       if (r) parts.push(`${r.raw} primitives + ${r.semantic} semantic variables (Light / Dark)` + (r.rebuilt ? ", regrouped" : "") + (r.pruned ? `, ${r.pruned} stale pruned` : ""));
       if (fr && fr.collections) parts.push(`${fr.variables} type/geometry variable${fr.variables === 1 ? "" : "s"} across ${fr.collections} collection${fr.collections === 1 ? "" : "s"}`);
       if (sr && (sr.paints || sr.texts)) parts.push(`${sr.paints + sr.texts} style${sr.paints + sr.texts === 1 ? "" : "s"} (${sr.paints} color · ${sr.texts} text)` + (sr.pruned ? `, ${sr.pruned} stale pruned` : ""));
+      if (sr && sr.missingFonts && sr.missingFonts.length) figma.notify(`Some text styles were skipped — fonts not available in Figma: ${sr.missingFonts.slice(0, 3).join(", ")}${sr.missingFonts.length > 3 ? "…" : ""}`, { timeout: 6000 });
       figma.notify(parts.length ? "Applied " + parts.join(" · ") : "Nothing to apply — every system is toggled off.");
       // Signal the iframe UI that the async write actually COMPLETED (its optimistic "Applying…" toast alone
       // can't know when the sandbox finishes) → onApplyDone shows a real "Applied N…" toast + closes the gate.
-      figma.ui.postMessage({ type: "apply-done", raw: r ? r.raw : 0, semantic: r ? r.semantic : 0, floatVars: fr ? fr.variables : 0, floatCollections: fr ? fr.collections : 0, paintStyles: sr ? sr.paints : 0, textStyles: sr ? sr.texts : 0 });
+      figma.ui.postMessage({ type: "apply-done", raw: r ? r.raw : 0, semantic: r ? r.semantic : 0, floatVars: fr ? fr.variables : 0, floatCollections: fr ? fr.collections : 0, paintStyles: sr ? sr.paints : 0, textStyles: sr ? sr.texts : 0, missingFonts: sr && sr.missingFonts ? sr.missingFonts : [] });
     } else if (msg.type === "save-config") {
       writeConfig(msg.config);
       figma.notify("Palette set saved into this file");
@@ -243,22 +244,36 @@ async function applyFontPrimitives(plan) {
   return { variables: count };
 }
 
-// the Figma style-string candidates per ladder weight — tried in order against loadFontAsync until one
-// exists in the family (static families name faces, they don't expose numeric weights).
-const WEIGHT_STYLE_CANDIDATES = {
-  100: ["Thin", "Hairline"], 200: ["ExtraLight", "Extra Light", "UltraLight", "Ultra Light"],
-  300: ["Light"], 400: ["Regular", "Normal", "Book"], 500: ["Medium"],
-  600: ["SemiBold", "Semi Bold", "Semibold", "DemiBold", "Demi Bold"], 700: ["Bold"],
-  800: ["ExtraBold", "Extra Bold", "UltraBold", "Ultra Bold"], 900: ["Black", "Heavy"],
-};
-function weightStyleCandidates(literal) {
-  const out = [];
-  if (literal && typeof literal.styleName === "string" && literal.styleName) out.push(literal.styleName);
-  const w = literal && Number.isFinite(literal.weight) ? Math.max(100, Math.min(900, Math.round(literal.weight / 100) * 100)) : 400;
-  const ladder = WEIGHT_STYLE_CANDIDATES[w] || [];
-  for (const c of ladder) if (out.indexOf(c) < 0) out.push(c);
-  if (out.indexOf("Regular") < 0) out.push("Regular");
-  return out;
+// resolveFace — pick a REAL face for {family, weight, styleName?} from Figma's actual font list
+// (listAvailableFontsAsync), never guess-and-catch: the kit's styleName wins when it exists; else the
+// style whose NAME-implied weight is nearest the requested weight (upright faces preferred over
+// italics; "Regular" wins ties at equal distance via the name table's order). Returns the style
+// string, or null when the family is not available in this Figma at all (the caller reports it).
+const STYLE_NAME_WEIGHTS = [
+  ["thin", 100], ["hairline", 100], ["extralight", 200], ["extra light", 200], ["ultralight", 200], ["ultra light", 200],
+  ["light", 300], ["regular", 400], ["normal", 400], ["book", 400], ["medium", 500],
+  ["semibold", 600], ["semi bold", 600], ["demibold", 600], ["demi bold", 600],
+  ["extrabold", 800], ["extra bold", 800], ["ultrabold", 800], ["ultra bold", 800],
+  ["bold", 700], ["black", 900], ["heavy", 900],
+];
+function styleNameWeight(style) {
+  const s = String(style).toLowerCase();
+  for (const pair of STYLE_NAME_WEIGHTS) if (s.indexOf(pair[0]) >= 0) return pair[1];
+  return 400; // an unnamed cut reads as the family's regular
+}
+function resolveFace(stylesOfFamily, literal) {
+  if (!stylesOfFamily || !stylesOfFamily.length) return null;
+  const wanted = literal && typeof literal.styleName === "string" ? literal.styleName : "";
+  if (wanted && stylesOfFamily.indexOf(wanted) >= 0) return wanted;
+  const w = literal && Number.isFinite(literal.weight) ? literal.weight : 400;
+  const upright = stylesOfFamily.filter(function (st) { return !/italic|oblique/i.test(st); });
+  const pool = upright.length ? upright : stylesOfFamily;
+  let best = pool[0], bestD = Infinity;
+  for (const st of pool) {
+    const d = Math.abs(styleNameWeight(st) - w);
+    if (d < bestD) { best = st; bestD = d; }
+  }
+  return best;
 }
 
 // applyStylePlans — paint styles bound to the Color Modes variables; text styles set from the plan's
@@ -308,22 +323,33 @@ async function applyStylePlans(sp) {
     const local = await figma.getLocalTextStylesAsync();
     const byName = {};
     for (const st of local) byName[st.name] = st;
+    // the REAL font list, once: family → its available style strings. Faces are resolved from this
+    // (nearest name-implied weight), never guessed-and-caught — a wrong guess used to abandon a
+    // freshly-created style at Figma's defaults (Inter Regular 12).
+    const fontsByFamily = {};
+    try {
+      for (const f of await figma.listAvailableFontsAsync()) {
+        const fn = f.fontName || f;
+        if (!fontsByFamily[fn.family]) fontsByFamily[fn.family] = [];
+        fontsByFamily[fn.family].push(fn.style);
+      }
+    } catch (e) { console.error("[Ultimate Tokens] couldn't list fonts:", e); }
+    out.missingFonts = [];
     const current = {};
     for (const t of texts) {
       const lit = t.literal || {};
       if (!lit.family || !Number.isFinite(lit.size)) continue;
+      const face = resolveFace(fontsByFamily[lit.family], lit);
+      if (!face) { if (out.missingFonts.indexOf(lit.family) < 0) out.missingFonts.push(lit.family); continue; }
+      try { await figma.loadFontAsync({ family: lit.family, style: face }); }
+      catch (e) { if (out.missingFonts.indexOf(lit.family) < 0) out.missingFonts.push(lit.family); continue; }
+      // ONLY after the face is loaded: find-or-create + name + mutate (a load failure must never
+      // create or reset a style).
       let st = byName[t.name];
       if (!st && reg.texts[t.name]) { try { st = await figma.getStyleByIdAsync(reg.texts[t.name]); } catch (e) { st = null; } }
       if (!st) st = figma.createTextStyle();
       st.name = t.name;
-      // font face: try the style-name candidates until one loads (static families name faces).
-      let loaded = null;
-      for (const cand of weightStyleCandidates(lit)) {
-        try { await figma.loadFontAsync({ family: lit.family, style: cand }); loaded = cand; break; }
-        catch (e) { /* try the next face name */ }
-      }
-      if (!loaded) continue; // family unavailable in this file — skip, never throw (report via texts count)
-      st.fontName = { family: lit.family, style: loaded };
+      st.fontName = { family: lit.family, style: face };
       st.fontSize = lit.size;
       if (Number.isFinite(lit.lineHeight) && lit.size > 0) st.lineHeight = { unit: "PERCENT", value: (lit.lineHeight / lit.size) * 100 };
       if (Number.isFinite(lit.letterSpacing) && lit.size > 0) st.letterSpacing = { unit: "PERCENT", value: (lit.letterSpacing / lit.size) * 100 };
@@ -486,4 +512,4 @@ async function applyFloatPlans(plans) {
 }
 
 // Exposed for the headless verifier (a no-op inside Figma's VM).
-if (typeof module !== "undefined") module.exports = { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, weightStyleCandidates, rgbaOf, aliasTarget, childKeys };
+if (typeof module !== "undefined") module.exports = { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, resolveFace, styleNameWeight, rgbaOf, aliasTarget, childKeys };
