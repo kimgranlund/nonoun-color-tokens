@@ -76,11 +76,12 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           ...(hasPara ? { paragraphSpacing: s.paragraphSpacing } : {}),
           textCase: s.textTransform || "none",
         };
-        // the CORE style — bare `Voice/step` (ratified: no weight suffix on the core).
+        // the CORE style — bare `Voice/step` (ratified: no weight suffix on the core). fontWeight binds
+        // to the voice's core weight primitive (always emitted), so weight is variable-driven on cores too.
         texts.push({
           name: `${voice}/${stepSlug}`,
           voice, step,
-          bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${voice}` } : {}) },
+          bind: { ...bindBase, fontWeight: `weight/${voice}`, ...(coreStyleName ? { fontStyle: `weight-style/${voice}` } : {}) },
           literal: { ...litBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
         });
         // the SIBLING weight variants — `Voice/step/Name`, weight + style-name swapped per sibling.

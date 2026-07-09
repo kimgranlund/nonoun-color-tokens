@@ -87,7 +87,8 @@ const plans = stylePlans({ families, scale });
   ok(stylePlans({ families, scale, include: { type: false } }).texts.length === 0, "include.type:false ⇒ no texts");
   ok(JSON.stringify(stylePlans({ families, scale })) === JSON.stringify(stylePlans({ families, scale })), "same inputs ⇒ byte-identical plan (determinism)");
   const bare = stylePlans({ families, scale: typeScale({ treatment: "product" }) });
-  ok(bare.texts.every((t) => !t.bind.fontStyle && !t.bind.fontWeight && !t.literal.styleName), "no styleName/weights config ⇒ no fontStyle/fontWeight bindings (identity)");
+  ok(bare.texts.every((t) => !t.bind.fontStyle && !t.literal.styleName), "no styleName config ⇒ no fontStyle bindings (identity)");
+  ok(bare.texts.every((t) => t.bind.fontWeight === `weight/${t.voice}`), "every CORE style binds fontWeight to the voice's core weight primitive (always emitted)");
   ok(stylePlans({}).paints.length === 0 && stylePlans({}).texts.length === 0, "empty inputs ⇒ empty plan, no throw");
 }
 
