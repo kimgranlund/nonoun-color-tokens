@@ -5739,10 +5739,13 @@ class HctApp extends HTMLElement {
     const stylesPart = st ? `${st} style swatch${st === 1 ? "" : "es"}` : "";
     const what = [varsPart, stylesPart].filter(Boolean).join(" + ");
     const missing = m && Array.isArray(m.missingFonts) ? m.missingFonts : [];
+    const subbed = m && Array.isArray(m.substitutedFonts) ? m.substitutedFonts : [];
     this.toast(what ? `Applied ${what} to Figma — check the Variables & Styles panels` : "Applied to Figma — check the Variables panel");
-    // a SECOND toast for skipped families — this is the difference between "6 voices silently missing"
-    // and an actionable message (the sandbox's own notify races the apply-done toast and gets lost).
-    if (missing.length) this.toast(`Text styles skipped for ${missing.length} font${missing.length === 1 ? "" : "s"} not available in Figma: ${missing.slice(0, 4).join(", ")}${missing.length > 4 ? "…" : ""}`);
+    // SECOND toast — the font reality. A substituted family means the style EXISTS with its family
+    // still bound to the Font Primitives variable: installing the font adopts it, no re-apply needed.
+    // (The sandbox's own notify races the apply-done toast and gets lost, so the UI says it too.)
+    if (subbed.length) this.toast(`${m.substituted || subbed.length} text style${(m.substituted || 0) === 1 ? "" : "s"} use a placeholder face — install to see them as designed: ${subbed.slice(0, 4).join(", ")}${subbed.length > 4 ? "…" : ""}. The family stays variable-bound.`);
+    if (missing.length) this.toast(`Text styles skipped — no usable font for: ${missing.slice(0, 4).join(", ")}${missing.length > 4 ? "…" : ""}`);
   }
   onApplyError() {
     this.toast("Couldn't apply to Figma — please try again.");

@@ -101,11 +101,12 @@ figma.ui.onmessage = async (msg) => {
       if (r) parts.push(`${r.raw} primitives + ${r.semantic} semantic variables (Light / Dark)` + (r.rebuilt ? ", regrouped" : "") + (r.pruned ? `, ${r.pruned} stale pruned` : ""));
       if (fr && fr.collections) parts.push(`${fr.variables} type/geometry variable${fr.variables === 1 ? "" : "s"} across ${fr.collections} collection${fr.collections === 1 ? "" : "s"}`);
       if (sr && (sr.paints || sr.texts)) parts.push(`${sr.paints + sr.texts} style${sr.paints + sr.texts === 1 ? "" : "s"} (${sr.paints} color · ${sr.texts} text)` + (sr.pruned ? `, ${sr.pruned} stale pruned` : ""));
-      if (sr && sr.missingFonts && sr.missingFonts.length) figma.notify(`Some text styles were skipped — fonts not available in Figma: ${sr.missingFonts.slice(0, 3).join(", ")}${sr.missingFonts.length > 3 ? "…" : ""}`, { timeout: 6000 });
+      if (sr && sr.substitutedFonts && sr.substitutedFonts.length) figma.notify(`${sr.substituted} text style(s) use a placeholder face — install to see them as designed: ${sr.substitutedFonts.slice(0, 3).join(", ")}${sr.substitutedFonts.length > 3 ? "…" : ""}`, { timeout: 6000 });
+      if (sr && sr.missingFonts && sr.missingFonts.length) figma.notify(`Some text styles were skipped — no usable font: ${sr.missingFonts.slice(0, 3).join(", ")}${sr.missingFonts.length > 3 ? "…" : ""}`, { timeout: 6000 });
       figma.notify(parts.length ? "Applied " + parts.join(" · ") : "Nothing to apply — every system is toggled off.");
       // Signal the iframe UI that the async write actually COMPLETED (its optimistic "Applying…" toast alone
       // can't know when the sandbox finishes) → onApplyDone shows a real "Applied N…" toast + closes the gate.
-      figma.ui.postMessage({ type: "apply-done", raw: r ? r.raw : 0, semantic: r ? r.semantic : 0, floatVars: fr ? fr.variables : 0, floatCollections: fr ? fr.collections : 0, paintStyles: sr ? sr.paints : 0, textStyles: sr ? sr.texts : 0, missingFonts: sr && sr.missingFonts ? sr.missingFonts : [] });
+      figma.ui.postMessage({ type: "apply-done", raw: r ? r.raw : 0, semantic: r ? r.semantic : 0, floatVars: fr ? fr.variables : 0, floatCollections: fr ? fr.collections : 0, paintStyles: sr ? sr.paints : 0, textStyles: sr ? sr.texts : 0, missingFonts: sr && sr.missingFonts ? sr.missingFonts : [], substitutedFonts: sr && sr.substitutedFonts ? sr.substitutedFonts : [], substituted: sr ? sr.substituted : 0 });
     } else if (msg.type === "save-config") {
       writeConfig(msg.config);
       figma.notify("Palette set saved into this file");
@@ -261,6 +262,17 @@ function styleNameWeight(style) {
   for (const pair of STYLE_NAME_WEIGHTS) if (s.indexOf(pair[0]) >= 0) return pair[1];
   return 400; // an unnamed cut reads as the family's regular
 }
+// pickFallbackFamily — when the kit's family is absent from this Figma, the style still gets BUILT:
+// a loadable placeholder face carries the metrics while `fontFamily`/`fontStyle` stay BOUND to the
+// Font Primitives variables that carry the TRUE family. Figma resolves a text style's family from the
+// bound variable, so the style self-heals the moment the real font is installed. Prefer Figma's own
+// default (Inter), then Roboto, then any family — a substitution is reported, never silent.
+function pickFallbackFamily(fontsByFamily) {
+  for (const pref of ["Inter", "Roboto"]) if (fontsByFamily[pref] && fontsByFamily[pref].length) return pref;
+  for (const fam of Object.keys(fontsByFamily)) if (fontsByFamily[fam] && fontsByFamily[fam].length) return fam;
+  return null;
+}
+
 function resolveFace(stylesOfFamily, literal) {
   if (!stylesOfFamily || !stylesOfFamily.length) return null;
   const wanted = literal && typeof literal.styleName === "string" ? literal.styleName : "";
@@ -343,22 +355,38 @@ async function applyStylePlans(sp) {
         fontsByFamily[fn.family].push(fn.style);
       }
     } catch (e) { console.error("[Ultimate Tokens] couldn't list fonts:", e); }
-    out.missingFonts = [];
+    out.missingFonts = [];      // families with NO usable face at all (style skipped)
+    out.substitutedFonts = [];  // families absent from this Figma (style BUILT on a placeholder face)
+    out.substituted = 0;
+    const fallbackFamily = pickFallbackFamily(fontsByFamily);
     const current = {};
     for (const t of texts) {
       const lit = t.literal || {};
       if (!lit.family || !Number.isFinite(lit.size)) continue;
-      const face = resolveFace(fontsByFamily[lit.family], lit);
+      // resolve the kit's OWN face first; fall back to a loadable placeholder (the bound fontFamily
+      // variable still carries the true family, so intent survives and self-heals on install).
+      let useFamily = lit.family;
+      let face = resolveFace(fontsByFamily[lit.family], lit);
+      let didSubstitute = false;
+      if (!face && fallbackFamily) {
+        useFamily = fallbackFamily;
+        face = resolveFace(fontsByFamily[fallbackFamily], lit);
+        didSubstitute = true;
+      }
       if (!face) { if (out.missingFonts.indexOf(lit.family) < 0) out.missingFonts.push(lit.family); continue; }
-      try { await figma.loadFontAsync({ family: lit.family, style: face }); }
+      try { await figma.loadFontAsync({ family: useFamily, style: face }); }
       catch (e) { if (out.missingFonts.indexOf(lit.family) < 0) out.missingFonts.push(lit.family); continue; }
+      if (didSubstitute) {
+        if (out.substitutedFonts.indexOf(lit.family) < 0) out.substitutedFonts.push(lit.family);
+        out.substituted++;
+      }
       // ONLY after the face is loaded: find-or-create + name + mutate (a load failure must never
       // create or reset a style).
       let st = byName[t.name];
       if (!st && reg.texts[t.name]) { try { st = await figma.getStyleByIdAsync(reg.texts[t.name]); } catch (e) { st = null; } }
       if (!st) st = figma.createTextStyle();
       st.name = t.name;
-      st.fontName = { family: lit.family, style: face };
+      st.fontName = { family: useFamily, style: face };
       st.fontSize = lit.size;
       if (Number.isFinite(lit.lineHeight) && lit.size > 0) st.lineHeight = { unit: "PERCENT", value: (lit.lineHeight / lit.size) * 100 };
       if (Number.isFinite(lit.letterSpacing) && lit.size > 0) st.letterSpacing = { unit: "PERCENT", value: (lit.letterSpacing / lit.size) * 100 };
@@ -390,7 +418,8 @@ async function applyStylePlans(sp) {
     }
     reg.texts = current;
     // diagnostics — the console is the debugging surface (figma.notify races and truncates):
-    if (out.missingFonts.length) console.warn("[Ultimate Tokens] text styles skipped — families not in this Figma's font list:", out.missingFonts.join(", "), "(list size:", Object.keys(fontsByFamily).length, "families)");
+    if (out.substitutedFonts.length) console.warn("[Ultimate Tokens]", out.substituted, "text style(s) built on a placeholder face — these families are not in this Figma:", out.substitutedFonts.join(", "), "· their fontFamily stays BOUND to the Font Primitives variable, so installing the font adopts it.");
+    if (out.missingFonts.length) console.warn("[Ultimate Tokens] text styles skipped — no usable face at all:", out.missingFonts.join(", "), "(font list size:", Object.keys(fontsByFamily).length, "families)");
     if (!Object.keys(typoVars).length) console.warn("[Ultimate Tokens] Typography collection empty/missing at styles time — fontSize/leading/tracking bindings degraded to literals");
     if (!Object.keys(primVars).length) console.warn("[Ultimate Tokens] Font Primitives collection empty/missing at styles time — family/weight bindings degraded to literals");
   }
@@ -530,4 +559,4 @@ async function applyFloatPlans(plans) {
 }
 
 // Exposed for the headless verifier (a no-op inside Figma's VM).
-if (typeof module !== "undefined") module.exports = { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, resolveFace, styleNameWeight, rgbaOf, aliasTarget, childKeys };
+if (typeof module !== "undefined") module.exports = { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, resolveFace, pickFallbackFamily, styleNameWeight, rgbaOf, aliasTarget, childKeys };

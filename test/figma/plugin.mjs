@@ -411,13 +411,33 @@ if (applyStylePlans && applyFontPrimitives) {
     if (core && !core._bound.fontWeight) FAIL("styles", "core fontWeight not bound to weight/<voice>");
     if (sib && !sib._bound.fontWeight) FAIL("styles", "sibling fontWeight not bound to weight/<voice>/<slug>");
 
-    // a family Figma does not have: skipped + reported, and NO default-valued style left behind.
-    // The ghost rides the FULL plan (a partial plan would legitimately prune the rest).
+    // a family Figma does not have: the style is BUILT on a placeholder face (Inter), reported as
+    // SUBSTITUTED (not skipped), and its fontFamily stays BOUND to the true-family variable — so the
+    // style self-heals once the font is installed. The ghost rides the FULL plan (a partial plan
+    // would legitimately prune the rest).
     {
-      const before = F.figma._styles.length;
-      const ghost = await applyStylePlans({ paints: plans.paints, texts: plans.texts.concat([{ name: "Ghost/md", voice: "Ghost", step: "MD", bind: {}, literal: { family: "Nonexistent Face", weight: 700, size: 20, lineHeight: 24, letterSpacing: 0, textCase: "none" } }]) });
-      if (!ghost.missingFonts || ghost.missingFonts.indexOf("Nonexistent Face") < 0) FAIL("styles", "an unavailable family is not reported in missingFonts");
-      if (F.figma._styles.length !== before || F.figma._styles.some((x) => x.name === "Ghost/md")) FAIL("styles", "an unavailable family left a default-valued style behind (the Inter-Regular-12 bug)");
+      const ghostBind = { ...plans.texts[0].bind };
+      const ghost = await applyStylePlans({ paints: plans.paints, texts: plans.texts.concat([{ name: "Ghost/md", voice: "Ghost", step: "MD", bind: ghostBind, literal: { family: "Nonexistent Face", weight: 700, size: 20, lineHeight: 24, letterSpacing: 0, textCase: "none" } }]) });
+      if (!ghost.substitutedFonts || ghost.substitutedFonts.indexOf("Nonexistent Face") < 0) FAIL("styles", "an unavailable family is not reported in substitutedFonts");
+      if (ghost.substituted !== 1) FAIL("styles", `substituted count ${ghost.substituted}, want 1`);
+      if (ghost.missingFonts.length) FAIL("styles", "a substitutable family must NOT be reported as missing");
+      const g = F.figma._styles.find((x) => x.name === "Ghost/md");
+      if (!g) FAIL("styles", "an unavailable family produced NO style (scaffold-with-fallback regressed)");
+      else {
+        if (!g.fontName || g.fontName.family !== "Inter") FAIL("styles", `the placeholder face is not Figma's default Inter: ${g.fontName && g.fontName.family}`);
+        if (g.fontSize !== 20) FAIL("styles", "the substituted style lost its metrics");
+        if (!g._bound.fontFamily) FAIL("styles", "the substituted style did not keep fontFamily BOUND to the true-family variable (the whole point)");
+      }
+      // a Figma with NO fonts at all cannot scaffold — then, and only then, we skip honestly.
+      const saved = F.figma._fonts; F.figma._fonts = {};
+      const none = await applyStylePlans({ paints: [], texts: [{ name: "Nofont/md", voice: "N", step: "MD", bind: {}, literal: { family: "Anything", weight: 400, size: 12, lineHeight: 16, letterSpacing: 0, textCase: "none" } }] });
+      F.figma._fonts = saved;
+      if (!none.missingFonts.length || F.figma._styles.some((x) => x.name === "Nofont/md")) FAIL("styles", "with no loadable font at all the style must be SKIPPED and reported missing");
+      // the two experiments above mutated the style registry (Ghost added; the empty-font run pruned
+      // every text style). Re-apply the canonical plan so the registry/idempotency/prune assertions
+      // below measure the real contract, not the experiments' residue.
+      await applyStylePlans(plans);
+      if (F.figma._styles.some((x) => x.name === "Ghost/md")) FAIL("styles", "Ghost/md survived the canonical re-apply (prune regressed)");
     }
 
     // registry + idempotency + provenance-scoped prune
