@@ -316,8 +316,17 @@ async function applyStylePlans(sp) {
   const texts = Array.isArray(sp.texts) ? sp.texts : [];
   if (texts.length) {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const typoColl = cols.find(function (c) { return c.name === "Typography"; });
-    const primColl = cols.find(function (c) { return c.name === "Font Primitives"; });
+    // PROVENANCE FIRST: resolve OUR collections by the float-registry id (name → id map written by
+    // ensureFloatCollection), falling back to name. A name-only find can hit a foreign same-named
+    // collection (or miss after a user rename) — then every typo binding silently degrades to the
+    // literal, which reads as "the props are hardcoded".
+    const floatReg = readFloatRegistry();
+    const byRegistry = function (name) {
+      const id = floatReg[name];
+      return (id && cols.find(function (c) { return c.id === id; })) || cols.find(function (c) { return c.name === name; });
+    };
+    const typoColl = byRegistry("Typography");
+    const primColl = byRegistry("Font Primitives");
     const typoVars = typoColl ? await varsByName(typoColl.id) : {};
     const primVars = primColl ? await varsByName(primColl.id) : {};
     const local = await figma.getLocalTextStylesAsync();
@@ -364,6 +373,11 @@ async function applyStylePlans(sp) {
         try { st.setBoundVariable(field, target); } catch (e) { /* field not bindable in this API — literal stands */ }
       };
       bindField("fontSize", typoVars);
+      // leading/tracking: the PERCENT literals above set the unit context; the bound FLOAT carries the
+      // same percent number. Verify rendering after a real apply — if Figma reads the bound value as px,
+      // unbind these two fields and fall back to the literals.
+      bindField("lineHeight", typoVars);
+      bindField("letterSpacing", typoVars);
       bindField("paragraphSpacing", typoVars);
       bindField("fontFamily", primVars);
       bindField("fontStyle", primVars);
@@ -375,6 +389,10 @@ async function applyStylePlans(sp) {
       try { const st = await figma.getStyleByIdAsync(reg.texts[name]); if (st) { st.remove(); out.pruned++; } } catch (e) { /* already gone */ }
     }
     reg.texts = current;
+    // diagnostics — the console is the debugging surface (figma.notify races and truncates):
+    if (out.missingFonts.length) console.warn("[Ultimate Tokens] text styles skipped — families not in this Figma's font list:", out.missingFonts.join(", "), "(list size:", Object.keys(fontsByFamily).length, "families)");
+    if (!Object.keys(typoVars).length) console.warn("[Ultimate Tokens] Typography collection empty/missing at styles time — fontSize/leading/tracking bindings degraded to literals");
+    if (!Object.keys(primVars).length) console.warn("[Ultimate Tokens] Font Primitives collection empty/missing at styles time — family/weight bindings degraded to literals");
   }
 
   writeStyleRegistry(reg);

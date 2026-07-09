@@ -5737,7 +5737,11 @@ class HctApp extends HTMLElement {
     const varsPart = n ? `${n} variable${n === 1 ? "" : "s"}` : "";
     const stylesPart = st ? `${st} style swatch${st === 1 ? "" : "es"}` : "";
     const what = [varsPart, stylesPart].filter(Boolean).join(" + ");
+    const missing = m && Array.isArray(m.missingFonts) ? m.missingFonts : [];
     this.toast(what ? `Applied ${what} to Figma — check the Variables & Styles panels` : "Applied to Figma — check the Variables panel");
+    // a SECOND toast for skipped families — this is the difference between "6 voices silently missing"
+    // and an actionable message (the sandbox's own notify races the apply-done toast and gets lost).
+    if (missing.length) this.toast(`Text styles skipped for ${missing.length} font${missing.length === 1 ? "" : "s"} not available in Figma: ${missing.slice(0, 4).join(", ")}${missing.length > 4 ? "…" : ""}`);
   }
   onApplyError() {
     this.toast("Couldn't apply to Figma — please try again.");

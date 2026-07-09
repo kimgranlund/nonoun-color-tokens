@@ -403,9 +403,12 @@ if (applyStylePlans && applyFontPrimitives) {
     if (!core || !sib) FAIL("styles", "Display/md core or Display/md/Medium sibling text style missing");
     if (core && (!core.fontName || core.fontName.style !== "Bold")) FAIL("styles", `Display core face = ${core && core.fontName && core.fontName.style}, want Bold (700 candidates)`);
     if (sib && (!sib.fontName || sib.fontName.style !== "Medium")) FAIL("styles", `Display sibling face = ${sib && sib.fontName && sib.fontName.style}, want Medium`);
-    if (core && (!core.lineHeight || core.lineHeight.unit !== "PERCENT")) FAIL("styles", "text style lineHeight is not literal PERCENT");
+    if (core && (!core.lineHeight || core.lineHeight.unit !== "PERCENT")) FAIL("styles", "text style lineHeight is not PERCENT-united");
     if (core && !core._bound.fontSize) FAIL("styles", "core fontSize not bound to the Typography variable");
+    if (core && !core._bound.lineHeight) FAIL("styles", "core lineHeight not bound (percent FLOAT after unit set)");
+    if (core && !core._bound.letterSpacing) FAIL("styles", "core letterSpacing not bound (percent FLOAT after unit set)");
     if (core && !core._bound.fontFamily) FAIL("styles", "core fontFamily not bound to the Font Primitives alias");
+    if (core && !core._bound.fontWeight) FAIL("styles", "core fontWeight not bound to weight/<voice>");
     if (sib && !sib._bound.fontWeight) FAIL("styles", "sibling fontWeight not bound to weight/<voice>/<slug>");
 
     // a family Figma does not have: skipped + reported, and NO default-valued style left behind.
