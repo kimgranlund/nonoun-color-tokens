@@ -61,7 +61,17 @@ canonical raw-colors name (solid → pad3 `"50"→"050"`; scrim → `"500-{step}
 versioned localStorage key, the destructive **Regroup** ALWAYS warns) → `applyToFigma` posts
 `{type:"apply", dtcg: this.figmaBundle(), config: serialize(this.doc), rebuildSemantic}`.
 `figma/plugin/code.js#applyBundle` creates Color Primitives + Color Modes, prunes orphans, embeds the config
-in `figma.root` pluginData. Round-trip OUT: `configFromVariables` (`src/ui/model.mjs`) recovers each family's
+in `figma.root` pluginData. **STYLES (2026-07-09, PRs #231–#236):** when the drawer's Styles chip is on
+(opt-OUT), `msg.stylePlans` + `msg.fontPrimitives` ride the same apply — pure plans from
+`figma/binder/style-plan.mjs` (the THIRD planner sibling: paint styles per semantic role bound to Color
+Modes via `setBoundVariableForPaint`; text styles per voice×step×sibling-weight bound to
+Typography/Font Primitives; `primitivesApplyPlan` = the ordered Font Primitives ensure-plan) →
+`code.js#applyStylePlans` + `applyFontPrimitives` execute them verbatim, provenance-pruned via
+`STYLE_REGISTRY_KEY` (user styles untouchable). v1 binds fontSize/fontFamily/fontStyle/fontWeight/
+paragraphSpacing; lineHeight/letterSpacing stay literal PERCENT (the Typography vars carry % of size —
+a FLOAT binding reads px). Verifier: `test/figma/style-plan.mjs` (both-directions parity vs exportUI3)
++ the styles e2e in `plugin.mjs`. Sibling weights: `doc.type.voices[v].weights`, edited in the
+per-voice panel (Suggest = `siblingWeightDefaults`). Round-trip OUT: `configFromVariables` (`src/ui/model.mjs`) recovers each family's
 500 hue/chroma from the live raw vars (the APPROXIMATE fallback when no config is embedded); `read-variables`
 → `receiveLiveVariables` feeds the drift diff. Geometry rides a separate `Geometry` collection of Figma
 NUMBER (FLOAT) vars via `geomTokensFigma` (`src/engine/geometry.mjs`).
