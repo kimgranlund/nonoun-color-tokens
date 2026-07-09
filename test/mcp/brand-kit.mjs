@@ -23,6 +23,9 @@ ok(kit.icons && kit.icons.family === "Phosphor" && kit.icons.variant === "regula
   const k2 = brandKit({ ...defaultDocument(), icons: { id: "lucide" } });
   ok(k2.icons && k2.icons.family === "Lucide" && !k2.icons.variant, "a variant-less library (Lucide) serves no variant");
 }
+// MOTION — system constants, always served (an agent binds curves, never types a raw ms).
+ok(kit.motion && kit.motion.easing && kit.motion.easing.standard && kit.motion.duration.short2 === 100 && kit.motion.animatable.join() === "transform,opacity",
+  `brandKit serves the motion facet: ${JSON.stringify(kit.motion && kit.motion.animatable)}`);
 ok(kit.roles.primary && typeof kit.roles.primary.primary.light === "string" && typeof kit.roles.primary.primary.dark === "string", "brandKit resolves the prime accent for light + dark");
 ok(kit.type && kit.geometry, "brandKit() (no arg) includes all three systems (color + type + geometry)");
 

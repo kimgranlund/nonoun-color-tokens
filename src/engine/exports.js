@@ -20,6 +20,7 @@
 import { paletteStops, EXPORT_STOPS, DEFAULT_CONTROLS } from "./tonal.js";
 import { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAccentRef } from "./semantic.js";
 import { iconSystem, iconSystemLabel } from "./icon-systems.mjs";
+import { motionTokens, MOTION_EASING, MOTION_DURATION, MOTION_NEVER } from "./motion.mjs";
 import { oklchToSrgb8, hexToSrgb8, pyRound, dsBundleGates } from "./ds-gates.js"; // §8 carrier primitives + the gate itself — the receipt cites the SAME run the gate measures
 
 // WCAG relative luminance of an [r,g,b] (0..255) triple — for the opt-in contrast on-color pick.
@@ -766,7 +767,7 @@ export function exportDesignSystemTokens(state, typeSc, geomSc) {
   for (const t of ds.tokens) { colors[t.name] = t.light.oklch; colorsDark[t.name] = t.dark.oklch; }
   if (ds.aliasDistinct) { colors[ds.alias.name] = ds.alias.light.oklch; colorsDark[ds.alias.name] = ds.alias.dark.oklch; }
   const { semantic, semanticDark } = dsSemanticLayer(state);
-  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. Two color tiers: \`colors\`/\`colorsDark\` are the reduced consumption grammar (the set the DESIGN.md teaches — the kit's resolved role values VERBATIM, per its onColorMode setting; contrast is measured and disclosed in README.md); \`semantic\`/\`semanticDark\` are the FULL semantic role layer (every role of every palette) for consumers that need the complete set. Values are high-resolution OKLCH (never bare hex); alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px) and letterSpacing, where present, an em factor. \`geometry\` is the full dimensional system (control size ramp, insets, gaps, borders, focus ring; px numbers); \`spacing\`/\`radii\` remain the compact ladders. \`icons\` names the icon library + its stroke variant this kit binds to, with the size ramp it renders at (from geometry) — bind to it, never substitute another set.`;
+  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. Two color tiers: \`colors\`/\`colorsDark\` are the reduced consumption grammar (the set the DESIGN.md teaches — the kit's resolved role values VERBATIM, per its onColorMode setting; contrast is measured and disclosed in README.md); \`semantic\`/\`semanticDark\` are the FULL semantic role layer (every role of every palette) for consumers that need the complete set. Values are high-resolution OKLCH (never bare hex); alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px) and letterSpacing, where present, an em factor. \`geometry\` is the full dimensional system (control size ramp, insets, gaps, borders, focus ring; px numbers); \`spacing\`/\`radii\` remain the compact ladders. \`icons\` names the icon library + its stroke variant this kit binds to, with the size ramp it renders at (from geometry) — bind to it, never substitute another set. \`motion\` carries the easing curves + the ms duration ladder: bind these, never type a raw ms or bezier; entrances decelerate, exits accelerate and run faster.`;
   return JSON.stringify({
     $generator: "Ultimate Tokens by NONOUN",
     $note: note,
@@ -775,6 +776,7 @@ export function exportDesignSystemTokens(state, typeSc, geomSc) {
     type: dsTypeLayer(typeSc), spacing: dsSpacing(geomSc), radii: dsRadii(geomSc),
     geometry: dsGeometryLayer(geomSc),
     icons: dsIconLayer(state, geomSc),
+    motion: motionTokens(),
   }, null, 2);
 }
 
@@ -1120,6 +1122,36 @@ function dsSpineBody(ds, state, ctx) {
     "system's own hand; an emoji imports someone else's.",
   ].join("\n");
 
+  // Motion — an EXTRA section (like Iconography). Its contract (durations · easings · what never
+  // animates · reduced-motion policy) is design-md-format's; the VALUES are system constants with
+  // provenance (see src/engine/motion.mjs), not user parameters, so this section is a rulebook.
+  const motion = [
+    "## Motion", "",
+    "Motion is a token, never a number you type. Bind the curves and the ms ladder below; a raw",
+    "`300ms ease` in a component is a defect.", "",
+    "**Duration — tier by scope.** Small components (switch, checkbox) run short",
+    `(\`${MOTION_DURATION.short2}\`–\`${MOTION_DURATION.short4}\`ms); partial-screen surfaces (menu, drawer, card) run medium`,
+    `(\`${MOTION_DURATION.medium1}\`–\`${MOTION_DURATION.medium4}\`ms); full-screen transitions run long (\`${MOTION_DURATION.long1}\`ms+). **100ms is the "instant" floor** —`,
+    "feedback faster than that is felt as immediate; past ~400ms a transition starts reading as slow.", "",
+    "**Entrances decelerate. Exits accelerate — and run faster.** The user is done with the thing and",
+    "waiting for what's next: a drawer opens in ~250ms and closes in ~200ms; a modal appears in ~300ms",
+    "and dismisses in ~200ms. Symmetric timing reads as sluggish dismissal. The asymmetry FLIPS with the",
+    "initiator: user-initiated UI answers fast and departs gently; system-initiated UI (an error) enters",
+    "slowly enough to be noticed and gets out of the way fast.", "",
+    `**Easing.** Entrances \`${MOTION_EASING["standard-decelerate"]}\`; exits \`${MOTION_EASING["standard-accelerate"]}\`; on-screen utility motion`,
+    `\`${MOTION_EASING.standard}\`; technical motion (spinners, progress) stays \`linear\`. The **emphasized** family`,
+    "is for hero moments only — everywhere-emphasized is just standard with extra cost.", "",
+    "**Animate `transform` and `opacity`, nothing else** — they are the only properties the compositor",
+    "holds at 60fps off the main thread. Never animate:", "",
+    ...MOTION_NEVER.map(([what, why]) => `- **${what}** — ${why}.`),
+    "",
+    "**Reduced motion: reduce, don't remove.** Honour `@media (prefers-reduced-motion: reduce)` — it means",
+    "\"this user gets vestibular-safe motion\", not \"this user wants a static page\". Substitute a cross-fade",
+    "for the vestibular triggers (parallax, background video, zoom/scale, spin, slide-everything transitions),",
+    "keep the opacity change, and keep every state legible without motion. Nothing flashes more than three",
+    "times per second, ever.",
+  ].join("\n");
+
   const components = [
     "## Components", "",
     "State the interactive states explicitly — generic output betrays itself in hover/focus/disabled.", "",
@@ -1143,6 +1175,7 @@ function dsSpineBody(ds, state, ctx) {
     `- Reach for ${intents.map((f) => `\`${f}\``).join("/")} only for status; ${mutedSig.map((f) => `\`${f}\``).join(", ") || "signature families"} are brand light, not status — small reads, never fields of color.`,
     "- Elevate by stepping the surface ladder, not by heavy shadows.",
     "- Compose spacing, radii, and type from the scales; express states with the `-hover`/`-active`/`-disabled` tokens, not raw opacity guesses.",
+    "- Express motion with the easing + duration tokens (entrances decelerate, exits accelerate and run faster); never type a raw ms or `cubic-bezier()` into a component, and animate only `transform`/`opacity`.",
     // The signature/metal families carry quiet emphasis, not action — a POSITIVE bullet (the theme's
     // negative-space `refuses` clause belongs in the Overview, never under "Prefer:", where it inverts).
     metal
@@ -1200,7 +1233,7 @@ function dsSpineBody(ds, state, ctx) {
     `Deliberately refused: ${refuses}`,
   ].join("\n");
 
-  return [overview, colors, typography, layout, elevation, shapes, iconography, components, donts, responsive, agent].join("\n\n");
+  return [overview, colors, typography, layout, elevation, shapes, iconography, motion, components, donts, responsive, agent].join("\n\n");
 }
 
 // exportDesignSystemReceipt — the README.md profile receipt (§4). Every 🟢 cites a check; DIVERGENCE

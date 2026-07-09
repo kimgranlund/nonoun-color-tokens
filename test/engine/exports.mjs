@@ -236,6 +236,19 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
     if (!tj.icons || tj.icons.family !== "Phosphor" || tj.icons.variant !== "regular") FAIL("design-system", `tokens.icons is not the default Phosphor·regular: ${JSON.stringify(tj.icons)}`);
     const geoIcons = Object.fromEntries(Object.entries(gsc.sizes).map(([k, v]) => [k.toLowerCase(), v.icon]));
     if (JSON.stringify(tj.icons.sizes) !== JSON.stringify(geoIcons)) FAIL("design-system", "tokens.icons.sizes diverges from the geometry ramp (icon sizes must never be redefined)");
+    // MOTION — always present. Easings are cubic-bezier strings (an agent binds, never types); the ms
+    // ladder is 4 tiers × 4 steps, strictly ascending; only compositor properties are animatable.
+    const mo = tj.motion || {};
+    if (!mo.easing || !mo.duration || !Array.isArray(mo.animatable)) FAIL("design-system", "tokens.motion missing easing/duration/animatable");
+    else {
+      for (const [k, v] of Object.entries(mo.easing)) if (!/^cubic-bezier\(/.test(v)) FAIL("design-system", `motion.easing.${k} is not a cubic-bezier(): ${v}`);
+      for (const need of ["standard", "standard-decelerate", "standard-accelerate", "emphasized-decelerate", "emphasized-accelerate", "linear"]) if (!mo.easing[need]) FAIL("design-system", `motion.easing missing ${need}`);
+      const ds = Object.values(mo.duration);
+      if (ds.length !== 16 || ds.some((n) => !Number.isFinite(n) || n <= 0)) FAIL("design-system", `motion.duration is not 16 positive ms values (got ${ds.length})`);
+      if (ds.some((n, i) => i > 0 && n <= ds[i - 1])) FAIL("design-system", "motion.duration ladder is not strictly ascending");
+      if (mo.duration.short2 !== 100) FAIL("design-system", "motion.duration.short2 must be the 100ms instant floor");
+      if (JSON.stringify(mo.animatable) !== JSON.stringify(["transform", "opacity"])) FAIL("design-system", "motion.animatable must be exactly transform+opacity (compositor-only)");
+    }
   }
 
   // SELF-CONTAINMENT (standing rule): no emitted file may reference a path outside its shipped folder —
@@ -245,7 +258,16 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
 
   // DESIGN.md: the canonical sections, the grammar teaching, and light-dark() ONLY in the runtime block.
   const md = byName["DESIGN.md"];
-  for (const sec of ["## Overview", "## Colors", "## Typography", "## Iconography", "## Components", "## Do's and Don'ts", "## Responsive Behavior", "## Agent Prompt Guide"]) if (!md.includes(sec)) FAIL("design-system", `spine missing ${sec}`);
+  for (const sec of ["## Overview", "## Colors", "## Typography", "## Iconography", "## Motion", "## Components", "## Do's and Don'ts", "## Responsive Behavior", "## Agent Prompt Guide"]) if (!md.includes(sec)) FAIL("design-system", `spine missing ${sec}`);
+  // the Motion section is the four-part contract: durations · easings · what never animates · reduced motion.
+  {
+    const mo = md.split("## Motion")[1].split("## Components")[0];
+    if (!/100ms is the "instant" floor/.test(mo)) FAIL("design-system", "Motion section states no duration guidance");
+    if (!/Entrances decelerate\. Exits accelerate/.test(mo)) FAIL("design-system", "Motion section states no enter/exit asymmetry law");
+    if (!/Never animate:/.test(mo) || !/CLS defect/.test(mo)) FAIL("design-system", "Motion section carries no never-animate list");
+    if (!/prefers-reduced-motion: reduce/.test(mo) || !/reduce, don't remove/.test(mo)) FAIL("design-system", "Motion section carries no reduced-motion policy");
+    if (!/cubic-bezier\(/.test(mo)) FAIL("design-system", "Motion section names no easing curve");
+  }
   // the icon system is a binding RULE in PROSE, never a frontmatter key (a frontmatter `icons:` trips the
   // Stitch schema linter's unknown-key check; the extra prose section rides its unknown-section tolerance).
   if (/^icons:/m.test(md.split("---")[1] || "")) FAIL("design-system", "icons must not appear as a frontmatter key (Stitch unknown-key)");

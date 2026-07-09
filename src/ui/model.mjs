@@ -20,6 +20,7 @@ import {
 } from "../engine/hct.js";
 import { oklchToRgb } from "../engine/okhsl.js";
 import { iconSystem } from "../engine/icon-systems.mjs";
+import { motionTokens } from "../engine/motion.mjs";
 import {
   paletteStops,
   effHue,
@@ -252,6 +253,9 @@ export function brandKit(doc, systems) {
     const ic = iconSystem(doc.icons || {});
     kit.icons = { family: ic.name, ...(ic.variant ? { variant: ic.variant } : {}), ...(ic.license ? { license: ic.license } : {}), ...(ic.url ? { url: ic.url } : {}) };
   }
+  // the MOTION facet — system constants (no user parameters), always served: an agent binds these
+  // curves + the ms ladder instead of typing a raw `300ms ease`.
+  kit.motion = motionTokens();
   if (sys.color) {
     const view = projectView(doc);
     const on = view.palettes.filter((p) => p.on);

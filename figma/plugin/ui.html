@@ -3755,6 +3755,81 @@ const iconSystemLabel = (resolved) => (resolved.variant ? `${resolved.name} · $
 
 return { DEFAULT_ICON_SYSTEM, ICON_SYSTEMS, iconSystemById, iconSystem, iconSystemLabel };
 })();
+__M.motion = (function(){
+// motion.mjs — the MOTION facet of a brand kit. Pure, no DOM (an engine module).
+//
+// Motion is the one facet whose values are not derived from the user's parameters (there is no motion
+// engine, and no Settings picker): they are SYSTEM CONSTANTS with provenance. So this module's job is
+// to carry them accurately, cite them, and let the exports state the LAWS an agent must follow — a
+// DESIGN.md's Motion section is a rulebook, not a slider.
+//
+// ── Why Material-founded curves and not springs ────────────────────────────────────────────────
+// The estate's house default for motion is Apple-style springs (velocity continuity, mid-flight
+// retargeting). Two rationales don't apply here, so we deviate deliberately (naming the reason, per
+// the deviation doctrine):
+//   1. Every target that consumes this kit renders on the WEB (Claude Code / Stitch / Figma Make →
+//      React + Tailwind + shadcn). Web has no spring tokens; springs are realized by sampling
+//      stiffness/damping into `linear()`. A cubic-bezier + ms ladder is directly bindable everywhere.
+//   2. This kit's semantic role system is already Material-Design-founded; a Material-founded motion
+//      layer keeps one lineage across color, geometry, and motion.
+// A consuming project that IS spring-native (SwiftUI, Compose, M3 Expressive) should use its own
+// spring set — the laws below (enter/exit asymmetry, compositor-only, reduced-motion) still hold.
+//
+// Provenance: values are the published M3 spec set — the material-foundation token repo's
+// `css/motion.css`, MDC-Android Motion.md, m3.material.io (as carried by the
+// `material-design-motion-tokens` pack, accessed 2026-07-09). The perception limits, enter/exit
+// asymmetry, never-animate list, and reduced-motion policy come from the `motion-design` corpus
+// (Nielsen's limits; web.dev asymmetric-animation-timing + animations-guide; WCAG 2.2.2/2.3.1/2.3.3;
+// vestibular.org). Cited in DESIGN.md so a consuming agent can audit the claim.
+
+// EASING — cubic-bezier control points. NOTE the published caveat: `emphasized` carries the SAME
+// bezier as `standard`; the emphasized family's distinctness lives in its accelerate/decelerate
+// variants. We reproduce that faithfully rather than inventing a distinct curve.
+const MOTION_EASING = {
+  "linear": "cubic-bezier(0, 0, 1, 1)",
+  "standard": "cubic-bezier(0.2, 0, 0, 1)",
+  "standard-decelerate": "cubic-bezier(0, 0, 0, 1)",
+  "standard-accelerate": "cubic-bezier(0.3, 0, 1, 1)",
+  "emphasized": "cubic-bezier(0.2, 0, 0, 1)",
+  "emphasized-decelerate": "cubic-bezier(0.05, 0.7, 0.1, 1)",
+  "emphasized-accelerate": "cubic-bezier(0.3, 0, 0.8, 0.15)",
+};
+
+// DURATION — the ms ladder, four tiers × four steps. Tier by SCOPE: short = a small component
+// (switch, checkbox); medium = a partial-screen surface (drawer, menu, card); long/extra-long =
+// full-screen transitions. 100 ms is the "instant" perceptual floor; past ~400 ms a transition
+// starts reading as slow.
+const MOTION_DURATION = {
+  "short1": 50, "short2": 100, "short3": 150, "short4": 200,
+  "medium1": 250, "medium2": 300, "medium3": 350, "medium4": 400,
+  "long1": 450, "long2": 500, "long3": 550, "long4": 600,
+  "extra-long1": 700, "extra-long2": 800, "extra-long3": 900, "extra-long4": 1000,
+};
+
+// The properties that may be animated by default — the only ones the compositor can hold at 60fps
+// (a 16.7 ms frame budget) off the main thread.
+const MOTION_ANIMATABLE = ["transform", "opacity"];
+
+// NEVER-ANIMATE — the list design-md-format's Motion section asks for, each with the reason that
+// makes it a defect rather than a preference.
+const MOTION_NEVER = [
+  ["layout properties (`top`/`left`/`width`/`height`)", "they trigger layout + paint; animated layout shift is a CLS defect — animate `transform` instead"],
+  ["anything but `transform`/`opacity`, by default", "only compositor properties hold 60fps off the main thread"],
+  ["text while it is being read", "moving/blinking text impedes reading (WCAG 2.2.2 — the user must be able to pause it)"],
+  ["focus indicators, via reflow", "showing an outline must never shift layout (WCAG 2.4.11)"],
+  ["the text caret", "the blink is OS-defined; caret color interpolates discretely anyway"],
+  ["form fields during entry", "state animation mid-typing is cognitive load — value changes land instantly"],
+  ["decorative loops with no pause control", "WCAG 2.2.2's five-second rule"],
+];
+
+// motionTokens() — the machine-readable block the exports carry. Pure data; no config to resolve
+// (motion has no user-tunable parameters in this kit).
+function motionTokens() {
+  return { easing: { ...MOTION_EASING }, duration: { ...MOTION_DURATION }, animatable: [...MOTION_ANIMATABLE] };
+}
+
+return { MOTION_EASING, MOTION_DURATION, MOTION_ANIMATABLE, MOTION_NEVER, motionTokens };
+})();
 __M.persist = (function(){
 const { ICON_SYSTEMS, DEFAULT_ICON_SYSTEM } = __M.iconSystems;
 
@@ -4727,6 +4802,7 @@ __M.exports = (function(){
 const { paletteStops, EXPORT_STOPS, DEFAULT_CONTROLS } = __M.tonal;
 const { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAccentRef } = __M.semantic;
 const { iconSystem, iconSystemLabel } = __M.iconSystems;
+const { motionTokens, MOTION_EASING, MOTION_DURATION, MOTION_NEVER } = __M.motion;
 const { oklchToSrgb8, hexToSrgb8, pyRound, dsBundleGates } = __M.dsGates; // §8 carrier primitives + the gate itself — the receipt cites the SAME run the gate measures
 
 // WCAG relative luminance of an [r,g,b] (0..255) triple — for the opt-in contrast on-color pick.
@@ -5473,7 +5549,7 @@ function exportDesignSystemTokens(state, typeSc, geomSc) {
   for (const t of ds.tokens) { colors[t.name] = t.light.oklch; colorsDark[t.name] = t.dark.oklch; }
   if (ds.aliasDistinct) { colors[ds.alias.name] = ds.alias.light.oklch; colorsDark[ds.alias.name] = ds.alias.dark.oklch; }
   const { semantic, semanticDark } = dsSemanticLayer(state);
-  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. Two color tiers: \`colors\`/\`colorsDark\` are the reduced consumption grammar (the set the DESIGN.md teaches — the kit's resolved role values VERBATIM, per its onColorMode setting; contrast is measured and disclosed in README.md); \`semantic\`/\`semanticDark\` are the FULL semantic role layer (every role of every palette) for consumers that need the complete set. Values are high-resolution OKLCH (never bare hex); alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px) and letterSpacing, where present, an em factor. \`geometry\` is the full dimensional system (control size ramp, insets, gaps, borders, focus ring; px numbers); \`spacing\`/\`radii\` remain the compact ladders. \`icons\` names the icon library + its stroke variant this kit binds to, with the size ramp it renders at (from geometry) — bind to it, never substitute another set.`;
+  const note = `Design System tokens.json — Ultimate Tokens naming grammar: {family}[-slot], families ${ds.families.join("/")}; CSS prefix --${cssPrefixOf(state)}-. Two color tiers: \`colors\`/\`colorsDark\` are the reduced consumption grammar (the set the DESIGN.md teaches — the kit's resolved role values VERBATIM, per its onColorMode setting; contrast is measured and disclosed in README.md); \`semantic\`/\`semanticDark\` are the FULL semantic role layer (every role of every palette) for consumers that need the complete set. Values are high-resolution OKLCH (never bare hex); alpha < 1 rides as \`oklch(L C H / A)\`. type.scale lineHeight is a unitless multiplier of size (leading factor — never px) and letterSpacing, where present, an em factor. \`geometry\` is the full dimensional system (control size ramp, insets, gaps, borders, focus ring; px numbers); \`spacing\`/\`radii\` remain the compact ladders. \`icons\` names the icon library + its stroke variant this kit binds to, with the size ramp it renders at (from geometry) — bind to it, never substitute another set. \`motion\` carries the easing curves + the ms duration ladder: bind these, never type a raw ms or bezier; entrances decelerate, exits accelerate and run faster.`;
   return JSON.stringify({
     $generator: "Ultimate Tokens by NONOUN",
     $note: note,
@@ -5482,6 +5558,7 @@ function exportDesignSystemTokens(state, typeSc, geomSc) {
     type: dsTypeLayer(typeSc), spacing: dsSpacing(geomSc), radii: dsRadii(geomSc),
     geometry: dsGeometryLayer(geomSc),
     icons: dsIconLayer(state, geomSc),
+    motion: motionTokens(),
   }, null, 2);
 }
 
@@ -5827,6 +5904,36 @@ function dsSpineBody(ds, state, ctx) {
     "system's own hand; an emoji imports someone else's.",
   ].join("\n");
 
+  // Motion — an EXTRA section (like Iconography). Its contract (durations · easings · what never
+  // animates · reduced-motion policy) is design-md-format's; the VALUES are system constants with
+  // provenance (see src/engine/motion.mjs), not user parameters, so this section is a rulebook.
+  const motion = [
+    "## Motion", "",
+    "Motion is a token, never a number you type. Bind the curves and the ms ladder below; a raw",
+    "`300ms ease` in a component is a defect.", "",
+    "**Duration — tier by scope.** Small components (switch, checkbox) run short",
+    `(\`${MOTION_DURATION.short2}\`–\`${MOTION_DURATION.short4}\`ms); partial-screen surfaces (menu, drawer, card) run medium`,
+    `(\`${MOTION_DURATION.medium1}\`–\`${MOTION_DURATION.medium4}\`ms); full-screen transitions run long (\`${MOTION_DURATION.long1}\`ms+). **100ms is the "instant" floor** —`,
+    "feedback faster than that is felt as immediate; past ~400ms a transition starts reading as slow.", "",
+    "**Entrances decelerate. Exits accelerate — and run faster.** The user is done with the thing and",
+    "waiting for what's next: a drawer opens in ~250ms and closes in ~200ms; a modal appears in ~300ms",
+    "and dismisses in ~200ms. Symmetric timing reads as sluggish dismissal. The asymmetry FLIPS with the",
+    "initiator: user-initiated UI answers fast and departs gently; system-initiated UI (an error) enters",
+    "slowly enough to be noticed and gets out of the way fast.", "",
+    `**Easing.** Entrances \`${MOTION_EASING["standard-decelerate"]}\`; exits \`${MOTION_EASING["standard-accelerate"]}\`; on-screen utility motion`,
+    `\`${MOTION_EASING.standard}\`; technical motion (spinners, progress) stays \`linear\`. The **emphasized** family`,
+    "is for hero moments only — everywhere-emphasized is just standard with extra cost.", "",
+    "**Animate `transform` and `opacity`, nothing else** — they are the only properties the compositor",
+    "holds at 60fps off the main thread. Never animate:", "",
+    ...MOTION_NEVER.map(([what, why]) => `- **${what}** — ${why}.`),
+    "",
+    "**Reduced motion: reduce, don't remove.** Honour `@media (prefers-reduced-motion: reduce)` — it means",
+    "\"this user gets vestibular-safe motion\", not \"this user wants a static page\". Substitute a cross-fade",
+    "for the vestibular triggers (parallax, background video, zoom/scale, spin, slide-everything transitions),",
+    "keep the opacity change, and keep every state legible without motion. Nothing flashes more than three",
+    "times per second, ever.",
+  ].join("\n");
+
   const components = [
     "## Components", "",
     "State the interactive states explicitly — generic output betrays itself in hover/focus/disabled.", "",
@@ -5850,6 +5957,7 @@ function dsSpineBody(ds, state, ctx) {
     `- Reach for ${intents.map((f) => `\`${f}\``).join("/")} only for status; ${mutedSig.map((f) => `\`${f}\``).join(", ") || "signature families"} are brand light, not status — small reads, never fields of color.`,
     "- Elevate by stepping the surface ladder, not by heavy shadows.",
     "- Compose spacing, radii, and type from the scales; express states with the `-hover`/`-active`/`-disabled` tokens, not raw opacity guesses.",
+    "- Express motion with the easing + duration tokens (entrances decelerate, exits accelerate and run faster); never type a raw ms or `cubic-bezier()` into a component, and animate only `transform`/`opacity`.",
     // The signature/metal families carry quiet emphasis, not action — a POSITIVE bullet (the theme's
     // negative-space `refuses` clause belongs in the Overview, never under "Prefer:", where it inverts).
     metal
@@ -5907,7 +6015,7 @@ function dsSpineBody(ds, state, ctx) {
     `Deliberately refused: ${refuses}`,
   ].join("\n");
 
-  return [overview, colors, typography, layout, elevation, shapes, iconography, components, donts, responsive, agent].join("\n\n");
+  return [overview, colors, typography, layout, elevation, shapes, iconography, motion, components, donts, responsive, agent].join("\n\n");
 }
 
 // exportDesignSystemReceipt — the README.md profile receipt (§4). Every 🟢 cites a check; DIVERGENCE
@@ -7424,6 +7532,7 @@ __M.model = (function(){
 const { hctToRgb, hctToOklch, lstarFromRgb, cam16FromRgb, peakC } = __M.hct;
 const { oklchToRgb } = __M.okhsl;
 const { iconSystem } = __M.iconSystems;
+const { motionTokens } = __M.motion;
 const { paletteStops, effHue, STOPS, EXPORT_STOPS, DEFAULT_CONTROLS } = __M.tonal;
 const { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAccentRef } = __M.semantic;
 const { typeScale, DEFAULT_TYPE } = __M.type;
@@ -7634,6 +7743,9 @@ function brandKit(doc, systems) {
     const ic = iconSystem(doc.icons || {});
     kit.icons = { family: ic.name, ...(ic.variant ? { variant: ic.variant } : {}), ...(ic.license ? { license: ic.license } : {}), ...(ic.url ? { url: ic.url } : {}) };
   }
+  // the MOTION facet — system constants (no user parameters), always served: an agent binds these
+  // curves + the ms ladder instead of typing a raw `300ms ease`.
+  kit.motion = motionTokens();
   if (sys.color) {
     const view = projectView(doc);
     const on = view.palettes.filter((p) => p.on);
