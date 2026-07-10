@@ -27,8 +27,9 @@ import { ICON_SYSTEMS, DEFAULT_ICON_SYSTEM } from "../engine/icon-systems.mjs";
 // No dependencies.
 
 // The persistence key — the exact slot the storage chain reads/writes (spec-draft §11).
-// Renamed from "hct-palette-state-v1" with the product rename; app.js migrates old saved data forward.
-export const STORAGE_KEY = "nonoun-color-tokens";
+// Renamed hct-palette-state-v1 -> nonoun-color-tokens -> ultimate-tokens (product renames);
+// app.js#migrateStorageKeys walks the WHOLE chain forward so a returning user never loses work.
+export const STORAGE_KEY = "ultimate-tokens";
 
 // ── DOMAINS ────────────────────────────────────────────────────────────────────
 // One descriptor per State field. Two kinds:

@@ -16,7 +16,7 @@ const ok = (c, m) => { if (!c) fails.push(m); };
 
 // 1. generate a real brand kit from the default doc (no systems arg → all three, the back-compat default)
 const kit = brandKit(defaultDocument());
-ok(kit.$schema === "nonoun-brand-kit/1" && kit.palettes.length === 8, `brandKit shape: ${kit.palettes.length} palettes (want 8)`);
+ok(kit.$schema === "ultimate-tokens-brand-kit/1" && kit.palettes.length === 8, `brandKit shape: ${kit.palettes.length} palettes (want 8)`);
 // ICONS — the kit ALWAYS names an icon library (an agent must never pick its own).
 ok(kit.icons && kit.icons.family === "Phosphor" && kit.icons.variant === "regular", `brandKit serves the default icon system: ${JSON.stringify(kit.icons)}`);
 {
@@ -84,7 +84,7 @@ const callTool = async (name, args) => { const r = await rpc("tools/call", { nam
 
 try {
   const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } });
-  ok(init.result && init.result.serverInfo.name === "nonoun-brand-kit" && !!init.result.capabilities.tools, "initialize → serverInfo + capabilities");
+  ok(init.result && init.result.serverInfo.name === "ultimate-tokens-brand-kit" && !!init.result.capabilities.tools, "initialize → serverInfo + capabilities");
   notify("notifications/initialized");
 
   const tools = (await rpc("tools/list")).result.tools.map((t) => t.name);

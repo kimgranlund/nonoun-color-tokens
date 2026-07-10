@@ -9,7 +9,7 @@
 // can't drift between the downloaded and hosted servers. Parity by construction (see test/mcp/core.mjs).
 
 export const PROTOCOL_VERSION = "2025-06-18";
-export const SERVER = { name: "nonoun-brand-kit", version: "0.1.0" };
+export const SERVER = { name: "ultimate-tokens-brand-kit", version: "0.1.0" };
 
 const slugOf = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 const hexToRgb = (h) => { const m = String(h).replace("#", ""); return [0, 2, 4].map((i) => parseInt(m.slice(i, i + 2) || "0", 16)); };

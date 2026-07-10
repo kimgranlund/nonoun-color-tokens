@@ -1,8 +1,8 @@
 // Entry point: mount the HCT Palette Generator.
 //
 // The web component + its stylesheet live under `src/ui/` (app.js customElements.define's
-// <nonoun-color-tokens> and pulls in the `./model.mjs` → `../engine/…` ES-module graph). We import them
-// here and drop <nonoun-color-tokens> into the page; Vite resolves and bundles the graph.
+// <ultimate-tokens> and pulls in the `./model.mjs` → `../engine/…` ES-module graph). We import them
+// here and drop <ultimate-tokens> into the page; Vite resolves and bundles the graph.
 import "./ui/styles.css";
 import "./ui/app.js";
 // flags.js is an intentionally-untyped pure engine module (the project keeps its JS engines vanilla, no
@@ -68,10 +68,10 @@ const lemonSqueezyLicenseService: LicenseService = {
 
 const root = document.querySelector<HTMLElement>("#app");
 if (root) {
-  root.innerHTML = "<nonoun-color-tokens></nonoun-color-tokens>";
+  root.innerHTML = "<ultimate-tokens></ultimate-tokens>";
   // The element upgrades synchronously on innerHTML (app.js already ran customElements.define), so it's
   // present here; swap its offline default seam for the real Lemon-Squeezy service before any user action.
-  const el = root.querySelector("nonoun-color-tokens") as LicensedElement | null;
+  const el = root.querySelector("ultimate-tokens") as LicensedElement | null;
   if (el) {
     el._licenseService = lemonSqueezyLicenseService;
     // boot re-check of an activated license against LS (refresh entitlement + live seat count; downgrade if

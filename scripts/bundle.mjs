@@ -76,7 +76,7 @@ const css = readFileSync(`${ROOT}/src/ui/styles.css`, "utf8");
 const favHref = "data:image/svg+xml;base64," + Buffer.from(readFileSync(`${ROOT}/public/favicon/favicon.svg`)).toString("base64");
 // The GitHub Pages demo origin — og:image/og:url must be ABSOLUTE for scrapers, and the pages
 // workflow ships public/icons/ + public/favicon/ alongside the single-file demo so they resolve.
-const SITE = "https://kimgranlund.github.io/nonoun-color-tokens/";
+const SITE = "https://kimgranlund.github.io/ultimate-tokens/";
 const DESC = "Perceptual design tokens — color ramps with 53 semantic roles, typography and geometry, exported to CSS, Tailwind v4, shadcn/ui, Figma and DTCG.";
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -94,9 +94,9 @@ const html = `<!doctype html>
 <meta property="og:image:alt" content="The NONOUN monogram — a white N on a black square">
 <meta name="twitter:card" content="summary">
 <style>${css}</style></head>
-<body><nonoun-color-tokens></nonoun-color-tokens>
+<body><ultimate-tokens></ultimate-tokens>
 <script type="module">
 ${out}</script></body></html>`;
 mkdirSync(`${ROOT}/dist`, { recursive: true });
-writeFileSync(`${ROOT}/dist/nonoun-color-tokens.html`, html);
-console.log("wrote dist/nonoun-color-tokens.html", (html.length / 1024).toFixed(1) + " KB");
+writeFileSync(`${ROOT}/dist/ultimate-tokens.html`, html);
+console.log("wrote dist/ultimate-tokens.html", (html.length / 1024).toFixed(1) + " KB");

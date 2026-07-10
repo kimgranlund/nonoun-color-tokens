@@ -14,7 +14,7 @@ import { dirname, resolve } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
-const ARTIFACT = resolve(ROOT, "dist/nonoun-color-tokens.html"); // the offline single-file build
+const ARTIFACT = resolve(ROOT, "dist/ultimate-tokens.html"); // the offline single-file build
 const OUT = resolve(ROOT, "smoke-out");
 
 if (!existsSync(ARTIFACT)) { console.error(`smoke: missing ${ARTIFACT} — run \`npm run build\` first`); process.exit(1); }
@@ -74,7 +74,7 @@ try {
   await send("Page.enable"); await send("Runtime.enable");
   await sleep(2500); // boot the web component + first render
 
-  const el = `document.querySelector("nonoun-color-tokens")`;
+  const el = `document.querySelector("ultimate-tokens")`;
   ok(await evalJS(`!!${el} && !!${el}.querySelector(".gallery")`), "gallery boots");
   ok(await evalJS(`${el}.querySelectorAll(".category-card").length === 7`), "hub renders 7 category cards");
 
@@ -151,7 +151,7 @@ try {
   await evalJS(`${el}.toggleDrawer(false)`); await sleep(200);
 
   // Apply-to-Figma consent gate: a centered "back up your variables first" road-block before writing.
-  await evalJS(`(()=>{try{localStorage.removeItem("nonoun-color-tokens-apply-consent-v1")}catch(e){};${el}.setInFigma(true);${el}.requestApplyToFigma(false);})()`); await sleep(300);
+  await evalJS(`(()=>{try{localStorage.removeItem("ultimate-tokens-apply-consent-v1")}catch(e){};${el}.setInFigma(true);${el}.requestApplyToFigma(false);})()`); await sleep(300);
   ok(await evalJS(`(()=>{const d=${el}.querySelector("dialog.apply-gate");if(!d||!d.open)return false;const r=d.getBoundingClientRect();return Math.abs((r.left+r.right)/2-innerWidth/2)<2 && !!${el}.querySelector(".apply-gate-warn")})()`), "Apply-to-Figma consent gate opens (centered, back-up warning) before posting");
   const gateShot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(resolve(OUT, "apply-gate.png"), Buffer.from(gateShot.data, "base64"));

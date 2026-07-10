@@ -246,7 +246,7 @@ export function figmaBundle(doc) {
 // absent from the kit entirely, so the MCP serves only what the user chose to include.
 export function brandKit(doc, systems) {
   const sys = systems || { color: true, type: true, geometry: true };
-  const kit = { $schema: "nonoun-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Ultimate Tokens by NONOUN" };
+  const kit = { $schema: "ultimate-tokens-brand-kit/1", name: doc.name || (doc.story && doc.story.title) || "Brand Kit", generator: "Ultimate Tokens by NONOUN" };
   // the ICON facet — always served: an agent must never have to pick a library. Sizes ride the geometry
   // system (below) when it is included; this names the library + its stroke/fill character.
   {
@@ -534,7 +534,7 @@ function round2(x) {
 // editing). This is the dogfooding hook — the same `exportCSS` the tool ships to
 // users generates the `--{n}-{stop}` raw vars + 53 `--c-{n}{suffix}` semantic
 // roles per palette that the app's own styles.css then consumes as design tokens.
-// Injected once on boot as <style id="nonoun-color-tokens-theme"> (see app.js).
+// Injected once on boot as <style id="ultimate-tokens-theme"> (see app.js).
 export function appThemeCSS() {
   const d = defaultDocument();
   const state = {

@@ -200,7 +200,7 @@ checkBundle(
 const GOLDEN = join(
   homedir(),
   "Downloads",
-  "nonoun-color-tokens-studio-54-the-dancefloor",
+  "ultimate-tokens-studio-54-the-dancefloor",
   "design-system-for-claude-code"
 );
 let goldenRan = false;

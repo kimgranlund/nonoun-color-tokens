@@ -67,10 +67,10 @@ addition history.
 
 ### Versions and identity
 
-- **Two version numbers, unrelated:** `kit.$schema` (`"nonoun-brand-kit/1"`, the data shape) vs
+- **Two version numbers, unrelated:** `kit.$schema` (`"ultimate-tokens-brand-kit/1"`, the data shape) vs
   `PROTOCOL_VERSION` (`"2025-06-18"`, the MCP wire version in the `initialize` reply). Bump the schema only when
   `brandKit`'s output shape changes; bump the protocol only to track an MCP spec revision. The test asserts
-  `kit.$schema === "nonoun-brand-kit/1"` and `serverInfo.name === "nonoun-brand-kit"`.
+  `kit.$schema === "ultimate-tokens-brand-kit/1"` and `serverInfo.name === "ultimate-tokens-brand-kit"`.
 
 ### Validation loop
 

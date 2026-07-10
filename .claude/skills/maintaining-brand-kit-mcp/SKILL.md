@@ -35,7 +35,7 @@ present**. The user-facing *why* of the kit shape is owned by `mcp/README.md` (d
 
 | Part | File | Role |
 |---|---|---|
-| The **core** | `mcp/brand-kit-core.mjs` | PURE, no I/O — `SERVER` (`nonoun-brand-kit`), `buildSurface(kit)` (the gated `TOOLS`/`RESOURCES`/`PROMPTS` pushes + `usageGuide()`), `handle(msg, surface)` (the JSON-RPC dispatch). The ONLY place tools/resources are defined — the stdio server AND the hosted Worker both serve it. |
+| The **core** | `mcp/brand-kit-core.mjs` | PURE, no I/O — `SERVER` (`ultimate-tokens-brand-kit`), `buildSurface(kit)` (the gated `TOOLS`/`RESOURCES`/`PROMPTS` pushes + `usageGuide()`), `handle(msg, surface)` (the JSON-RPC dispatch). The ONLY place tools/resources are defined — the stdio server AND the hosted Worker both serve it. |
 | The **server** | `mcp/brand-kit-server.mjs` | the thin stdio transport — loads `brand-kit.json`, calls `buildSurface`, frames newline-delimited JSON-RPC over stdin/stdout around `handle()`, prints the STDERR banner. No surface logic. |
 | The **kit** | `brandKit(doc, systems)` in `src/ui/model.mjs:237` | the pure projection that produces `brand-kit.json` — `stops`/`palettes`/`roles` (Color), `type`, `geometry`. `systems` is the per-system opt-in. |
 | The **package** | `downloadBrandKitMcp()` in `src/ui/app.js:6565` | the export drawer's **Download Brand-Kit MCP** — zips the server + core + `brand-kit.json` + README + `package.json`. Uses the `MCP_BRAND_KIT` asset. |
@@ -46,16 +46,16 @@ present**. The user-facing *why* of the kit shape is owned by `mcp/README.md` (d
 The kit's `systems` arg (the drawer's **Include** toggles, passed as `this.exportSystems`) opts each SYSTEM
 in/out; omitted/undefined → **all three** (the back-compat default). `buildSurface(kit)` reads what's present:
 
-- **Color** (`palettes`/`roles` present) → tools `nonoun-brand-kit:list_palettes`,
-  `nonoun-brand-kit:get_ramp(palette)`, `nonoun-brand-kit:resolve_token(palette, role, scheme)`,
-  `nonoun-brand-kit:get_semantic(scheme)`, `nonoun-brand-kit:nearest_token(hex)`; resources
+- **Color** (`palettes`/`roles` present) → tools `ultimate-tokens-brand-kit:list_palettes`,
+  `ultimate-tokens-brand-kit:get_ramp(palette)`, `ultimate-tokens-brand-kit:resolve_token(palette, role, scheme)`,
+  `ultimate-tokens-brand-kit:get_semantic(scheme)`, `ultimate-tokens-brand-kit:nearest_token(hex)`; resources
   `brand://palettes`, `brand://semantic/light`, `brand://semantic/dark`.
-- **Typography** (`kit.type` present) → tool `nonoun-brand-kit:get_type`; resource `brand://type`. `kit.type.categories`
+- **Typography** (`kit.type` present) → tool `ultimate-tokens-brand-kit:get_type`; resource `brand://type`. `kit.type.categories`
   carries the **seven** `make7` voices — **Display**, **Heading / Sub-heading / Kicker**, **Body**,
   **UI**, **Code** — each step with `size · lineHeight · letterSpacing · weight` (+ `textTransform`,
   `paragraph*`). The guide prose teaches a four-voice mental model (Display/Heading/Body/UI); the *data* has
   seven keys — don't claim four.
-- **Geometry** (`kit.geometry` present) → tool `nonoun-brand-kit:get_geometry`; resource `brand://geometry`. The XS–2XL
+- **Geometry** (`kit.geometry` present) → tool `ultimate-tokens-brand-kit:get_geometry`; resource `brand://geometry`. The XS–2XL
   `sizes` ramp, the top-level `radii` ladder (`none/sm/md/lg/full`), and the `space` scale. Each size carries
   `{ height, icon, caret, font, gap, padding, edgePadding, radiusPill, minWidth }`; the centering law is
   **`padding === (height − icon) / 2`** (the server prose calls `icon` "glyph" loosely — the field is `icon`).
@@ -105,7 +105,7 @@ fastest, most faithful signal. Run it first, then the suite:
 node test/mcp/core.mjs        # the PURE surface: buildSurface + handle driven directly (no spawn) — the
                               #   parity lock shared by the stdio server and the hosted Worker
 node test/mcp/brand-kit.mjs   # generates a kit from defaultDocument(), spawns the server, asserts:
-                              #   initialize → serverInfo.name "nonoun-brand-kit" + capabilities.tools
+                              #   initialize → serverInfo.name "ultimate-tokens-brand-kit" + capabilities.tools
                               #   tools/list has the 5 colour tools + get_type + get_geometry
                               #   get_type (Body voice) · get_geometry (centering law on MD; font = type UI size)
                               #   resources/list (brand://type + brand://geometry) · list_palettes (8)
@@ -129,11 +129,11 @@ request arrives.
 | Path | Use when |
 |---|---|
 | `references/foundations.md` | the JSON-RPC-over-stdio loop, the kit shape `brandKit` emits, the four opt-in checkpoints, the engine-free contract, `nearestToken`/`semanticFor` — the mental model the procedure assumes |
-| `references/best-practices.md` | the non-obvious do/don't (stdout-is-sacred, gate-in-lockstep, regenerate-the-asset, README-is-hand-mirrored, serve-don't-compute) + a worked walkthrough adding `nonoun-brand-kit:get_geometry` |
+| `references/best-practices.md` | the non-obvious do/don't (stdout-is-sacred, gate-in-lockstep, regenerate-the-asset, README-is-hand-mirrored, serve-don't-compute) + a worked walkthrough adding `ultimate-tokens-brand-kit:get_geometry` |
 | `references/rubric.md` | score the change before calling it done — stdio hygiene + opt-in gating + asset regen + test coverage are the gates |
 | `mcp/README.md` | the user-facing doc (de-staled) — what it exposes, how to add it to Claude Code / a project `.mcp.json`. Cite, keep in sync. |
-| `.claude/skills/adding-semantic-roles` | the roles that flow into `nonoun-brand-kit:get_semantic` / `nonoun-brand-kit:resolve_token` / `brand://semantic/*` — cite for the per-palette role model (53 today) |
-| `.claude/skills/geometry-system` + `.claude/skills/type-scale` + `src/engine/type.mjs` (`typeScale`) · `src/engine/geometry.mjs` (`geomScale`) | the type + geometry scales `nonoun-brand-kit:get_type` / `nonoun-brand-kit:get_geometry` serve verbatim — cite the `geometry-system` skill (the size ramp / centering law) + the `type-scale` skill (the seven voices) + the engine for the shapes; don't re-derive them |
+| `.claude/skills/adding-semantic-roles` | the roles that flow into `ultimate-tokens-brand-kit:get_semantic` / `ultimate-tokens-brand-kit:resolve_token` / `brand://semantic/*` — cite for the per-palette role model (53 today) |
+| `.claude/skills/geometry-system` + `.claude/skills/type-scale` + `src/engine/type.mjs` (`typeScale`) · `src/engine/geometry.mjs` (`geomScale`) | the type + geometry scales `ultimate-tokens-brand-kit:get_type` / `ultimate-tokens-brand-kit:get_geometry` serve verbatim — cite the `geometry-system` skill (the size ramp / centering law) + the `type-scale` skill (the seven voices) + the engine for the shapes; don't re-derive them |
 
 ## Peer skills
 

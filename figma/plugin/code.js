@@ -27,27 +27,32 @@ figma.ui.postMessage({ type: "figma-init" });
 // and cannot reverse-derive the params). Root pluginData is saved inside the .fig and TRAVELS WITH THE
 // FILE (shared with everyone who opens it), unlike clientStorage which is per-user-machine. So a read
 // reproduces the generator's state LOSSLESSLY instead of approximating it from the 500 colors.
-const CONFIG_KEY = "nonoun-color-tokens-config"; // (matches SETS_KEY's `nonoun-color-tokens-*` naming)
-const LEGACY_CONFIG_KEY = "hct-config"; // pre-rename key — read as a fallback so files saved before the
+const CONFIG_KEY = "ultimate-tokens-config"; // (matches SETS_KEY's `ultimate-tokens-*` naming)
+// NOTE — there is no legacy pluginData fallback, and there cannot be one. Figma namespaces
+// `root.setPluginData` BY PLUGIN ID, and this plugin's id changed (nonoun-color-tokens ->
+// ultimate-tokens) with the product rename: data written under the old id is unreadable by this
+// plugin, at any key. Files applied before the rename lose their embedded config (re-import the
+// config JSON, or re-apply) and their provenance registries (the first apply re-adopts collections
+// and styles BY NAME, then re-registers them — nothing is duplicated, nothing stale is pruned once).
                                         // rename still load; the next writeConfig migrates them forward.
 
 // SETS_KEY — the gallery's "Your Palettes" sets, persisted in figma.clientStorage (PER-USER, survives
 // across plugin sessions). The plugin UI iframe has an opaque origin, so its localStorage is blocked /
 // non-persistent; clientStorage is the sanctioned per-user store. (Mirrors the browser's localStorage
-// key `nonoun-color-tokens-sets`, so the same gallery data model round-trips in both environments.)
-const SETS_KEY = "nonoun-color-tokens-sets";
+// key `ultimate-tokens-sets`, so the same gallery data model round-trips in both environments.)
+const SETS_KEY = "ultimate-tokens-sets";
 
 // FLOAT_REGISTRY_KEY — the PROVENANCE registry for the breakpoint-moded Type/Geometry collections, a
 // name→collectionId map stored in root pluginData (travels with the .fig, like CONFIG_KEY). applyFloatPlans
 // reconciles/prunes ONLY a collection we created (matched by id), so a user's OWN pre-existing collection
 // named "Typography"/"Geometry" is never canonicalized or pruned — we make a separate one instead.
-const FLOAT_REGISTRY_KEY = "nonoun-color-tokens-float-collections";
+const FLOAT_REGISTRY_KEY = "ultimate-tokens-float-collections";
 
 // writeConfig / readConfig — the file-embedded parametric config (root pluginData is a string store;
 // getPluginData returns "" when unset). JSON-encoded; a corrupt value reads back as null, never throws.
 function writeConfig(config) { figma.root.setPluginData(CONFIG_KEY, JSON.stringify(config)); }
 function readConfig() {
-  const raw = figma.root.getPluginData(CONFIG_KEY) || figma.root.getPluginData(LEGACY_CONFIG_KEY); // legacy fallback
+  const raw = figma.root.getPluginData(CONFIG_KEY);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (e) { return null; } // NB: param required — Figma's plugin VM rejects optional catch binding (ES2019)
 }
@@ -212,7 +217,7 @@ async function varsByName(collectionId) {
 // The UI computes the plans (figma/binder/style-plan.mjs — pure, parity-gated); this executor runs
 // them verbatim. Provenance: STYLE_REGISTRY_KEY records the style ids WE created (name → id), so
 // pruning can never touch a user's own styles — the float-registry discipline, applied to styles.
-const STYLE_REGISTRY_KEY = "nonoun-color-tokens-styles";
+const STYLE_REGISTRY_KEY = "ultimate-tokens-styles";
 function readStyleRegistry() {
   try {
     const raw = figma.root.getPluginData(STYLE_REGISTRY_KEY);

@@ -50,7 +50,7 @@ if (/figma\.notify\([^;]*HCT/.test(codeNoComments))
 if (!existsSync(`${HERE}/ui.html`)) FAIL("ui", "ui.html not generated — run gen-ui.mjs");
 else {
   const ui = readFileSync(`${HERE}/ui.html`, "utf8");
-  if (!ui.includes("<nonoun-color-tokens>")) FAIL("ui", "ui.html does not embed the generator (<nonoun-color-tokens>)");
+  if (!ui.includes("<ultimate-tokens>")) FAIL("ui", "ui.html does not embed the generator (<ultimate-tokens>)");
   if (!/figma-init/.test(ui) || !/pluginMessage/.test(ui) || !/figmaBundle/.test(ui))
     FAIL("ui", "ui.html missing the bridge (figma-init listener / pluginMessage / figmaBundle())");
   if (!/config-loaded/.test(ui) || !/applyLoadedConfig/.test(ui))
@@ -225,7 +225,7 @@ if (applyBundle) {
   if (F.figma.ui._h) {
     const cfg = { name: "T", palettes: [{ name: "P", hue: 7, chroma: 50, skew: 0, lift: 0, on: true }], roleOverrides: { onSurface: { light: "900" } } };
     await F.figma.ui._h({ type: "save-config", config: cfg });
-    if (JSON.stringify(JSON.parse(F.figma.root.getPluginData("nonoun-color-tokens-config") || "null")) !== JSON.stringify(cfg)) FAIL("config", "save-config did not store the config in the file's root pluginData (must travel with the file, not clientStorage)");
+    if (JSON.stringify(JSON.parse(F.figma.root.getPluginData("ultimate-tokens-config") || "null")) !== JSON.stringify(cfg)) FAIL("config", "save-config did not store the config in the file's root pluginData (must travel with the file, not clientStorage)");
     F.figma.ui._posted.length = 0;
     await F.figma.ui._h({ type: "load-config" });
     const loaded = F.figma.ui._posted.find((m) => m && m.type === "config-loaded");
@@ -236,16 +236,20 @@ if (applyBundle) {
     F.figma.root._pd = {}; // clear, then apply with an embedded config
     const cfg2 = { name: "Embedded", palettes: [{ name: "Q", hue: 200, chroma: 60, skew: 0, lift: 0, on: true }] };
     await F.figma.ui._h({ type: "apply", dtcg: figmaBundle(defaultDocument()), config: cfg2 });
-    if (JSON.stringify(JSON.parse(F.figma.root.getPluginData("nonoun-color-tokens-config") || "null")) !== JSON.stringify(cfg2)) FAIL("config", "apply did not embed the config in the file (read-back would be lossy)");
+    if (JSON.stringify(JSON.parse(F.figma.root.getPluginData("ultimate-tokens-config") || "null")) !== JSON.stringify(cfg2)) FAIL("config", "apply did not embed the config in the file (read-back would be lossy)");
 
-    // LEGACY fallback: a file saved under the pre-rename "hct-config" key still loads (forward-migrated).
+    // ORPHANED legacy keys: figma.root.setPluginData is namespaced PER PLUGIN ID, so the id rename to
+    // "ultimate-tokens" makes every pre-rename key unreachable from this plugin -- no forward-migration is
+    // possible (that is the accepted cost of the rename). What IS gated: load-config must degrade to a clean
+    // empty start, never read a stale key and never throw.
     F.figma.root._pd = {};
-    const legacyCfg = { name: "Legacy", palettes: [{ name: "L", hue: 33, chroma: 44, skew: 0, lift: 0, on: true }] };
-    F.figma.root.setPluginData("hct-config", JSON.stringify(legacyCfg)); // saved before the rename
+    const orphaned = { name: "Legacy", palettes: [{ name: "L", hue: 33, chroma: 44, skew: 0, lift: 0, on: true }] };
+    for (const k of ["hct-config", "nonoun-color-tokens-config"]) F.figma.root.setPluginData(k, JSON.stringify(orphaned));
     F.figma.ui._posted.length = 0;
     await F.figma.ui._h({ type: "load-config" });
-    const legacyLoaded = F.figma.ui._posted.find((m) => m && m.type === "config-loaded");
-    if (!legacyLoaded || JSON.stringify(legacyLoaded.config) !== JSON.stringify(legacyCfg)) FAIL("config", "load-config did not fall back to the legacy 'hct-config' key");
+    const orphanLoaded = F.figma.ui._posted.find((m) => m && m.type === "config-loaded");
+    if (!orphanLoaded) FAIL("config", "load-config did not answer at all when only pre-rename keys are present (must post config-loaded with an empty config)");
+    if (orphanLoaded && orphanLoaded.config) FAIL("config", "load-config read a pre-rename pluginData key -- setPluginData is namespaced per plugin id, so a legacy key must be invisible, not silently adopted");
 
     // ── READ-VARIABLES (drift reference): the live Color Primitives values come back as #RRGGBB(AA) hexes ──
     F.figma.ui._posted.length = 0;
@@ -455,7 +459,7 @@ if (applyStylePlans && applyFontPrimitives) {
     }
 
     // registry + idempotency + provenance-scoped prune
-    const reg = JSON.parse(F.figma.root.getPluginData("nonoun-color-tokens-styles"));
+    const reg = JSON.parse(F.figma.root.getPluginData("ultimate-tokens-styles"));
     if (Object.keys(reg.paints).length !== plans.paints.length || Object.keys(reg.texts).length !== plans.texts.length) FAIL("styles", "style registry does not record every created style");
     const userStyle = F.figma.createPaintStyle(); userStyle.name = "My Own/keep-me";
     const before = F.figma._styles.length;

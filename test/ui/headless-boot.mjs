@@ -126,8 +126,9 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => "" });
 
 // ── boot ─────────────────────────────────────────────────────────────────────────
 await import("../../src/ui/app.js");
-const App = customElements.get("nonoun-color-tokens");
-ok(!!App, "custom element nonoun-color-tokens defined");
+const App = customElements.get("ultimate-tokens");
+ok(!!App, "custom element ultimate-tokens defined");
+ok(!!customElements.get("nonoun-color-tokens"), "the deprecated <nonoun-color-tokens> alias is still registered (pre-rename embeds keep working)");
 
 const app = new App();
 app.classList = new ClassList();
@@ -782,7 +783,7 @@ ok(hasClassX(figmaBarX, "figma-plugin-btn"), "(x) Regroup sits beside the Binder
 app.exportOpen = false; app.render(); flushRaf();
 
 // ── (xg) apply gate: requestApplyToFigma road-blocks with a backup-consent modal before posting ──
-try { localStorage.removeItem("nonoun-color-tokens-apply-consent-v1"); } catch {}
+try { localStorage.removeItem("ultimate-tokens-apply-consent-v1"); } catch {}
 app.applyGateOpen = false; posted = null;
 app.requestApplyToFigma(false);
 ok(app.applyGateOpen === true && posted === null, "(xg) requestApplyToFigma opens the consent gate and does NOT post yet");
@@ -808,7 +809,7 @@ ok(app.applyGateOpen === true && posted === null, "(xg) the destructive Regroup 
 app.confirmApplyGate();
 ok(posted && posted.pluginMessage.rebuildSemantic === true, "(xg) confirming the Regroup gate posts rebuildSemantic:true");
 ok(app._applyConsented() === true, "(xg) Regroup confirm does NOT change the apply consent");
-try { localStorage.removeItem("nonoun-color-tokens-apply-consent-v1"); } catch {}
+try { localStorage.removeItem("ultimate-tokens-apply-consent-v1"); } catch {}
 
 globalThis.parent = realParent;
 app.setInFigma(false);
@@ -1056,7 +1057,7 @@ app.doc.name = "My Set";
 app.downloadAllZip(projectViewZ(app.doc));
 app.downloadBytes = realDB;
 app.doc.name = setName0;
-ok(zipCap && zipCap.filename === "nonoun-color-tokens-my-set.zip", `(ee) downloads a single .zip named nonoun-color-tokens-{slug} (${zipCap && zipCap.filename})`);
+ok(zipCap && zipCap.filename === "ultimate-tokens-my-set.zip", `(ee) downloads a single .zip named ultimate-tokens-{slug} (${zipCap && zipCap.filename})`);
 const zb = zipCap ? zipCap.bytes : new Uint8Array();
 ok(zb[0] === 0x50 && zb[1] === 0x4b && zb[2] === 0x03 && zb[3] === 0x04, "(ee) the archive begins with a ZIP local-file-header signature (PK\\x03\\x04)");
 const eocd = zb.length - 22; // EOCD has no trailing comment → it's the final 22 bytes
@@ -1070,7 +1071,7 @@ const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
 // all riding systems.color) + 4 figma-aliased + 5 typography (incl. figma/ + figma/ moded + figma/ primitives) + 4 geometry + config = 45.
 ok(eocdSig && entries === 46, `(ee) the EOCD reports 46 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (5) + geometry (4) + figma/styles.plan.json (1) + config (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
-const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "design-system-for-claude-code/DESIGN.md", "design-system-for-claude-code/tokens.json", "design-system-for-claude-code/components/colors.html", "design-system-for-claude-code/README.md", "design-system-for-google-stitch/DESIGN.md", "design-system-for-google-stitch/README.md", "design-system-for-figma-make/guidelines/Guidelines.md", "design-system-for-figma-make/guidelines/setup.md", "design-system-for-figma-make/guidelines/styles.css", "design-system-for-figma-make/guidelines/foundations/color.md", "design-system-for-figma-make/guidelines/foundations/typography.md", "design-system-for-figma-make/guidelines/foundations/spacing.md", "design-system-for-figma-make/guidelines/components/overview.md", "design-system-for-figma-make/guidelines/components/button.md", "design-system-for-figma-make/README.md", "nonoun-color-tokens-my-set-config.json",
+const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "design-system-for-claude-code/DESIGN.md", "design-system-for-claude-code/tokens.json", "design-system-for-claude-code/components/colors.html", "design-system-for-claude-code/README.md", "design-system-for-google-stitch/DESIGN.md", "design-system-for-google-stitch/README.md", "design-system-for-figma-make/guidelines/Guidelines.md", "design-system-for-figma-make/guidelines/setup.md", "design-system-for-figma-make/guidelines/styles.css", "design-system-for-figma-make/guidelines/foundations/color.md", "design-system-for-figma-make/guidelines/foundations/typography.md", "design-system-for-figma-make/guidelines/foundations/spacing.md", "design-system-for-figma-make/guidelines/components/overview.md", "design-system-for-figma-make/guidelines/components/button.md", "design-system-for-figma-make/README.md", "ultimate-tokens-my-set-config.json",
   "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt",
   "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "figma/typography.modes.variables.json", "figma/typography.primitives.variables.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.variables.json", "figma/dimension.modes.variables.json"];
 ok(wantPaths.every((p) => zipText.includes(p)), "(ee) every colour format + typography/ + geometry/ + the moded Figma-variable files + the config + the figma-aliased/ cascade variant is present in the archive");
@@ -1183,13 +1184,39 @@ ok(hasSvgIcon(findFk("pane-left")), "(ic) the pane toggle renders an inline-SVG 
 ok(hasSvgIcon(app.querySelector(".app-header")), "(ic) the app-header controls (Undo/Redo/Export/theme) carry registry icons");
 ok(hasSvgIcon(app.querySelector(".canvas-header")), "(ic) the canvas-header controls (Fit/zoom/+Palette) carry registry icons");
 
-// ── (mig) storage-key migration: pre-rename keys are copied into the new namespace on boot ──
-localStorage.setItem("hct-palette-state-v1-sets", JSON.stringify({ sets: [{ id: "legacy1", name: "Legacy", doc: {}, updated: 1 }] }));
-localStorage.removeItem("nonoun-color-tokens-sets");                 // the new slot starts empty
-const app2 = new (customElements.get("nonoun-color-tokens"))();
-app2.connectedCallback();                                            // runs migrateStorageKeys() before loadSets()
-ok(localStorage.getItem("nonoun-color-tokens-sets") != null, "(mig) a pre-rename '-sets' key is copied into the new namespace on boot");
+// ── (mig) storage-key migration: BOTH pre-rename generations forward-migrate into the new namespace ──
+// The chain is ultimate-tokens ← nonoun-color-tokens ← hct-palette-state-v1 (newest legacy wins).
+const setsBlob = (id) => JSON.stringify({ sets: [{ id, name: id, doc: {}, updated: 1 }] });
+const migKeys = ["ultimate-tokens-sets", "nonoun-color-tokens-sets", "hct-palette-state-v1-sets"];
+const lsClear = () => migKeys.forEach((k) => localStorage.removeItem(k));   // the shim has no clear()
+const bootFresh = () => { const a = new (customElements.get("ultimate-tokens"))(); a.connectedCallback(); return a; };
+
+// (1) the OLDEST generation still migrates (a user who never opened the middle-named build).
+lsClear();
+localStorage.setItem("hct-palette-state-v1-sets", setsBlob("legacy1"));
+const app2 = bootFresh();                                            // connectedCallback runs migrateStorageKeys() before loadSets()
+ok(localStorage.getItem("ultimate-tokens-sets") != null, "(mig) an oldest-generation 'hct-palette-state-v1-sets' key is copied into the new namespace on boot");
 ok(Array.isArray(app2.sets) && app2.sets.some((s) => s.id === "legacy1"), "(mig) the migrated set is loaded by the new app (no data loss across the rename)");
+
+// (2) the MIDDLE generation migrates too — the hop this rename adds.
+lsClear();
+localStorage.setItem("nonoun-color-tokens-sets", setsBlob("legacy2"));
+const app2b = bootFresh();
+ok(app2b.sets.some((s) => s.id === "legacy2"), "(mig) a 'nonoun-color-tokens-sets' key migrates across the ultimate-tokens rename");
+
+// (3) NEWEST legacy wins when a user has data under both — never resurrect the staler blob.
+lsClear();
+localStorage.setItem("nonoun-color-tokens-sets", setsBlob("newer"));
+localStorage.setItem("hct-palette-state-v1-sets", setsBlob("older"));
+const app2c = bootFresh();
+ok(app2c.sets.some((s) => s.id === "newer") && !app2c.sets.some((s) => s.id === "older"), "(mig) with both legacy generations present the NEWEST wins (the staler blob is not resurrected)");
+
+// (4) an existing new-namespace value is never clobbered by a stale legacy one.
+lsClear();
+localStorage.setItem("ultimate-tokens-sets", setsBlob("current"));
+localStorage.setItem("nonoun-color-tokens-sets", setsBlob("stale"));
+const app2d = bootFresh();
+ok(app2d.sets.some((s) => s.id === "current") && !app2d.sets.some((s) => s.id === "stale"), "(mig) a present new-namespace key is never overwritten by a legacy one");
 
 // ── (gc) Global inspector HIDES the CIELAB-only controls (Curve / Chroma basis) outside "even" mode ──
 app.openSet(app.sets[0].id); app.setSegment("global"); flushRaf();
@@ -1893,7 +1920,7 @@ ok(app.tier() === "pro" && app.profile.entitlement && app.profile.entitlement.st
 ok(app.profile.instanceId === "inst-acct", "(acct) enterLicense records the activation instance id (this device's seat)");
 ok(app.profile.seats && app.profile.seats.limit === 5 && app.profile.seats.usage === 2, "(acct) enterLicense stores the seat count {limit,usage}");
 ok(app.flagOf("proExport") === true, "(acct) flagOf returns unlocked pre-launch (TIERS_ENFORCED off — the entitlement gate itself is unit-tested in flags.mjs; app.tier() above proves the effective-tier resolution)");
-const acctStored = JSON.parse(localStorage.getItem("nonoun-color-tokens-profile") || "null");
+const acctStored = JSON.parse(localStorage.getItem("ultimate-tokens-profile") || "null");
 ok(acctStored && acctStored.tier === "pro" && acctStored.licenseKey === "PRO-TEST-1234" && acctStored.instanceId === "inst-acct" && acctStored.entitlement.status === "active", "(acct) the license + instance + entitlement persist to the profile store");
 app.render(); flushRaf();
 ok(acctTier() === "Pro" && !app.querySelector(".account-license-input") && !!app.querySelector(".account-remove"), "(acct) once Pro the badge reads Pro and the entry becomes Remove");

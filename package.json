@@ -1,5 +1,5 @@
 {
-  "name": "nonoun-color-tokens",
+  "name": "ultimate-tokens",
   "version": "1.2.0",
   "description": "Ultimate Tokens by NONOUN — a perceptually-even color-palette + semantic-token generator built on the HCT color space (pure engine, web component, Figma plugin).",
   "type": "module",

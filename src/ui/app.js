@@ -1,6 +1,6 @@
 // app.js — the DOM app for the HCT Palette Generator.
 //
-// One <nonoun-color-tokens> web component. The `document` (a palette SET) is the single
+// One <ultimate-tokens> web component. The `document` (a palette SET) is the single
 // source of truth; the whole right side is projectView(document), recomputed on
 // every edit — NEVER stored. Palette SETS persist to localStorage; the gallery
 // lists them. The six validated capability modules do all the color/token work
@@ -89,17 +89,23 @@ To test (Figma → Local variables → Import):
      cascade did not resolve — use the plugin instead.
 `;
 
-// One-time storage-key migration: the key prefix was renamed "hct-palette-state-v1" -> "nonoun-color-tokens"
-// (the product rename, CHANGELOG 1.12). Copy any sets/config saved under the OLD keys into the new ones so a
-// returning user keeps their work. Idempotent (only fills an ABSENT new key) and tolerates a throwing
-// localStorage (a Figma sandboxed iframe) the same way save() does.
+// One-time storage-key migration across the FULL rename chain:
+//   "hct-palette-state-v1-*"  ->  "nonoun-color-tokens-*"  ->  "ultimate-tokens-*"
+// A user last seen on ANY prior prefix keeps their work, so the legacy prefixes are tried
+// NEWEST-FIRST (a user who already migrated once must not have older, staler data win).
+// Idempotent (only ever fills an ABSENT new key) and tolerates a throwing localStorage
+// (the Figma sandboxed iframe) exactly the way save() does.
+const LEGACY_STORAGE_PREFIXES = ["nonoun-color-tokens", "hct-palette-state-v1"]; // newest first
 function migrateStorageKeys() {
   try {
-    for (const [oldK, newK] of [["hct-palette-state-v1-sets", SETS_KEY], ["hct-palette-state-v1-project", PROJECT_KEY]]) {
-      const old = localStorage.getItem(oldK);
-      if (old != null && localStorage.getItem(newK) == null) localStorage.setItem(newK, old);
+    for (const [suffix, newK] of [["-sets", SETS_KEY], ["-project", PROJECT_KEY], ["-profile", PROFILE_KEY]]) {
+      if (localStorage.getItem(newK) != null) continue; // already migrated / already present
+      for (const prefix of LEGACY_STORAGE_PREFIXES) {
+        const old = localStorage.getItem(prefix + suffix);
+        if (old != null) { localStorage.setItem(newK, old); break; } // newest legacy wins
+      }
     }
-  } catch {}
+  } catch (e) { /* storage unavailable (sandboxed iframe) — nothing to migrate */ }
 }
 
 function loadSets() {
@@ -199,10 +205,10 @@ function hydrateStoredDoc(stored) {
 // ── app-theme injection (dogfooding) ────────────────────────────────────────────
 // The chrome themes itself with the tokens the tool generates. On boot we run the
 // tool's own `exportCSS` over the FIXED 8 default palettes (appThemeCSS) and inject
-// the result once as <style id="nonoun-color-tokens-theme"> into <head>, so every --c-* role and
+// the result once as <style id="ultimate-tokens-theme"> into <head>, so every --c-* role and
 // raw var is available globally for styles.css to consume. We use the FIXED default
 // set (not the user's edited doc) so the chrome stays stable while a doc is edited.
-const APP_THEME_STYLE_ID = "nonoun-color-tokens-theme";
+const APP_THEME_STYLE_ID = "ultimate-tokens-theme";
 function ensureAppTheme() {
   if (typeof document === "undefined" || !document.head) return;
   if (document.getElementById(APP_THEME_STYLE_ID)) return; // inject exactly once
@@ -5673,9 +5679,9 @@ class HctApp extends HTMLElement {
       }
     }
     // the re-importable parametric config — ALWAYS (it carries the colour + type + geometry params).
-    files.push({ name: `nonoun-color-tokens-${s}-config.json`, data: JSON.stringify(serialize(this.doc), null, 2) });
+    files.push({ name: `ultimate-tokens-${s}-config.json`, data: JSON.stringify(serialize(this.doc), null, 2) });
     const bytes = zipStore(files);
-    this.downloadBytes(bytes, `nonoun-color-tokens-${s}.zip`, "application/zip");
+    this.downloadBytes(bytes, `ultimate-tokens-${s}.zip`, "application/zip");
   }
 
   // _saveBlob — save a Blob to disk. PREFERS the File System Access API (showSaveFilePicker): an
@@ -5768,7 +5774,7 @@ class HctApp extends HTMLElement {
   // consent is a per-USER preference (not doc-bound) → localStorage, versioned so a material change to
   // apply-behavior can re-surface the warning by bumping the key. (Figma's iframe localStorage may be
   // session-scoped — re-warning once per session for a destructive action is acceptable / safe.)
-  _applyConsentKey() { return "nonoun-color-tokens-apply-consent-v1"; }
+  _applyConsentKey() { return "ultimate-tokens-apply-consent-v1"; } // renamed: re-shows the back-up warning once (a safety prompt, not data)
   _applyConsented() { try { return localStorage.getItem(this._applyConsentKey()) === "1"; } catch { return false; } }
   _setApplyConsent() { try { localStorage.setItem(this._applyConsentKey(), "1"); } catch { /* storage blocked */ } }
 
@@ -7070,7 +7076,7 @@ class HctApp extends HTMLElement {
     const kit = brandKit(this.doc, this.exportSystems);
     const base = slug(kit.name) || "brand-kit";
     const pkg = JSON.stringify(
-      { name: "nonoun-brand-kit", version: "0.1.0", type: "module", description: `MCP server for the "${kit.name}" brand kit (Ultimate Tokens by NONOUN)`, bin: { "brand-kit-mcp": "brand-kit-server.mjs" }, private: true },
+      { name: "ultimate-tokens-brand-kit", version: "0.1.0", type: "module", description: `MCP server for the "${kit.name}" brand kit (Ultimate Tokens by NONOUN)`, bin: { "brand-kit-mcp": "brand-kit-server.mjs" }, private: true },
       null, 2,
     );
     const files = [
@@ -7121,7 +7127,12 @@ class HctApp extends HTMLElement {
   }
 }
 
-customElements.define("nonoun-color-tokens", HctApp);
+customElements.define("ultimate-tokens", HctApp);
+// DEPRECATED ALIAS — the element shipped as <nonoun-color-tokens> before the product rename, and the
+// single-file bundle is embeddable, so a page in the wild may still use the old tag. A custom-element
+// CLASS may only be registered once, hence the trivial subclass. Remove once no embed uses it.
+class NonounColorTokensElement extends HctApp {}
+customElements.define("nonoun-color-tokens", NonounColorTokensElement);
 
 // expose a couple of pure helpers for any console poking / future tests.
 export { HctApp, contrastRatio };

@@ -131,7 +131,7 @@ function mockFigma() {
 //    FLOAT_REGISTRY_KEY as the flagship (figma/plugin/code.js) so both converge on one collection set ──
 const binderSrc = readFileSync(BINDER_PATH, "utf8");
 if (!binderSrc.includes(FLOAT_ANCHOR)) FAIL("floatanchor", "code.js is missing the FLOAT_PLANS injection anchor");
-if (!/FLOAT_REGISTRY_KEY\s*=\s*"nonoun-color-tokens-float-collections"/.test(binderSrc)) FAIL("floatanchor", "code.js FLOAT_REGISTRY_KEY does not match the flagship plugin's key string");
+if (!/FLOAT_REGISTRY_KEY\s*=\s*"ultimate-tokens-float-collections"/.test(binderSrc)) FAIL("floatanchor", "code.js FLOAT_REGISTRY_KEY does not match the flagship plugin's key string");
 if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no applyFloatPlans executor");
 
 // ── floatcreate: applyFloatPlans creates Typography + Geometry collections (Base + a breakpoint mode

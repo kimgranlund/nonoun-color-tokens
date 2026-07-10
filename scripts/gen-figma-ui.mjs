@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const BUNDLE = `${HERE}/../dist/nonoun-color-tokens.html`;
+const BUNDLE = `${HERE}/../dist/ultimate-tokens.html`;
 
 // The bridge is injected just before </body>. It uses Figma's UI⇄code postMessage contract:
 //   code.js → UI:  figma.ui.postMessage(x)        → window 'message' event, e.data.pluginMessage = x
@@ -19,13 +19,13 @@ const BRIDGE = `
 (function(){
   // Tell the generator it's inside Figma so it reveals its own "⚑ Add Variables → Figma"
   // action in the Export drawer. code.js posts {type:"figma-init"} right after showUI; the
-  // message can land before <nonoun-color-tokens> is upgraded, so poll briefly until setInFigma exists.
+  // message can land before <ultimate-tokens> is upgraded, so poll briefly until setInFigma exists.
   function markInFigma(){
-    var app=document.querySelector("nonoun-color-tokens");
+    var app=document.querySelector("ultimate-tokens");
     if(app&&typeof app.setInFigma==="function"){ app.setInFigma(true); return; }
     setTimeout(markInFigma,50);
   }
-  function app(){ return document.querySelector("nonoun-color-tokens"); }
+  function app(){ return document.querySelector("ultimate-tokens"); }
   addEventListener("message",function(e){
     var m=e.data&&e.data.pluginMessage;       // sandbox→UI: read e.data.pluginMessage, not e.data
     if(!m) return;

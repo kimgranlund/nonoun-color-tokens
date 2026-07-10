@@ -24,11 +24,11 @@ ok(toolNames.includes("get_type") && toolNames.includes("get_geometry"), "surfac
 const resUris = surface.RESOURCES.map((r) => r.uri);
 ok(["brand://kit", "brand://palettes", "brand://semantic/light", "brand://semantic/dark", "brand://type", "brand://geometry", "brand://guide"].every((u) => resUris.includes(u)), `surface has all resources (${resUris})`);
 ok(surface.PROMPTS.length === 1 && surface.PROMPTS[0].name === "apply_brand", "surface has the apply_brand prompt");
-ok(surface.SERVER === SERVER && surface.PROTOCOL_VERSION === PROTOCOL_VERSION && SERVER.name === "nonoun-brand-kit", "surface carries SERVER + PROTOCOL_VERSION");
+ok(surface.SERVER === SERVER && surface.PROTOCOL_VERSION === PROTOCOL_VERSION && SERVER.name === "ultimate-tokens-brand-kit", "surface carries SERVER + PROTOCOL_VERSION");
 
 // ── handle: the JSON-RPC dispatch ──
 const init = req("initialize", { protocolVersion: PROTOCOL_VERSION, capabilities: {} });
-ok(init.result && init.result.serverInfo.name === "nonoun-brand-kit" && !!init.result.capabilities.tools && init.result.protocolVersion === PROTOCOL_VERSION, "initialize → serverInfo + capabilities + protocolVersion");
+ok(init.result && init.result.serverInfo.name === "ultimate-tokens-brand-kit" && !!init.result.capabilities.tools && init.result.protocolVersion === PROTOCOL_VERSION, "initialize → serverInfo + capabilities + protocolVersion");
 ok(note("notifications/initialized") === null, "a notification (no id) returns null — nothing to send");
 ok(handle({ jsonrpc: "2.0", method: "ping" }, surface) === null && req("ping", {}).result && Object.keys(req("ping", {}).result).length === 0, "ping: notification → null, request → {}");
 

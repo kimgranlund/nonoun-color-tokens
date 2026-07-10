@@ -10,7 +10,7 @@ probably fighting one of these. The user-facing contract is owned by `mcp/README
   `brand-kit.json`. It is engine-aware (it reads `projectView(doc)`'s resolved palettes/roles, `typeScale`,
   and `geometryScale`) — it is where every value the server can serve comes from. Shape:
   ```
-  { $schema: "nonoun-brand-kit/1", name, generator: "Ultimate Tokens by NONOUN",
+  { $schema: "ultimate-tokens-brand-kit/1", name, generator: "Ultimate Tokens by NONOUN",
     stops:    [50, 100, …, 950],                       # the stop numbers (color only; on[0].ramp's stops)
     palettes: [ { name, slug, key, ramp: [ {stop, hex} ] } ],
     roles:    { <slug>: { <roleKey>: { light: "#…", dark: "#…" } } },   # 53 keys per palette
@@ -34,9 +34,9 @@ probably fighting one of these. The user-facing contract is owned by `mcp/README
   Cloudflare Worker (spec: `.claude/docs/site/mcp-hosting-spec.md`) imports the SAME core, so the downloaded
   and hosted surfaces can't drift; `test/mcp/core.mjs` locks the parity.
 
-Two version numbers live here and are unrelated: `kit.$schema = "nonoun-brand-kit/1"` (the data shape) and
+Two version numbers live here and are unrelated: `kit.$schema = "ultimate-tokens-brand-kit/1"` (the data shape) and
 `PROTOCOL_VERSION = "2025-06-18"` (the MCP wire protocol the `initialize` reply advertises). `SERVER =
-{ name: "nonoun-brand-kit", version: "0.1.0" }`. Don't conflate the schema and the protocol version.
+{ name: "ultimate-tokens-brand-kit", version: "0.1.0" }`. Don't conflate the schema and the protocol version.
 
 ### 2. The JSON-RPC-over-stdio loop
 

@@ -6,8 +6,8 @@
     "name": "Kim Granlund",
     "email": "kim.granlund@gmail.com"
   },
-  "homepage": "https://kimgranlund.github.io/nonoun-color-tokens/",
-  "repository": "https://github.com/kimgranlund/nonoun-color-tokens",
+  "homepage": "https://kimgranlund.github.io/ultimate-tokens/",
+  "repository": "https://github.com/kimgranlund/ultimate-tokens",
   "license": "MIT",
   "keywords": ["design-tokens", "css-variables", "semantic-colors", "type-scale", "geometry", "material-3", "oklch", "ultimate-tokens", "consumption"]
 }

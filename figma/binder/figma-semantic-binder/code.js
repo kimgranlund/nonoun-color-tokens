@@ -44,7 +44,7 @@ const FLOAT_PLANS = JSON.parse("[]"); /* __NONOUN_FLOAT_PLANS__ */
 // name→collectionId map stored in root pluginData (travels with the .fig, like the palette set). Kept
 // as the SAME key string as figma/plugin/code.js so the flagship plugin and this binder converge on the
 // SAME collections idempotently if a user runs both against one file.
-const FLOAT_REGISTRY_KEY = "nonoun-color-tokens-float-collections";
+const FLOAT_REGISTRY_KEY = "ultimate-tokens-float-collections";
 
 // MIRRORS figma/plugin/code.js's float executor: readFloatRegistry/writeFloatRegistry/
 // ensureFloatCollection/varsByName/applyFloatPlans are ported VERBATIM — a pure DATA executor (no

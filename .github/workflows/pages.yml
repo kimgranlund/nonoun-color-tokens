@@ -1,6 +1,6 @@
 name: Deploy demo to GitHub Pages
 
-# Publishes the dependency-free single-file build (dist/nonoun-color-tokens.html)
+# Publishes the dependency-free single-file build (dist/ultimate-tokens.html)
 # as the site root, so the public repo has a one-click live demo.
 
 on:
@@ -39,7 +39,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp dist/nonoun-color-tokens.html _site/index.html
+          cp dist/ultimate-tokens.html _site/index.html
           cp -R dist/icons _site/icons
           cp -R dist/favicon _site/favicon
       - uses: actions/configure-pages@v5
