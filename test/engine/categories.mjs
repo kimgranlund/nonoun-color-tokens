@@ -64,8 +64,14 @@ for (const slug of CATS) {
       const s = sd[r]; if (!s) continue;
       if (s.font && s.font !== t.fonts[r]) FAIL("faithful", `${slug}[${i}] ${r} font: preset ${t.fonts[r]} != spec ${s.font}`);
       const vv = t.voices?.[VOICE_OF[r]] || {};
-      if (Number.isFinite(s.trackingEm) && vv.tracking !== s.trackingEm) FAIL("faithful", `${slug}[${i}] ${r} tracking: preset ${vv.tracking} != spec ${s.trackingEm}`);
-      if (Number.isFinite(s.leading) && vv.leading !== s.leading) FAIL("faithful", `${slug}[${i}] ${r} leading: preset ${vv.leading} != spec ${s.leading}`);
+      // the spec schema carries leading/tracking as STRICT %-strings ("96%", "-2%" — the 2026-07-10 unit
+      // transition); the gate parses them the mapper's way AND rejects the retired numeric shape outright.
+      const pct = (x) => { if (typeof x !== "string") return NaN; const m = /^\s*(-?\d+(?:\.\d+)?)\s*%\s*$/.exec(x); return m ? Number(m[1]) / 100 : NaN; };
+      if (typeof s.trackingEm === "number" || typeof s.leading === "number") FAIL("schema", `${slug}[${i}] ${r} carries the RETIRED numeric leading/trackingEm — presets must use %-strings (tracking: "-2%", leading: "96%")`);
+      if (s.tracking != null && !Number.isFinite(pct(s.tracking))) FAIL("schema", `${slug}[${i}] ${r} tracking "${s.tracking}" is not a %-string`);
+      if (s.leading != null && !Number.isFinite(pct(s.leading))) FAIL("schema", `${slug}[${i}] ${r} leading "${s.leading}" is not a %-string`);
+      if (Number.isFinite(pct(s.tracking)) && vv.tracking !== pct(s.tracking)) FAIL("faithful", `${slug}[${i}] ${r} tracking: preset ${vv.tracking} != spec ${s.tracking}`);
+      if (Number.isFinite(pct(s.leading)) && vv.leading !== pct(s.leading)) FAIL("faithful", `${slug}[${i}] ${r} leading: preset ${vv.leading} != spec ${s.leading}`);
       if (Number.isFinite(s.weight) && vv.weight !== s.weight) FAIL("faithful", `${slug}[${i}] ${r} weight: preset ${vv.weight} != spec ${s.weight}`);
     }
     // (e) typeScale RESOLVES the design fonts (the picker reads scale.fonts[role])

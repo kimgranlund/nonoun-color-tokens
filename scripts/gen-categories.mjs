@@ -158,6 +158,15 @@ const VIVID_MIDS = { damp: 70, dampCurve: 1.5, dampAmp: 55, dampBias: 0 };
 // treatment's character). mono→Kicker (the slot's tracking IS the wide-kicker value; Code stays neutral).
 const TYPE_VOICE_OF = { display: "Display", heading: "Heading", body: "Body", ui: "UI", mono: "Kicker" };
 const TYPE_BASES = ["product", "luxury", "editorial", "technical", "statement"];
+// pct — the STRICT %-string parser for the preset schema's leading/tracking (Kim's 2026-07-10 unit
+// transition: `leading: "96%"` = 0.96 × size; `tracking: "-2%"` = -0.02em). Strings only — a bare
+// number is the RETIRED shape and is deliberately NOT honored (the schema gate rejects it), so the
+// unit can never be ambiguous again.
+const pct = (v) => {
+  if (typeof v !== "string") return NaN;
+  const m = /^\s*(-?\d+(?:\.\d+)?)\s*%\s*$/.exec(v);
+  return m ? Number(m[1]) / 100 : NaN;
+};
 function design5ToTypeConfig(t) {
   if (!t || typeof t !== "object" || !t.slots || typeof t.slots !== "object") return null;
   const out = { treatment: TYPE_BASES.includes(t.base) ? t.base : "product" };
@@ -170,9 +179,11 @@ function design5ToTypeConfig(t) {
     if (!s || typeof s !== "object") continue;
     if (typeof s.font === "string" && s.font.trim()) fonts[role] = s.font.trim();
     const v = {};
-    if (Number.isFinite(s.trackingEm)) v.tracking = s.trackingEm; // clampType range [-0.5, 1]
-    if (Number.isFinite(s.leading)) v.leading = s.leading; //         clampType range [0.8, 3]
-    if (Number.isFinite(s.weight)) v.weight = s.weight; //            clampType range [100, 1000]
+    const tr = pct(s.tracking); // "%-of-size" string → em ratio; clampType range [-0.5, 1]
+    if (Number.isFinite(tr)) v.tracking = tr;
+    const ld = pct(s.leading); //                                 clampType range [0.8, 3]
+    if (Number.isFinite(ld)) v.leading = ld;
+    if (Number.isFinite(s.weight)) v.weight = s.weight; //        clampType range [100, 1000]
     if (Object.keys(v).length) voices[TYPE_VOICE_OF[role]] = v;
   }
   if (Object.keys(fonts).length) out.fonts = fonts;

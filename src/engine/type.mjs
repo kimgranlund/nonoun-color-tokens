@@ -162,7 +162,7 @@ const nextNice = (v) => { let n = v + 1; while (niceSize(n) <= v) n += 1; return
 // on a non-reading role (Caption/Legal ride the ui FONT but are prose) falls back to 0.75.
 const PARA_PROSE = { display: 0.7, heading: 0.7, body: 0.75 };
 
-function buildCategory(name, p, factor, overrides, vp) {
+function buildCategory(name, p, factor, overrides, vp, compress) {
   // per-VOICE shaping overrides (vp): ratio · weight · leading · tracking(em) REPLACE the treatment's for the
   // WHOLE voice (the "select a voice, retune it" lever — like a per-palette Hue). Absent ⇒ the treatment
   // values, so a voice with no override is byte-identical (the identity gate). The per-cell size `overrides`
@@ -174,7 +174,9 @@ function buildCategory(name, p, factor, overrides, vp) {
   const out = {};
   let prevSize = 0; // running max, for the monotonic bump (quantization can collide adjacent steps)
   for (const [step, n] of p.steps) {
-    const rawModular = p.base * factor * ratio ** n;
+    // breakpoint compression (modeFactor) applies to the RAW modular size before rounding/quantization —
+    // it IS a size change (line-height, tracking, paragraph rhythm all re-derive from the compressed size).
+    const rawModular = compress ? compress(p.base * factor * ratio ** n) : p.base * factor * ratio ** n;
     const derived = Math.max(8, Math.round(rawModular)); // the modular-scale size — letterSpacing STAYS on this
     const ov = overrides && overrides[name + "|" + step];
     const overridden = typeof ov === "number" && Number.isFinite(ov) && ov > 0;
@@ -206,17 +208,39 @@ function buildCategory(name, p, factor, overrides, vp) {
   return out;
 }
 
-// typeScale — the resolved scale for a config { treatment, bodyBase, overrides? }. `bodyBase` (the Body base
-// size) uniformly scales every category so the whole system grows/shrinks together while keeping its ratios.
-// `overrides` (optional) is a flat per-cell size-override map (see buildCategory); ABSENT ⇒ identity.
+// typeScale — the resolved scale for a config { treatment, bodyBase, modeFactor?, overrides? }. `bodyBase`
+// (the Body base size) uniformly scales every category so the whole system grows/shrinks together while
+// keeping its ratios. `overrides` (optional) is a flat per-cell size-override map (see buildCategory);
+// ABSENT ⇒ identity.
+// `modeFactor` (optional, default 1) — the HIERARCHY-AWARE breakpoint compression (Kim's ratified law,
+// 2026-07-10): body-class text is frozen across breakpoints while display-class type compresses. The
+// factor names the compression at the TOP of the ramp (Tablet 5/6 · Mobile 2/3 canonical — Display 90 →
+// 75 → 60); each step's own factor interpolates in LOG-size space from ×1.0 at bodyBase to ×modeFactor at
+// the base ramp's largest size, so Body/Label/UI move ±0px, headings compress partially, Display fully.
+// modeFactor = 1 (or absent) ⇒ byte-identical scale (the identity gate).
 export function typeScale(config = {}) {
   const t = TYPE_TREATMENTS.find((x) => x.id === config.treatment) || TYPE_TREATMENTS[0];
   const bodyBase = Number(config.bodyBase) || t.categories.Body.base;
   const factor = bodyBase / t.categories.Body.base;
   const overrides = config.overrides && typeof config.overrides === "object" ? config.overrides : null;
   const voices = config.voices && typeof config.voices === "object" ? config.voices : null; // per-voice shaping overrides
+  const mfRaw = Number(config.modeFactor);
+  const mf = Number.isFinite(mfRaw) && mfRaw > 0 && mfRaw !== 1 ? mfRaw : 1;
+  let compress = null;
+  if (mf !== 1) {
+    // the base ramp's largest raw size (uncompressed, treatment ratios) anchors the curve's top end; a
+    // per-voice ratio override that exceeds it clamps to the full factor (t ≤ 1), never over-compresses.
+    let sMax = bodyBase;
+    for (const p of Object.values(t.categories)) for (const [, n] of p.steps) sMax = Math.max(sMax, p.base * factor * p.ratio ** n);
+    const logSpan = Math.log(Math.max(sMax, bodyBase * 1.01) / bodyBase);
+    compress = (S) => {
+      if (S <= bodyBase) return S; // body size and below: frozen
+      const tt = Math.min(1, Math.log(S / bodyBase) / logSpan);
+      return S * (1 - (1 - mf) * tt);
+    };
+  }
   const categories = {};
-  for (const [name, p] of Object.entries(t.categories)) categories[name] = buildCategory(name, p, factor, overrides, voices ? voices[name] : null);
+  for (const [name, p] of Object.entries(t.categories)) categories[name] = buildCategory(name, p, factor, overrides, voices ? voices[name] : null, compress);
   // fonts: the treatment's families, with optional per-role CUSTOM overrides (config.fonts). A custom family
   // exports as-is + renders if installed/bundled; the specimen falls back to a generic otherwise.
   const fonts = { ...t.fonts };

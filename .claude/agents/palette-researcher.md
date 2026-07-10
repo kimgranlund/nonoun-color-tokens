@@ -48,7 +48,9 @@ rulebook.
 
 Propose a pairing within the four self-hosted families, name the nearest of the five treatments, and
 return make7 overrides + a rationale - a reply, NOT a schema file. The voice/knob/treatment vocabulary is
-the preloaded type-scale skill's; don't re-derive it here.
+the preloaded type-scale skill's; don't re-derive it here. If a draft carries per-palette `type.slots`,
+leading and tracking are STRICT %-strings (`"leading": "96%"`, `"tracking": "-2%"` - % of font size;
+never bare floats - the categories gate rejects the retired numeric shape).
 
 ## How you work
 

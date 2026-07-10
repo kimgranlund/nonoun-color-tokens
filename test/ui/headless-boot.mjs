@@ -1558,7 +1558,7 @@ app.typeVoice = null; app.render(); flushRaf();
 app.setTypeSpecMode("tokens"); flushRaf();
 ok(!!app.querySelector(".tok-table") && !app.querySelector(".type-spec"), "(ty-tok) the Specimen·Tokens toggle renders the token matrix table (no specimen scene)");
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(ty-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
-ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Mobile")).length === 1 && walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 0, "(ty-tok) the base column header reads Mobile (the intrinsic standard set — no 'Base' column)");
+ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Desktop")).length === 1 && walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 0, "(ty-tok) the base column header reads Desktop (the designed scale, the intrinsic anchor — no 'Base' column)");
 ok(app._typeTokenColumns().length === 1, "(ty-tok) base-only — exactly one column (Base) with no breakpoints");
 ok(app.querySelectorAll(".tok-row").length === 53, `(ty-tok) one row per type step (53) (got ${app.querySelectorAll(".tok-row").length})`);
 ok(app.querySelectorAll(".tok-group").length === 11, `(ty-tok) the rows are grouped by voice — 11 group headers (got ${app.querySelectorAll(".tok-group").length})`);
@@ -1736,7 +1736,7 @@ app.geomSize = null; app.render(); flushRaf(); // leave the section in Geometry 
 app.setGeomSpecMode("tokens"); flushRaf();
 ok(!!app.querySelector(".tok-table") && !app.querySelector(".geom-spec"), "(geo-tok) the Controls·Tokens toggle renders the token matrix table (no controls scene)");
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(geo-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
-ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Mobile")).length === 1 && walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 0, "(geo-tok) the base column header reads Mobile (the intrinsic standard set — no 'Base' column)");
+ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Desktop")).length === 1 && walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 0, "(geo-tok) the base column header reads Desktop (the designed scale, the intrinsic anchor — no 'Base' column)");
 ok(app._geomTokenColumns().length === 1, "(geo-tok) base-only — exactly one column (Base) with no breakpoints");
 ok(app.querySelectorAll(".tok-row").length === 6, `(geo-tok) one row per control size (6) (got ${app.querySelectorAll(".tok-row").length})`);
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}) === "--size-2xl", `(geo-tok) the first (sticky) token name is --size-2xl (largest→smallest) (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
@@ -1981,50 +1981,59 @@ ok(!app.querySelector(".account-license-input") && !app.querySelector(".account-
 app.inFigma = false; app.render(); flushRaf();
 app.closeSettings(); flushRaf();
 
-// ── (std) the one-click STANDARD breakpoint sets (Typography + Geometry) ─────────────
-// Clear any modes accumulated above, then create each standard set and pin its shape: DESKTOP-FIRST —
-// Desktop (1280) · Tablet (992) stored in that order, with the base RENAMED "Mobile" (the ≤476 layer);
-// type bodyBase steps +2/+1, geometry compresses the base and lands the original ramp on Desktop.
+// ── (std) the STANDARD breakpoint sets (Typography + Geometry) — the DESKTOP-ANCHORED law ─────────────
+// Clear any modes accumulated above, then materialize each standard set and pin its shape: the DESIGNED
+// scale IS Desktop (the base, first, Figma's default mode — baseName "Desktop", untouched by the commit);
+// Tablet (992) and Mobile (≤476) derive DOWN — type via the hierarchy-aware factor (body frozen, display
+// compressed ×5/6 / ×2/3), geometry via heights −2/−4.
 app.commit((d) => { if (d.type) { d.type = { ...d.type }; delete d.type.modes; delete d.type.baseName; } if (d.geometry) { d.geometry = { ...d.geometry }; delete d.geometry.modes; delete d.geometry.baseName; } }); flushRaf();
 const stdBB = (app.doc.type && app.doc.type.bodyBase) ?? 16;
 app.addStandardTypeModes(); flushRaf();
 {
   const ms = (app.doc.type.modes || []);
-  ok(ms.length === 2 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([1280, 992]), `(std) Standard set creates Desktop(1280) + Tablet(992), stored desktop-first (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
-  ok(ms[0].name === "Desktop" && ms[0].bodyBase === stdBB + 2 && ms[1].name === "Tablet" && ms[1].bodyBase === stdBB + 1, "(std) type modes are Desktop (+2px body) and Tablet (+1px body)");
-  ok(app.doc.type.baseName === "Mobile", "(std) the type base layer is renamed Mobile");
-  ok(app.typeMode === ms[0].id, "(std) the control lands on Desktop (the first new type mode)");
+  ok(ms.length === 2 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([992, 476]), `(std) Standard set materializes Tablet(992) + Mobile(476) — the designed scale stays the Desktop base (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
+  ok(ms[0].name === "Tablet" && Math.abs(ms[0].factor - 5 / 6) < 1e-9 && ms[1].name === "Mobile" && Math.abs(ms[1].factor - 2 / 3) < 1e-9 && ms.every((m) => m.bodyBase == null), "(std) type modes carry the compression FACTORS (5/6 · 2/3), no bodyBase override — body is frozen by the law, not by a bump");
+  ok(app.doc.type.baseName === "Desktop", "(std) the type base layer is named Desktop (the designed scale)");
+  ok(app.typeMode === "base", "(std) the control stays on Desktop (nothing about the designed scale changed)");
   const opts = app._typeBaseOpts();
-  ok(opts.baseName === "Mobile" && opts.baseLast === true, "(std) _typeBaseOpts derives the named-base-last (desktop-first) emitter shape");
-  const cols = app._typeTokenColumns().map((c) => c.name);
-  ok(JSON.stringify(cols) === JSON.stringify(["Desktop", "Tablet", "Mobile"]), `(std) the type token matrix reads Desktop · Tablet · Mobile (got ${JSON.stringify(cols)})`);
+  ok(opts.baseName === "Desktop" && opts.baseLast === false, "(std) _typeBaseOpts derives Desktop-first (the designed scale IS Figma's default mode)");
+  const cols = app._typeTokenColumns();
+  ok(JSON.stringify(cols.map((c) => c.name)) === JSON.stringify(["Desktop", "Tablet", "Mobile"]), `(std) the type token matrix reads Desktop · Tablet · Mobile (got ${JSON.stringify(cols.map((c) => c.name))})`);
+  // the ratified law itself: Body/MD frozen across every column; the Display top strictly compresses.
+  const bodyAt = cols.map((c) => c.scale.categories.Body.MD.size);
+  ok(bodyAt.every((s) => s === bodyAt[0]), `(std) Body/MD is FROZEN across Desktop·Tablet·Mobile (${bodyAt.join("·")})`);
+  const dispTop = cols.map((c) => { const st = Object.values(c.scale.categories.Display); return st[st.length - 1].size; });
+  ok(dispTop[0] > dispTop[1] && dispTop[1] > dispTop[2], `(std) the Display top strictly compresses Desktop→Tablet→Mobile (${dispTop.join("→")})`);
 }
 const stdBH = (app.doc.geometry && app.doc.geometry.baseHeight) ?? 28;
 app.addStandardGeomModes(); flushRaf();
 {
-  const g = app.doc.geometry, ms = (g.modes || []), mob = Math.max(20, stdBH - 4);
-  ok(ms.length === 2 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([1280, 992]), `(std) Standard set creates Desktop(1280) + Tablet(992) geometry modes, desktop-first (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
-  // the base becomes the compressed ≤476 Mobile ramp (−4px base, zero contrast = the linear gear).
-  ok(g.baseHeight === mob && g.rampContrast === 0 && g.baseName === "Mobile", `(std) the base compresses to the Mobile ramp (baseHeight ${mob}, rampContrast 0, baseName Mobile — got ${g.baseHeight}, ${g.rampContrast}, ${g.baseName})`);
-  ok(ms[0].name === "Desktop" && ms[0].baseHeight === Math.min(48, mob + 4) && ms[0].rampContrast === 1, "(std) Desktop carries the original full ramp (height +4, contrast 1)");
-  ok(ms[1].name === "Tablet" && ms[1].baseHeight === Math.min(48, mob + 2) && ms[1].rampContrast === 0.5, "(std) Tablet sits midway (height +2, contrast 0.5)");
-  ok(app.geomMode === "base", "(std) the control lands on the base (the compression is the visible change)");
-  // the resolved columns: base = the compressed reference ramp; Desktop = the original full ramp.
+  const g = app.doc.geometry, ms = (g.modes || []);
+  ok(ms.length === 2 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([992, 476]), `(std) Standard set materializes Tablet(992) + Mobile(476) geometry modes (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
+  ok(g.baseHeight === stdBH && g.baseName === "Desktop", `(std) the designed ramp is UNTOUCHED and named Desktop (baseHeight ${stdBH} — got ${g.baseHeight}, ${g.baseName})`);
+  ok(ms[0].name === "Tablet" && ms[0].baseHeight === Math.max(20, stdBH - 2) && ms[1].name === "Mobile" && ms[1].baseHeight === Math.max(20, stdBH - 4), "(std) geometry modes derive DOWN (Tablet −2 · Mobile −4, floor 20)");
+  ok(app.geomMode === "base", "(std) the control stays on the base (the designed ramp)");
+  // the resolved columns: base(Desktop) = the original full ramp; Mobile strictly below it per step.
   const hcol = (k) => ["XS", "SM", "MD", "LG", "XL", "2XL"].map((n) => app._geomScaleFor(k).sizes[n].height);
-  if (stdBH === 28) ok(JSON.stringify(hcol("base")) === JSON.stringify([18, 20, 24, 28, 32, 36]) && JSON.stringify(hcol(ms[0].id)) === JSON.stringify([20, 24, 28, 36, 48, 64]), `(std) resolved columns match the responsive spec (base ${hcol("base")} · Desktop ${hcol(ms[0].id)})`);
-  // the Figma float plans emit the desktop-first moded collections: Desktop leads (= Figma's default mode),
-  // the renamed Mobile base rides LAST — and the responsive CSS keeps its mobile-first ascending cascade.
+  if (stdBH === 28) ok(JSON.stringify(hcol("base")) === JSON.stringify([20, 24, 28, 36, 48, 64]), `(std) the Desktop base keeps the original full ramp (got ${hcol("base")})`);
+  const mobCol = hcol(ms[1].id), deskCol = hcol("base");
+  ok(mobCol.every((h, i) => h <= deskCol[i]) && mobCol.some((h, i) => h < deskCol[i]), `(std) the Mobile ramp sits at-or-below Desktop per step (${mobCol.join("·")} vs ${deskCol.join("·")})`);
+  // the Figma float plans emit the desktop-first moded collections: Desktop (the designed scale) leads
+  // as the base = Figma's default mode; Tablet · Mobile follow.
   const plans = app._figmaFloatPlans();
   const typo = plans.find((p) => p.collection === "Typography"), geo = plans.find((p) => p.collection === "Geometry");
   ok(typo && JSON.stringify(typo.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && typo.defaultMode === "Desktop", `(std) the Typography float plan is [Desktop, Tablet, Mobile], default Desktop (got ${typo && JSON.stringify(typo.modes)})`);
   ok(geo && JSON.stringify(geo.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && geo.defaultMode === "Desktop", `(std) the Geometry float plan is [Desktop, Tablet, Mobile], default Desktop (got ${geo && JSON.stringify(geo.modes)})`);
 }
 {
-  // responsive CSS cascade: DESCENDING stored modes still emit ASCENDING @media blocks (mobile-first).
+  // responsive CSS re-anchors mobile-first: :root = the MOBILE scale, then ascending @media blocks up to
+  // the designed Desktop scale at 1280 (_typeCssArgs owns the assembly for the desktop-anchored shapes).
   const { typeTokensResponsiveCSS: rcss } = await import("../../src/engine/type.mjs");
-  const css = rcss(app._typeScaleFor("base"), app._typeModeScales());
+  const a = app._typeCssArgs(app._typeScaleFor("base"));
+  const css = rcss(a.root, a.modes);
   const at992 = css.indexOf("min-width: 992px"), at1280 = css.indexOf("min-width: 1280px");
-  ok(at992 > -1 && at1280 > at992, `(std) responsive type CSS emits ascending @media blocks regardless of desktop-first storage (992 @ ${at992}, 1280 @ ${at1280})`);
+  ok(at992 > -1 && at1280 > at992, `(std) responsive type CSS is mobile-first — :root=Mobile, @media 992 then 1280 (992 @ ${at992}, 1280 @ ${at1280})`);
+  ok(a.root.categories.Body.MD.size === app._typeScaleFor("base").categories.Body.MD.size, "(std) the CSS :root (Mobile) keeps Body/MD identical to the designed scale — the frozen-body law in CSS");
 }
 
 // ── report ──────────────────────────────────────────────────────────────────────────

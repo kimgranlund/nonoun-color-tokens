@@ -381,9 +381,13 @@ function clampType(t) {
   // breakpoint MODES (Phase 5) — each a named bodyBase override. OPTIONAL: only attach when present, so a
   // config without modes round-trips identically (the hydrate identity gate). Each mode = { id, name, bodyBase }.
   if (Array.isArray(t.modes) && t.modes.length) {
+    // a mode carries EITHER a bodyBase override (legacy custom modes) or a hierarchy-aware compression
+    // `factor` in (0,1] (the desktop-anchored Standard set) — attach each only when present, so both
+    // shapes round-trip identically.
+    const clampFactor = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 && n <= 1 ? { factor: Math.round(n * 1000) / 1000 } : {}; };
     const modes = t.modes
       .filter((m) => m && typeof m === "object" && typeof m.id === "string")
-      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", bodyBase: clampBody(m.bodyBase), ...clampMinWidth(m.minWidth) }));
+      .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", ...(Number.isFinite(Number(m.bodyBase)) ? { bodyBase: clampBody(m.bodyBase) } : {}), ...clampFactor(m.factor), ...clampMinWidth(m.minWidth) }));
     if (modes.length) out.modes = modes;
   }
   // baseName — the RENAMED base layer (the standard set writes "Mobile"; desktop-first order derives from

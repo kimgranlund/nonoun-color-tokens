@@ -3026,7 +3026,8 @@ class HctApp extends HTMLElement {
     const mode = this._effTypeMode();
     if (mode === "base") return t;
     const m = (t.modes || []).find((x) => x.id === mode);
-    return m ? { ...t, bodyBase: m.bodyBase } : t; // a deleted/unknown mode (incl. "compare") falls back to base
+    // a factor mode (the Standard set) keeps the doc bodyBase — the compression lives in the scale, not here.
+    return m ? { ...t, bodyBase: m.bodyBase ?? t.bodyBase } : t; // a deleted/unknown mode (incl. "compare") falls back to base
   }
   // the resolved type scale at the ACTIVE mode, WITH that mode's per-cell overrides (so the specimen +
   // inspector reflect the matrix edits). A deleted/unknown mode resolves through "base" in _typeScaleFor.
@@ -3046,7 +3047,7 @@ class HctApp extends HTMLElement {
     // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
     if (this.typeMode !== "base" && this.typeMode !== "compare" && !modes.some((m) => m.id === this.typeMode)) this.typeMode = "base";
     const baseItem = { id: "base", label: bn, title: `${bn} type scale · ${t.bodyBase ?? 16}px` };
-    const modeItems = modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: `${m.name || "Mode"} · ${m.bodyBase}px body` }));
+    const modeItems = modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: m.factor ? `${m.name || "Mode"} · display ×${Math.round(m.factor * 100)}% (body frozen)` : `${m.name || "Mode"} · ${m.bodyBase}px body` }));
     const items = [
       ...(baseLast ? [...modeItems, baseItem] : [baseItem, ...modeItems]),
       // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only the base, so only when ≥1 mode.
@@ -3058,23 +3059,25 @@ class HctApp extends HTMLElement {
       this.segmented(items, this.typeMode, (id) => { this.typeMode = id; this.render(); },
         { cls: "canvas-seg", ariaLabel: "Typography breakpoint mode", role: "group", idPrefix: "tmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named scale with its own body size", onclick: () => this.addTypeMode() }),
-      // one-click standard web set — only while no modes exist (it would duplicate names otherwise).
-      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard breakpoints — Desktop 1280 · Tablet 992 · Mobile ≤476 (your Base scale, renamed), body stepped +1px per rung. Desktop leads, so it becomes Figma's default mode.", onclick: () => this.addStandardTypeModes() })] : []),
+      // one-click standard set — only while no modes exist (it would duplicate names otherwise). It
+      // MATERIALIZES the intrinsic synthesized modes as editable doc modes (same values, same law).
+      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Materialize the standard breakpoints for editing — your scale IS Desktop (1280, Figma's default mode); Tablet 992 and Mobile ≤476 derive down with body frozen and display compressed (×83% / ×67% at the top of the ramp).", onclick: () => this.addStandardTypeModes() })] : []),
     );
   }
-  // addStandardTypeModes — the standard breakpoint set in one click: Desktop (min-width 1280, body +2)
-  // and Tablet (992, +1) stored DESKTOP-FIRST, with the base scale renamed "Mobile" (the ≤476 layer —
-  // that's why 476 has no mode of its own). The stored order IS the display/Figma order (Desktop · Tablet ·
-  // Mobile, base last); the responsive CSS emitters sort ascending internally, so the cascade stays mobile-first.
+  // addStandardTypeModes — materialize the intrinsic standard set as editable doc modes (Kim's ratified
+  // desktop-anchored law, 2026-07-10): the designed scale IS Desktop (the base, first, Figma's default
+  // mode — baseName "Desktop"); Tablet (992) and Mobile (≤476, marker minWidth 476) derive DOWN via the
+  // hierarchy-aware `factor` (body frozen, display ×5/6 / ×2/3). Same values the synthesized (no-modes)
+  // shape exports — committing just makes them matrix-editable. The responsive CSS re-anchors via
+  // _typeCssArgs (root = Mobile, @media up to Desktop), so the mobile-first cascade holds.
   addStandardTypeModes() {
-    const bb = (this.doc.type && this.doc.type.bodyBase) ?? 16;
     const seed = Date.now().toString(36);
-    const rungs = [{ name: "Desktop", w: 1280, bump: 2 }, { name: "Tablet", w: 992, bump: 1 }];
-    this.typeMode = "tm-" + seed + "-0"; // land on Desktop (the first new mode)
+    const rungs = [{ name: "Tablet", w: 992, factor: 5 / 6 }, { name: "Mobile", w: 476, factor: 2 / 3 }];
+    this.typeMode = "base"; // stay on Desktop (the designed scale — nothing about it changed)
     this.commit((d) => {
-      d.type = { ...(d.type || DEFAULT_TYPE), baseName: "Mobile" };
+      d.type = { ...(d.type || DEFAULT_TYPE), baseName: "Desktop" };
       const modes = d.type.modes ? [...d.type.modes] : [];
-      rungs.forEach((r, i) => modes.push({ id: `tm-${seed}-${i}`, name: r.name, bodyBase: bb + r.bump, minWidth: r.w }));
+      rungs.forEach((r, i) => modes.push({ id: `tm-${seed}-${i}`, name: r.name, factor: r.factor, minWidth: r.w }));
       d.type.modes = modes;
     });
   }
@@ -3301,11 +3304,13 @@ class HctApp extends HTMLElement {
     return Object.keys(out).length ? out : undefined;
   }
   // _typeScaleFor(modeKey) — the resolved typeScale for a mode WITH that mode's per-cell overrides applied.
-  // "base" → doc.type; a mode id → {...doc.type, bodyBase: mode.bodyBase}. The single place a type scale is
-  // built so overrides reach the matrix, the specimen, and every export consistently.
+  // "base" → doc.type; a mode id → the mode's own levers layered on doc.type: EITHER a bodyBase override
+  // (legacy custom modes) or a hierarchy-aware compression `factor` (the Standard set: Tablet 5/6 ·
+  // Mobile 2/3 — body frozen, display compressed). The single place a type scale is built so overrides
+  // reach the matrix, the specimen, and every export consistently.
   _typeScaleFor(modeKey) {
     const t = this.doc.type || DEFAULT_TYPE;
-    const base = modeKey === "base" ? t : (() => { const m = (t.modes || []).find((x) => x.id === modeKey); return m ? { ...t, bodyBase: m.bodyBase } : t; })();
+    const base = modeKey === "base" ? t : (() => { const m = (t.modes || []).find((x) => x.id === modeKey); return m ? { ...t, bodyBase: m.bodyBase ?? t.bodyBase, modeFactor: m.factor ?? 1 } : t; })();
     return typeScale({ ...base, overrides: this._typeOverridesFor(modeKey) });
   }
   // _geomOverridesFor(modeKey) — the flat { "<size>": height } slice for one mode (the suffix stripped).
@@ -3324,9 +3329,11 @@ class HctApp extends HTMLElement {
   // overrides applied, COMPOSED with the type scale at the SAME mode (so the shared `font` tracks too).
   _geomScaleFor(modeKey) {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    // a mode's rampContrast is EXPLICIT (default 1 = the full ramp) — it never inherits Base's, so a
-    // compressed Base can't silently flatten a desktop breakpoint.
-    const cfg = modeKey === "base" ? g : (() => { const m = (g.modes || []).find((x) => x.id === modeKey); return m ? { ...g, baseHeight: m.baseHeight, rampContrast: typeof m.rampContrast === "number" ? m.rampContrast : 1 } : g; })();
+    // a mode's rampContrast: mode-explicit wins; otherwise it INHERITS the doc's (the desktop-anchored
+    // shape — base isn't compressed, so inheritance is natural). Legacy #251 committed sets always carry
+    // explicit per-mode values, so they resolve identically; a legacy compressed base (contrast 0) with a
+    // silent mode keeps the old full-ramp default via the ?? 1 tail.
+    const cfg = modeKey === "base" ? g : (() => { const m = (g.modes || []).find((x) => x.id === modeKey); return m ? { ...g, baseHeight: m.baseHeight, rampContrast: m.rampContrast ?? ((g.baseName || "Base") === "Desktop" ? g.rampContrast : undefined) ?? 1 } : g; })();
     return geomScale(cfg, { typeScale: this._typeScaleFor(modeKey), overrides: this._geomOverridesFor(modeKey) });
   }
 
@@ -3396,8 +3403,8 @@ class HctApp extends HTMLElement {
     const baseCol = { id: "base", modeKey: "base", name: bn, minWidth: null, scale: this._typeScaleFor("base") };
     const modes = (t.modes || [])
       .map((m) => ({ id: m.id, modeKey: m.id, name: m.name || "Mode", minWidth: Number(m.minWidth) || 0, scale: this._typeScaleFor(m.id) }))
-      // a named base reads desktop-first (widest → base last); the legacy shape stays Base-first ascending.
-      .sort((a, b) => (baseLast ? b.minWidth - a.minWidth : a.minWidth - b.minWidth));
+      // a named base reads desktop-first (widest first); the legacy "Base" shape stays ascending.
+      .sort((a, b) => (bn === "Base" ? a.minWidth - b.minWidth : b.minWidth - a.minWidth));
     return baseLast ? [...modes, baseCol] : [baseCol, ...modes];
   }
 
@@ -3483,8 +3490,8 @@ class HctApp extends HTMLElement {
     const baseCol = { id: "base", modeKey: "base", name: bn, minWidth: null, scale: this._geomScaleFor("base") };
     const modes = (g.modes || [])
       .map((m) => ({ id: m.id, modeKey: m.id, name: m.name || "Mode", minWidth: Number(m.minWidth) || 0, scale: this._geomScaleFor(m.id) }))
-      // a named base reads desktop-first (widest → base last); the legacy shape stays Base-first ascending.
-      .sort((a, b) => (baseLast ? b.minWidth - a.minWidth : a.minWidth - b.minWidth));
+      // a named base reads desktop-first (widest first); the legacy "Base" shape stays ascending.
+      .sort((a, b) => (bn === "Base" ? a.minWidth - b.minWidth : b.minWidth - a.minWidth));
     return baseLast ? [...modes, baseCol] : [baseCol, ...modes];
   }
 
@@ -5381,9 +5388,9 @@ class HctApp extends HTMLElement {
     const ut = { ...u, prefix: this._typePrefix() }; // + the naming-scheme prefix for the type CSS
     const ug = { ...u, prefix: this._geomPrefix() }; // + the naming-scheme prefix for the geometry CSS
     const SYSTEM_CODE = {
-      "type-css": () => typeTokensResponsiveCSS(typeSc, this._typeModeScales(), ut),
+      "type-css": () => (() => { const a = this._typeCssArgs(typeSc); return typeTokensResponsiveCSS(a.root, a.modes, ut); })(),
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
-      "geom-css": () => geomTokensResponsiveCSS(geomSc, this._geomModeScales(), ug),
+      "geom-css": () => (() => { const a = this._geomCssArgs(geomSc); return geomTokensResponsiveCSS(a.root, a.modes, ug); })(),
       "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
       // the Design System export — the universal-dialect DESIGN.md core + tokens.json (the LLM generation
       // system); the component previews ride the Download-All bundle only (a folder, not a single preview).
@@ -5650,7 +5657,7 @@ class HctApp extends HTMLElement {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
       const tDtcg = JSON.stringify(typeTokensDTCG(tsc, u), null, 2); // the chosen unit — for the typography/ folder
       files.push(
-        { name: "typography/type.css", data: typeTokensResponsiveCSS(tsc, this._typeModeScales(), { ...u, prefix: this._typePrefix() }) },
+        { name: "typography/type.css", data: (() => { const a = this._typeCssArgs(tsc); return typeTokensResponsiveCSS(a.root, a.modes, { ...u, prefix: this._typePrefix() }); })() },
         { name: "typography/type.tokens.json", data: tDtcg },
         ...this._typeModeDTCGFiles("typography/type", u),
         { name: "figma/type.tokens.json", data: JSON.stringify(typeTokensDTCG(tsc), null, 2) }, // ALWAYS px — Figma import (a tokens plugin)
@@ -5666,7 +5673,7 @@ class HctApp extends HTMLElement {
       const gsc = this._geomScaleFor("base"); // composed with the type scale (the per-step `font` is shared); override-aware (Phase 3)
       const gDtcg = JSON.stringify(geomTokensDTCG(gsc, u), null, 2); // the chosen unit — for the geometry/ folder
       files.push(
-        { name: "geometry/geometry.css", data: geomTokensResponsiveCSS(gsc, this._geomModeScales(), { ...u, prefix: this._geomPrefix() }) },
+        { name: "geometry/geometry.css", data: (() => { const a = this._geomCssArgs(gsc); return geomTokensResponsiveCSS(a.root, a.modes, { ...u, prefix: this._geomPrefix() }); })() },
         { name: "geometry/geometry.tokens.json", data: gDtcg },
         ...this._geomModeDTCGFiles("geometry/geometry", u),
         { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
@@ -6355,52 +6362,70 @@ class HctApp extends HTMLElement {
     const key = mode === "base" || !(g.modes || []).some((m) => m.id === mode) ? "base" : mode;
     return this._geomScaleFor(key);
   }
-  // the breakpoint-mode scales for the responsive CSS + Figma exports — [{ name, minWidth, scale }].
-  // Size modes are INTRINSIC, the same technique as Color's Light/Dark: when the doc carries configured
-  // modes they resolve override-aware (via _typeScaleFor); when it carries NONE, the standard
-  // Desktop (1280, body +2) / Tablet (992, body +1) pair is SYNTHESIZED from the base config — the same
-  // stepping the Standard-set button commits — and the base rides as "Mobile" (_typeBaseOpts). So every
-  // export and every Figma apply carries Desktop · Tablet · Mobile with zero setup, exactly as every
-  // color export carries Light + Dark. Configuring your own modes (＋ / Standard set) takes full manual
-  // control and switches the whole surface to the doc's modes.
+  // the breakpoint-mode scales for the Figma exports — [{ name, minWidth, scale }]. Size modes are
+  // INTRINSIC, the same technique as Color's Light/Dark — and DESKTOP-ANCHORED (Kim's ratified law,
+  // 2026-07-10): the scale you design IS Desktop; Tablet/Mobile derive DOWN via the hierarchy-aware
+  // modeFactor curve (body frozen, Display fully compressed — 5/6 at Tablet, 2/3 at Mobile). When the
+  // doc carries configured modes they resolve override-aware (via _typeScaleFor, incl. factor modes);
+  // when it carries NONE the pair is synthesized — so every export/apply carries Desktop · Tablet ·
+  // Mobile with zero setup. Configuring your own modes (＋) takes full manual control.
   _typeModeScales() {
     const t = this.doc.type || DEFAULT_TYPE;
     if ((t.modes || []).length) return t.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._typeScaleFor(m.id) }));
-    const bb = t.bodyBase ?? 16;
     return [
-      { name: "Desktop", minWidth: 1280, scale: typeScale({ ...t, bodyBase: bb + 2 }) },
-      { name: "Tablet", minWidth: 992, scale: typeScale({ ...t, bodyBase: bb + 1 }) },
+      { name: "Tablet", minWidth: 992, scale: typeScale({ ...t, modeFactor: 5 / 6 }) },
+      { name: "Mobile", minWidth: 476, scale: typeScale({ ...t, modeFactor: 2 / 3 }) },
     ];
   }
   _geomModeScales() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     if ((g.modes || []).length) return g.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._geomScaleFor(m.id) }));
-    // synthesized: heights step +2/+4 (capped like every mode height) and each rung composes the TYPE
-    // scale at the SAME rung, so the shared `font` tracks the synthesized type modes.
+    // synthesized, Desktop-anchored: the doc ramp IS Desktop; Tablet/Mobile derive DOWN (heights −2/−4,
+    // floor 20) and each rung composes the TYPE scale at the SAME rung so the shared `font` tracks.
     const t = this.doc.type || DEFAULT_TYPE;
-    const bh = g.baseHeight ?? 28, bb = t.bodyBase ?? 16;
-    const synth = (bump, tBump) => geomScale({ ...g, baseHeight: Math.min(48, bh + bump) }, { typeScale: typeScale({ ...t, bodyBase: bb + tBump }) });
+    const bh = g.baseHeight ?? 28;
+    const synth = (drop, mf) => geomScale({ ...g, baseHeight: Math.max(20, bh - drop) }, { typeScale: typeScale({ ...t, modeFactor: mf }) });
     return [
-      { name: "Desktop", minWidth: 1280, scale: synth(4, 2) },
-      { name: "Tablet", minWidth: 992, scale: synth(2, 1) },
+      { name: "Tablet", minWidth: 992, scale: synth(2, 5 / 6) },
+      { name: "Mobile", minWidth: 476, scale: synth(4, 2 / 3) },
     ];
   }
-  // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The base
-  // is "Mobile", placed LAST (desktop-first canon: Figma's default mode is the FIRST mode, so Desktop
-  // leads) in BOTH mode shapes that carry the standard set — synthesized (no doc modes) or committed
-  // (doc.baseName, the Standard-set button). Only a doc with its OWN configured modes and no baseName
-  // keeps the legacy "Base"-first shape (full manual control).
+  // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The
+  // desktop-first canon: Figma's default mode is the FIRST mode, so the DESIGNED scale leads as
+  // "Desktop" (synthesized shape and the factor-committed Standard set both), and only a base named
+  // "Mobile" (the legacy #251 committed-geometry shape) rides LAST. A doc with its OWN configured
+  // modes and no baseName keeps the legacy "Base"-first shape (full manual control).
   _typeBaseOpts() {
     const t = this.doc.type || DEFAULT_TYPE;
-    const synthesized = !(t.modes || []).length; // the intrinsic standard set ⇒ the base IS Mobile
-    const n = (t.baseName || (synthesized ? "Mobile" : "Base")).trim() || "Base";
-    return { baseName: n, baseLast: n.toLowerCase() !== "base" };
+    const synthesized = !(t.modes || []).length; // the intrinsic set ⇒ the designed scale IS Desktop
+    const n = (t.baseName || (synthesized ? "Desktop" : "Base")).trim() || "Base";
+    return { baseName: n, baseLast: n.toLowerCase() === "mobile" };
   }
   _geomBaseOpts() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     const synthesized = !(g.modes || []).length;
-    const n = (g.baseName || (synthesized ? "Mobile" : "Base")).trim() || "Base";
-    return { baseName: n, baseLast: n.toLowerCase() !== "base" };
+    const n = (g.baseName || (synthesized ? "Desktop" : "Base")).trim() || "Base";
+    return { baseName: n, baseLast: n.toLowerCase() === "mobile" };
+  }
+  // _typeCssArgs/_geomCssArgs — the RESPONSIVE-CSS assembly, which is always MOBILE-FIRST regardless of
+  // the design anchor: for a Desktop-anchored doc (synthesized, or committed with baseName "Desktop")
+  // the :root block carries the MOBILE scale and the designed scale enters as a Desktop @media block at
+  // 1280; the legacy shapes keep root = the doc base. Consumed by every responsive-CSS call site.
+  _typeCssArgs(baseScale) {
+    const { baseName } = this._typeBaseOpts();
+    const modes = this._typeModeScales();
+    if (baseName.toLowerCase() !== "desktop") return { root: baseScale, modes };
+    const mobile = modes.find((m) => String(m.name).toLowerCase() === "mobile");
+    if (!mobile) return { root: baseScale, modes };
+    return { root: mobile.scale, modes: [...modes.filter((m) => m !== mobile), { name: "Desktop", minWidth: 1280, scale: baseScale }] };
+  }
+  _geomCssArgs(baseScale) {
+    const { baseName } = this._geomBaseOpts();
+    const modes = this._geomModeScales();
+    if (baseName.toLowerCase() !== "desktop") return { root: baseScale, modes };
+    const mobile = modes.find((m) => String(m.name).toLowerCase() === "mobile");
+    if (!mobile) return { root: baseScale, modes };
+    return { root: mobile.scale, modes: [...modes.filter((m) => m !== mobile), { name: "Desktop", minWidth: 1280, scale: baseScale }] };
   }
   // per-breakpoint DTCG files — one valid standalone DTCG per mode that has a minWidth, keyed by the width
   // (self-documenting + collision-free). No-width modes are preview-only, so they don't export (mirrors CSS).
@@ -6433,26 +6458,26 @@ class HctApp extends HTMLElement {
       this.segmented(items, this.geomMode, (id) => { this.geomMode = id; this.render(); },
         { cls: "canvas-seg", ariaLabel: "Geometry breakpoint mode", role: "group", idPrefix: "gmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named ramp with its own base control height", onclick: () => this.addGeomMode() }),
-      // one-click standard web set — only while no modes exist (mirrors the Typography control).
-      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard breakpoints — Desktop 1280 (your current full ramp) · Tablet 992 · Mobile ≤476 (Base, compressed −4px, renamed). Desktop leads, so it becomes Figma's default mode. One undo step.", onclick: () => this.addStandardGeomModes() })] : []),
+      // one-click standard set — only while no modes exist (mirrors the Typography control). It
+      // MATERIALIZES the intrinsic synthesized modes as editable doc modes (same values, same law).
+      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Materialize the standard breakpoints for editing — your ramp IS Desktop (1280, Figma's default mode); Tablet 992 (heights −2) and Mobile ≤476 (heights −4) derive down. One undo step.", onclick: () => this.addStandardGeomModes() })] : []),
     );
   }
-  // addStandardGeomModes — the standard breakpoint set in one click, RESPONSIVE by construction: the
-  // current design (full geometric ramp) becomes the Desktop (1280) column, the base becomes the compressed
-  // ≤476 "Mobile" ramp (baseHeight −4, rampContrast 0 — the expressive band loses its gear: at bh 24 that's
-  // 18·20·24·28·32·36), and Tablet (992) sits midway (height +2, contrast 0.5). Stored DESKTOP-FIRST — the
-  // display/Figma order; the responsive CSS emitters sort ascending internally (mobile-first cascade holds).
-  // One commit = one undo step restores the flat pre-click design.
+  // addStandardGeomModes — materialize the intrinsic standard set as editable doc modes (the ratified
+  // desktop-anchored law): the designed ramp IS Desktop (the base, first, Figma's default mode —
+  // baseName "Desktop", nothing about it changes); Tablet (992, heights −2) and Mobile (≤476, marker
+  // minWidth 476, heights −4, floor 20) derive DOWN — the same values the synthesized (no-modes) shape
+  // exports; committing just makes them matrix-editable. Responsive CSS re-anchors via _geomCssArgs
+  // (root = Mobile, @media up to Desktop). One commit = one undo step.
   addStandardGeomModes() {
     const bh = (this.doc.geometry && this.doc.geometry.baseHeight) ?? 28;
-    const mob = Math.max(20, bh - 4);
     const seed = Date.now().toString(36);
-    const rungs = [{ name: "Desktop", w: 1280, bump: 4, contrast: 1 }, { name: "Tablet", w: 992, bump: 2, contrast: 0.5 }];
-    this.geomMode = "base"; // land on the base so the compression is the first thing seen (and undoable)
+    const rungs = [{ name: "Tablet", w: 992, drop: 2 }, { name: "Mobile", w: 476, drop: 4 }];
+    this.geomMode = "base"; // stay on Desktop (the designed ramp — nothing about it changed)
     this.commit((d) => {
-      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), baseHeight: mob, rampContrast: 0, baseName: "Mobile" };
+      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), baseName: "Desktop" };
       const modes = d.geometry.modes ? [...d.geometry.modes] : [];
-      rungs.forEach((r, i) => modes.push({ id: `gm-${seed}-${i}`, name: r.name, baseHeight: Math.min(48, mob + r.bump), rampContrast: r.contrast, minWidth: r.w }));
+      rungs.forEach((r, i) => modes.push({ id: `gm-${seed}-${i}`, name: r.name, baseHeight: Math.max(20, bh - r.drop), minWidth: r.w }));
       d.geometry.modes = modes;
     });
   }
