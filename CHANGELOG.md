@@ -18,17 +18,17 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   **Desktop becomes Figma's default mode**; the canvas Mode chips and the token matrices read the same
   way. Type steps body +2/+1 px; Geometry lands the original full ramp on Desktop (the base compresses
   −4 px, Tablet sits midway). Existing files convert on re-apply — the plugin renames the old `Base`
-  default mode to `Desktop` and adds the rest by name. (#252)
+  default mode to `Desktop` and adds the rest by name. (#251)
 - **Responsive CSS is order-proof.** `typeTokensResponsiveCSS`/`geomTokensResponsiveCSS` now emit
   `@media` blocks ascending by min-width regardless of how the doc stores its modes — a desktop-first
   mode list can no longer break the mobile-first cascade. The Figma emitters gain
   `{ baseName, baseLast }` (a renamed base layer, optionally ordered last); the mode-apply validator
   accepts any non-empty default mode name instead of requiring the literal `Base`. A doc without
-  breakpoint modes is byte-identical to before. (#252)
+  breakpoint modes is byte-identical to before. (#251)
 
 #### Fixed
 - The CHANGELOG's own header still attributed the product ("Ultimate Tokens by NONOUN") — the one
-  "by" line the #250 debrand missed. (#252)
+  "by" line the #250 debrand missed. (#251)
 
 ### 2026-07-09
 
