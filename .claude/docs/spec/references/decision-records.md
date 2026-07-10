@@ -274,7 +274,13 @@ Format: Context → Decision → Rationale → Consequences → Status.
   CSS selectors keep matching), because there the compatibility *is* free. The separately-published **Color
   Tokens Semantic Binder** plugin keeps its own id (`color-tokens-semantic-binder`) for the same reason in
   reverse: renaming it would orphan *its* data and its Figma listing, and it gains nothing.
-- **Status.** DECIDED.
+- **AMENDED 2026-07-09 (#250).** The alias was **retired**. "Free" priced only the code; it ignored that the
+  alias keeps the retired brand alive in the DOM, in `styles.css`, and in every generated bundle — which the
+  debrand (ADR-015) forbids. An embed on the old tag now renders nothing: a visible failure, which beats a
+  silently-styled ghost element. The **storage** half of this ADR is untouched — `migrateStorageKeys()`
+  still chains the old prefixes, because that carries a user's saved palettes and dropping it deletes work.
+  The tag was cosmetic compatibility; the keys are data compatibility. Only the first was expendable.
+- **Status.** DECIDED (consequences amended).
 
 ---
 
@@ -302,9 +308,11 @@ Format: Context → Decision → Rationale → Consequences → Status.
   claim about who makes this. So `test/repo/branding.mjs` runs in `npm test` and fails on `NONOUN`, on any
   `nonoun.io` URL, and on the pre-rename identifier outside a named back-compat allowlist. `voice-check.mjs`
   raises the same word to **ERROR** in copy.
-- **What still, deliberately, names the old identifier.** The `<nonoun-color-tokens>` element tag and the
-  `migrateStorageKeys()` prefix chain: back-compat machinery, not branding (see ADR-014). The allowlist in
-  the gate is the boundary, and a *new* file may not quietly join it.
+- **What still, deliberately, names the old identifier.** Only the `migrateStorageKeys()` prefix chain —
+  **data** compatibility, which carries a user's saved palettes across the rename (see ADR-014). The
+  `<nonoun-color-tokens>` element tag was **cosmetic** compatibility and went with the brand: a tag is a
+  name the DOM says out loud. The allowlist in the gate is the boundary, and a *new* file may not quietly
+  join it.
 - **Status.** DECIDED.
 
 ---

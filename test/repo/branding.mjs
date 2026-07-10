@@ -8,10 +8,11 @@
 // TWO shapes are banned, and one is deliberately allowed:
 //   BANNED  `NONOUN` (any case-exact uppercase run) — the maker name, in code, copy, or metadata.
 //   BANNED  `nonoun.io` — every URL and the support email; nothing there resolves anymore.
-//   ALLOWED `nonoun-color-tokens` — the pre-rename ELEMENT TAG and localStorage prefixes. This is
-//           back-compat machinery, not branding: removing it silently breaks pre-rename embeds and drops
-//           the migration chain. It is confined to the allowlist below, and the allowlist is the point:
-//           a NEW file may not quietly acquire the old identifier.
+//   ALLOWED `nonoun-color-tokens` — the pre-rename localStorage PREFIXES only. That is DATA compatibility:
+//           migrateStorageKeys() uses them to carry a user's saved palettes across the rename, and dropping
+//           it deletes their work. The pre-rename element TAG was COSMETIC compatibility and is gone
+//           (ADR-015) — a tag is a name the DOM says out loud. The allowlist below is the boundary, and it
+//           is the point: a NEW file may not quietly acquire the old identifier.
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -23,11 +24,10 @@ const FAIL = (file, msg) => { failed++; console.log(`  ✗ ${file}: ${msg}`); };
 
 // Files permitted to name the pre-rename identifier, each because it IMPLEMENTS back-compat.
 const LEGACY_TAG_ALLOWLIST = new Set([
-  "src/ui/app.js",              // the deprecated <nonoun-color-tokens> alias + LEGACY_STORAGE_PREFIXES
-  "src/ui/styles.css",          // the alias's tag-keyed selectors (an unstyled alias is a fake alias)
+  "src/ui/app.js",              // LEGACY_STORAGE_PREFIXES — migrateStorageKeys() carries saved palettes
   "src/ui/persist.js",          // the storage-key rename comment
   "figma/plugin/code.js",       // the ADR-014 orphaning comment
-  "test/ui/headless-boot.mjs",  // the (mig) migration + alias assertions
+  "test/ui/headless-boot.mjs",  // the (mig) storage-migration assertions + the alias-is-gone assertion
   "test/figma/plugin.mjs",      // the orphaned-pluginData gate
 ]);
 

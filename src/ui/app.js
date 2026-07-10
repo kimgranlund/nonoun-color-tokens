@@ -7134,12 +7134,11 @@ class HctApp extends HTMLElement {
   }
 }
 
+// The one tag. The pre-rename alias was retired with the maker brand (ADR-015): an embed on the old tag
+// now renders nothing, which is the intended, visible failure — a silently-styled ghost element would be
+// worse. The localStorage prefix chain in migrateStorageKeys() is a SEPARATE concern and stays: it carries
+// real saved palettes across the rename, and dropping it would delete a user's work.
 customElements.define("ultimate-tokens", HctApp);
-// DEPRECATED ALIAS — the element shipped as <nonoun-color-tokens> before the product rename, and the
-// single-file bundle is embeddable, so a page in the wild may still use the old tag. A custom-element
-// CLASS may only be registered once, hence the trivial subclass. Remove once no embed uses it.
-class DeprecatedColorTokensAlias extends HctApp {}
-customElements.define("nonoun-color-tokens", DeprecatedColorTokensAlias);
 
 // expose a couple of pure helpers for any console poking / future tests.
 export { HctApp, contrastRatio };

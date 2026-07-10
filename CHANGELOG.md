@@ -15,6 +15,12 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   "by" line, no monogram. The `nonoun.io` surface is gone: **support is GitHub Issues**, **docs are the
   README**, **billing is Lemon Squeezy's own customer portal**. Every replacement link resolves today; the
   alternative was a domain nobody owns, shipping 404s behind a nicer name.
+- **The `<nonoun-color-tokens>` element tag.** The deprecated alias registered alongside `<ultimate-tokens>`
+  is retired: there is **one tag**. Keeping it looked free, but an alias keeps the retired brand alive in
+  the DOM and in every generated bundle. An embed on the old tag now renders nothing — a visible failure,
+  which beats a silently-styled ghost. `migrateStorageKeys()` is untouched: the tag was *cosmetic*
+  compatibility, the storage prefixes are *data* compatibility, and only the first was expendable.
+  (ADR-014 amended, #250)
 - **The "N" monogram**, which could not be renamed away because it *was* the letterform. `brandMark()` and
   the eight `ico-nonoun-*` assets are deleted; the favicon set is regenerated from a brand-neutral mark —
   four tonal swatches, saying what the product is rather than who made it. The header shows the wordmark

@@ -128,7 +128,7 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => "" });
 await import("../../src/ui/app.js");
 const App = customElements.get("ultimate-tokens");
 ok(!!App, "custom element ultimate-tokens defined");
-ok(!!customElements.get("nonoun-color-tokens"), "the deprecated <nonoun-color-tokens> alias is still registered (pre-rename embeds keep working)");
+ok(!customElements.get("nonoun-color-tokens"), "the pre-rename <nonoun-color-tokens> alias is NOT registered — one tag only (ADR-015)");
 
 const app = new App();
 app.classList = new ClassList();

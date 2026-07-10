@@ -7,6 +7,9 @@
 - **The nonoun.io surface** → support is **GitHub Issues**, docs are the **repo README**, billing is
   **Lemon Squeezy's customer portal**. Every replacement resolves today. The unbuilt hosted-MCP / magic-link
   URLs became `<APP_DOMAIN>` / `<MCP_DOMAIN>` placeholders — Phase B must acquire a domain, not inherit one.
+- **The element tag**: the deprecated `<nonoun-color-tokens>` alias is retired — one tag, `<ultimate-tokens>`.
+  Its CSS selectors collapse to a single tag too. `migrateStorageKeys()` stays (data compat ≠ cosmetic
+  compat); ADR-014's "the alias stays, compatibility is free" consequence is amended accordingly.
 - **The mark** could not be renamed away; it WAS the "N" letterform. `brandMark()` + the eight
   `ico-nonoun-*` assets deleted; favicon/og regenerated from a neutral four-swatch mark.
 - **The voice platform** kept "no nouns, just verbs" (load-bearing on its own) and dropped the etymology it
