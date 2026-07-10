@@ -3036,16 +3036,20 @@ class HctApp extends HTMLElement {
     const key = mode === "base" || !(t.modes || []).some((m) => m.id === mode) ? "base" : mode;
     return this._typeScaleFor(key);
   }
-  // the Mode control in the Typography canvas header: Base + each breakpoint, plus "+" to add one.
+  // the Mode control in the Typography canvas header: the base layer + each breakpoint, plus "+" to add one.
+  // A NAMED base (doc.type.baseName, e.g. "Mobile" — the standard set) renders LAST: the canonical order is
+  // desktop-first (Desktop · Tablet · Mobile), matching the Figma mode-column order the emitters produce.
   typeModeControl() {
     const t = this.doc.type || DEFAULT_TYPE;
     const modes = t.modes || [];
+    const { baseName: bn, baseLast } = this._typeBaseOpts();
     // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
     if (this.typeMode !== "base" && this.typeMode !== "compare" && !modes.some((m) => m.id === this.typeMode)) this.typeMode = "base";
+    const baseItem = { id: "base", label: bn, title: `${bn} type scale · ${t.bodyBase ?? 16}px` };
+    const modeItems = modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: `${m.name || "Mode"} · ${m.bodyBase}px body` }));
     const items = [
-      { id: "base", label: "Base", title: `Base type scale · ${t.bodyBase ?? 16}px` },
-      ...modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: `${m.name || "Mode"} · ${m.bodyBase}px body` })),
-      // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only Base, so only when ≥1 mode.
+      ...(baseLast ? [...modeItems, baseItem] : [baseItem, ...modeItems]),
+      // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only the base, so only when ≥1 mode.
       ...(modes.length ? [{ id: "compare", label: "Compare", title: "All breakpoints side by side" }] : []),
     ];
     return h(
@@ -3055,21 +3059,22 @@ class HctApp extends HTMLElement {
         { cls: "canvas-seg", ariaLabel: "Typography breakpoint mode", role: "group", idPrefix: "tmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named scale with its own body size", onclick: () => this.addTypeMode() }),
       // one-click standard web set — only while no modes exist (it would duplicate names otherwise).
-      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard web breakpoints — 768 · 992 · 1280 · 1540, each with a stepped body size (Base stays your ≤476 mobile scale)", onclick: () => this.addStandardTypeModes() })] : []),
+      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard breakpoints — Desktop 1280 · Tablet 992 · Mobile ≤476 (your Base scale, renamed), body stepped +1px per rung. Desktop leads, so it becomes Figma's default mode.", onclick: () => this.addStandardTypeModes() })] : []),
     );
   }
-  // addStandardTypeModes — the standard web breakpoint set in one click: four modes at min-widths
-  // 768/992/1280/1540, bodyBase stepping +1px per rung from the current Base (Base itself stays the
-  // mobile ≤476 scale — that's why 476 has no mode of its own). Names are the widths.
+  // addStandardTypeModes — the standard breakpoint set in one click: Desktop (min-width 1280, body +2)
+  // and Tablet (992, +1) stored DESKTOP-FIRST, with the base scale renamed "Mobile" (the ≤476 layer —
+  // that's why 476 has no mode of its own). The stored order IS the display/Figma order (Desktop · Tablet ·
+  // Mobile, base last); the responsive CSS emitters sort ascending internally, so the cascade stays mobile-first.
   addStandardTypeModes() {
     const bb = (this.doc.type && this.doc.type.bodyBase) ?? 16;
     const seed = Date.now().toString(36);
-    const rungs = [768, 992, 1280, 1540];
-    this.typeMode = "tm-" + seed + "-0"; // land on the first new mode
+    const rungs = [{ name: "Desktop", w: 1280, bump: 2 }, { name: "Tablet", w: 992, bump: 1 }];
+    this.typeMode = "tm-" + seed + "-0"; // land on Desktop (the first new mode)
     this.commit((d) => {
-      d.type = { ...(d.type || DEFAULT_TYPE) };
+      d.type = { ...(d.type || DEFAULT_TYPE), baseName: "Mobile" };
       const modes = d.type.modes ? [...d.type.modes] : [];
-      rungs.forEach((w, i) => modes.push({ id: `tm-${seed}-${i}`, name: String(w), bodyBase: bb + i + 1, minWidth: w }));
+      rungs.forEach((r, i) => modes.push({ id: `tm-${seed}-${i}`, name: r.name, bodyBase: bb + r.bump, minWidth: r.w }));
       d.type.modes = modes;
     });
   }
@@ -3387,11 +3392,13 @@ class HctApp extends HTMLElement {
   // the value at that step × that mode. Built via _typeScaleFor so overrides match the specimen + exports.
   _typeTokenColumns() {
     const t = this.doc.type || DEFAULT_TYPE; // the DOCUMENT base — mode-independent (NOT _activeType, which tracks the header Mode selector)
-    const cols = [{ id: "base", modeKey: "base", name: "Base", minWidth: null, scale: this._typeScaleFor("base") }];
+    const { baseName: bn, baseLast } = this._typeBaseOpts();
+    const baseCol = { id: "base", modeKey: "base", name: bn, minWidth: null, scale: this._typeScaleFor("base") };
     const modes = (t.modes || [])
       .map((m) => ({ id: m.id, modeKey: m.id, name: m.name || "Mode", minWidth: Number(m.minWidth) || 0, scale: this._typeScaleFor(m.id) }))
-      .sort((a, b) => a.minWidth - b.minWidth);
-    return cols.concat(modes);
+      // a named base reads desktop-first (widest → base last); the legacy shape stays Base-first ascending.
+      .sort((a, b) => (baseLast ? b.minWidth - a.minWidth : a.minWidth - b.minWidth));
+    return baseLast ? [...modes, baseCol] : [baseCol, ...modes];
   }
 
   // renderTypeTokensTable — the EDITABLE Typography token MATRIX (Phase 3). Rows = type steps GROUPED by
@@ -3472,11 +3479,13 @@ class HctApp extends HTMLElement {
   // prepends Base = the DOCUMENT base composed geometry scale (mode-independent — NOT _activeGeomScale).
   _geomTokenColumns() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const cols = [{ id: "base", modeKey: "base", name: "Base", minWidth: null, scale: this._geomScaleFor("base") }];
+    const { baseName: bn, baseLast } = this._geomBaseOpts();
+    const baseCol = { id: "base", modeKey: "base", name: bn, minWidth: null, scale: this._geomScaleFor("base") };
     const modes = (g.modes || [])
       .map((m) => ({ id: m.id, modeKey: m.id, name: m.name || "Mode", minWidth: Number(m.minWidth) || 0, scale: this._geomScaleFor(m.id) }))
-      .sort((a, b) => a.minWidth - b.minWidth);
-    return cols.concat(modes);
+      // a named base reads desktop-first (widest → base last); the legacy shape stays Base-first ascending.
+      .sort((a, b) => (baseLast ? b.minWidth - a.minWidth : a.minWidth - b.minWidth));
+    return baseLast ? [...modes, baseCol] : [baseCol, ...modes];
   }
 
   // renderGeomTokensTable — the EDITABLE Geometry token MATRIX (Phase 3). Rows = the six control sizes
@@ -5647,7 +5656,7 @@ class HctApp extends HTMLElement {
         { name: "figma/type.tokens.json", data: JSON.stringify(typeTokensDTCG(tsc), null, 2) }, // ALWAYS px — Figma import (a tokens plugin)
         // a single "Typography" collection with a MODE per breakpoint (Base + each) — one moded Figma-variable
         // file instead of N per-width DTCG files. Always emitted (Base-only when there are no breakpoints).
-        { name: "figma/typography.modes.variables.json", data: JSON.stringify(typeTokensFigmaModes(tsc, this._typeModeScales()), null, 2) },
+        { name: "figma/typography.modes.variables.json", data: JSON.stringify(typeTokensFigmaModes(tsc, this._typeModeScales(), this._typeBaseOpts()), null, 2) },
         // the companion "Font Primitives" collection — deduped family STRING primitives + per-voice
         // font aliases + per-voice weight primitives (import artifact; never enters the apply path).
         { name: "figma/typography.primitives.variables.json", data: JSON.stringify(typeTokensFigmaPrimitives(tsc), null, 2) },
@@ -5663,7 +5672,7 @@ class HctApp extends HTMLElement {
         { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
         // a single "Geometry" collection with a MODE per breakpoint (Base + each) — one moded Figma-variable
         // file instead of N per-width DTCG files. Always emitted (Base-only when there are no breakpoints).
-        { name: "figma/dimension.modes.variables.json", data: JSON.stringify(geomTokensFigmaModes(gsc, this._geomModeScales()), null, 2) },
+        { name: "figma/dimension.modes.variables.json", data: JSON.stringify(geomTokensFigmaModes(gsc, this._geomModeScales(), this._geomBaseOpts()), null, 2) },
       );
     }
     // figma/styles.plan.json — the plugin-free STYLES import artifact (rides the Styles opt-out chip,
@@ -5856,8 +5865,8 @@ class HctApp extends HTMLElement {
     const out = [];
     const sys = this.exportSystems || {};
     const add = (ix) => { try { if (ix && validateModeInterchange(ix).length === 0) out.push(...modeApplyPlan(ix)); } catch { /* skip a malformed system */ } };
-    if (sys.type !== false) try { add(typeTokensFigmaModes(this._typeScaleFor("base"), this._typeModeScales())); } catch { /* skip type */ }
-    if (sys.geometry !== false) try { add(geomTokensFigmaModes(this._geomScaleFor("base"), this._geomModeScales())); } catch { /* skip geometry */ }
+    if (sys.type !== false) try { add(typeTokensFigmaModes(this._typeScaleFor("base"), this._typeModeScales(), this._typeBaseOpts())); } catch { /* skip type */ }
+    if (sys.geometry !== false) try { add(geomTokensFigmaModes(this._geomScaleFor("base"), this._geomModeScales(), this._geomBaseOpts())); } catch { /* skip geometry */ }
     return out;
   }
 
@@ -6356,6 +6365,18 @@ class HctApp extends HTMLElement {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     return (g.modes || []).map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._geomScaleFor(m.id) }));
   }
+  // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. A doc with
+  // a RENAMED base (doc.{type,geometry}.baseName, e.g. "Mobile" — the standard set writes it) also places
+  // the base LAST (desktop-first canon: Figma's default mode is the FIRST mode, so Desktop leads); the
+  // legacy unnamed shape keeps "Base" first, byte-identical to pre-baseName exports.
+  _typeBaseOpts() {
+    const n = ((this.doc.type || DEFAULT_TYPE).baseName || "Base").trim() || "Base";
+    return { baseName: n, baseLast: n.toLowerCase() !== "base" };
+  }
+  _geomBaseOpts() {
+    const n = ((this.doc.geometry || DEFAULT_GEOMETRY).baseName || "Base").trim() || "Base";
+    return { baseName: n, baseLast: n.toLowerCase() !== "base" };
+  }
   // per-breakpoint DTCG files — one valid standalone DTCG per mode that has a minWidth, keyed by the width
   // (self-documenting + collision-free). No-width modes are preview-only, so they don't export (mirrors CSS).
   _typeModeDTCGFiles(prefix = "type", opts = {}) {
@@ -6366,15 +6387,19 @@ class HctApp extends HTMLElement {
     return this._geomModeScales().filter((m) => Number(m.minWidth) > 0)
       .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(geomTokensDTCG(m.scale, opts), null, 2) }));
   }
+  // Mirrors typeModeControl: a NAMED base (doc.geometry.baseName, e.g. "Mobile") renders LAST — the
+  // canonical desktop-first order (Desktop · Tablet · Mobile), matching the Figma mode-column order.
   geomModeControl() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     const modes = g.modes || [];
+    const { baseName: bn, baseLast } = this._geomBaseOpts();
     // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
     if (this.geomMode !== "base" && this.geomMode !== "compare" && !modes.some((m) => m.id === this.geomMode)) this.geomMode = "base";
+    const baseItem = { id: "base", label: bn, title: `${bn} size ramp · ${g.baseHeight ?? 28}px` };
+    const modeItems = modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: `${m.name || "Mode"} · ${m.baseHeight}px base height` }));
     const items = [
-      { id: "base", label: "Base", title: `Base size ramp · ${g.baseHeight ?? 28}px` },
-      ...modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: `${m.name || "Mode"} · ${m.baseHeight}px base height` })),
-      // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only Base, so only when ≥1 mode.
+      ...(baseLast ? [...modeItems, baseItem] : [baseItem, ...modeItems]),
+      // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only the base, so only when ≥1 mode.
       ...(modes.length ? [{ id: "compare", label: "Compare", title: "All breakpoints side by side" }] : []),
     ];
     return h(
@@ -6384,24 +6409,25 @@ class HctApp extends HTMLElement {
         { cls: "canvas-seg", ariaLabel: "Geometry breakpoint mode", role: "group", idPrefix: "gmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named ramp with its own base control height", onclick: () => this.addGeomMode() }),
       // one-click standard web set — only while no modes exist (mirrors the Typography control).
-      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard web breakpoints — 768 · 992 · 1280 · 1540. Base becomes the compressed ≤476 ramp (−4px base, linear gear); your current full ramp lands at 1540. One undo step.", onclick: () => this.addStandardGeomModes() })] : []),
+      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Create the standard breakpoints — Desktop 1280 (your current full ramp) · Tablet 992 · Mobile ≤476 (Base, compressed −4px, renamed). Desktop leads, so it becomes Figma's default mode. One undo step.", onclick: () => this.addStandardGeomModes() })] : []),
     );
   }
-  // addStandardGeomModes — the standard web breakpoint set in one click, RESPONSIVE by construction:
-  // the current design (full geometric ramp) becomes the 1540 desktop column, Base becomes the
-  // compressed ≤476 mobile ramp (baseHeight −4, rampContrast 0 — the expressive band loses its gear:
-  // at bh 24 that's 18·20·24·28·32·36), and the rungs between interpolate height +1px and contrast
-  // +0.25 per step. One commit = one undo step restores the flat pre-click design.
+  // addStandardGeomModes — the standard breakpoint set in one click, RESPONSIVE by construction: the
+  // current design (full geometric ramp) becomes the Desktop (1280) column, the base becomes the compressed
+  // ≤476 "Mobile" ramp (baseHeight −4, rampContrast 0 — the expressive band loses its gear: at bh 24 that's
+  // 18·20·24·28·32·36), and Tablet (992) sits midway (height +2, contrast 0.5). Stored DESKTOP-FIRST — the
+  // display/Figma order; the responsive CSS emitters sort ascending internally (mobile-first cascade holds).
+  // One commit = one undo step restores the flat pre-click design.
   addStandardGeomModes() {
     const bh = (this.doc.geometry && this.doc.geometry.baseHeight) ?? 28;
     const mob = Math.max(20, bh - 4);
     const seed = Date.now().toString(36);
-    const rungs = [768, 992, 1280, 1540];
-    this.geomMode = "base"; // land on Base so the compression is the first thing seen (and undoable)
+    const rungs = [{ name: "Desktop", w: 1280, bump: 4, contrast: 1 }, { name: "Tablet", w: 992, bump: 2, contrast: 0.5 }];
+    this.geomMode = "base"; // land on the base so the compression is the first thing seen (and undoable)
     this.commit((d) => {
-      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), baseHeight: mob, rampContrast: 0 };
+      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), baseHeight: mob, rampContrast: 0, baseName: "Mobile" };
       const modes = d.geometry.modes ? [...d.geometry.modes] : [];
-      rungs.forEach((w, i) => modes.push({ id: `gm-${seed}-${i}`, name: String(w), baseHeight: Math.min(48, mob + i + 1), rampContrast: (i + 1) / 4, minWidth: w }));
+      rungs.forEach((r, i) => modes.push({ id: `gm-${seed}-${i}`, name: r.name, baseHeight: Math.min(48, mob + r.bump), rampContrast: r.contrast, minWidth: r.w }));
       d.geometry.modes = modes;
     });
   }

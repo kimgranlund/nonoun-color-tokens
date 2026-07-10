@@ -197,9 +197,12 @@ export function geomTokensCSS(scale, { unit = "px", prefix = "" } = {}) {
 // geomTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
 // re-declares the per-size vars at that mode's scale (radii/space/density + the .control-* utilities are
 // mode-independent, so they auto-track). `modes` = [{ name, minWidth, scale }]; no-minWidth modes skipped.
+// Blocks emit ASCENDING by minWidth regardless of array order — mobile-first CSS needs the widest block
+// last to win the cascade, and the doc may store modes desktop-first (the standard set's display order).
 export function geomTokensResponsiveCSS(scale, modes = [], { unit = "px", prefix = "" } = {}) {
   let css = geomTokensCSS(scale, { unit, prefix });
-  for (const m of modes) {
+  const ordered = [...(modes || [])].sort((a, b) => (Number(a.minWidth) || 0) - (Number(b.minWidth) || 0));
+  for (const m of ordered) {
     if (!(Number(m.minWidth) > 0) || !m.scale) continue;
     css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`;
   }
@@ -256,12 +259,14 @@ export function geomTokensFigma(scale) {
 // imports ONE breakpoint-moded collection instead of N separate per-width files. The size fields mirror
 // `geomTokensFigma` (height/icon/caret/font/gap/padding/edgePadding/radius/minWidth). `modes` = the SAME
 // shape `_geomModeScales()` returns: [{ name, scale }] (minWidth, if present, is ignored — Figma modes are
-// named, not media-queried). IDENTITY: `modes = []` ⇒ a single "Base" mode whose values equal the base.
+// named, not media-queried). IDENTITY: `modes = []` ⇒ a single base mode whose values equal the base.
+// `opts.baseName` (default "Base") NAMES the synthetic base layer (e.g. "Mobile" — the standard set);
+// `opts.baseLast` (default false) places it AFTER the breakpoints (Figma's default mode = the FIRST mode).
 const GEOM_SIZE_FIELDS = [["height", "height"], ["icon", "icon"], ["caret", "caret"], ["font", "font"], ["gap", "gap"], ["padding", "padding"], ["edgePadding", "edgePadding"], ["radius", "radiusPill"], ["minWidth", "minWidth"]];
-// Figma requires DISTINCT mode names per collection; "Base" is the synthetic base layer. Reserve it +
-// de-dup (case-insensitively) so a breakpoint renamed "Base" / two same-named modes can't collide on import.
-function disambiguateModeNames(names) {
-  const used = new Set(["base"]);
+// Figma requires DISTINCT mode names per collection; the synthetic base layer (`baseName`) is reserved +
+// de-dup (case-insensitively) so a breakpoint sharing its name / two same-named modes can't collide on import.
+function disambiguateModeNames(names, baseName = "Base") {
+  const used = new Set([String(baseName).toLowerCase()]);
   return (names || []).map((raw) => {
     const stem = String(raw);
     let n = stem, i = 1;
@@ -270,10 +275,10 @@ function disambiguateModeNames(names) {
     return n;
   });
 }
-export function geomTokensFigmaModes(baseScale, modes = []) {
+export function geomTokensFigmaModes(baseScale, modes = [], { baseName = "Base", baseLast = false } = {}) {
   const list = (Array.isArray(modes) ? modes : []).filter((m) => m && m.name && m.scale && m.scale.sizes);
-  const names = disambiguateModeNames(list.map((m) => m.name));
-  const modeNames = ["Base", ...names];
+  const names = disambiguateModeNames(list.map((m) => m.name), baseName);
+  const modeNames = baseLast ? [...names, baseName] : [baseName, ...names];
   const variables = {};
   const set = (key, mode, value) => {
     if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
@@ -291,7 +296,7 @@ export function geomTokensFigmaModes(baseScale, modes = []) {
     for (const [k, v] of Object.entries(scale.borders || {})) set(`border/${camelKebab(k)}`, mode, v);
     for (const [k, v] of Object.entries(scale.focus || {})) set(`focus/${camelKebab(k)}`, mode, v);
   };
-  layer(baseScale, "Base");
+  layer(baseScale, baseName);
   list.forEach((m, i) => layer(m.scale, names[i]));
   return {
     $schema: "figma-ui3-variables.float.schema.v1",

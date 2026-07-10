@@ -386,6 +386,11 @@ function clampType(t) {
       .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", bodyBase: clampBody(m.bodyBase), ...clampMinWidth(m.minWidth) }));
     if (modes.length) out.modes = modes;
   }
+  // baseName — the RENAMED base layer (the standard set writes "Mobile"; desktop-first order derives from
+  // it). OPTIONAL: attach only when meaningfully set, so a legacy config round-trips identically.
+  if (typeof t.baseName === "string" && t.baseName.trim() && t.baseName.trim().toLowerCase() !== "base") {
+    out.baseName = t.baseName.trim().slice(0, 40);
+  }
   return out;
 }
 
@@ -413,6 +418,11 @@ function clampGeometry(g) {
       .filter((m) => m && typeof m === "object" && typeof m.id === "string")
       .map((m) => ({ id: m.id, name: typeof m.name === "string" ? m.name : "Mode", baseHeight: clampH(m.baseHeight), ...clampMinWidth(m.minWidth), ...clampContrast(m.rampContrast) }));
     if (modes.length) out.modes = modes;
+  }
+  // baseName — the RENAMED base layer (mirrors type.baseName; the standard set writes "Mobile").
+  // OPTIONAL: attach only when meaningfully set, so a legacy config round-trips identically.
+  if (typeof g.baseName === "string" && g.baseName.trim() && g.baseName.trim().toLowerCase() !== "base") {
+    out.baseName = g.baseName.trim().slice(0, 40);
   }
   return out;
 }

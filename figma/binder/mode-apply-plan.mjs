@@ -52,9 +52,11 @@ export function modeApplyPlan(interchange) {
 
 // validateModeInterchange(interchange) → string[] of problems ([] when sound). The invariants the Figma
 // apply-path depends on — a malformed interchange is caught HERE (pure, tested) rather than half-applied to a
-// user's file. Checks: ≥1 collection; modes is a non-empty list of DISTINCT names (case-insensitive) led by
-// "Base" (Figma rejects duplicate mode names + needs a default); every variable has a known type, a value for
-// EVERY mode, and FLOAT values that are finite numbers.
+// user's file. Checks: ≥1 collection; modes is a non-empty list of DISTINCT, non-empty names
+// (case-insensitive; Figma rejects duplicates) whose FIRST entry becomes the collection's default mode —
+// any name, not just "Base": the emitters may name the base layer (e.g. "Mobile") and order it last, making
+// a breakpoint (e.g. "Desktop") the default; every variable has a known type, a value for EVERY mode, and
+// FLOAT values that are finite numbers.
 export function validateModeInterchange(interchange) {
   const out = [];
   const collections = interchange && typeof interchange === "object" ? interchange.collections : null;
@@ -65,7 +67,7 @@ export function validateModeInterchange(interchange) {
     const c = collections[name] || {};
     const modes = Array.isArray(c.modes) ? c.modes : [];
     if (modes.length === 0) { out.push(`${name}: no modes`); continue; }
-    if (String(modes[0]).toLowerCase() !== "base") out.push(`${name}: first mode must be "Base" (got "${modes[0]}")`);
+    if (!String(modes[0] ?? "").trim()) out.push(`${name}: first mode (the default) must be a non-empty name`);
     const seen = new Set();
     for (const m of modes) {
       const key = String(m).toLowerCase();

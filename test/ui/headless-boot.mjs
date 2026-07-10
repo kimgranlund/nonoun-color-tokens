@@ -1981,29 +1981,49 @@ app.inFigma = false; app.render(); flushRaf();
 app.closeSettings(); flushRaf();
 
 // ── (std) the one-click STANDARD breakpoint sets (Typography + Geometry) ─────────────
-// Clear any modes accumulated above, then create each standard set and pin its shape: four modes at
-// min-widths 768/992/1280/1540 named by width; type bodyBase steps +1/rung, geometry seeds FLAT.
-app.commit((d) => { if (d.type) { d.type = { ...d.type }; delete d.type.modes; } if (d.geometry) { d.geometry = { ...d.geometry }; delete d.geometry.modes; } }); flushRaf();
+// Clear any modes accumulated above, then create each standard set and pin its shape: DESKTOP-FIRST —
+// Desktop (1280) · Tablet (992) stored in that order, with the base RENAMED "Mobile" (the ≤476 layer);
+// type bodyBase steps +2/+1, geometry compresses the base and lands the original ramp on Desktop.
+app.commit((d) => { if (d.type) { d.type = { ...d.type }; delete d.type.modes; delete d.type.baseName; } if (d.geometry) { d.geometry = { ...d.geometry }; delete d.geometry.modes; delete d.geometry.baseName; } }); flushRaf();
 const stdBB = (app.doc.type && app.doc.type.bodyBase) ?? 16;
 app.addStandardTypeModes(); flushRaf();
 {
   const ms = (app.doc.type.modes || []);
-  ok(ms.length === 4 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([768, 992, 1280, 1540]), `(std) Standard set creates the four type modes at 768/992/1280/1540 (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
-  ok(ms.every((m, i) => m.name === String(m.minWidth) && m.bodyBase === stdBB + i + 1), "(std) type modes are named by width and step bodyBase +1 per rung");
-  ok(app.typeMode === ms[0].id, "(std) the control lands on the first new type mode");
+  ok(ms.length === 2 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([1280, 992]), `(std) Standard set creates Desktop(1280) + Tablet(992), stored desktop-first (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
+  ok(ms[0].name === "Desktop" && ms[0].bodyBase === stdBB + 2 && ms[1].name === "Tablet" && ms[1].bodyBase === stdBB + 1, "(std) type modes are Desktop (+2px body) and Tablet (+1px body)");
+  ok(app.doc.type.baseName === "Mobile", "(std) the type base layer is renamed Mobile");
+  ok(app.typeMode === ms[0].id, "(std) the control lands on Desktop (the first new type mode)");
+  const opts = app._typeBaseOpts();
+  ok(opts.baseName === "Mobile" && opts.baseLast === true, "(std) _typeBaseOpts derives the named-base-last (desktop-first) emitter shape");
+  const cols = app._typeTokenColumns().map((c) => c.name);
+  ok(JSON.stringify(cols) === JSON.stringify(["Desktop", "Tablet", "Mobile"]), `(std) the type token matrix reads Desktop · Tablet · Mobile (got ${JSON.stringify(cols)})`);
 }
 const stdBH = (app.doc.geometry && app.doc.geometry.baseHeight) ?? 28;
 app.addStandardGeomModes(); flushRaf();
 {
   const g = app.doc.geometry, ms = (g.modes || []), mob = Math.max(20, stdBH - 4);
-  ok(ms.length === 4 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([768, 992, 1280, 1540]), `(std) Standard set creates the four geometry modes at 768/992/1280/1540 (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
-  // Base becomes the compressed ≤476 mobile ramp (−4px base, zero contrast = the linear gear).
-  ok(g.baseHeight === mob && g.rampContrast === 0, `(std) Base compresses to the mobile ramp (baseHeight ${mob}, rampContrast 0 — got ${g.baseHeight}, ${g.rampContrast})`);
-  ok(ms.every((m, i) => m.name === String(m.minWidth) && m.baseHeight === Math.min(48, mob + i + 1) && m.rampContrast === (i + 1) / 4), "(std) geometry rungs step height +1px and contrast +0.25 up to the full ramp at 1540");
-  ok(app.geomMode === "base", "(std) the control lands on Base (the compression is the visible change)");
-  // the resolved columns: Base = the compressed reference ramp; 1540 = the original full ramp.
+  ok(ms.length === 2 && JSON.stringify(ms.map((m) => m.minWidth)) === JSON.stringify([1280, 992]), `(std) Standard set creates Desktop(1280) + Tablet(992) geometry modes, desktop-first (got ${JSON.stringify(ms.map((m) => m.minWidth))})`);
+  // the base becomes the compressed ≤476 Mobile ramp (−4px base, zero contrast = the linear gear).
+  ok(g.baseHeight === mob && g.rampContrast === 0 && g.baseName === "Mobile", `(std) the base compresses to the Mobile ramp (baseHeight ${mob}, rampContrast 0, baseName Mobile — got ${g.baseHeight}, ${g.rampContrast}, ${g.baseName})`);
+  ok(ms[0].name === "Desktop" && ms[0].baseHeight === Math.min(48, mob + 4) && ms[0].rampContrast === 1, "(std) Desktop carries the original full ramp (height +4, contrast 1)");
+  ok(ms[1].name === "Tablet" && ms[1].baseHeight === Math.min(48, mob + 2) && ms[1].rampContrast === 0.5, "(std) Tablet sits midway (height +2, contrast 0.5)");
+  ok(app.geomMode === "base", "(std) the control lands on the base (the compression is the visible change)");
+  // the resolved columns: base = the compressed reference ramp; Desktop = the original full ramp.
   const hcol = (k) => ["XS", "SM", "MD", "LG", "XL", "2XL"].map((n) => app._geomScaleFor(k).sizes[n].height);
-  if (stdBH === 28) ok(JSON.stringify(hcol("base")) === JSON.stringify([18, 20, 24, 28, 32, 36]) && JSON.stringify(hcol(ms[3].id)) === JSON.stringify([20, 24, 28, 36, 48, 64]), `(std) resolved columns match the responsive spec (base ${hcol("base")} · 1540 ${hcol(ms[3].id)})`);
+  if (stdBH === 28) ok(JSON.stringify(hcol("base")) === JSON.stringify([18, 20, 24, 28, 32, 36]) && JSON.stringify(hcol(ms[0].id)) === JSON.stringify([20, 24, 28, 36, 48, 64]), `(std) resolved columns match the responsive spec (base ${hcol("base")} · Desktop ${hcol(ms[0].id)})`);
+  // the Figma float plans emit the desktop-first moded collections: Desktop leads (= Figma's default mode),
+  // the renamed Mobile base rides LAST — and the responsive CSS keeps its mobile-first ascending cascade.
+  const plans = app._figmaFloatPlans();
+  const typo = plans.find((p) => p.collection === "Typography"), geo = plans.find((p) => p.collection === "Geometry");
+  ok(typo && JSON.stringify(typo.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && typo.defaultMode === "Desktop", `(std) the Typography float plan is [Desktop, Tablet, Mobile], default Desktop (got ${typo && JSON.stringify(typo.modes)})`);
+  ok(geo && JSON.stringify(geo.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && geo.defaultMode === "Desktop", `(std) the Geometry float plan is [Desktop, Tablet, Mobile], default Desktop (got ${geo && JSON.stringify(geo.modes)})`);
+}
+{
+  // responsive CSS cascade: DESCENDING stored modes still emit ASCENDING @media blocks (mobile-first).
+  const { typeTokensResponsiveCSS: rcss } = await import("../../src/engine/type.mjs");
+  const css = rcss(app._typeScaleFor("base"), app._typeModeScales());
+  const at992 = css.indexOf("min-width: 992px"), at1280 = css.indexOf("min-width: 1280px");
+  ok(at992 > -1 && at1280 > at992, `(std) responsive type CSS emits ascending @media blocks regardless of desktop-first storage (992 @ ${at992}, 1280 @ ${at1280})`);
 }
 
 // ── report ──────────────────────────────────────────────────────────────────────────

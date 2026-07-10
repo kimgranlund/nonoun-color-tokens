@@ -346,9 +346,12 @@ export function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
 // typeTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
 // re-declares the per-step size vars at that mode's scale (the utilities + font vars are unchanged, so they
 // auto-track). `modes` = [{ name, minWidth, scale }]; a mode without a positive minWidth is skipped.
+// Blocks emit ASCENDING by minWidth regardless of array order — mobile-first CSS needs the widest block
+// last to win the cascade, and the doc may store modes desktop-first (the standard set's display order).
 export function typeTokensResponsiveCSS(scale, modes = [], { unit = "px", prefix = "type" } = {}) {
   let css = typeTokensCSS(scale, { unit, prefix });
-  for (const m of modes) {
+  const ordered = [...(modes || [])].sort((a, b) => (Number(a.minWidth) || 0) - (Number(b.minWidth) || 0));
+  for (const m of ordered) {
     if (!(Number(m.minWidth) > 0) || !m.scale) continue;
     css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`;
   }
@@ -390,13 +393,17 @@ export function typeTokensDTCG(scale, { unit = "px" } = {}) {
 // lineHeight + letterSpacing ride as a % of font size (relPct) — leading/tracking are ALWAYS relative,
 // never px, and % is Figma's native relative unit. `modes` = the SAME
 // shape `_typeModeScales()` returns: [{ name, scale }] (minWidth, if present, is ignored — Figma modes are
-// named, not media-queried). IDENTITY: `modes = []` ⇒ a single "Base" mode whose values equal the base.
+// named, not media-queried). IDENTITY: `modes = []` ⇒ a single base mode whose values equal the base.
+// `opts.baseName` (default "Base") NAMES the synthetic base layer (e.g. "Mobile" — the standard set);
+// `opts.baseLast` (default false) places it AFTER the breakpoints: Figma's default mode is the FIRST mode,
+// so a desktop-first collection stores modes [Desktop, Tablet] and emits [Desktop, Tablet, Mobile].
 const TYPE_FIGMA_PROPS = ["size", "lineHeight", "letterSpacing", "weight", "paragraphSpacing"];
-// disambiguateModeNames — Figma requires DISTINCT mode names per collection. "Base" is the synthetic base
-// layer, so a breakpoint named "Base" (or any duplicate of another breakpoint) is renamed ("Mobile 2", …)
-// before it would silently shadow another mode / emit modes:["Base","Base"] (which Figma rejects on import).
-export function disambiguateModeNames(names) {
-  const used = new Set(["base"]); // reserve the synthetic Base mode (compared case-insensitively)
+// disambiguateModeNames — Figma requires DISTINCT mode names per collection. The synthetic base layer
+// (named `baseName`, default "Base") is reserved, so a breakpoint sharing its name (or any duplicate of
+// another breakpoint) is renamed ("Mobile 2", …) before it would silently shadow another mode / emit
+// duplicate mode names (which Figma rejects on import).
+export function disambiguateModeNames(names, baseName = "Base") {
+  const used = new Set([String(baseName).toLowerCase()]); // reserve the base mode (compared case-insensitively)
   return (names || []).map((raw) => {
     const stem = String(raw);
     let n = stem, i = 1;
@@ -405,12 +412,12 @@ export function disambiguateModeNames(names) {
     return n;
   });
 }
-export function typeTokensFigmaModes(baseScale, modes = []) {
+export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base", baseLast = false } = {}) {
   const list = (Array.isArray(modes) ? modes : []).filter((m) => m && m.name && m.scale && m.scale.categories);
-  const names = disambiguateModeNames(list.map((m) => m.name));
-  const modeNames = ["Base", ...names];
+  const names = disambiguateModeNames(list.map((m) => m.name), baseName);
+  const modeNames = baseLast ? [...names, baseName] : [baseName, ...names];
   const variables = {};
-  // for each mode (Base first, then each breakpoint), write every voice×step×prop value under that mode key.
+  // for each mode (the base layer + each breakpoint), write every voice×step×prop value under that mode key.
   const layer = (scale, mode) => {
     for (const [cName, steps] of Object.entries(scale.categories)) {
       for (const [sName, s] of Object.entries(steps)) {
@@ -429,7 +436,7 @@ export function typeTokensFigmaModes(baseScale, modes = []) {
       }
     }
   };
-  layer(baseScale, "Base");
+  layer(baseScale, baseName);
   list.forEach((m, i) => layer(m.scale, names[i]));
   return {
     $schema: "figma-ui3-variables.float.schema.v1",

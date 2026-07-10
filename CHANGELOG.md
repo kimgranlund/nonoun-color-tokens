@@ -1,12 +1,34 @@
 # Changelog
 
-All notable changes to **Ultimate Tokens by NONOUN** are documented here.
+All notable changes to **Ultimate Tokens** are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims
 to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Entries are grouped by the day
 they landed on `main` and reference the squash-merged PR that introduced them.
 
 ## [Unreleased]
+
+### 2026-07-10
+
+#### Changed
+- **The standard breakpoint set is now Desktop · Tablet · Mobile.** One click in Typography or Geometry
+  creates **Desktop (min-width 1280)** and **Tablet (992)** and renames the base layer **Mobile** (your
+  unmodified ≤476 scale) — replacing the four numeric rungs (768/992/1280/1540). The order is
+  desktop-first everywhere it shows: the Figma collections emit modes **Desktop · Tablet · Mobile**, so
+  **Desktop becomes Figma's default mode**; the canvas Mode chips and the token matrices read the same
+  way. Type steps body +2/+1 px; Geometry lands the original full ramp on Desktop (the base compresses
+  −4 px, Tablet sits midway). Existing files convert on re-apply — the plugin renames the old `Base`
+  default mode to `Desktop` and adds the rest by name. (#252)
+- **Responsive CSS is order-proof.** `typeTokensResponsiveCSS`/`geomTokensResponsiveCSS` now emit
+  `@media` blocks ascending by min-width regardless of how the doc stores its modes — a desktop-first
+  mode list can no longer break the mobile-first cascade. The Figma emitters gain
+  `{ baseName, baseLast }` (a renamed base layer, optionally ordered last); the mode-apply validator
+  accepts any non-empty default mode name instead of requiring the literal `Base`. A doc without
+  breakpoint modes is byte-identical to before. (#252)
+
+#### Fixed
+- The CHANGELOG's own header still attributed the product ("Ultimate Tokens by NONOUN") — the one
+  "by" line the #250 debrand missed. (#252)
 
 ### 2026-07-09
 
