@@ -11,6 +11,15 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-07-10
 
 #### Changed
+- **Size modes are now INTRINSIC — every export carries Desktop · Tablet · Mobile, like every color
+  export carries Light + Dark.** A document with no configured breakpoint modes no longer produces
+  Base-only Typography/Geometry collections: the standard Desktop (1280, +2px body / +4px heights) and
+  Tablet (992, +1 / +2) rungs are synthesized from the base config at export/apply time, with the base
+  riding as **Mobile** — zero setup, in the Figma variables, the responsive CSS `@media` blocks, and the
+  per-breakpoint DTCG files (Download-All gains `type.{1280,992}.tokens.json` +
+  `geometry.{1280,992}.tokens.json`). Configuring your own modes (＋ or Standard set) takes full manual
+  control. Geometry's synthesized rungs compose the type scale at the same rung, so the shared `font`
+  tracks. (#252)
 - **The standard breakpoint set is now Desktop · Tablet · Mobile.** One click in Typography or Geometry
   creates **Desktop (min-width 1280)** and **Tablet (992)** and renames the base layer **Mobile** (your
   unmodified ≤476 scale) — replacing the four numeric rungs (768/992/1280/1540). The order is

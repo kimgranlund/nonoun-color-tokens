@@ -1069,7 +1069,7 @@ const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
 // design-system-for-figma-make/ bundle: guidelines/{Guidelines.md, setup.md, styles.css,
 // foundations/{color,typography,spacing}.md, components/{overview,button}.md} + README.md (9, a routed tree),
 // all riding systems.color) + 4 figma-aliased + 5 typography (incl. figma/ + figma/ moded + figma/ primitives) + 4 geometry + config = 45.
-ok(eocdSig && entries === 46, `(ee) the EOCD reports 46 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (5) + geometry (4) + figma/styles.plan.json (1) + config (got ${entries})`);
+ok(eocdSig && entries === 50, `(ee) the EOCD reports 50 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (7, incl. the intrinsic type.1280/type.992 per-mode DTCG) + geometry (6, incl. geometry.1280/geometry.992) + figma/styles.plan.json (1) + config (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
 const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "design-system-for-claude-code/DESIGN.md", "design-system-for-claude-code/tokens.json", "design-system-for-claude-code/components/colors.html", "design-system-for-claude-code/README.md", "design-system-for-google-stitch/DESIGN.md", "design-system-for-google-stitch/README.md", "design-system-for-figma-make/guidelines/Guidelines.md", "design-system-for-figma-make/guidelines/setup.md", "design-system-for-figma-make/guidelines/styles.css", "design-system-for-figma-make/guidelines/foundations/color.md", "design-system-for-figma-make/guidelines/foundations/typography.md", "design-system-for-figma-make/guidelines/foundations/spacing.md", "design-system-for-figma-make/guidelines/components/overview.md", "design-system-for-figma-make/guidelines/components/button.md", "design-system-for-figma-make/README.md", "ultimate-tokens-my-set-config.json",
   "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt",
@@ -1558,7 +1558,7 @@ app.typeVoice = null; app.render(); flushRaf();
 app.setTypeSpecMode("tokens"); flushRaf();
 ok(!!app.querySelector(".tok-table") && !app.querySelector(".type-spec"), "(ty-tok) the Specimen·Tokens toggle renders the token matrix table (no specimen scene)");
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(ty-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
-ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 1, "(ty-tok) there is exactly one Base column header");
+ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Mobile")).length === 1 && walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 0, "(ty-tok) the base column header reads Mobile (the intrinsic standard set — no 'Base' column)");
 ok(app._typeTokenColumns().length === 1, "(ty-tok) base-only — exactly one column (Base) with no breakpoints");
 ok(app.querySelectorAll(".tok-row").length === 53, `(ty-tok) one row per type step (53) (got ${app.querySelectorAll(".tok-row").length})`);
 ok(app.querySelectorAll(".tok-group").length === 11, `(ty-tok) the rows are grouped by voice — 11 group headers (got ${app.querySelectorAll(".tok-group").length})`);
@@ -1578,14 +1578,15 @@ app.setTypeModeMinWidth(_bpId, 768); flushRaf();
 ok(app.doc.type.modes[0].minWidth === 768 && app._typeModeScales()[0].minWidth === 768, "(ty-bp) setTypeModeMinWidth persists + flows to the responsive-export mode scales (→ @media min-width)");
 ok(app._typeModeDTCGFiles().length === 1 && app._typeModeDTCGFiles()[0].name === "type.768.tokens.json" && JSON.parse(app._typeModeDTCGFiles()[0].data).typography, "(ty-bp) the breakpoint emits a per-mode DTCG file keyed by width");
 // (ty-fig) the NATIVE Figma apply payload: _figmaFloatPlans() composes the emitters → validateModeInterchange
-// → modeApplyPlan, so the "Apply to Figma" message carries a Typography plan (Base + this 768 breakpoint) and
-// a Geometry plan (Base-only — no geometry breakpoints here). Proves the validate→plan glue, not just its parts.
+// → modeApplyPlan, so the "Apply to Figma" message carries a Typography plan (Base + this 768 breakpoint —
+// the CONFIGURED-modes path) and a Geometry plan carrying the INTRINSIC standard set (no geometry modes
+// configured ⇒ Desktop · Tablet · Mobile synthesized, the Light/Dark-style always-there shape).
 const _fplans = app._figmaFloatPlans();
 const _typlan = _fplans.find((p) => p.collection === "Typography");
 const _geolan = _fplans.find((p) => p.collection === "Geometry");
 ok(!!_typlan && !!_geolan, "(ty-fig) _figmaFloatPlans yields a Typography + a Geometry apply plan");
 ok(_typlan && _typlan.modes[0] === "Base" && _typlan.modes.length === 2, `(ty-fig) the Typography plan has Base + the 768 breakpoint mode (got ${_typlan && _typlan.modes.join()})`);
-ok(_geolan && _geolan.modes.length === 1 && _geolan.modes[0] === "Base", `(ty-fig) the Geometry plan is Base-only with no geometry breakpoints (got ${_geolan && _geolan.modes.join()})`);
+ok(_geolan && JSON.stringify(_geolan.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && _geolan.defaultMode === "Desktop", `(ty-fig) the Geometry plan carries the INTRINSIC Desktop·Tablet·Mobile set with Desktop as default — no configured modes needed (got ${_geolan && _geolan.modes.join()})`);
 ok(_fplans.every((p) => p.variables.length > 0 && p.variables.every((v) => v.type === "FLOAT" && v.values.length === p.modes.length && v.values.every((x) => Number.isFinite(x.value)))), "(ty-fig) every emitted plan is value-complete (FLOAT, one finite value per mode) — the validateModeInterchange gate held");
 // the apply payload RESPECTS the export-system toggles: a toggled-off system is not in floatPlans (the bug).
 app.exportSystems = { color: true, type: false, geometry: true };
@@ -1735,7 +1736,7 @@ app.geomSize = null; app.render(); flushRaf(); // leave the section in Geometry 
 app.setGeomSpecMode("tokens"); flushRaf();
 ok(!!app.querySelector(".tok-table") && !app.querySelector(".geom-spec"), "(geo-tok) the Controls·Tokens toggle renders the token matrix table (no controls scene)");
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(geo-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
-ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 1, "(geo-tok) there is exactly one Base column header");
+ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Mobile")).length === 1 && walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 0, "(geo-tok) the base column header reads Mobile (the intrinsic standard set — no 'Base' column)");
 ok(app._geomTokenColumns().length === 1, "(geo-tok) base-only — exactly one column (Base) with no breakpoints");
 ok(app.querySelectorAll(".tok-row").length === 6, `(geo-tok) one row per control size (6) (got ${app.querySelectorAll(".tok-row").length})`);
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}) === "--size-2xl", `(geo-tok) the first (sticky) token name is --size-2xl (largest→smallest) (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);

@@ -6355,26 +6355,51 @@ class HctApp extends HTMLElement {
     const key = mode === "base" || !(g.modes || []).some((m) => m.id === mode) ? "base" : mode;
     return this._geomScaleFor(key);
   }
-  // the breakpoint-mode scales for the responsive CSS export — [{ name, minWidth, scale }], one per mode.
-  // Each carries the override-aware scale at that mode (via _typeScaleFor) so per-cell edits reach @media.
+  // the breakpoint-mode scales for the responsive CSS + Figma exports — [{ name, minWidth, scale }].
+  // Size modes are INTRINSIC, the same technique as Color's Light/Dark: when the doc carries configured
+  // modes they resolve override-aware (via _typeScaleFor); when it carries NONE, the standard
+  // Desktop (1280, body +2) / Tablet (992, body +1) pair is SYNTHESIZED from the base config — the same
+  // stepping the Standard-set button commits — and the base rides as "Mobile" (_typeBaseOpts). So every
+  // export and every Figma apply carries Desktop · Tablet · Mobile with zero setup, exactly as every
+  // color export carries Light + Dark. Configuring your own modes (＋ / Standard set) takes full manual
+  // control and switches the whole surface to the doc's modes.
   _typeModeScales() {
     const t = this.doc.type || DEFAULT_TYPE;
-    return (t.modes || []).map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._typeScaleFor(m.id) }));
+    if ((t.modes || []).length) return t.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._typeScaleFor(m.id) }));
+    const bb = t.bodyBase ?? 16;
+    return [
+      { name: "Desktop", minWidth: 1280, scale: typeScale({ ...t, bodyBase: bb + 2 }) },
+      { name: "Tablet", minWidth: 992, scale: typeScale({ ...t, bodyBase: bb + 1 }) },
+    ];
   }
   _geomModeScales() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    return (g.modes || []).map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._geomScaleFor(m.id) }));
+    if ((g.modes || []).length) return g.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._geomScaleFor(m.id) }));
+    // synthesized: heights step +2/+4 (capped like every mode height) and each rung composes the TYPE
+    // scale at the SAME rung, so the shared `font` tracks the synthesized type modes.
+    const t = this.doc.type || DEFAULT_TYPE;
+    const bh = g.baseHeight ?? 28, bb = t.bodyBase ?? 16;
+    const synth = (bump, tBump) => geomScale({ ...g, baseHeight: Math.min(48, bh + bump) }, { typeScale: typeScale({ ...t, bodyBase: bb + tBump }) });
+    return [
+      { name: "Desktop", minWidth: 1280, scale: synth(4, 2) },
+      { name: "Tablet", minWidth: 992, scale: synth(2, 1) },
+    ];
   }
-  // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. A doc with
-  // a RENAMED base (doc.{type,geometry}.baseName, e.g. "Mobile" — the standard set writes it) also places
-  // the base LAST (desktop-first canon: Figma's default mode is the FIRST mode, so Desktop leads); the
-  // legacy unnamed shape keeps "Base" first, byte-identical to pre-baseName exports.
+  // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The base
+  // is "Mobile", placed LAST (desktop-first canon: Figma's default mode is the FIRST mode, so Desktop
+  // leads) in BOTH mode shapes that carry the standard set — synthesized (no doc modes) or committed
+  // (doc.baseName, the Standard-set button). Only a doc with its OWN configured modes and no baseName
+  // keeps the legacy "Base"-first shape (full manual control).
   _typeBaseOpts() {
-    const n = ((this.doc.type || DEFAULT_TYPE).baseName || "Base").trim() || "Base";
+    const t = this.doc.type || DEFAULT_TYPE;
+    const synthesized = !(t.modes || []).length; // the intrinsic standard set ⇒ the base IS Mobile
+    const n = (t.baseName || (synthesized ? "Mobile" : "Base")).trim() || "Base";
     return { baseName: n, baseLast: n.toLowerCase() !== "base" };
   }
   _geomBaseOpts() {
-    const n = ((this.doc.geometry || DEFAULT_GEOMETRY).baseName || "Base").trim() || "Base";
+    const g = this.doc.geometry || DEFAULT_GEOMETRY;
+    const synthesized = !(g.modes || []).length;
+    const n = (g.baseName || (synthesized ? "Mobile" : "Base")).trim() || "Base";
     return { baseName: n, baseLast: n.toLowerCase() !== "base" };
   }
   // per-breakpoint DTCG files — one valid standalone DTCG per mode that has a minWidth, keyed by the width
