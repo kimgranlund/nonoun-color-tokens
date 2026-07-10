@@ -2,8 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-`nonoun-color-tokens` is a perceptual **color + design-token generator**: one Vite web app that is also a
-self-contained `<nonoun-color-tokens>` web component, a **Figma plugin** (a semantic-variable binder), and
+`ultimate-tokens` is a perceptual **color + design-token generator**: one Vite web app that is also a
+self-contained `<ultimate-tokens>` web component, a **Figma plugin** (a semantic-variable binder), and
 an **MCP brand-kit** server. A brand kit is **one document** with three composing systems, surfaced as
 **sections of one editor**: **Color** (palettes → 53 semantic roles) · **Typography** · **Geometry**
 (its per-step text size composes *from* the Type UI scale).

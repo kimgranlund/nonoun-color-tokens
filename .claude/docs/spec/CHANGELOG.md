@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## 1.50 — 2026-07-09 — the deeper identity rename → `ultimate-tokens`
+
+The product identity moves in four namespaces, each with its own compatibility story.
+
+- **Custom element** `<nonoun-color-tokens>` → **`<ultimate-tokens>`**. The old tag stays registered as a
+  DEPRECATED ALIAS (a subclass), and every tag-keyed selector in `styles.css` now matches **both** tags —
+  an alias that renders unstyled is a fake alias.
+- **`STORAGE_KEY`** → `"ultimate-tokens"`. `migrateStorageKeys()` becomes a **chain**
+  (`hct-palette-state-v1` ← `nonoun-color-tokens` ← `ultimate-tokens`): newest legacy wins, and a present
+  new-namespace key is never overwritten. Four properties gated in headless `(mig)`.
+- **Figma plugin `id`** → `ultimate-tokens`; `CONFIG_KEY` / `FLOAT_REGISTRY_KEY` / `STYLE_REGISTRY_KEY` /
+  `SETS_KEY` follow (the binder mirrors `FLOAT_REGISTRY_KEY`, parity-gated). Because `setPluginData` is
+  namespaced **per plugin id**, all pre-rename keys are **orphaned and unreadable** — no forward-migration
+  exists, so `LEGACY_CONFIG_KEY` was removed and replaced by a gate proving `load-config` starts clean.
+  This is the accepted cost of the id change (**ADR-014**).
+- **Brand-kit schema** `nonoun-brand-kit/1` → **`ultimate-tokens-brand-kit/1`** (engine · MCP core · skills).
+- Build artifact `dist/nonoun-color-tokens.html` → `dist/ultimate-tokens.html`; `pages.yml` follows it.
+- The **company** brand is unchanged: `nonoun.io`, `support@nonoun.io`, the NONOUN mark, and the
+  vendor-prefixed `nonoun-figma-styles.plan.v1` schema all stay.
+
+Landed as #247 (code + gates) and #248 (docs, marketing, skills, and the user-facing name drift).
+
 ## 1.49 — 2026-07-04 — Editorial type voices: the taxonomy grows 7 → 11 (ADR-013)
 
 Four **editorial** voices join the type taxonomy, so `make7()` becomes **`make11()`**: **Lead** (a

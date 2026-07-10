@@ -1,6 +1,6 @@
 ## Rubric — a semantic-role change
 
-Scores a role addition/modification in nonoun-color-tokens. `[gate]` = mechanically checkable
+Scores a role addition/modification in ultimate-tokens. `[gate]` = mechanically checkable
 (`grep` / a named verifier / `npm test`); `[review]` = judgment with cited evidence. Score each 1–5.
 
 | # | Dimension | Type | What it checks | 1 (fail) → 3 (adequate) → 5 (excellent) |

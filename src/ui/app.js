@@ -1259,7 +1259,7 @@ class HctApp extends HTMLElement {
         h(
           "div",
           { class: "masthead-row" },
-          h("h1", { class: "masthead-title" }, "Color Tokens"),
+          h("h1", { class: "masthead-title" }, "Ultimate Tokens"),
           h("div", { class: "spacer" }),
           this.ensureSearchInput("Search your palette sets"),
         ),
@@ -1687,7 +1687,7 @@ class HctApp extends HTMLElement {
           onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.toGallery(); } },
         },
         brandMark(),
-        "Color Tokens",
+        "Ultimate Tokens",
       ),
       h("input", {
         class: "docname",

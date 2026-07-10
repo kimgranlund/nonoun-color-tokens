@@ -6,7 +6,7 @@
 > *structure, behavior, state, and states* — never pixels, component APIs, color, or type. Where a
 > requirement would pin an implementation choice, it is stated as a constraint with a rationale and the
 > freedom left explicit.
-> **Origin:** abstracted from the shipped `nonoun-color-tokens` shell; its concrete realization is the
+> **Origin:** abstracted from the shipped `ultimate-tokens` shell; its concrete realization is the
 > reference implementation and lives in `.claude/docs/lld/app-shell.md` (the LLD — the *how*). This SPEC
 > is the *what*; that LLD is one conforming build.
 > **Audience:** implementers building a create/configure/analyze tool who want a proven shell skeleton
@@ -279,7 +279,7 @@ changing region roles, routing, or the render/refresh contracts.
 | PRD-G6 density control | R16 |
 | PRD-G7 design-system-agnostic | R11, R20 |
 
-**Reference implementation:** `nonoun-color-tokens` — see `.claude/docs/lld/app-shell.md` (maps each
+**Reference implementation:** `ultimate-tokens` — see `.claude/docs/lld/app-shell.md` (maps each
 region here to a concrete `LLD-C*`, e.g. this SPEC's §R3 analysis rail ↔ its left pane; §R8 section axis
 ↔ its `this.section` routing; §R12 live-refresh ↔ its partial `liveRefresh`). That LLD is one conforming
 build; this SPEC is the portable contract.

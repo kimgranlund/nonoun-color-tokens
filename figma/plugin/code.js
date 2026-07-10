@@ -142,11 +142,11 @@ figma.ui.onmessage = async (msg) => {
   } catch (e) {
     // Log the technical detail to the console for debugging; show the user a friendly, actionable
     // message naming what was attempted (never the raw error / stack).
-    console.error("[Color Tokens] '" + (msg && msg.type) + "' failed:", e);
+    console.error("[Ultimate Tokens] '" + (msg && msg.type) + "' failed:", e);
     // Tell the iframe an apply FAILED so it can clear its optimistic "Applying…" toast (→ onApplyError).
     if (msg && msg.type === "apply") { try { figma.ui.postMessage({ type: "apply-error" }); } catch (e2) { /* UI gone */ } }
     const what = (msg && ACTIONS[msg.type]) || "complete that action";
-    figma.notify("Color Tokens couldn't " + what + ". Please try again — if it keeps happening, email support@nonoun.io.", { error: true });
+    figma.notify("Ultimate Tokens couldn't " + what + ". Please try again — if it keeps happening, email support@nonoun.io.", { error: true });
   }
 };
 

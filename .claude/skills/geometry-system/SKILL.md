@@ -1,7 +1,7 @@
 ---
 name: geometry-system
 description: >
-  Change the dimensional / GEOMETRY ENGINE in nonoun-color-tokens — the centering
+  Change the dimensional / GEOMETRY ENGINE in ultimate-tokens — the centering
   law, the size ramp (XS–2XL heights + glyphs), radius and spacing ladders, and the
   composition with typography. Use whenever a change touches src/engine/geometry.mjs
   or src/ui/model.mjs geometryScale, or someone says "change the size ramp / control
@@ -12,7 +12,7 @@ description: >
   systematic ramp → tokens).
 ---
 
-# Geometry / dimensional engine — nonoun-color-tokens
+# Geometry / dimensional engine — ultimate-tokens
 
 `src/engine/geometry.mjs` is the spatial analog of the color & type engines: **`{ treatment, baseHeight }` → a
 six-size ramp → derived control geometry → DTCG / CSS / Figma tokens.** Pure, no DOM, no RNG. It encodes ONE

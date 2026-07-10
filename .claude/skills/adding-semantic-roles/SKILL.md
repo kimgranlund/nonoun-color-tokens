@@ -1,14 +1,14 @@
 ---
 name: adding-semantic-roles
 description: >
-  Use when adding or changing a semantic color role/token in nonoun-color-tokens —
+  Use when adding or changing a semantic color role/token in ultimate-tokens —
   "add a semantic role", "add hover/active/disabled states", "change a role's ref",
   any edit to src/engine/semantic.js, or a red count gate ("53 vs N"). Walks the
   lockstep parity procedure so the answer key, Figma copy, count literals, and
   spec prose all move together.
 ---
 
-# Adding (or changing) a semantic role — nonoun-color-tokens
+# Adding (or changing) a semantic role — ultimate-tokens
 
 Each palette resolves **53** roles (`semanticRoles(n)` in `src/engine/semantic.js`). The role set lives in
 ONE place but is **mirrored and counted in eight others**; the classic break is a half-applied count (one

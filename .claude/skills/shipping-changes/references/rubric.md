@@ -1,6 +1,6 @@
 ## Rubric — a shipped change
 
-Scores a ship of nonoun-color-tokens (one PR landed + local synced). `[gate]` = mechanically checkable
+Scores a ship of ultimate-tokens (one PR landed + local synced). `[gate]` = mechanically checkable
 (grep / a `gh`/`git` command); `[review]` = judgment with cited evidence. Score each 1–5.
 
 | # | Dimension | Type | What it checks | 1 (fail) → 3 (adequate) → 5 (excellent) |

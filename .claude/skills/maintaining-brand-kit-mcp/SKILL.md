@@ -14,7 +14,7 @@ description: >
   (Color / Typography / Geometry) is wrong".
 ---
 
-# Brand-Kit MCP server — nonoun-color-tokens
+# Brand-Kit MCP server — ultimate-tokens
 
 The Brand-Kit MCP is two **zero-dependency** files: `mcp/brand-kit-core.mjs` — the PURE, transport-agnostic
 surface (`SERVER` · `buildSurface(kit)` · `handle(msg, surface)`) — and `mcp/brand-kit-server.mjs`, the thin

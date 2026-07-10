@@ -57,14 +57,15 @@ The non-obvious do/don'ts (each cost a real bug or a review cycle), then a worke
   collection (the `regroup` gate asserts a fresh-but-single `Color Modes` with scrims last).
 - **Apply embeds the config in `figma.root` pluginData.** A read-back must reproduce the params losslessly —
   don't drop the `config` from the `apply` message or recover state approximately from colors when the exact
-  config is available. The `config` gate proves apply embeds it under `nonoun-color-tokens-config` and
-  `load-config` round-trips it (including the legacy `hct-config` key fallback).
+  config is available. The `config` gate proves apply embeds it under `ultimate-tokens-config`, that
+  `load-config` round-trips it, and that a file carrying only PRE-RENAME keys loads as a clean empty config
+  — `setPluginData` is namespaced per plugin id, so those keys are orphaned and unreadable, never adopted.
 
 ### After regenerating the bundle
 
-- **Run `npm run gen:figma-ui`** so `figma/plugin/ui.html` reflects the current `dist/nonoun-color-tokens.html`
-  (it embeds `<nonoun-color-tokens>` + the bridge). `npm test` runs it for you, but a hand-built `ui.html` or a
-  stale one fails the `ui` gate (it checks for `<nonoun-color-tokens>`, the `figma-init`/`pluginMessage`/
+- **Run `npm run gen:figma-ui`** so `figma/plugin/ui.html` reflects the current `dist/ultimate-tokens.html`
+  (it embeds `<ultimate-tokens>` + the bridge). `npm test` runs it for you, but a hand-built `ui.html` or a
+  stale one fails the `ui` gate (it checks for `<ultimate-tokens>`, the `figma-init`/`pluginMessage`/
   `figmaBundle` bridge, the `config-loaded`→`applyLoadedConfig` round-trip, and `variables-read`→
   `receiveLiveVariables`). `ui.html` is generated — never hand-edit it.
 

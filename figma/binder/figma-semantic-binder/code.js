@@ -296,7 +296,7 @@ async function main() {
   if (FLOAT_PLANS.length) fp = await applyFloatPlans(FLOAT_PLANS);
 
   if (!rawColl && !fp) {
-    figma.notify('No "Color Primitives" collection found — apply your palette in Color Tokens first, then run the Binder.', { error: true });
+    figma.notify('No "Color Primitives" collection found — apply your palette in Ultimate Tokens first, then run the Binder.', { error: true });
     figma.closePlugin();
     return;
   }

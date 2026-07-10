@@ -1,7 +1,7 @@
 # ultimate-tokens — the consumption plugin
 
 Three skills that teach a coding agent to **consume** an exported
-[Ultimate Tokens](https://kimgranlund.github.io/nonoun-color-tokens/) design-token kit correctly in
+[Ultimate Tokens](https://kimgranlund.github.io/ultimate-tokens/) design-token kit correctly in
 *your* project — picking the right semantic role for every UI surface instead of guessing a hex, a
 font size, or a pixel value.
 
@@ -32,7 +32,7 @@ names the semantic token for the job rather than inventing a value — or stops 
 Add the marketplace, then the plugin:
 
 ```
-/plugin marketplace add kimgranlund/nonoun-color-tokens
+/plugin marketplace add kimgranlund/ultimate-tokens
 /plugin install ultimate-tokens
 ```
 
@@ -41,7 +41,7 @@ the right skill activates on the task.
 
 ## Provenance
 
-Authored in [`nonoun-color-tokens`](https://github.com/kimgranlund/nonoun-color-tokens) (the generator
+Authored in [`ultimate-tokens`](https://github.com/kimgranlund/ultimate-tokens) (the generator
 that produces the kits these skills consume). Every skill is parity-gated against the product's
 engines in that repo's `npm test`, so the skills cannot drift from the tokens they document — and each
 was independently reviewed before shipping.
