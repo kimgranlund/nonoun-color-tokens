@@ -15,7 +15,7 @@ who builds what:
   *"No 'Color Primitives' collection found — apply your palette in Color Tokens first, then run the Binder."*
   and closes. It has no UI and no `figmaBundle` — its inputs are purely the live variables in the open file.
 - **The app-as-plugin** (`figma/plugin/`) is the whole generator running inside Figma. `ui.html` embeds
-  `<nonoun-color-tokens>` (built by `npm run gen:figma-ui` from `dist/nonoun-color-tokens.html`); the UI posts
+  `<ultimate-tokens>` (built by `npm run gen:figma-ui` from `dist/ultimate-tokens.html`); the UI posts
   `figmaBundle()` to `code.js#applyBundle`, which CREATES both collections from scratch, prunes orphans, and
   can rebuild. It needs nothing pre-existing.
 
@@ -97,14 +97,18 @@ stops, so targets < canonical is expected, not a miss.)
   target resolves, so the `cascade` gate proves every mode-value IS an alias to a created raw var; the
   fallback is a safety net, not the normal path.
 - **config embedding**: apply writes `serialize(this.doc)` into `figma.root` pluginData under
-  `CONFIG_KEY = "nonoun-color-tokens-config"` (with a `LEGACY_CONFIG_KEY = "hct-config"` fallback for files
-  saved before the rename). This is the source-of-truth round-trip — the exact hue/chroma/skew/lift travels
-  IN the `.fig`, so a re-read reproduces the state losslessly, not approximately from the colors.
+  `CONFIG_KEY = "ultimate-tokens-config"`. This is the source-of-truth round-trip — the exact
+  hue/chroma/skew/lift travels IN the `.fig`, so a re-read reproduces the state losslessly, not
+  approximately from the colors.
+- **pluginData is namespaced PER PLUGIN ID** — so when the plugin id changed to `ultimate-tokens`, every
+  key written under the old id became unreachable. There is no read path to them, which is why no
+  `LEGACY_CONFIG_KEY` fallback exists (a former `"hct-config"` fallback was removed with the id change).
+  A pre-rename file therefore opens as a clean empty config, never a stale one — gated in `test/figma/plugin.mjs`.
 
 ### 6. The consent gate (grep `src/ui/app.js`)
 
 `requestApplyToFigma(rebuild)` → if a normal apply is already consented (a versioned localStorage key,
-`nonoun-color-tokens-apply-consent-v1`, via `_applyConsented()`), apply immediately; otherwise open
+`ultimate-tokens-apply-consent-v1`, via `_applyConsented()`), apply immediately; otherwise open
 `renderApplyGate()` — a *back up your file first* road-block. Normal apply is cookieable ("don't show again"
 → `_setApplyConsent()`); the destructive **Regroup** always re-warns — `renderApplyGate` renders the checkbox
 as `rebuild ? false : <checkbox>`, and `confirmApplyGate` only persists consent when `!rebuild`. `applyToFigma`

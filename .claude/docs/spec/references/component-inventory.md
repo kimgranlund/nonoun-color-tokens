@@ -1,4 +1,4 @@
-# Component Inventory — nonoun-color-tokens UI
+# Component Inventory — ultimate-tokens UI
 
 > Inventory of every interactive primitive + data-viz mark in the UI, profiled as a **contract
 > card** on the COMPOSE axis (layer → anatomy → API → composition). Produced with the
@@ -22,13 +22,13 @@
 ## The architecture finding (read first)
 
 There is **no component library**. The entire UI is one monolithic autonomous web component —
-`nonoun-color-tokens` (`src/ui/app.js`, ~5,330 lines, `customElements.define` at `app.js:5327`) —
+`ultimate-tokens` (`src/ui/app.js`, ~5,330 lines, `customElements.define` at `app.js:5327`) —
 that builds every control inline with a single hyperscript helper `h(tag, attrs, ...kids)`
 (`app.js:172`), across ~25 `render*()` methods. Styling is ~570 CSS class selectors in
 `src/ui/styles.css` (~1,282 lines). Consequences that recur in every card below:
 
 - **S2 is not a second surface.** `scripts/gen-figma-ui.mjs` bundles the *same* compiled app
-  (`dist/nonoun-color-tokens.html`) and injects a postMessage bridge that flips `inFigma`
+  (`dist/ultimate-tokens.html`) and injects a postMessage bridge that flips `inFigma`
   (`gen-figma-ui.mjs:23-38`). So **S2 reuses S1's primitives verbatim**; the only S2-specific
   *instances* are `inFigma`-gated buttons ("Read live" `app.js:1950`, "Read approx →" `app.js:803`,
   `.figma-plugin-btn` `app.js:2638`) and the `.figma-files` mode segment (`app.js:2625`).

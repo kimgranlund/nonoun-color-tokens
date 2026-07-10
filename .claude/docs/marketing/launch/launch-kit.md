@@ -22,7 +22,7 @@ within a minute of clicking. Posture: **social/short-form** (§4). Facts:
   Brand-Kit MCP, in the free tier. → {{APP_URL}}
 • Install the Ultimate Tokens plugin and your coding agent builds with your
   exact roles — which of the 53 goes where, not a guessed hex. Free.
-  → /plugin marketplace add kimgranlund/nonoun-color-tokens
+  → /plugin marketplace add kimgranlund/ultimate-tokens
 • Export a design system to Claude, Google Stitch, or Figma Make; each
   generates on-brand UI from your kit. Free, every tier. → {{APP_URL}}
 • Export your tokens under your own names — Ultimate, Material 3-style
@@ -72,7 +72,7 @@ within a minute of clicking. Posture: **social/short-form** (§4). Facts:
 > with your exact tokens — which of the 53 semantic roles goes on each surface, not a guessed hex.
 > Three consumption skills (color · type · geometry) and a `token-integrator` agent that wires a
 > component or migrates a whole UI. Free, MIT, parity-gated against the generator so its guidance
-> can't drift from the tokens. → `/plugin marketplace add kimgranlund/nonoun-color-tokens`
+> can't drift from the tokens. → `/plugin marketplace add kimgranlund/ultimate-tokens`
 
 ## Design-system export launch post
 

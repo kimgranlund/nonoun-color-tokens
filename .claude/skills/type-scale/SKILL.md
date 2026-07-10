@@ -2,14 +2,14 @@
 name: type-scale
 description: >
   Use when a change touches src/engine/type.mjs or any typography in
-  nonoun-color-tokens — the modular scale, a voice or treatment,
+  ultimate-tokens — the modular scale, a voice or treatment,
   tracking/leading/weight/case, a font swap, a fallback-font render, or a red
   type gate. Covers the eleven named voices (Display · Heading · Sub-heading · Kicker · Lead ·
   Body · Quote · Caption · UI · Code · Legal), the five treatments, and the self-hosted fonts. TYPE sibling of
   color-math (COLOR only).
 ---
 
-# The typography engine — the type scale (nonoun-color-tokens)
+# The typography engine — the type scale (ultimate-tokens)
 
 One file, `src/engine/type.mjs`, the type analog of the color engine: a few per-voice params → a systematic
 scale → DTCG / CSS tokens. Pure, no DOM, no magic numbers — every step's size, line-height, letter-spacing,

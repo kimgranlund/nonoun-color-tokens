@@ -152,7 +152,7 @@ Format: Context → Decision → Rationale → Consequences → Status.
 - **Status.** DECIDED.
 - **Re-framed 2026-06-15 (from the build).** "Single-file" is the **distribution** format, not an
   authoring constraint. The reference build authors **modular ES modules** (engine · tonal · semantic ·
-  export · persist) and **bundles** them to one offline HTML (`nonoun-color-tokens.html`, ~111 KB,
+  export · persist) and **bundles** them to one offline HTML (`ultimate-tokens.html`, ~111 KB,
   opens via `file://`). Authoring modular *and* distributing single-file are both satisfied — the
   "no build step" line means *no toolchain is required to run it*, not *the source must be one file*.
 
@@ -252,6 +252,32 @@ Format: Context → Decision → Rationale → Consequences → Status.
 
 ---
 
+## ADR-014 — The `ultimate-tokens` rename orphans all Figma `pluginData` (no migration is possible)
+- **Context.** The product renamed `nonoun-color-tokens` → `ultimate-tokens` across four namespaces: the
+  custom element, the localStorage keys, the Figma plugin id, and the brand-kit MCP schema. Three of the
+  four are migratable. The fourth is not.
+- **Decision.** Rename the Figma plugin `id` anyway, accepting that every key it ever wrote is orphaned.
+- **Why no migration exists.** `figma.root.setPluginData(key, value)` is namespaced **by the calling
+  plugin's id**. A plugin can only read back the data *it* wrote under *its own* id. Once the id changes,
+  the pre-rename keys are not merely differently-named — they are **unreachable**, from any code path, in
+  any plugin. There is no cross-id read API. A "migration" would have to run under the OLD id, and the old
+  plugin is what's being replaced. So `LEGACY_CONFIG_KEY` (the `"hct-config"` fallback that survived the
+  *previous* rename, when the id happened not to change) is dead code and was removed.
+- **What is gated instead.** `load-config` must degrade to a **clean empty config** when only pre-rename
+  keys are present — never throw, never silently adopt a stale one (`test/figma/plugin.mjs`, `config` gate).
+  The user's cost is re-running *apply* once on an old `.fig`; the config also travels in the exported
+  bundle, so nothing is unrecoverable.
+- **Contrast with localStorage.** The web app's keys ARE migratable — same origin, no namespacing — so
+  `migrateStorageKeys()` chains `hct-palette-state-v1` ← `nonoun-color-tokens` ← `ultimate-tokens`,
+  newest legacy wins, and never overwrites a present key. The asymmetry is the platform's, not a choice.
+- **Consequences.** The `<nonoun-color-tokens>` element tag stays registered as a deprecated alias (and its
+  CSS selectors keep matching), because there the compatibility *is* free. The separately-published **Color
+  Tokens Semantic Binder** plugin keeps its own id (`color-tokens-semantic-binder`) for the same reason in
+  reverse: renaming it would orphan *its* data and its Figma listing, and it gains nothing.
+- **Status.** DECIDED.
+
+---
+
 ## Quick map: decisions an enhancing agent is most likely to "fix" (don't)
 | ADR | Looks wrong because… | But it's intentional because… |
 |-----|----------------------|-------------------------------|
@@ -260,3 +286,4 @@ Format: Context → Decision → Rationale → Consequences → Status.
 | ADR-002 | semantic could alias raw to cascade | native import errors on name-only aliasData; plugin does cascade |
 | ADR-011 | `role-table.json` still encodes cam16 hues though hueSpace is now OKLCH | role-table is the cam16 answer key for the parity gate; the OKLCH flip is at the doc/seed layer, not the role table |
 | ADR-007 | a real-looking Figma schema isn't imported | the schema is unverified/non-native |
+| ADR-014 | a pre-rename `.fig` loses its embedded config, and no migration was written | `setPluginData` is namespaced per plugin id — the old keys are unreadable from the new id; a migration cannot exist |

@@ -8,6 +8,33 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 
 ## [Unreleased]
 
+### 2026-07-09
+
+#### Changed
+- **The deeper identity rename — `nonoun-color-tokens` → `ultimate-tokens`.** Following the folder and
+  GitHub-repo move, the product's identity moved everywhere it is *addressable*, in four namespaces:
+  the **custom element** (`<nonoun-color-tokens>` → **`<ultimate-tokens>`**, with the old tag kept as a
+  deprecated alias so pre-rename embeds keep booting — every tag-keyed CSS selector matches both);
+  **localStorage** (`ultimate-tokens-*`, with `migrateStorageKeys()` now a chain
+  `hct-palette-state-v1` ← `nonoun-color-tokens` ← `ultimate-tokens`, newest legacy wins, never clobbering
+  a present key); the **Figma plugin id** and its `pluginData` keys; and the **brand-kit MCP schema**
+  (`nonoun-brand-kit/1` → **`ultimate-tokens-brand-kit/1`**). The build artifact is now
+  `dist/ultimate-tokens.html` and the Pages deploy follows it. (#247)
+- **The public install command changed** — the Claude plugin is now
+  `/plugin marketplace add kimgranlund/ultimate-tokens`. GitHub redirects the old path, but new copy
+  uses the new one. (#248)
+- **User-facing product-name drift repaired.** The flagship Figma plugin's error toast and console prefix
+  still said "Color Tokens" while its manifest said "Ultimate Tokens by NONOUN"; the app's masthead `<h1>`
+  and brand link said the same. All now read **Ultimate Tokens**. The separately-published **Color Tokens
+  Semantic Binder** plugin keeps its own published name and id. (#248)
+
+#### Removed
+- **`LEGACY_CONFIG_KEY` (the Figma `"hct-config"` fallback).** `figma.root.setPluginData` is namespaced
+  **per plugin id**, so changing the id orphans every pre-rename key — there is no read path to them and no
+  migration is possible. The fallback was dead code. In its place, a gate proves `load-config` degrades to a
+  clean empty config when only pre-rename keys exist, rather than silently adopting a stale one. (#247)
+
+
 ### 2026-07-05
 
 #### Added

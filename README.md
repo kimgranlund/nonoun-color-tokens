@@ -1,9 +1,9 @@
 # Ultimate Tokens by NONOUN
 
-[![CI](https://github.com/kimgranlund/nonoun-color-tokens/actions/workflows/ci.yml/badge.svg)](https://github.com/kimgranlund/nonoun-color-tokens/actions/workflows/ci.yml)
-[![Live demo](https://img.shields.io/badge/demo-live-2b8a3e)](https://kimgranlund.github.io/nonoun-color-tokens/)
+[![CI](https://github.com/kimgranlund/ultimate-tokens/actions/workflows/ci.yml/badge.svg)](https://github.com/kimgranlund/ultimate-tokens/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-live-2b8a3e)](https://kimgranlund.github.io/ultimate-tokens/)
 
-**▶ [Try it live](https://kimgranlund.github.io/nonoun-color-tokens/)** — the dependency-free,
+**▶ [Try it live](https://kimgranlund.github.io/ultimate-tokens/)** — the dependency-free,
 single-file build, served straight from GitHub Pages. (It's the very same `.html` you get from a
 local build; download it and it runs offline from `file://`.)
 
@@ -12,7 +12,7 @@ even across their whole range, derives a **53-role semantic layer** (surfaces, o
 containers, scrims, inverse), and exports to **CSS, Tailwind v4, shadcn/ui, Figma, DTCG, JSON, Claude
 Design** and more — plus a one-click `.zip` of everything.
 
-It ships three ways: a **Vite web app**, a single dependency-free **`<nonoun-color-tokens>` web
+It ships three ways: a **Vite web app**, a single dependency-free **`<ultimate-tokens>` web
 component**, and a **Figma plugin** that writes the palette straight into the file's variable
 collections.
 
@@ -83,8 +83,8 @@ npm run preview    # serve the built dist/
 
 `npm run build` produces:
 - `dist/` — the Vite-built web app (the color categories are code-split into lazy chunks).
-- `dist/nonoun-color-tokens.html` — a dependency-free **offline single-file** build (open it
-  directly). This is the artifact published to the [live demo](https://kimgranlund.github.io/nonoun-color-tokens/).
+- `dist/ultimate-tokens.html` — a dependency-free **offline single-file** build (open it
+  directly). This is the artifact published to the [live demo](https://kimgranlund.github.io/ultimate-tokens/).
 - `figma/plugin/ui.html` — the Figma plugin UI (the bundled app + a postMessage bridge).
 
 ## Test
@@ -107,7 +107,7 @@ src/
   ui/       app.js · model.mjs · persist.js · styles.css · icons.js · zip.mjs
             categories/     index.js + one lazy module per category (generated)
             figma-plugin-assets.js
-  main.ts   — Vite entry (imports the stylesheet + <nonoun-color-tokens>, mounts it)
+  main.ts   — Vite entry (imports the stylesheet + <ultimate-tokens>, mounts it)
 figma/
   plugin/   code.js · manifest.json · ui.html              — the generator AS a Figma plugin
   binder/   bind-plan.mjs · figma-semantic-binder/          — the standalone Semantic Binder plugin
@@ -117,7 +117,7 @@ scripts/    bundle.mjs · gen-categories.mjs · gen-figma-ui.mjs · gen-figma-as
 test/       engine/ · ui/ · figma/ · run.mjs
 ```
 
-The engine is pure and DOM-free; `src/ui/app.js` defines the `<nonoun-color-tokens>` web component over
+The engine is pure and DOM-free; `src/ui/app.js` defines the `<ultimate-tokens>` web component over
 it; the Figma plugin reuses the exact same bundle. `.claude/docs/spec/data/role-table.json` is the **canonical
 contract** the semantic / export / figma verifiers validate against — it is the spec, not a derived
 file. The Color Categories are generated from `.claude/docs/spec/colors/categories/*.json` by

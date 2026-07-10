@@ -1,7 +1,7 @@
 ---
 name: adding-export-formats
 description: >
-  Use when adding or changing a token output format in nonoun-color-tokens —
+  Use when adding or changing a token output format in ultimate-tokens —
   someone says "add an export format", "emit a new framework / DTCG / Figma
   file", "change an export's output shape", "wire a tab into the export drawer",
   or "a new role didn't show up in shadcn" — or a change touches
@@ -10,7 +10,7 @@ description: >
   plus its export-drawer tab and Download-All zip entry.
 ---
 
-# Adding (or changing) an export format — nonoun-color-tokens
+# Adding (or changing) an export format — ultimate-tokens
 
 An export format is one serializer that turns the resolved engine output into a portable artifact (a CSS
 string, a DTCG tree, a framework file). The **color** formats live in `src/engine/exports.js` (8 of them);

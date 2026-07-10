@@ -1,6 +1,6 @@
 ## Rubric — an export-format change
 
-Scores adding or changing an output format in nonoun-color-tokens. `[gate]` = mechanically checkable (`grep` / a named verifier / `npm test`); `[review]` = judgment with cited evidence. Score each 1–5.
+Scores adding or changing an output format in ultimate-tokens. `[gate]` = mechanically checkable (`grep` / a named verifier / `npm test`); `[review]` = judgment with cited evidence. Score each 1–5.
 
 | # | Dimension | Type | What it checks | 1 (fail) → 3 (adequate) → 5 (excellent) |
 |---|---|---|---|---|

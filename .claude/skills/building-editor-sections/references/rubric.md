@@ -1,6 +1,6 @@
 # Rubric — editor section
 
-Scores a built or evolved editor section in the `<nonoun-color-tokens>` workbench. `[gate]` = mechanically
+Scores a built or evolved editor section in the `<ultimate-tokens>` workbench. `[gate]` = mechanically
 checkable (grep / `npm test`); `[review]` = judgment with cited evidence. Score each 1–5.
 
 | # | Dimension | Type | What it checks | 1 (fail) → 3 (adequate) → 5 (excellent) |

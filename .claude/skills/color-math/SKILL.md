@@ -9,7 +9,7 @@ description: >
   modes, chroma shaping, neutral/relative derivation.
 ---
 
-# Color math — the perceptual engine (nonoun-color-tokens)
+# Color math — the perceptual engine (ultimate-tokens)
 
 Four files, one rule: **every emitted color is in-gamut by construction, hits its target tone, and holds a
 constant CAM16 hue along the ramp** — and the verifiers prove all three on every change. Color math is

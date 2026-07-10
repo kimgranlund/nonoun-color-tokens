@@ -1,7 +1,7 @@
 ---
 name: maintaining-figma-plugins
 description: >
-  Work on the Figma plugins for nonoun-color-tokens — the standalone semantic
+  Work on the Figma plugins for ultimate-tokens — the standalone semantic
   Binder and the app-as-plugin apply path. Use whenever a change touches figma/,
   a binder/plugin code.js, the offline manifest, the "Color Modes" / "Color
   Primitives" collections, the raw→semantic alias cascade, the apply/Regroup
@@ -10,7 +10,7 @@ description: >
   fails to run / syntax error in the sandbox".
 ---
 
-# Figma variable binder — nonoun-color-tokens
+# Figma variable binder — ultimate-tokens
 
 There are **TWO** Figma plugins in `figma/`, and they are NOT the same artifact. Know which one a task
 touches before you change a line — they share the Color Primitives → Color Modes vocabulary but differ in
@@ -21,7 +21,7 @@ who creates what:
 | Path | `figma/binder/figma-semantic-binder/{code.js, manifest.json}` | `figma/plugin/{code.js, manifest.json, ui.html}` |
 | Does | aliases an existing raw collection → a new aliased `Color Modes` | the full generator UI; `applyBundle` CREATES both collections, prunes, can rebuild |
 | Needs | `Color Primitives` to ALREADY exist (else it notifies + closes) | nothing — it generates the raw colors too |
-| `ui.html` | none (no UI) | the generated app bundle (`npm run gen:figma-ui` → `<nonoun-color-tokens>` + the bridge) |
+| `ui.html` | none (no UI) | the generated app bundle (`npm run gen:figma-ui` → `<ultimate-tokens>` + the bridge) |
 | Verifier | `test/figma/binder.mjs` | `test/figma/plugin.mjs` |
 
 The conceptual model — *why* aliasing is the only thing giving a live raw→semantic cascade — is owned by
@@ -92,7 +92,7 @@ NUMBER (FLOAT) vars via `geomTokensFigma` (`src/engine/geometry.mjs`).
    no dangling `"{n}/50"`, no out-of-range scrim step.
 5. **If you regenerated the app bundle**, run `npm run gen:figma-ui` so `figma/plugin/ui.html` is current
    (`npm test` runs it for you; a stale `ui.html` fails the `ui` gate). Never hand-edit `ui.html` — it is
-   generated from `dist/nonoun-color-tokens.html`.
+   generated from `dist/ultimate-tokens.html`.
 
 ## Validate (draft → check → fix → re-check)
 

@@ -1,7 +1,7 @@
 ---
 name: marketing-manager
 description: >
-  Owns the marketing corpus of nonoun-color-tokens (.claude/docs/marketing/ — the voice platform,
+  Owns the marketing corpus of ultimate-tokens (.claude/docs/marketing/ — the voice platform,
   the pinned fact sheet, store copy, product descriptions, the launch/social kit) and authors or
   updates ANY customer-facing words for Ultimate Tokens / NONOUN. Use PROACTIVELY when marketing,
   store, launch, social, email, or in-app upsell/lifecycle copy must be written, revised, or

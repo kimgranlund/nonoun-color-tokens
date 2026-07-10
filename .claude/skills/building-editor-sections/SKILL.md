@@ -2,13 +2,13 @@
 name: building-editor-sections
 description: >
   Use when adding a new editor section, promoting a modal into a section, or
-  adding a per-section canvas view/mode/table to the nonoun-color-tokens
+  adding a per-section canvas view/mode/table to the ultimate-tokens
   workbench editor. Covers the Color · Typography · Geometry pattern — canvas
   + left-analysis + right-inspector, this.section routing, tokenOverrides
   matrix, lettered headless + smoke tests.
 ---
 
-# Building editor sections (nonoun-color-tokens workbench)
+# Building editor sections (ultimate-tokens workbench)
 
 A **section** is one of the three systems of a brand-kit doc surfaced as a slice of the editor:
 `this.section ∈ {color, typography, geometry}`. Each owns the same five-region shell — **App-Header

@@ -1,7 +1,7 @@
 ---
 name: shipping-changes
 description: >
-  Use when a change in nonoun-color-tokens is ready to land — "ship this",
+  Use when a change in ultimate-tokens is ready to land — "ship this",
   "open a PR", "merge and sync", "release this" — or proactively when work is
   done and green. Covers the full release workflow: branch from origin/main,
   the two gates (npm test, npm run build), PR, CI watch (build · test ·
@@ -9,7 +9,7 @@ description: >
   isolation for fan-outs.
 ---
 
-# Shipping changes (nonoun-color-tokens)
+# Shipping changes (ultimate-tokens)
 
 `CLAUDE.md`'s Shipping + Always sections have the one-paragraph version — read them; this skill owns
 the full procedure and the concurrency recovery. The repo is squash-merge, has no local git hooks

@@ -10,8 +10,8 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 |---|---|---|
 | Product name | **Ultimate Tokens by NONOUN** (first mention) → Ultimate Tokens | `index.html` `<title>` |
 | Maker | **NONOUN** (always uppercase) | brand mark, `public/icons/` |
-| Internal id (never customer-facing) | `nonoun-color-tokens` | `package.json` |
-| Live app | `https://kimgranlund.github.io/nonoun-color-tokens/` (until `app.nonoun.io`) | README badge |
+| Internal id (kebab form; never customer-facing) | `ultimate-tokens` | `package.json` |
+| Live app | `https://kimgranlund.github.io/ultimate-tokens/` (until `app.nonoun.io`) | README badge |
 | Semantic roles per palette | **53**, resolved for Light + Dark | `.claude/docs/spec/data/role-table.json` `rolesPerPalette` |
 | Default palettes | **8** | `role-table.json` `defaults` |
 | Tonal ramp | **050–950** (19 display stops; 25 in exports with the extra stops) | `src/engine/tonal.js` `STOPS`/`EXPORT_STOPS` |
@@ -32,7 +32,7 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 | Brand-Kit MCP | zero-dependency stdio server download, pre-filled with your tokens, for Claude Code / Cursor / any MCP agent; **hosted** endpoint is a Pro feature (not yet live — never market it as live) | `mcp/` |
 | Ultimate Tokens Claude plugin | installable Claude Code plugin, **free + MIT**, that teaches a coding agent to CONSUME an exported kit in its own project — 3 skills (**color-tokens** · **typography-tokens** · **geometry-tokens**) + the **`token-integrator`** agent; parity-gated against the engines in `npm test`. Install: `/plugin marketplace add kimgranlund/nonoun-color-tokens` → `/plugin install ultimate-tokens` | `plugin/ultimate-tokens/` |
 | Design system export | **free** on every tier — one canonical core (a universal-dialect `DESIGN.md` generation prompt + a `tokens.json` carrier: light + dark colour role set + type / spacing / radii, on-colours measured WCAG-AA, OKLCH payload) emitted as **three platform targets**, one folder each in the Download-all `.zip`: **`design-system-for-claude-code/`** (10 files — `DESIGN.md` · `tokens.json` · `components/*.html` **7** preview cards · `README.md`; the Claude-facing target for both `claude.ai/design` (Anthropic's surface where a vision-capable Claude generates on-brand UI) and Claude Code) · **`design-system-for-google-stitch/`** (2 files — a byte-identical `DESIGN.md` + `README.md`; for **Google Stitch**, Google's generative-UI tool) · **`design-system-for-figma-make/`** (9 files — a routed `guidelines/` tree of compiled shadcn + `README.md`; for **Figma Make**, React + Tailwind + shadcn/ui). The `DESIGN.md` is a **10-section** generation prompt carrying the kit's own guardrails. In-app it surfaces as a **"Design System"** Export-drawer group (tokens.json + DESIGN.md tabs); the three-folder split appears in Download-all, not as three drawer groups | `src/engine/exports.js` `exportDesignSystemBundle` / `exportDesignSystemStitchBundle` / `exportDesignSystemMakeBundle` |
-| Dependencies | **zero** runtime dependencies; ships as one self-contained file that runs offline | `package.json`, `dist/nonoun-color-tokens.html` |
+| Dependencies | **zero** runtime dependencies; ships as one self-contained file that runs offline | `package.json`, `dist/ultimate-tokens.html` |
 | Privacy | local-first: your browser + your Figma file; the **only network call is the license check** | `src/main.ts` |
 | Free tier | full generator · **2 brand kits** · core exports · base treatments · offline Figma plugin · MCP download · design-system export | `src/engine/flags.js` |
 | Pro | **$39/year, per user** — unlimited kits · complete export suite · advanced treatments · hosted MCP (when live) · updates + support | store, `flags.js` |

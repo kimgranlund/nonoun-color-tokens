@@ -44,8 +44,14 @@ for (const file of process.argv.slice(2)) {
     continue;
   }
   let pivots = 0;
+  let inFence = false;
   lines.forEach((text, i) => {
     const n = i + 1;
+
+    // Fenced code is code, not copy — no voice rule applies inside it (a store slug, a shell command, an
+    // id). Toggle on the fence line itself and skip everything within.
+    if (/^\s*(```|~~~)/.test(text)) { inFence = !inFence; return; }
+    if (inFence) return;
 
     for (const w of BANNED) {
       if (new RegExp(`(?<![\\w-])${w.replace(/[-\s]/g, "[-\\s]")}(?![\\w-])`, "i").test(text))
@@ -74,11 +80,13 @@ for (const file of process.argv.slice(2)) {
     // The PIVOT construction specifically: "…claim — not/never/no contrast…". Ordinary em-dashes
     // (bullets, appositions) are normal punctuation and not counted.
     if (/ — (?:not|never|no)\b/i.test(text)) pivots += 1;
-    // lowercase "nonoun" outside domains/emails/ids (nonoun.io, @nonoun, nonoun-color-tokens are fine)
-    if (/\bnonoun\b(?!\.io|-color)/.test(text.replace(/@nonoun/g, "")))
+    // lowercase "nonoun" outside domains/emails/ids (nonoun.io, @nonoun, any nonoun-* id are fine)
+    if (/\bnonoun\b(?!\.io|-)/.test(text.replace(/@nonoun/g, "")))
       report(file, n, "WARN", 'lowercase "nonoun" — the maker is always NONOUN (uppercase); ok only in code ids/paths/domains');
-    if (/nonoun-color-tokens/.test(text) && !/https?:\/\/|github\.io|`/.test(text))
-      report(file, n, "WARN", "internal id in copy — never customer-facing (URLs/code identifiers exempt)");
+    // The internal id shares its words with the brand name, so police the SHAPE: the kebab form is the id,
+    // "Ultimate Tokens" is the product. (The pre-rename id is still caught, for older copy.)
+    if (/ultimate-tokens|nonoun-color-tokens/.test(text) && !/https?:\/\/|github\.io|`/.test(text))
+      report(file, n, "WARN", "internal id (kebab form) in copy — write \"Ultimate Tokens\" (URLs/code identifiers exempt)");
   });
   if (pivots > 3) report(file, "-", "WARN", `${pivots} em-dash pivot constructions ("… — not …") in one piece — the signature dies as a tic; keep ~one per section`);
 }

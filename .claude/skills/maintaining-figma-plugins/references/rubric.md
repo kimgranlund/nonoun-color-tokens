@@ -1,6 +1,6 @@
 ## Rubric — a Figma-plugin change
 
-Scores a change to either Figma plugin in nonoun-color-tokens. `[gate]` = mechanically checkable (a named
+Scores a change to either Figma plugin in ultimate-tokens. `[gate]` = mechanically checkable (a named
 verifier / `npm test` / grep); `[review]` = judgment with cited evidence. Score each 1–5. This file OWNS the
 per-verifier gate-group list (the authoritative source is each verifier's report loop — the `for (const g of
 [...])` near its end): `binder.mjs` prints `bindings · offline · parity`; `plugin.mjs` prints `manifest ·
@@ -17,7 +17,7 @@ rather than a printed line; `node --check` is folded into the binder's `offline`
 | F5 | Apply correctness | [review] | (app path) `applyBundle` is find-or-create + full-mirror prune (semantic orphans first); idempotent (no duplicate collection/var/mode on re-run); `idempotent`+`prune`+`cascade` gates pass; every semantic mode-value aliases a CREATED raw var (the `lt ? alias : rgbaOf` fallback is a safety net, not the path) | 1: blind-create (duplicates) or an un-pruned orphan or an unaliased mode-value · 3: idempotent + pruned + cascaded · 5: + the config embedded in `figma.root` so read-back is lossless |
 | F6 | Cascade integrity | [review] | Each semantic var gets a Light AND a Dark alias to the right raw var via `setValueForMode`+`createVariableAlias`; refs go through `refKey`/`targetName`/`aliasTarget`, never hand-built | 1: a static color where an alias should be, a single-mode bind, or a hand-built target · 3: both modes aliased by ref · 5: + the light/dark flip mirrors the role's mode logic |
 | F7 | Regroup safety | [review] | (app path) `rebuildSemantic` re-creates `Color Modes` only, leaves Color Primitives intact, doesn't duplicate the collection, and stays behind the ALWAYS-warn gate (`renderApplyGate` renders `rebuild ? false : checkbox`; `confirmApplyGate` persists consent only when `!rebuild`) | 1: Regroup cookieable, or it touches Color Primitives, or duplicates the collection · 3: gated + isolated · 5: + the canonical regroup order (scrims last 7) preserved |
-| F8 | Bundle freshness | [gate] | (app path) `figma/plugin/ui.html` regenerated via `npm run gen:figma-ui`; the `ui` gate passes (embeds `<nonoun-color-tokens>` + the figma-init/pluginMessage/figmaBundle/config-loaded/variables-read bridge); `ui.html` not hand-edited | 1: stale/hand-edited `ui.html`, `ui` gate red · 3: regenerated, passes · 5: passes + the round-trip bridges (config + drift) all present |
+| F8 | Bundle freshness | [gate] | (app path) `figma/plugin/ui.html` regenerated via `npm run gen:figma-ui`; the `ui` gate passes (embeds `<ultimate-tokens>` + the figma-init/pluginMessage/figmaBundle/config-loaded/variables-read bridge); `ui.html` not hand-edited | 1: stale/hand-edited `ui.html`, `ui` gate red · 3: regenerated, passes · 5: passes + the round-trip bridges (config + drift) all present |
 
 **Gate to ship:** F1, F2, F3, F4 must each score ≥ 3 (and F8 for an app-path change). A plugin change that
 goes online (F1), uses `catch {` the Figma VM rejects (F2), drifts the hardcoded `roleTable` from

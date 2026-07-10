@@ -24,9 +24,10 @@ zero dependencies, offline-capable, engines pure, output verifiable — *is* the
 never claims a value the code doesn't embody.
 
 Naming discipline: **"Ultimate Tokens by NONOUN"** at first formal mention (store, page titles,
-legal); **"Ultimate Tokens"** thereafter; **NONOUN** is the maker, always uppercase; the internal id
-`nonoun-color-tokens` never appears in customer-facing copy (code identifiers, paths, and URLs are
-exempt until the app moves off the project domain).
+legal); **"Ultimate Tokens"** thereafter; **NONOUN** is the maker, always uppercase. The internal id is the
+kebab form `ultimate-tokens` — it shares its words with the brand name, so the rule is about SHAPE, not
+spelling: write "Ultimate Tokens", never `ultimate-tokens`, in customer-facing copy (code identifiers,
+paths, and URLs are exempt until the app moves off the project domain).
 
 ## 2 · Persona — who is speaking
 

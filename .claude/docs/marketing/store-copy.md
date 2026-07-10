@@ -271,7 +271,7 @@ bullets + FAQ only.
 > **Can my AI coding agent use the kit?**
 > Two ways, both free. Download the **Brand-Kit MCP** server and point Claude Code, Cursor, or any MCP
 > agent at it to read your exact roles and resolved tokens. Or install the **Ultimate Tokens Claude plugin**
-> (`/plugin marketplace add kimgranlund/nonoun-color-tokens`) — it teaches the agent which of the 53
+> (`/plugin marketplace add kimgranlund/ultimate-tokens`) — it teaches the agent which of the 53
 > semantic roles belongs on each surface, binding to your project's real exported variables.
 >
 > **Can an AI design tool generate a UI from my kit?**
