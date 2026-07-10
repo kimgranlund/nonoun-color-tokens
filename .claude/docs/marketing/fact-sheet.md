@@ -8,10 +8,10 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 
 | Fact | Value | Verify at |
 |---|---|---|
-| Product name | **Ultimate Tokens by NONOUN** (first mention) → Ultimate Tokens | `index.html` `<title>` |
-| Maker | **NONOUN** (always uppercase) | brand mark, `public/icons/` |
+| Product name | **Ultimate Tokens** — every mention; there is no longer form | `index.html` `<title>` |
+| Maker | **none** — the product is unattributed; no "by" line, no maker brand, no monogram | `test/repo/branding.mjs` (gated) |
 | Internal id (kebab form; never customer-facing) | `ultimate-tokens` | `package.json` |
-| Live app | `https://kimgranlund.github.io/ultimate-tokens/` (until `app.nonoun.io`) | README badge |
+| Live app | `https://kimgranlund.github.io/ultimate-tokens/` (no custom domain) | README badge |
 | Semantic roles per palette | **53**, resolved for Light + Dark | `.claude/docs/spec/data/role-table.json` `rolesPerPalette` |
 | Default palettes | **8** | `role-table.json` `defaults` |
 | Tonal ramp | **050–950** (19 display stops; 25 in exports with the extra stops) | `src/engine/tonal.js` `STOPS`/`EXPORT_STOPS` |
@@ -30,7 +30,7 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 | Figma styles | On "Apply → Figma", **style swatches bound to the variables** — opt-out via the **"Styles"** toggle in the export drawer (default on). A **paint style per semantic role per palette family** (`Primary/onPrimary`), grouped into `scrims/` + `surfaces/` sub-folders, each bound to its Color Modes variable so it tracks **Light + Dark** automatically — **424** on the default 8-palette kit (53 × 8). **Text styles per type voice × step** (`Display/xl`), bound to the Typography + Font Primitives variables, with literal leading/tracking. Plugin-created styles are updated/pruned on re-apply; the user's own styles are never touched. Download-all adds `figma/styles.plan.json` (a machine-readable plan) | `figma/binder/style-plan.mjs`, `figma/plugin/code.js` |
 | Sibling weights | Per type voice, named weight variants around the core (e.g. **Black 900 · Bold 700 · Medium 500**); a **Suggest** seeds defaults, user-editable in the Typography panel. Each sibling becomes a Figma text style (`Display/xl/Bold`), a CSS custom property, a DTCG `fontWeight` token, and a Figma weight primitive | `src/engine/type.mjs` `WEIGHT_NAMES` |
 | Brand-Kit MCP | zero-dependency stdio server download, pre-filled with your tokens, for Claude Code / Cursor / any MCP agent; **hosted** endpoint is a Pro feature (not yet live — never market it as live) | `mcp/` |
-| Ultimate Tokens Claude plugin | installable Claude Code plugin, **free + MIT**, that teaches a coding agent to CONSUME an exported kit in its own project — 3 skills (**color-tokens** · **typography-tokens** · **geometry-tokens**) + the **`token-integrator`** agent; parity-gated against the engines in `npm test`. Install: `/plugin marketplace add kimgranlund/nonoun-color-tokens` → `/plugin install ultimate-tokens` | `plugin/ultimate-tokens/` |
+| Ultimate Tokens Claude plugin | installable Claude Code plugin, **free + MIT**, that teaches a coding agent to CONSUME an exported kit in its own project — 3 skills (**color-tokens** · **typography-tokens** · **geometry-tokens**) + the **`token-integrator`** agent; parity-gated against the engines in `npm test`. Install: `/plugin marketplace add kimgranlund/ultimate-tokens` → `/plugin install ultimate-tokens` | `plugin/ultimate-tokens/` |
 | Design system export | **free** on every tier — one canonical core (a universal-dialect `DESIGN.md` generation prompt + a `tokens.json` carrier: light + dark colour role set + type / spacing / radii, on-colours measured WCAG-AA, OKLCH payload) emitted as **three platform targets**, one folder each in the Download-all `.zip`: **`design-system-for-claude-code/`** (10 files — `DESIGN.md` · `tokens.json` · `components/*.html` **7** preview cards · `README.md`; the Claude-facing target for both `claude.ai/design` (Anthropic's surface where a vision-capable Claude generates on-brand UI) and Claude Code) · **`design-system-for-google-stitch/`** (2 files — a byte-identical `DESIGN.md` + `README.md`; for **Google Stitch**, Google's generative-UI tool) · **`design-system-for-figma-make/`** (9 files — a routed `guidelines/` tree of compiled shadcn + `README.md`; for **Figma Make**, React + Tailwind + shadcn/ui). The `DESIGN.md` is a **10-section** generation prompt carrying the kit's own guardrails. In-app it surfaces as a **"Design System"** Export-drawer group (tokens.json + DESIGN.md tabs); the three-folder split appears in Download-all, not as three drawer groups | `src/engine/exports.js` `exportDesignSystemBundle` / `exportDesignSystemStitchBundle` / `exportDesignSystemMakeBundle` |
 | Dependencies | **zero** runtime dependencies; ships as one self-contained file that runs offline | `package.json`, `dist/ultimate-tokens.html` |
 | Privacy | local-first: your browser + your Figma file; the **only network call is the license check** | `src/main.ts` |
@@ -39,7 +39,7 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 | Studio | **$149/year for 5 seats**, +**$19/seat/year** — Pro for a team, one account | store |
 | Refund | **14 days**, full, no questions | store policy |
 | Store | Lemon Squeezy (`ultimate-tokens.lemonsqueezy.com`) | store-copy.md |
-| Support / comms address | **support@nonoun.io** — all customer comms come and go from it (decided 2026-07-02) | store-copy.md placeholders |
+| Support channel | **GitHub Issues** on `kimgranlund/ultimate-tokens` — there is no support inbox (decided 2026-07-09) | store-copy.md placeholders |
 | Licensing direction | email-bound identity: unlimited devices for the key's owner; Studio seats become named emails (Phase 2) — customer copy describes SHIPPED behavior until each phase lands | `.claude/docs/site/licensing-identity-spec.md` |
 | Dogfooding | the app chrome runs on the very tokens it generates | README |
 

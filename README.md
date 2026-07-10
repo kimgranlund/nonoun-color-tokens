@@ -1,4 +1,4 @@
-# Ultimate Tokens by NONOUN
+# Ultimate Tokens
 
 [![CI](https://github.com/kimgranlund/ultimate-tokens/actions/workflows/ci.yml/badge.svg)](https://github.com/kimgranlund/ultimate-tokens/actions/workflows/ci.yml)
 [![Live demo](https://img.shields.io/badge/demo-live-2b8a3e)](https://kimgranlund.github.io/ultimate-tokens/)

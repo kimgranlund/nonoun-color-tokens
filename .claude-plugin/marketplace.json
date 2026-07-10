@@ -5,7 +5,7 @@
     "email": "kim.granlund@gmail.com"
   },
   "metadata": {
-    "description": "The consumption-side toolchain for Ultimate Tokens by NONOUN — skills that teach coding agents to use an exported design-token kit (colour · type · geometry) correctly in their own projects. Authored in the generator repo and parity-gated against its engines."
+    "description": "The consumption-side toolchain for Ultimate Tokens — skills that teach coding agents to use an exported design-token kit (colour · type · geometry) correctly in their own projects. Authored in the generator repo and parity-gated against its engines."
   },
   "plugins": [
     {

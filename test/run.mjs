@@ -15,6 +15,7 @@ const TESTS = [
   "figma/plugin.mjs", "figma/binder.mjs", "figma/mode-apply.mjs", "figma/style-plan.mjs",
   "mcp/core.mjs", "mcp/brand-kit.mjs",
   "plugin/manifest.mjs", "plugin/color-tokens.mjs", "plugin/typography-tokens.mjs", "plugin/geometry-tokens.mjs",
+  "repo/branding.mjs",
 ];
 
 let failed = 0;

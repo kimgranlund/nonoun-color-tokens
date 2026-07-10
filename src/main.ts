@@ -27,7 +27,7 @@ type LicenseService = {
 };
 type LicensedElement = HTMLElement & { _licenseService?: LicenseService; revalidateLicense?: () => void };
 
-// PIN activation to the NONOUN Lemon Squeezy store (id 420293) — the mappers are FAIL-CLOSED on this, so a
+// PIN activation to the Ultimate Tokens Lemon Squeezy store (id 420293) — the mappers are FAIL-CLOSED on this, so a
 // valid key issued by any OTHER store is rejected. null would accept any active key from any store.
 const LEMON_STORE_ID: number | null = 420293;
 // PIN to OUR products too (Pro 1182548 · Studio 1182535) — layered on the store pin, so even a key for a

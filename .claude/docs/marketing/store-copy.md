@@ -1,4 +1,4 @@
-# Ultimate Tokens by NONOUN — Lemon Squeezy store corpus
+# Ultimate Tokens — Lemon Squeezy store corpus
 
 The complete, paste-ready store copy for the Lemon Squeezy store
 (`ultimate-tokens.lemonsqueezy.com`, store id `420293`) and the in-app tie-ins that mirror it.
@@ -9,13 +9,13 @@ it pastes into — e.g. `products[1182548].attributes.description` — following
 storefront field (SEO, tagline, policy, email) is a dashboard setting rather than a JSON:API attribute,
 the block says so and names the dashboard location. Facts are pinned by [`fact-sheet.md`](fact-sheet.md);
 voice by [`voice/voice-platform.md`](voice/voice-platform.md) — gate every edit with the
-`color-tokens-brand-voice` voice-check script before shipping.
+`ultimate-tokens-brand-voice` voice-check script before shipping.
 
 **The objects this corpus keys to:**
 
 | Object | id | Notes |
 |---|---|---|
-| Store | `420293` | `ultimate-tokens.lemonsqueezy.com` · name "Ultimate Tokens by NONOUN" |
+| Store | `420293` | `ultimate-tokens.lemonsqueezy.com` · name "Ultimate Tokens" |
 | Product — Pro | `1182548` | → variant `1849393` · $39/year, per user · license keys enabled |
 | Product — Studio | `1182535` | → variant `1849376` · $149/year, 5 seats · +$19/seat/year, usage-based per seat |
 | Pro checkout deep-link | — | `https://ultimate-tokens.lemonsqueezy.com/checkout/buy/1849393` |
@@ -31,8 +31,8 @@ precise/craft voice (matches the app).
 
 | Token | Meaning |
 |---|---|
-| `{{APP_URL}}` | The web app URL (e.g. `app.nonoun.io`) |
-| `{{SUPPORT_EMAIL}}` | **Pinned: `support@nonoun.io`** (decided 2026-07-02 — all customer comms come and go from this address; lifecycle mail routes through our own mailer sending as it, once one exists) |
+| `{{APP_URL}}` | The web app URL (currently `kimgranlund.github.io/ultimate-tokens`; no custom domain) |
+| `{{SUPPORT_CHANNEL}}` | **Pinned: `github.com/kimgranlund/ultimate-tokens/issues`** (decided 2026-07-09 — there is no support inbox; the tracker is the channel, and it is public on purpress; lifecycle mail routes through our own mailer sending as it, once one exists) |
 | `{{CUSTOMER_PORTAL}}` | Lemon Squeezy customer portal (manage / cancel) |
 | `{{LICENSE_KEY}}` · `{{RENEWAL_DATE}}` · `{{PERIOD_END}}` · `{{SEATS}}` | Injected by Lemon Squeezy per order |
 | `{{CODE}}` / `{{N}}` / `{{DATE}}` | Discount-code template fields |
@@ -52,7 +52,7 @@ precise/craft voice (matches the app).
 **`stores.attributes.name`** — store name
 
 ```
-Ultimate Tokens by NONOUN
+Ultimate Tokens
 ```
 
 **`stores.attributes.slug` · `.domain` · `.url`** — identity (set once; read-only on the object)
@@ -69,7 +69,7 @@ exposes the URL only; the alt text below is a storefront/dashboard value, not a 
 **Avatar / logo alt text**
 
 ```
-Ultimate Tokens by NONOUN
+Ultimate Tokens
 ```
 
 **Storefront tagline** — dashboard-only (**Settings → Store**); not on the `stores` API object (≤60 chars)
@@ -87,7 +87,7 @@ Perceptual color, type & geometry — as tokens you ship.
 **SEO meta title** — dashboard-only (**Settings → SEO**)
 
 ```
-Ultimate Tokens by NONOUN — perceptual design-token generator
+Ultimate Tokens — perceptual design-token generator
 ```
 
 **SEO meta description** — dashboard-only (**Settings → SEO**, ≤155 chars)
@@ -394,13 +394,13 @@ post-purchase receipt. Defaults inherit the product; fill a field only where the
 **Pro — `product_options.receipt_thank_you_note`** (checkout for variant `1849393`)
 
 > Thanks for going Pro. Your license key is in your purchase email — open Ultimate Tokens, go to Settings →
-> Account, paste the key, and click Validate. Anything at all: {{SUPPORT_EMAIL}}. — NONOUN
+> Account, paste the key, and click Validate. Anything at all: {{SUPPORT_CHANNEL}}. — Ultimate Tokens
 
 **Studio — `product_options.receipt_thank_you_note`** (checkout for variant `1849376`)
 
 > Thanks for bringing Ultimate Tokens to your team. Your team license key is in your purchase email — each
 > member activates under Settings → Account, then Validate, and every device activation takes one of your 5
-> seats. Manage seats and billing anytime at {{CUSTOMER_PORTAL}}. — NONOUN
+> seats. Manage seats and billing anytime at {{CUSTOMER_PORTAL}}. — Ultimate Tokens
 
 **`checkout_data`** (prefill + pass-through) — set `email` / `name` only when you already know the buyer;
 `discount_code` to pre-apply a launch code (§6); `custom` to carry an internal reference through to the
@@ -481,7 +481,7 @@ Subject: Your Ultimate Tokens Pro subscription
 >
 > Anything at all: {{SUPPORT_EMAIL}}.
 >
-> — NONOUN
+> — Ultimate Tokens
 
 **Studio welcome email** — **Settings → Emails → Order confirmation** for the Studio product (or your
 webhook mailer, keyed on the Studio variant)

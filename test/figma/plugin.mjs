@@ -44,7 +44,7 @@ if (/\bcatch\s*\{/.test(codeNoComments)) FAIL("vmsyntax", "code.js uses optional
 if (/figma\.notify\([^;]*\b(?:e\.message|String\(e\)|err\.message|\.stack)\b/.test(codeNoComments))
   FAIL("compliance", "code.js surfaces a raw error in figma.notify — show a friendly message; log the detail to console only");
 if (/figma\.notify\([^;]*HCT/.test(codeNoComments))
-  FAIL("compliance", "a user-facing figma.notify still says 'HCT' (stale branding) — the product is 'Ultimate Tokens by NONOUN'");
+  FAIL("compliance", "a user-facing figma.notify still says 'HCT' (stale branding) — the product is 'Ultimate Tokens'");
 
 // ── ui.html: the generator + the Figma bridge ───────────────────────────────────
 if (!existsSync(`${HERE}/ui.html`)) FAIL("ui", "ui.html not generated — run gen-ui.mjs");
@@ -328,7 +328,7 @@ if (applyFloatPlans) {
     const userColl = F2.figma.variables.createVariableCollection("Typography"); // the user's own, pre-existing
     F2.figma.variables.createVariable("user/keepme", userColl, "FLOAT").setValueForMode(userColl.modes[0].modeId, 123);
     await a2(modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), [])));
-    if (F2.collections.filter((c) => c.name === "Typography").length !== 2) FAIL("floatprov", `expected the user's Typography + a separate NONOUN one (2), got ${F2.collections.filter((c) => c.name === "Typography").length}`);
+    if (F2.collections.filter((c) => c.name === "Typography").length !== 2) FAIL("floatprov", `expected the user's Typography + a separate plugin-created one (2), got ${F2.collections.filter((c) => c.name === "Typography").length}`);
     if (!F2.variables.some((v) => v.variableCollectionId === userColl.id && v.name === "user/keepme")) FAIL("floatprov", "apply pruned a variable from the user's OWN Typography collection");
     if (userColl.modes[0].name !== "Mode 1") FAIL("floatprov", "apply renamed the default mode of the user's OWN Typography collection");
     await a2(modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), []))); // re-apply: reconcile OURS by id, not the user's

@@ -1,4 +1,7 @@
-# Landing page copy — app.nonoun.io
+# Landing page copy
+
+> **No domain yet.** These blocks are written to be domain-agnostic; they currently
+> render at the GitHub Pages build (`kimgranlund.github.io/ultimate-tokens`).
 
 Copy blocks for the marketing landing page, in page order. Structure only — layout belongs to the
 site build. Posture: **landing/store** (§4); every section demonstrates with the tool's real render
@@ -84,5 +87,5 @@ Design tokens, derived — not guessed.
 ## Footer line
 
 ```
-Ultimate Tokens by NONOUN · Perceptual color, type & geometry — as tokens you ship.
+Ultimate Tokens · Perceptual color, type & geometry — as tokens you ship.
 ```

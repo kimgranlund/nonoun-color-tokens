@@ -1,11 +1,15 @@
 # Hosted Brand-Kit MCP — Spec & Plan (Cloudflare, account-based)
 
-**Status:** draft / design. **Owner:** NONOUN. **Gates:** the `hostedMcp` Pro flag (`src/engine/flags.js`).
+**Status:** draft / design. **Owner:** `kimgranlund/ultimate-tokens`. **Gates:** the `hostedMcp` Pro flag (`src/engine/flags.js`).
+
+> **Domains are a prerequisite, not a given.** The product owns no domain. `<APP_DOMAIN>` and
+> `<MCP_DOMAIN>` below are placeholders: acquiring and wiring them is step zero of Phase B, and every
+> URL here is unresolvable until then. The app ships from GitHub Pages today.
 
 The **hosted Brand-Kit MCP** is the live, always-current sibling of the free *downloadable* MCP server, and
 the **recurring-value anchor** for the Pro subscription. **Decided model:** there is **one** hosted MCP
 endpoint; a user **authenticates** when adding it to their agent (OAuth), and the server serves **their
-account's** brand kits. Identity is a **NONOUN account via email magic-link**, linked to the Lemon Squeezy
+account's** brand kits. Identity is an **Ultimate Tokens account via email magic-link**, linked to the Lemon Squeezy
 subscription by email. This makes accounts + cloud-synced kits a first-class part of the product — the same
 foundation the **Studio** (multi-seat) tier already assumes.
 
@@ -19,7 +23,7 @@ foundation the **Studio** (multi-seat) tier already assumes.
 ## 1. Goals & constraints
 
 **Goals**
-- **One-line setup:** `claude mcp add --transport http brand-kit https://mcp.nonoun.io/mcp` → the agent
+- **One-line setup:** `claude mcp add --transport http brand-kit https://<MCP_DOMAIN>/mcp` → the agent
   triggers an OAuth sign-in (magic-link) → it serves **that account's** kits. No URLs or tokens to copy.
 - **Always-current + team-shared:** kits live with the account; re-saving updates the hosted kit; Studio
   teammates on the same account see it — the recurring value the subscription is sold on.
@@ -36,7 +40,7 @@ foundation the **Studio** (multi-seat) tier already assumes.
   **server-side** (LS by email + webhook), never the client-side check.
 
 **New scope this introduces**
-- **NONOUN accounts** (email magic-link) — the product's first identity layer.
+- **Ultimate Tokens accounts** (email magic-link) — the product's first identity layer.
 - **Server-side kit sync** — kits push from the app to the account so the MCP (and other devices) see them.
 
 ---
@@ -46,7 +50,7 @@ foundation the **Studio** (multi-seat) tier already assumes.
 | Concern | Choice | Why |
 |---|---|---|
 | Static app | Cloudflare **Pages** | the SPA build + Figma bundle are static assets |
-| Identity | **email magic-link**, NONOUN-owned, linked to LS by email | no passwords, no third-party IdP; one auth system for the app login + the MCP OAuth |
+| Identity | **email magic-link**, first-party, linked to LS by email | no passwords, no third-party IdP; one auth system for the app login + the MCP OAuth |
 | Email delivery | **Resend** (Postmark/SES as alts) | simple API from a Worker, generous free tier (Cloudflare MailChannels free tier is gone) |
 | MCP server + OAuth | Cloudflare **Worker** + **`workers-oauth-provider`** + **`McpAgent`** (Durable Objects) | the supported Cloudflare pattern for *authenticated* remote MCP; the access token carries the user identity into the handlers |
 | Transport | **Streamable HTTP**, JSON-RPC 2.0 | the MCP remote transport agents speak |
@@ -61,7 +65,7 @@ foundation the **Studio** (multi-seat) tier already assumes.
  Browser (user) ──────▶│  Pages: the static generator (SPA)                                       │
    │  sign in / sync    │      │  POST /auth/start{email}        POST /api/kits/<id>{kit}          │
    │  (web-only seams)   │      ▼  (magic link emailed)            ▼  (signed-in + Pro)             │
-   └───────────────────▶│  Worker (mcp.nonoun.io)                                                  │
+   └───────────────────▶│  Worker (<MCP_DOMAIN>)                                                  │
                         │   • magic-link auth → session (D1)   • kit sync → KV(kit:<id>) + D1       │
                         │   • LS link by email (+ webhook)     • OAuth server (workers-oauth-provider)
                         │                                                                           │
@@ -83,7 +87,7 @@ foundation the **Studio** (multi-seat) tier already assumes.
 | Where | `mcp/brand-kit-server.mjs`, on the user's machine | one Cloudflare Worker, always on |
 | Transport | JSON-RPC over **stdio** | JSON-RPC over **Streamable HTTP** + **OAuth** |
 | Kit source | a sibling `brand-kit.json` snapshot | the account's **synced, live** kits (KV) |
-| Setup | unzip + `claude mcp add -- node …` | `claude mcp add --transport http brand-kit https://mcp.nonoun.io/mcp` → sign in |
+| Setup | unzip + `claude mcp add -- node …` | `claude mcp add --transport http brand-kit https://<MCP_DOMAIN>/mcp` → sign in |
 | Multi-kit | one file = one kit | the account's kits via `list_kits` + a `kit` arg |
 | Surface | **identical** (same core module) | **identical** (same core module) |
 
@@ -98,7 +102,7 @@ server); resources `brand://kit|palettes|semantic/light|semantic/dark|type|geome
 
 - **Sign up / in:** the app (or the OAuth `/authorize` screen) asks for an email → `POST /auth/start` → the
   Worker mints a single-use, short-TTL (~15 min) token, stores its hash in D1, and emails a link
-  (`https://app.nonoun.io/auth/verify?token=…`) via Resend → clicking it `POST /auth/verify` → the Worker
+  (`https://<APP_DOMAIN>/auth/verify?token=…`) via Resend → clicking it `POST /auth/verify` → the Worker
   creates a **session** (a row in D1 + an httpOnly, Secure session cookie for the app).
 - **Link to the LS subscription by email:** the LS **webhook** (`order_created`, `subscription_*`) upserts a
   `ls_subscriptions` row keyed by the purchase email; an account's entitlement = the subscription whose
@@ -115,7 +119,7 @@ server); resources `brand://kit|palettes|semantic/light|semantic/dark|type|geome
 The Worker is an **OAuth 2.1 authorization server** via `workers-oauth-provider` (supports the dynamic
 client registration MCP clients use). The magic-link login **is** the login step inside `/authorize`:
 
-1. `claude mcp add --transport http brand-kit https://mcp.nonoun.io/mcp`.
+1. `claude mcp add --transport http brand-kit https://<MCP_DOMAIN>/mcp`.
 2. Claude fetches the protected-resource + auth-server **metadata**, **registers dynamically**, opens the
    browser to **`/authorize`**.
 3. Not signed in → the Worker shows "enter your email" → magic link → verified → **consent** ("Allow Claude
@@ -205,11 +209,11 @@ access/refresh tokens are managed by `workers-oauth-provider` (its own KV/DO sto
 
 ## 11. Deployment & ops
 
-- **Pages:** the static SPA + the Figma bundle artifact (`app.nonoun.io`).
-- **Worker (`mcp.nonoun.io`):** MCP + OAuth + `/auth/*` + `/api/*` + the LS webhook; bindings: KV, D1,
+- **Pages:** the static SPA + the Figma bundle artifact (`<APP_DOMAIN>`).
+- **Worker (`<MCP_DOMAIN>`):** MCP + OAuth + `/auth/*` + `/api/*` + the LS webhook; bindings: KV, D1,
   Durable Objects (McpAgent + the OAuth provider). Secrets (`RESEND_API_KEY`, `LS_WEBHOOK_SECRET`, session
   signing key, an LS API key for license-link validation) via `wrangler secret`.
-- **Domains:** `app.nonoun.io` (Pages) · `mcp.nonoun.io` (Worker). Magic-link return + OAuth redirect URIs
+- **Domains:** `<APP_DOMAIN>` (Pages) · `<MCP_DOMAIN>` (Worker). Magic-link return + OAuth redirect URIs
   registered to these.
 - **Cost (free-tier-first):** Workers/KV/D1 free tiers cover launch volume; Resend free tier for email;
   Durable Objects bill on paid Workers ($5/mo) — realistically single-digit dollars/mo, consistent with

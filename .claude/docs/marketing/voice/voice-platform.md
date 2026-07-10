@@ -1,20 +1,23 @@
 <!-- voice-check: rulebook — this doc quotes banned lexicon as rules; the checker exempts it -->
-# The NONOUN voice platform
+# The Ultimate Tokens voice platform
 
-The canonical voice record for **Ultimate Tokens by NONOUN** and the NONOUN brand. Every piece of
+The canonical voice record for **Ultimate Tokens**. Every piece of
 brand, product, or marketing writing is authored against this platform and gated by §6. Operational
-application lives in the `color-tokens-brand-voice` skill; pinned product facts live in
+application lives in the `ultimate-tokens-brand-voice` skill; pinned product facts live in
 [`../fact-sheet.md`](../fact-sheet.md) — this document owns *who is speaking and how*, not the numbers.
 
 ---
 
-## 1 · Identity — who NONOUN is
+## 1 · Identity — who is speaking
 
-**NONOUN** is a one-person workshop that sells the instrument it makes. The name is a refusal: *no
-noun* — strip away the object, the ornament, the brand-as-thing, and what remains is the **system of
-relations**: hue to ramp, ramp to role, scale to step. The name cashes out as a grammar rule, not a
-slogan: **no nouns, just verbs** — derive, map, bind, ship (§5). The etymology stays internal;
-customer copy never explains the name.
+The product is **unattributed**. There is no maker brand, no studio name, no "by" line: copy speaks as
+**"we"**, and the only proper noun is the instrument itself. Nothing signs the work — a one-person
+workshop that names itself is performing smallness; one that just ships is demonstrating it.
+
+What survives from the workshop is the *stance*, not a signature: strip away the object, the ornament,
+the brand-as-thing, and what remains is the **system of relations** — hue to ramp, ramp to role, scale
+to step. That stance cashes out as a grammar rule, and the rule is load-bearing on its own: **no nouns,
+just verbs** — derive, map, bind, ship (§5).
 
 **Ultimate Tokens** is the instrument: a perceptual design-token generator whose thesis is
 **derivation over guesswork**. "Ultimate" is defended the same way — *ultima*, the last term of a
@@ -23,11 +26,10 @@ name, never an adjective** — copy never constructs "the ultimate X". The produ
 zero dependencies, offline-capable, engines pure, output verifiable — *is* the brand ethos; the voice
 never claims a value the code doesn't embody.
 
-Naming discipline: **"Ultimate Tokens by NONOUN"** at first formal mention (store, page titles,
-legal); **"Ultimate Tokens"** thereafter; **NONOUN** is the maker, always uppercase. The internal id is the
-kebab form `ultimate-tokens` — it shares its words with the brand name, so the rule is about SHAPE, not
-spelling: write "Ultimate Tokens", never `ultimate-tokens`, in customer-facing copy (code identifiers,
-paths, and URLs are exempt until the app moves off the project domain).
+Naming discipline: **"Ultimate Tokens"** everywhere — first mention and every mention after; there is no
+longer form and no maker to append. The internal id is the kebab form `ultimate-tokens`, which shares its
+words with the product name, so the rule is about SHAPE, not spelling: write "Ultimate Tokens", never
+`ultimate-tokens`, in customer-facing copy (code identifiers, paths, and URLs are exempt).
 
 ## 2 · Persona — who is speaking
 
@@ -44,8 +46,8 @@ instrument works, by using it in front of them.
 - **The persona is a compass, not a costume.** Workshop vocabulary ("bench", "instrument",
   "workshop") steers *how* copy is written and **never appears in customer-facing copy itself** —
   copy that performs craftsmanship instead of demonstrating it has failed this section.
-- **Smallness is a feature, stated as one.** Lifecycle mail is signed by the maker ("— NONOUN" or the
-  maker's name), never a team that doesn't exist. The one-person shop is why the instrument is built
+- **Smallness is a feature, shown not stated.** Lifecycle mail closes with the product name, never a
+  team that doesn't exist and never a maker persona. The one-person shop is why the instrument is built
   to outlive attention: the single file runs offline forever *because* there's no server farm behind
   it — that line converts the bus-factor objection into proof of §3's ownership conviction.
 

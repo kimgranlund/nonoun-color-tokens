@@ -37,7 +37,7 @@ Canonical specs + rubrics: `.claude/docs/spec/` (e.g. `.claude/docs/spec/data/ro
   teach agents to use exported kits in THEIR projects (parity-gated against the engine).
 - `.claude/docs/spec/` — canonical specs, rubrics, role-table answer key. `.claude/docs/marketing/` — the
   marketing corpus (voice platform · pinned fact sheet · store copy · launch kit); author via the
-  `marketing-manager` agent + `color-tokens-brand-voice` skill. `.claude/docs/other/` — **PRIVATE** (see below).
+  `marketing-manager` agent + `ultimate-tokens-brand-voice` skill. `.claude/docs/other/` — **PRIVATE** (see below).
 
 ## Conventions (non-obvious only)
 

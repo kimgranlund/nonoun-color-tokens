@@ -289,7 +289,7 @@ the toggle relocates (see §6).
 **Gallery** (`this.view==="gallery"`, `renderGallery` :1213 — the other top-level fork):
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ ◈ Ultimate Tokens by NONOUN            [⤓ Project] [⤒ Import] [+ New]  ◐   │
+│ Ultimate Tokens                        [⤓ Project] [⤒ Import] [+ New]  ◐   │
 ├──────────────────────────────────────────────────────────────────────────┤
 │  Your Palettes                         (search)                            │
 │  ┌────┐ ┌────┐ ┌────┐ ┌────┐    .set-grid of saved-set tiles              │

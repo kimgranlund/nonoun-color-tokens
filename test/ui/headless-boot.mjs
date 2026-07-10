@@ -128,7 +128,7 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => "" });
 await import("../../src/ui/app.js");
 const App = customElements.get("ultimate-tokens");
 ok(!!App, "custom element ultimate-tokens defined");
-ok(!!customElements.get("nonoun-color-tokens"), "the deprecated <nonoun-color-tokens> alias is still registered (pre-rename embeds keep working)");
+ok(!customElements.get("nonoun-color-tokens"), "the pre-rename <nonoun-color-tokens> alias is NOT registered — one tag only (ADR-015)");
 
 const app = new App();
 app.classList = new ClassList();
@@ -1605,7 +1605,7 @@ app.exportSystems = { color: true, type: true, geometry: true }; // restore
   await new Promise((resolve) => setTimeout(resolve, 250));
   app.download = realDl2;
   ok(!!capturedCode, "(t-bake) downloadFigmaPlugin emits a code.js (after its deferred setTimeout)");
-  ok(!!capturedCode && !capturedCode.includes("__NONOUN_FLOAT_PLANS__"), "(t-bake) the emitted code.js has the FLOAT_PLANS anchor comment replaced (no longer present)");
+  ok(!!capturedCode && !capturedCode.includes("__ULTIMATE_TOKENS_FLOAT_PLANS__"), "(t-bake) the emitted code.js has the FLOAT_PLANS anchor comment replaced (no longer present)");
   ok(!!capturedCode && /JSON\.parse\("\[\{/.test(capturedCode), "(t-bake) the emitted code.js's FLOAT_PLANS is a JSON.parse'd non-empty array literal");
   ok(app._figmaFloatPlans().length > 0, "(t-bake) with type+geometry ON + a breakpoint configured, _figmaFloatPlans() (what gets baked) is non-empty");
 }

@@ -1,7 +1,7 @@
 ---
-name: color-tokens-brand-voice
+name: ultimate-tokens-brand-voice
 description: >
-  Use BEFORE writing any customer-facing words for Ultimate Tokens / NONOUN — store or landing copy,
+  Use BEFORE writing any customer-facing words for Ultimate Tokens — store or landing copy,
   README marketing, social posts, launch announcements, product descriptions, in-app microcopy,
   upgrade/limit/error strings, lifecycle emails, release notes — or when judging them ("write the
   launch post", "update the store page", "add an upsell string", "does this sound like us?"). The
@@ -11,7 +11,7 @@ description: >
   brand/marketing writing.
 ---
 
-# Writing in the NONOUN voice
+# Writing in the Ultimate Tokens voice
 
 Two documents are canonical — read both before drafting (each is one page):
 
@@ -32,7 +32,7 @@ Two documents are canonical — read both before drafting (each is one page):
    argues none is filler; a piece that argues four is a brochure.
 3. **Draft with the fact sheet open.** Pull each number/price/name from it verbatim. Features behind a
    dark flag (hosted MCP; anything pre-enforcement) are never marketed as available.
-4. **Layer 1 — the mechanical gate:** `node .claude/skills/color-tokens-brand-voice/scripts/
+4. **Layer 1 — the mechanical gate:** `node .claude/skills/ultimate-tokens-brand-voice/scripts/
    voice-check.mjs <file…>` — pinned-fact drift, a non-live feature in the present tense (the hosted
    MCP is the standing case), banned lexicon, hype pricing, exclamation/emoji discipline. **Any error
    fails the piece outright**; warnings are review prompts. Rulebook docs (the platform, the fact
@@ -65,7 +65,7 @@ update `fact-sheet.md` **in the same change**, then sweep: `grep -rn "<old value
 .claude/docs/marketing/` and fix every hit. A drifted marketing fact is a defect of the same severity
 as a failing test (`CLAUDE.md` · "Context is memory").
 
-**The deployed store doesn't grep — audit it:** `node .claude/skills/color-tokens-brand-voice/
+**The deployed store doesn't grep — audit it:** `node .claude/skills/ultimate-tokens-brand-voice/
 scripts/store-drift-check.mjs` (needs `LEMONSQUEEZY_API_KEY`, a live-mode key, in
 `.claude/settings.local.json`). Read-only: it checks the live product set against the app's product
 pin (a published product outside the pin sells keys the app rejects — a blocking error), the live

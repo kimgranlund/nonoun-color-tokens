@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// voice-check.mjs — the mechanical half of the NONOUN voice gate. Checks customer-facing copy for the
+// voice-check.mjs — the mechanical half of the Ultimate Tokens voice gate. Checks customer-facing copy for the
 // failures a machine can catch: banned lexicon, hype-price phrasing, exclamation discipline, drifted
 // pinned facts, and em-dash-pivot overuse. The judged half (persona, posture, claim discipline) is the
 // rubric in .claude/docs/marketing/voice/voice-platform.md §6 — this script never scores those.
@@ -80,12 +80,13 @@ for (const file of process.argv.slice(2)) {
     // The PIVOT construction specifically: "…claim — not/never/no contrast…". Ordinary em-dashes
     // (bullets, appositions) are normal punctuation and not counted.
     if (/ — (?:not|never|no)\b/i.test(text)) pivots += 1;
-    // lowercase "nonoun" outside domains/emails/ids (nonoun.io, @nonoun, any nonoun-* id are fine)
-    if (/\bnonoun\b(?!\.io|-)/.test(text.replace(/@nonoun/g, "")))
-      report(file, n, "WARN", 'lowercase "nonoun" — the maker is always NONOUN (uppercase); ok only in code ids/paths/domains');
-    // The internal id shares its words with the brand name, so police the SHAPE: the kebab form is the id,
-    // "Ultimate Tokens" is the product. (The pre-rename id is still caught, for older copy.)
-    if (/ultimate-tokens|nonoun-color-tokens/.test(text) && !/https?:\/\/|github\.io|`/.test(text))
+    // The maker brand was RETIRED: the product is unattributed. Any spelling of the old name is an ERROR,
+    // not a style warning — a reintroduced "by <maker>" line is a factual claim about who makes this.
+    if (/nonoun/i.test(text))
+      report(file, n, "ERROR", 'the retired maker brand — the product is unattributed; it is "Ultimate Tokens", with no "by" line');
+    // The internal id shares its words with the product name, so police the SHAPE: the kebab form is the id,
+    // "Ultimate Tokens" is the product.
+    if (/ultimate-tokens/.test(text) && !/https?:\/\/|github\.io|`/.test(text))
       report(file, n, "WARN", "internal id (kebab form) in copy — write \"Ultimate Tokens\" (URLs/code identifiers exempt)");
   });
   if (pivots > 3) report(file, "-", "WARN", `${pivots} em-dash pivot constructions ("… — not …") in one piece — the signature dies as a tic; keep ~one per section`);

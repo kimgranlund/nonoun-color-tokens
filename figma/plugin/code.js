@@ -1,4 +1,4 @@
-// code.js — Ultimate Tokens by NONOUN, Figma plugin SANDBOX (the `main`).
+// code.js — Ultimate Tokens, Figma plugin SANDBOX (the `main`).
 //
 // Runs in Figma's plugin VM: the `figma` global is available, but there is NO DOM, no
 // fetch/XMLHttpRequest/WebSocket, no localStorage (ADR-010 / AC-P3 — offline by design;
@@ -146,7 +146,7 @@ figma.ui.onmessage = async (msg) => {
     // Tell the iframe an apply FAILED so it can clear its optimistic "Applying…" toast (→ onApplyError).
     if (msg && msg.type === "apply") { try { figma.ui.postMessage({ type: "apply-error" }); } catch (e2) { /* UI gone */ } }
     const what = (msg && ACTIONS[msg.type]) || "complete that action";
-    figma.notify("Ultimate Tokens couldn't " + what + ". Please try again — if it keeps happening, email support@nonoun.io.", { error: true });
+    figma.notify("Ultimate Tokens couldn't " + what + ". Please try again — if it keeps happening, open an issue at github.com/kimgranlund/ultimate-tokens.", { error: true });
   }
 };
 
@@ -533,12 +533,12 @@ async function applyBundle(dtcg, opts) {
 // leaving a removed breakpoint's mode behind). Value-complete plans mean no mode is ever left unset.
 async function applyFloatPlans(plans) {
   let collections = 0, variables = 0;
-  const reg = readFloatRegistry(); // provenance: only ever touch a collection NONOUN created (see ensureFloatCollection)
+  const reg = readFloatRegistry(); // provenance: only ever touch a collection this plugin created (see ensureFloatCollection)
   for (const plan of (Array.isArray(plans) ? plans : [])) {
     if (!plan || !plan.collection || !Array.isArray(plan.modes) || !plan.modes.length) continue;
     const coll = await ensureFloatCollection(plan.collection, reg);
     // The collection's DEFAULT mode (Figma rejects removing it) — rename it to the plan's first mode ("Base");
-    // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a NONOUN-created
+    // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a plugin-created
     // collection they coincide, but a foreign same-named collection's default may not be the first mode, and
     // pruning it would throw. (The headless mock has no defaultModeId → falls back to modes[0].)
     const defaultId = coll.defaultModeId || coll.modes[0].modeId;

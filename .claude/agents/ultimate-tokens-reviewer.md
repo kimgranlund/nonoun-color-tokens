@@ -1,7 +1,7 @@
 ---
-name: color-tokens-reviewer
+name: ultimate-tokens-reviewer
 description: >
-  Reviews a ultimate-tokens change (a diff, a staged set, or a PR branch)
+  Reviews an ultimate-tokens change (a diff, a staged set, or a PR branch)
   against THIS repo's specific invariants — semantic-role parity, the Safari
   font-quoting + SVG fill:none traps, the headless-shim limits, the editor
   section pattern, and the .claude/docs/other + node_modules guards. Use proactively

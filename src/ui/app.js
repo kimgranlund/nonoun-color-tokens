@@ -41,7 +41,7 @@ import { zipStore } from "./zip.mjs";
 import { modeApplyPlan, validateModeInterchange } from "../../figma/binder/mode-apply-plan.mjs";
 import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
 import { ICON_SYSTEMS, iconSystem, iconSystemById, iconSystemLabel } from "../engine/icon-systems.mjs";
-import { icon, brandMark } from "./icons.js";
+import { icon } from "./icons.js";
 
 // ── Multi-set storage ─────────────────────────────────────────────────────────
 // persist.js owns ONE document's serialize/hydrate. The gallery needs many sets,
@@ -64,6 +64,14 @@ const CHECKOUT_STORE = "https://ultimate-tokens.lemonsqueezy.com";
 const PRO_CHECKOUT_URL = CHECKOUT_STORE + "/checkout/buy/1849393";    // Pro (single-user)
 const STUDIO_CHECKOUT_URL = CHECKOUT_STORE + "/checkout/buy/1849376"; // Studio (teams · 5 seats)
 
+// Outbound links. The product has no domain of its own: support is the repo's issue tracker, the docs are
+// the repo README, and billing is Lemon Squeezy's own customer portal. Every one of these RESOLVES today —
+// prefer a real link over a branded one that 404s.
+const REPO_URL = "https://github.com/kimgranlund/ultimate-tokens";
+const SUPPORT_URL = REPO_URL + "/issues";
+const DOCS_URL = REPO_URL + "#readme";
+const ACCOUNT_URL = "https://app.lemonsqueezy.com/my-orders";
+
 // Pro-gated export formats (the proExport flag). Free = CSS (css/oklch) + the Figma/JSON interchange; Pro =
 // DTCG + the framework configs. flagOf("proExport") is true (unlocked) while TIERS_ENFORCED is off, so these
 // only actually gate after go-live. The single-format preview shows an upsell; Download-All omits them.
@@ -74,10 +82,10 @@ const ALIASED_README = `figma-aliased/ — EXPERIMENTAL plugin-free cascade (OD-
 ==========================================================
 Same tokens as ../figma/, but the Light/Dark variables carry com.figma.aliasData so they
 ALIAS the raw primitives instead of embedding resolved colors — i.e. editing a Color
-Primitive cascades to every semantic role, WITHOUT the NONOUN plugin.
+Primitive cascades to every semantic role, WITHOUT the Ultimate Tokens plugin.
 
 This native-import path is UNVERIFIED end-to-end. The ../figma/ (resolved) files always
-import cleanly; the NONOUN Figma plugin is the reliable cascade. Use this only to test
+import cleanly; the Ultimate Tokens Figma plugin is the reliable cascade. Use this only to test
 native import, and import the primitives FIRST.
 
 To test (Figma → Local variables → Import):
@@ -231,7 +239,7 @@ function ensureAppTheme() {
 // live specimen renders the REAL face when you click between palette families. This tier IS a runtime CDN
 // request, so it is GATED OFF in the Figma plugin (this.inFigma) — there (and offline) an unbundled face
 // falls back to the generic. Every EXPORT carries the real family name regardless of what the preview loads.
-const TYPE_FONTS_LINK_ID = "nonoun-type-fonts";
+const TYPE_FONTS_LINK_ID = "ultimate-tokens-type-fonts";
 function ensureTypeFonts() {
   if (typeof document === "undefined" || !document.head) return;
   if (document.getElementById(TYPE_FONTS_LINK_ID)) return; // inject exactly once
@@ -264,7 +272,7 @@ function ensureTypeFonts() {
 const SELF_HOSTED_FONTS = new Set(["Inter", "Inter Tight", "Source Serif 4", "JetBrains Mono"]);
 const GENERIC_FONTS = new Set(["serif", "sans-serif", "monospace", "system-ui", "ui-serif", "ui-sans-serif", "ui-monospace", "cursive", "fantasy", "inherit", "initial", "—"]);
 function ensureWebFont(fam) {
-  const id = "nonoun-wf-" + fam.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const id = "ultimate-tokens-wf-" + fam.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   if (document.getElementById(id)) return; // load each family exactly once
   const base = "https://fonts.googleapis.com/css2?family=" + encodeURIComponent(fam).replace(/%20/g, "+");
   const add = (href, onFail) => {
@@ -276,8 +284,8 @@ function ensureWebFont(fam) {
   add(base + ":wght@100..900&display=swap", () => add(base + "&display=swap")); // full range → default instance on 400
 }
 function ensureWebFontPreconnect() {
-  if (document.getElementById("nonoun-wf-pc-gstatic")) return; // once (gstatic is appended last)
-  for (const [host, id, cors] of [["https://fonts.googleapis.com", "nonoun-wf-pc-gapis", false], ["https://fonts.gstatic.com", "nonoun-wf-pc-gstatic", true]]) {
+  if (document.getElementById("ultimate-tokens-wf-pc-gstatic")) return; // once (gstatic is appended last)
+  for (const [host, id, cors] of [["https://fonts.googleapis.com", "ultimate-tokens-wf-pc-gapis", false], ["https://fonts.gstatic.com", "ultimate-tokens-wf-pc-gstatic", true]]) {
     const l = document.createElement("link"); // preconnect links must be direct <head> children
     l.id = id; l.rel = "preconnect"; l.href = host;
     if (cors) l.crossOrigin = "anonymous";
@@ -1233,7 +1241,7 @@ class HctApp extends HTMLElement {
       h(
         "header",
         { class: "gallery-header" },
-        h("div", { class: "brand" }, brandMark(), "Ultimate Tokens by NONOUN"),
+        h("div", { class: "brand" }, "Ultimate Tokens"),
         h("div", { class: "spacer" }),
         btn([icon("download"), "Project"], { onclick: () => this.loadFromProject(), title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project (Source of Truth)" }),
         btn([icon("upload"), "Import"], { onclick: () => this.importSet(), title: "Import a palette config (.json) exported from Export → Config" }),
@@ -1686,7 +1694,6 @@ class HctApp extends HTMLElement {
           onclick: () => this.toGallery(),
           onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.toGallery(); } },
         },
-        brandMark(),
         "Ultimate Tokens",
       ),
       h("input", {
@@ -5674,7 +5681,7 @@ class HctApp extends HTMLElement {
       }
       const stPlans = stylePlans({ families: stFamilies, scale: stScale, include: { color: !!sys.color, type: !!sys.type } });
       if (stPlans.paints.length || stPlans.texts.length) {
-        const artifact = { $schema: "nonoun-figma-styles.plan.v1", ...stPlans, ...(stPlans.texts.length && stScale ? { fontPrimitives: primitivesApplyPlan(typeTokensFigmaPrimitives(stScale)) } : {}) };
+        const artifact = { $schema: "ultimate-tokens-figma-styles.plan.v1", ...stPlans, ...(stPlans.texts.length && stScale ? { fontPrimitives: primitivesApplyPlan(typeTokensFigmaPrimitives(stScale)) } : {}) };
         files.push({ name: "figma/styles.plan.json", data: JSON.stringify(artifact, null, 2) });
       }
     }
@@ -5867,7 +5874,7 @@ class HctApp extends HTMLElement {
   // protection (Apply can overwrite same-named variables that components are bound to).
   renderApplyGate() {
     const rebuild = this.applyGateRebuild;
-    const MAPPINGS_DOC = "https://nonoun.io/docs/mappings";
+    const MAPPINGS_DOC = REPO_URL + "#figma-plugin";
     return h(
       "dialog",
       {
@@ -5887,10 +5894,10 @@ class HctApp extends HTMLElement {
         "div",
         { class: "apply-gate-body" },
         h("p", { class: "apply-gate-lede" }, rebuild
-          ? "Regroup deletes and re-creates the Color Modes variables so they adopt the grouped order. Any layers or styles bound to them will detach and need reconnecting — the NONOUN style swatches are re-bound automatically on this same apply. (Color Primitives are untouched.)"
+          ? "Regroup deletes and re-creates the Color Modes variables so they adopt the grouped order. Any layers or styles bound to them will detach and need reconnecting — the Ultimate Tokens style swatches are re-bound automatically on this same apply. (Color Primitives are untouched.)"
           : (this.exportSystems && this.exportSystems.styles === false
               ? "This creates or updates the Color Primitives + Color Modes variable collections in this file. Variables with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want)."
-              : "This creates or updates the Color Primitives + Color Modes variable collections in this file, plus the STYLE swatches bound to them (paint styles per semantic role, text styles per type step — toggle \u201CStyles\u201D in the drawer to opt out). Variables and NONOUN-created styles with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want).")),
+              : "This creates or updates the Color Primitives + Color Modes variable collections in this file, plus the STYLE swatches bound to them (paint styles per semantic role, text styles per type step — toggle \u201CStyles\u201D in the drawer to opt out). Variables and Ultimate Tokens styles with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want).")),
         h(
           "div",
           { class: "apply-gate-warn" },
@@ -6122,12 +6129,12 @@ class HctApp extends HTMLElement {
     if (sec === "account") return this._accountPanel();
     if (sec === "about") {
       return {
-        title: "About", desc: "Ultimate Tokens by NONOUN.",
+        title: "About", desc: "Ultimate Tokens.",
         body: [h("div", { class: "settings-about" },
           h("p", {}, "Generate perceptual color palettes, a systematic type scale, and a dimensional geometry system — exported as CSS, DTCG, Tailwind, shadcn, Figma variables, and a downloadable Brand-Kit MCP."),
           this._settingsGroup(null, [
-            h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("b", {}, "Support"), h("small", {}, "Questions, bugs, or feedback.")), h("span", { class: "settings-meta" }, "support@nonoun.io")),
-            h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("b", {}, "Documentation"), h("small", {}, "Guides and the token-mapping reference.")), h("span", { class: "settings-meta" }, "nonoun.io/docs")),
+            h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("b", {}, "Support"), h("small", {}, "Questions, bugs, or feedback.")), h("a", { class: "settings-meta", href: SUPPORT_URL, target: "_blank", rel: "noopener noreferrer" }, "GitHub Issues")),
+            h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("b", {}, "Documentation"), h("small", {}, "Guides and the token-mapping reference.")), h("a", { class: "settings-meta", href: DOCS_URL, target: "_blank", rel: "noopener noreferrer" }, "Read the docs")),
           ]),
         )],
       };
@@ -6233,7 +6240,7 @@ class HctApp extends HTMLElement {
         h("div", { class: "settings-row-text" },
           h("b", {}, "Manage subscription"),
           h("small", {}, "Invoices, payment method, and cancellation.")),
-        h("a", { class: "account-manage settings-meta", href: "https://nonoun.io/account", target: "_blank", rel: "noopener noreferrer" }, "nonoun.io/account")),
+        h("a", { class: "account-manage settings-meta", href: ACCOUNT_URL, target: "_blank", rel: "noopener noreferrer" }, "Manage on Lemon Squeezy")),
     ]));
 
     // Developer · flag overrides — three-state (Default / On / Off) per boolean capability flag, written to
@@ -7060,7 +7067,7 @@ class HctApp extends HTMLElement {
   // JSON.stringify'd TWICE so the result is a bulletproof-escaped JS string literal the binder
   // JSON.parses at runtime (no JS-literal injection hazard).
   downloadFigmaPlugin() {
-    const anchor = 'JSON.parse("[]"); /* __NONOUN_FLOAT_PLANS__ */';
+    const anchor = 'JSON.parse("[]"); /* __ULTIMATE_TOKENS_FLOAT_PLANS__ */';
     const plans = this._figmaFloatPlans(); // [] when type+geometry both off / no breakpoints
     const injected = FIGMA_PLUGIN.code.includes(anchor)
       ? FIGMA_PLUGIN.code.replace(anchor, "JSON.parse(" + JSON.stringify(JSON.stringify(plans)) + "); /* injected */")
@@ -7076,7 +7083,7 @@ class HctApp extends HTMLElement {
     const kit = brandKit(this.doc, this.exportSystems);
     const base = slug(kit.name) || "brand-kit";
     const pkg = JSON.stringify(
-      { name: "ultimate-tokens-brand-kit", version: "0.1.0", type: "module", description: `MCP server for the "${kit.name}" brand kit (Ultimate Tokens by NONOUN)`, bin: { "brand-kit-mcp": "brand-kit-server.mjs" }, private: true },
+      { name: "ultimate-tokens-brand-kit", version: "0.1.0", type: "module", description: `MCP server for the "${kit.name}" brand kit (Ultimate Tokens)`, bin: { "brand-kit-mcp": "brand-kit-server.mjs" }, private: true },
       null, 2,
     );
     const files = [
@@ -7127,12 +7134,11 @@ class HctApp extends HTMLElement {
   }
 }
 
+// The one tag. The pre-rename alias was retired with the maker brand (ADR-015): an embed on the old tag
+// now renders nothing, which is the intended, visible failure — a silently-styled ghost element would be
+// worse. The localStorage prefix chain in migrateStorageKeys() is a SEPARATE concern and stays: it carries
+// real saved palettes across the rename, and dropping it would delete a user's work.
 customElements.define("ultimate-tokens", HctApp);
-// DEPRECATED ALIAS — the element shipped as <nonoun-color-tokens> before the product rename, and the
-// single-file bundle is embeddable, so a page in the wild may still use the old tag. A custom-element
-// CLASS may only be registered once, hence the trivial subclass. Remove once no embed uses it.
-class NonounColorTokensElement extends HctApp {}
-customElements.define("nonoun-color-tokens", NonounColorTokensElement);
 
 // expose a couple of pure helpers for any console poking / future tests.
 export { HctApp, contrastRatio };

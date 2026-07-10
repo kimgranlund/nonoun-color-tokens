@@ -6,7 +6,7 @@ description: >
   tool/resource", "expose X to agents via MCP", "the MCP opt-in is wrong".
   Covers the zero-dep JSON-RPC stdio server + core (brand-kit-core.mjs owns the
   tools/resources surface; the hosted Worker serves the same core) that serve a
-  generated NONOUN brand kit (palettes · ramps · the per-palette 53 semantic
+  generated Ultimate Tokens brand kit (palettes · ramps · the per-palette 53 semantic
   roles · type · geometry) to AI agents offline, plus the in-app packaging.
   Also fires on "the brand-kit MCP server", "the Download Brand-Kit MCP",
   "get_type / get_geometry / get_semantic / resolve_token / nearest_token",

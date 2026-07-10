@@ -10,7 +10,39 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 
 ### 2026-07-09
 
+#### Removed
+- **The maker brand.** "Ultimate Tokens by NONOUN" is now simply **Ultimate Tokens** — no attribution, no
+  "by" line, no monogram. The `nonoun.io` surface is gone: **support is GitHub Issues**, **docs are the
+  README**, **billing is Lemon Squeezy's own customer portal**. Every replacement link resolves today; the
+  alternative was a domain nobody owns, shipping 404s behind a nicer name.
+- **The `<nonoun-color-tokens>` element tag.** The deprecated alias registered alongside `<ultimate-tokens>`
+  is retired: there is **one tag**. Keeping it looked free, but an alias keeps the retired brand alive in
+  the DOM and in every generated bundle. An embed on the old tag now renders nothing — a visible failure,
+  which beats a silently-styled ghost. `migrateStorageKeys()` is untouched: the tag was *cosmetic*
+  compatibility, the storage prefixes are *data* compatibility, and only the first was expendable.
+  (ADR-014 amended, #250)
+- **The "N" monogram**, which could not be renamed away because it *was* the letterform. `brandMark()` and
+  the eight `ico-nonoun-*` assets are deleted; the favicon set is regenerated from a brand-neutral mark —
+  four tonal swatches, saying what the product is rather than who made it. The header shows the wordmark
+  alone. (ADR-015, #250)
+
+#### Added
+- **`test/repo/branding.mjs`** — the debrand is a **gate**, not a sweep. A find-and-replace decays: the next
+  toast, og: tag, or lifecycle email reintroduces the maker by muscle memory, and re-attribution is a
+  factual claim about who makes this. The gate fails `npm test` on `NONOUN`, on any `nonoun.io` URL, and on
+  the pre-rename identifier outside a named back-compat allowlist. `voice-check.mjs` raises the same word to
+  **ERROR** in copy. Changelogs and the decision records are exempt — a record must be able to name what it
+  retired. (#250)
+
 #### Changed
+- Internal identifiers took the product's name: the export schema `nonoun-figma-styles.plan.v1` →
+  `ultimate-tokens-figma-styles.plan.v1`, the DOM ids `nonoun-type-fonts` / `nonoun-wf-*`, and the shared
+  build anchor `__NONOUN_FLOAT_PLANS__` (lockstep across the app, the binder, and two tests). (#250)
+- The voice platform's §1 kept the house grammar rule ("no nouns, just verbs") and dropped the etymology it
+  used to be derived from. The unbuilt hosted-MCP and magic-link URLs became explicit `<APP_DOMAIN>` /
+  `<MCP_DOMAIN>` placeholders, so Phase B must acquire a domain as step zero rather than inherit one. (#250)
+- Fixed a stale install command in the pinned fact sheet that #248 missed
+  (`/plugin marketplace add kimgranlund/nonoun-color-tokens`). (#250)
 - **The deeper identity rename — `nonoun-color-tokens` → `ultimate-tokens`.** Following the folder and
   GitHub-repo move, the product's identity moved everywhere it is *addressable*, in four namespaces:
   the **custom element** (`<nonoun-color-tokens>` → **`<ultimate-tokens>`**, with the old tag kept as a
@@ -23,6 +55,11 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 - **The public install command changed** — the Claude plugin is now
   `/plugin marketplace add kimgranlund/ultimate-tokens`. GitHub redirects the old path, but new copy
   uses the new one. (#248)
+- **The repo's own agent + skill renamed to the new domain**: `color-tokens-reviewer` →
+  **`ultimate-tokens-reviewer`**, and the `/color-tokens-brand-voice` skill →
+  **`/ultimate-tokens-brand-voice`** (the directory name IS the command). The plugin's `color-tokens`
+  consumption skill KEEPS its name — there `color-tokens` names the token *system* (peer to
+  `typography-tokens` / `geometry-tokens`), not the product. (#249)
 - **User-facing product-name drift repaired.** The flagship Figma plugin's error toast and console prefix
   still said "Color Tokens" while its manifest said "Ultimate Tokens by NONOUN"; the app's masthead `<h1>`
   and brand link said the same. All now read **Ultimate Tokens**. The separately-published **Color Tokens

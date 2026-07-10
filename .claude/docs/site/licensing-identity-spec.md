@@ -5,7 +5,7 @@ unlocks **any number of computers and Figma installs** as long as the person usi
 the license belongs to — i.e. their email matches the key's associated email. Device/activation
 counts stop being the seat model; they remain only as an abuse backstop.
 
-Related records: `mcp-hosting-spec.md` (Phase B introduces the NONOUN account = email magic-link —
+Related records: `mcp-hosting-spec.md` (Phase B introduces the Ultimate Tokens account = email magic-link —
 the same identity this spec leans on) · `storage-and-sync-spec.md` (the account the kits sync to) ·
 `.claude/docs/marketing/store-copy.md` §3 (the customer-facing seat copy this eventually rewrites).
 
@@ -42,7 +42,7 @@ microcopy via the marketing corpus).
 
 ## Phase 2 — verified identity (rides mcp-hosting Phase B; the real thing)
 
-- **Magic-link verification:** the NONOUN account (email, verified by link — the Phase B Worker)
+- **Magic-link verification:** the Ultimate Tokens account (email, verified by link — the Phase B Worker)
   becomes the identity; the app validates key + *verified session email* against the LS association.
 - **Server-side roster:** LS webhooks upsert `license ↔ email` into D1 on `order_created` /
   subscription events; "enter license key to link" remains the fallback for mismatched purchase
@@ -58,13 +58,16 @@ microcopy via the marketing corpus).
   activation; `enterLicense`→activate, `clearLicense`→deactivate.
 - **Customer copy** keeps describing shipped behavior (store-copy §3 context notes point here).
   When Phase 1 ships, the variant descriptions + FAQ move to "tied to your email, works on all your
-  devices" — through the `color-tokens-brand-voice` loop.
+  devices" — through the `ultimate-tokens-brand-voice` loop.
 - **Go-live (#158) does not wait for this.** The flip is orthogonal; only the runbook's
   activation-limit guidance changes (high ceiling, not 3–5).
 
 ## Comms decision (same date)
 
-All customer communication eventually comes and goes from **support@nonoun.io** — lifecycle emails
-(cancellation, ended, renewal) will route through our own mailer sending as support@nonoun.io once
+There is **no support inbox and no sending domain**: the product is unattributed and owns no domain.
+Support is **GitHub Issues** (`kimgranlund/ultimate-tokens/issues`), and Lemon Squeezy sends all
+transactional mail from its own address today. If Phase B ever sends lifecycle mail (cancellation,
+ended, renewal) it needs a `<SUPPORT_EMAIL>` on a domain that does not yet exist — an explicit
+prerequisite, not an assumed one. Once
 one exists; LS-native emails carry the copy until then. `{{SUPPORT_EMAIL}}` is pinned to
-support@nonoun.io across the corpus.
+`<SUPPORT_EMAIL>` across the corpus.

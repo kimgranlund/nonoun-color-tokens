@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // brand-kit-server.mjs — the zero-dependency STDIO entry for the Brand-Kit MCP server. It reads a sibling
-// `brand-kit.json` (the resolved tokens, produced by "Ultimate Tokens by NONOUN"), builds the MCP surface,
+// `brand-kit.json` (the resolved tokens, produced by "Ultimate Tokens"), builds the MCP surface,
 // and frames newline-delimited JSON-RPC 2.0 over stdio around the PURE dispatch in `brand-kit-core.mjs`
 // (which the hosted Cloudflare Worker imports too — same surface, parity by construction). Pure Node, no
 // `npm install` — just `node brand-kit-server.mjs`. (All logging → STDERR; stdout is the protocol stream.)

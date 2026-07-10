@@ -59,7 +59,7 @@ ok(!geomOnly.palettes && !geomOnly.type && geomOnly.geometry, "brandKit({geometr
   ok(brandKit(nonBaseDoc).type.categories.Body.MD.size === plainKit.type.categories.Body.MD.size, "a non-base (|md) override does NOT leak into the BASE kit");
 }
 
-const dir = mkdtempSync(join(tmpdir(), "nonoun-mcp-"));
+const dir = mkdtempSync(join(tmpdir(), "ultimate-tokens-mcp-"));
 const kitPath = join(dir, "brand-kit.json");
 writeFileSync(kitPath, JSON.stringify(kit));
 

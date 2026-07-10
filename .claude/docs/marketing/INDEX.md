@@ -1,7 +1,7 @@
-# Marketing corpus — Ultimate Tokens by NONOUN
+# Marketing corpus — Ultimate Tokens
 
 Everything a customer reads, in one place, under one voice. Authored and maintained by the
-**marketing-manager** agent through the **color-tokens-brand-voice** skill — every piece gated by the
+**marketing-manager** agent through the **ultimate-tokens-brand-voice** skill — every piece gated by the
 voice-check script and the platform rubric before it ships.
 
 ## The foundation (read first)
@@ -21,12 +21,12 @@ voice-check script and the platform rubric before it ships.
 | [`product/brand-kit-mcp.md`](product/brand-kit-mcp.md) | The MCP story — download copy, directory listing, agent pitch, setup block |
 | [`product/claude-plugin.md`](product/claude-plugin.md) | The consumption-plugin story — install copy, marketplace listing, agent pitch, the distribution-layer angle |
 | [`launch/launch-kit.md`](launch/launch-kit.md) | Announcements, social variants, the demonstration thread |
-| [`web/landing.md`](web/landing.md) | Landing-page copy blocks for `app.nonoun.io` |
+| [`web/landing.md`](web/landing.md) | Landing-page copy blocks (no domain yet — see the TBD note in the file) |
 
 ## Working agreements
 
 - **Edit through the loop.** Surface → posture → stance → fact-pinned draft →
-  `node .claude/skills/color-tokens-brand-voice/scripts/voice-check.mjs <file>` → §6 rubric ≥ 4 on
+  `node .claude/skills/ultimate-tokens-brand-voice/scripts/voice-check.mjs <file>` → §6 rubric ≥ 4 on
   every axis. A pinned-fact error fails the piece outright.
 - **Drift is a defect.** A product change that alters a stated fact updates `fact-sheet.md` in the
   same change, then sweeps this corpus (`grep -rn "<old>" .claude/docs/marketing/`) — plus the README

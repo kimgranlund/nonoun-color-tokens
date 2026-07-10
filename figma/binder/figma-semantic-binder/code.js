@@ -38,7 +38,7 @@ const PALETTES = [
 // can be carried as DATA: app.js's downloadFigmaPlugin() string-replaces this anchor with the current
 // project's _figmaFloatPlans() at download time. Default [] = the generic/asset form (no breakpoints
 // baked in) — a no-op, so the checked-in binder stays palette-agnostic.
-const FLOAT_PLANS = JSON.parse("[]"); /* __NONOUN_FLOAT_PLANS__ */
+const FLOAT_PLANS = JSON.parse("[]"); /* __ULTIMATE_TOKENS_FLOAT_PLANS__ */
 
 // FLOAT_REGISTRY_KEY — the PROVENANCE registry for the breakpoint-moded Type/Geometry collections, a
 // name→collectionId map stored in root pluginData (travels with the .fig, like the palette set). Kept
@@ -89,12 +89,12 @@ async function varsByName(collectionId) {
 // file to exactly the current plan (never doubling, never leaving a removed breakpoint's mode behind).
 async function applyFloatPlans(plans) {
   let collections = 0, variables = 0;
-  const reg = readFloatRegistry(); // provenance: only ever touch a collection NONOUN created (see ensureFloatCollection)
+  const reg = readFloatRegistry(); // provenance: only ever touch a collection this plugin created (see ensureFloatCollection)
   for (const plan of (Array.isArray(plans) ? plans : [])) {
     if (!plan || !plan.collection || !Array.isArray(plan.modes) || !plan.modes.length) continue;
     const coll = await ensureFloatCollection(plan.collection, reg);
     // The collection's DEFAULT mode (Figma rejects removing it) — rename it to the plan's first mode ("Base");
-    // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a NONOUN-created
+    // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a plugin-created
     // collection they coincide, but a foreign same-named collection's default may not be the first mode, and
     // pruning it would throw. (The headless mock has no defaultModeId → falls back to modes[0].)
     const defaultId = coll.defaultModeId || coll.modes[0].modeId;
@@ -316,6 +316,6 @@ async function main() {
 // show a friendly message, and close cleanly.
 main().catch((e) => {
   console.error("[Color Tokens Semantic Binder] bind failed:", e);
-  figma.notify("Couldn't bind the semantic variables. Please try again — if it keeps happening, email support@nonoun.io.", { error: true });
+  figma.notify("Couldn't bind the semantic variables. Please try again — if it keeps happening, open an issue at github.com/kimgranlund/ultimate-tokens.", { error: true });
   figma.closePlugin();
 });

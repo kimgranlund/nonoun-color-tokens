@@ -172,7 +172,7 @@ try {
   ok(await evalJS(`(()=>{return !!${el}.querySelector(".tyi-voices") && ${el}.querySelectorAll(".an-card").length>=4})()`), "Typography section: right-pane inspector + left-rail analysis cards render");
   // entering the section injects the SELF-HOSTED base64 @font-face <style> (TIER 1) — no CDN, so the 4 base
   // faces render offline + in the Figma plugin (networkAccess:none).
-  ok(await evalJS(`(()=>{const s=document.getElementById("nonoun-type-fonts");return !!s && s.tagName==="STYLE" && /@font-face/.test(s.textContent) && /base64/.test(s.textContent) && /Inter Tight/.test(s.textContent)})()`), "Typography injects the self-hosted base64 @font-face (renders offline + in the Figma plugin)");
+  ok(await evalJS(`(()=>{const s=document.getElementById("ultimate-tokens-type-fonts");return !!s && s.tagName==="STYLE" && /@font-face/.test(s.textContent) && /base64/.test(s.textContent) && /Inter Tight/.test(s.textContent)})()`), "Typography injects the self-hosted base64 @font-face (renders offline + in the Figma plugin)");
   // On a self-hosted treatment (the default), TIER 2 loads nothing — the 4 base faces never hit the CDN.
   ok(await evalJS(`(()=>{return ![...document.querySelectorAll("link[href]")].some(l=>/fonts\\.(googleapis|gstatic)\\.com/.test(l.href))})()`), "self-hosted base faces need no Google Fonts CDN request");
   // all four embedded faces must actually APPLY in real layout (the DOM is what the app renders) — measured

@@ -8,7 +8,7 @@ register for "How it works". Facts: [`../fact-sheet.md`](../fact-sheet.md).
 **Plugin name**
 
 ```
-Ultimate Tokens by NONOUN
+Ultimate Tokens
 ```
 
 **Tagline**
@@ -49,7 +49,7 @@ Perceptual color, type & geometry tokens — written straight into Figma variabl
 **Support / privacy lines (listing fields)**
 
 ```
-Support:  support@nonoun.io
+Support:  github.com/kimgranlund/ultimate-tokens/issues
 Privacy:  Runs fully offline. No network access, no analytics, no account.
 ```
 

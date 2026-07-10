@@ -21,8 +21,8 @@ The non-obvious do/don'ts (each cost a real bug or a review cycle), then a worke
   The technical detail goes to `console.error` ONLY. The `compliance` check in BOTH verifiers greps for
   `figma.notify(...e.message/String(e)/.stack...)` and fails the run (it's a run-failing check, not a printed
   pass/FAIL line).
-- **No stale "HCT" branding** in a user-facing `notify` or the manifest `name` — the product is "Color Tokens
-  by NONOUN" (the contrast/HCT math was removed, ADR-003). The `compliance` check guards this too.
+- **No stale "HCT" branding** in a user-facing `notify` or the manifest `name` — the product is
+  "Ultimate Tokens" (the contrast/HCT math was removed, ADR-003). The `compliance` check guards this too.
 
 ### The binder
 

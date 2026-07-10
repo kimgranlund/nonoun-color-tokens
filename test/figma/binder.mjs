@@ -58,7 +58,7 @@ try {
 } catch (e) { FAIL("compliance", `binder compliance scan: ${e.message}`); }
 
 const BINDER_PATH = join(HERE, "figma-semantic-binder/code.js");
-const FLOAT_ANCHOR = 'JSON.parse("[]"); /* __NONOUN_FLOAT_PLANS__ */';
+const FLOAT_ANCHOR = 'JSON.parse("[]"); /* __ULTIMATE_TOKENS_FLOAT_PLANS__ */';
 
 // loadBinder — compile the binder's source, EXPOSING roleTable/refKey/main/applyFloatPlans/FLOAT_PLANS
 // via an appended return (they're all top-level function/const declarations, which hoist within the

@@ -31,7 +31,7 @@ Derive OKLCH-true color, type & geometry systems from one source. Export to CSS,
 
 **Long (the full paragraph, about pages / press)**
 
-> Ultimate Tokens by NONOUN turns a few perceptual decisions into a complete design system. Color is
+> Ultimate Tokens turns a few perceptual decisions into a complete design system. Color is
 > modeled where human vision is even — OKLCH-native, HEX derived only for output — so a single key
 > color becomes a measured tonal ramp and 53 semantic roles, resolved for light and dark in one pass.
 > Typography and geometry compose from the same source: eleven type voices on a modular scale, a size

@@ -4,7 +4,7 @@
 shape (`targetVariableName` + `targetVariableSetName`), which Figma's docs say resolves on native
 import *when the target collection already exists in the file* (ADR-002, re-verified 2026-06-15).
 Whether the cascade actually resolves end-to-end is **unverified** — there is no Figma in CI, so this
-must be checked by hand. The resolved `figma/` export and the NONOUN plugin remain the reliable paths.
+must be checked by hand. The resolved `figma/` export and the Ultimate Tokens plugin remain the reliable paths.
 
 This file is the procedure to run that check.
 

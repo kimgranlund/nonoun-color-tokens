@@ -81,17 +81,17 @@ const DESC = "Perceptual design tokens — color ramps with 53 semantic roles, t
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="${favHref}">
-<title>Ultimate Tokens by NONOUN</title>
+<title>Ultimate Tokens</title>
 <meta name="description" content="${DESC}">
 <meta name="theme-color" content="#000000">
-<meta property="og:title" content="Ultimate Tokens by NONOUN">
+<meta property="og:title" content="Ultimate Tokens">
 <meta property="og:description" content="${DESC}">
 <meta property="og:type" content="website">
 <meta property="og:url" content="${SITE}">
-<meta property="og:image" content="${SITE}icons/ico-nonoun-black.png">
+<meta property="og:image" content="${SITE}icons/og-ultimate-tokens.png">
 <meta property="og:image:width" content="512">
 <meta property="og:image:height" content="512">
-<meta property="og:image:alt" content="The NONOUN monogram — a white N on a black square">
+<meta property="og:image:alt" content="The Ultimate Tokens mark — four tonal swatches on a black square">
 <meta name="twitter:card" content="summary">
 <style>${css}</style></head>
 <body><ultimate-tokens></ultimate-tokens>
