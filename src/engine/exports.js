@@ -624,6 +624,31 @@ export function exportShadcn(state, opts = {}) {
 // Spec: .claude/docs/spec (design-system-files-for-llms.md in the export repo).
 
 const DS_AA = 4.5;
+// ── the TEXT-RENDERING BASELINE — always included, never optional (Kim's standing rule, 2026-07-10) ──
+// The macOS smoothing pair (consistent weight in BOTH schemes) · optimizeLegibility (kerning + ligatures
+// engaged) · optical sizing (variable fonts use their optical axes) · font-synthesis none (no faux
+// bold/italic — weights must resolve from the actual font, never be synthesized) · kerning + common
+// ligatures — plus the code/pre/kbd exception so code-like units and mono values never ligate.
+// One source, three carriers: the DESIGN.md Typography section (fenced block below), the Figma Make
+// typography guideline, and every @dsCard preview's base CSS (DS_TEXT_RENDERING_PROPS inline).
+const DS_TEXT_RENDERING_PROPS = "-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;font-optical-sizing:auto;font-synthesis:none;font-kerning:normal;font-variant-ligatures:common-ligatures";
+const DS_TEXT_RENDERING_MD = [
+  "Always include the **text-rendering baseline** in the app's global CSS — it is part of this design",
+  "system, not an option:",
+  "",
+  "```css",
+  "html {",
+  "  -webkit-font-smoothing: antialiased;  /* macOS pair: consistent weight in light AND dark */",
+  "  -moz-osx-font-smoothing: grayscale;",
+  "  text-rendering: optimizeLegibility;   /* kerning + ligatures engaged */",
+  "  font-optical-sizing: auto;            /* variable fonts use their optical axes */",
+  "  font-synthesis: none;                 /* no faux bold/italic — weights resolve from the font */",
+  "  font-kerning: normal;",
+  "  font-variant-ligatures: common-ligatures;",
+  "}",
+  "code, pre, kbd { font-variant-ligatures: none; } /* code-like units never ligate */",
+  "```",
+].join("\n");
 const dsContrast = (a, b) => {
   const la = relLumExp(a), lb = relLumExp(b);
   const hi = Math.max(la, lb), lo = Math.min(la, lb);
@@ -928,7 +953,9 @@ export function exportDesignSystemComponents(state, typeSc, geomSc) {
   const rMd = radii.md != null ? radii.md : 12;
   const rLg = radii.lg != null ? radii.lg : 16;
   const cap = (s) => s.split(/[-\s]/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-  const baseCss = `*{box-sizing:border-box}.cd{font-family:${bodyStack};background:${V(cn + "-background")};color:${V(cn + "-on-surface")};padding:24px;line-height:1.5}.cd h3{font-family:${headStack};margin:0 0 12px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:${V(cn + "-on-surface-variant")}}.cd code{font-family:${monoStack};font-size:12px}.cap{font-size:12px;color:${V(cn + "-on-surface-variant")}}`;
+  // every preview carries the TEXT-RENDERING BASELINE (the same block the DESIGN.md's Typography section
+  // mandates — DS_TEXT_RENDERING_PROPS), so the cards render type the way the shipped system will.
+  const baseCss = `*{box-sizing:border-box}.cd{font-family:${bodyStack};background:${V(cn + "-background")};color:${V(cn + "-on-surface")};padding:24px;line-height:1.5;${DS_TEXT_RENDERING_PROPS}}.cd h3{font-family:${headStack};margin:0 0 12px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:${V(cn + "-on-surface-variant")}}.cd code,.cd pre,.cd kbd{font-family:${monoStack};font-size:12px;font-variant-ligatures:none}.cap{font-size:12px;color:${V(cn + "-on-surface-variant")}}`;
   const card = (name, group, title, subtitle, css, body) =>
     ({ name: `components/${name}`, data: `<!-- @dsCard group="${group}" title="${title}" subtitle="${subtitle}" -->\n<style>${root}${baseCss}${css}</style>\n<div class="cd"><h3>${title}</h3>${body}</div>\n` });
 
@@ -1079,6 +1106,8 @@ function dsSpineBody(ds, state, ctx) {
     "Set size **and** line-height **and** weight together from one level, never free-type; leading is a",
     "unitless factor and any tracking is em — never px. The frontmatter carries the working scale",
     `(${usedLevels.length} levels). Weight is voice — never interchange the weights across roles.`,
+    "",
+    DS_TEXT_RENDERING_MD,
   ].join("\n");
 
   const layout = [
@@ -1659,6 +1688,8 @@ function dsMakeTypographyMd(typeSc) {
     "| Level | Family | Size / Leading× | Weight | Use for |",
     "|---|---|---|---|---|",
     ...rows,
+    "", "## Text rendering — ALWAYS include", "",
+    DS_TEXT_RENDERING_MD,
     "", "## Rules — IMPORTANT", "",
     "- Do NOT use a level smaller than `body-md` for primary reading text; the smaller steps are",
     "  for dense, secondary UI only.",
@@ -1830,7 +1861,10 @@ export function exportDesignSystemMakeBundle(state, typeSc, geomSc, opts = {}) {
   // token can be a var() LINK into the design-token layer and resolve to the identical kit value.
   // aliasPrefix wires the links; radii/fonts seed --radius and the @theme font slots from the real scales.
   const shadcnCss = exportShadcn(state, { aliasPrefix: pfx, radii: dsRadii(geomSc), fonts: (typeSc && typeSc.fonts) || {} });
-  const stylesCss = shadcnCss + dsFullLayersCss(state, typeSc, geomSc);
+  // the text-rendering baseline ships as REAL CSS in the Make carrier (the same block the DESIGN.md
+  // and typography.md mandate as prose) — a Make consumer gets it by pasting styles.css, no reading owed.
+  const textRenderingCss = `\n/* text-rendering baseline — always on (see foundations/typography.md) */\nhtml {\n  ${DS_TEXT_RENDERING_PROPS.split(";").join(";\n  ")};\n}\ncode, pre, kbd { font-variant-ligatures: none; }\n`;
+  const stylesCss = shadcnCss + dsFullLayersCss(state, typeSc, geomSc) + textRenderingCss;
   return [
     { name: "guidelines/Guidelines.md", data: dsMakeGuidelinesMd(name, story) },
     { name: "guidelines/setup.md", data: dsMakeSetupMd(typeSc) },

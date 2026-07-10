@@ -10,6 +10,18 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 
 ### 2026-07-10
 
+#### Added
+- **The text-rendering baseline ships in every design-system export — always, never optional.** The
+  DESIGN.md Typography section (all three platform profiles), the Figma Make `styles.css` (as real,
+  paste-ready CSS) and `typography.md`, and every `@dsCard` preview now carry the block:
+  `-webkit-font-smoothing: antialiased` + `-moz-osx-font-smoothing: grayscale` (the macOS pair —
+  consistent weight in both schemes), `text-rendering: optimizeLegibility`, `font-optical-sizing:
+  auto`, `font-synthesis: none` (weights resolve from the real font, never synthesized),
+  `font-kerning: normal`, `font-variant-ligatures: common-ligatures`, plus
+  `code, pre, kbd { font-variant-ligatures: none }` so code-like units never ligate. "Always" is a
+  gate, not a hope: the exports verifier fails on any carrier missing the block. The consumption
+  plugin's `typography-tokens` skill teaches the same rule (law 7). (#254)
+
 #### Changed
 - **Breakpoints are hierarchy-aware and DESKTOP-ANCHORED.** The scale you design now IS the Desktop
   mode, and Tablet/Mobile derive *down* via a size-progressive compression curve: body-class text is

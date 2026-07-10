@@ -183,6 +183,22 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   if (previews.length < 5) FAIL("design-system", `too few previews (${previews.length})`);
   const asPreviews = previews.map((p) => ({ name: p.name.replace("components/", ""), html: p.data }));
 
+  // TEXT-RENDERING BASELINE — "always include" is a GATE, not a hope (the standing rule, 2026-07-10):
+  // the DESIGN.md Typography section mandates the block (smoothing pair · optimizeLegibility · optical
+  // sizing · font-synthesis none · kerning + common ligatures · the code/pre/kbd no-ligatures exception),
+  // and EVERY @dsCard preview actually renders under it.
+  {
+    const md = byName["DESIGN.md"] || "";
+    for (const probe of ["-webkit-font-smoothing: antialiased", "-moz-osx-font-smoothing: grayscale", "text-rendering: optimizeLegibility", "font-optical-sizing: auto", "font-synthesis: none", "font-kerning: normal", "font-variant-ligatures: common-ligatures", "code, pre, kbd { font-variant-ligatures: none; }"])
+      if (!md.includes(probe)) FAIL("design-system", `DESIGN.md Typography is missing the text-rendering baseline line: ${probe}`);
+    for (const p of previews) {
+      if (!p.data.includes("font-synthesis:none") || !p.data.includes("-webkit-font-smoothing:antialiased") || !p.data.includes("font-variant-ligatures:common-ligatures"))
+        FAIL("design-system", `preview ${p.name} is missing the text-rendering baseline props`);
+      if (!p.data.includes(".cd code,.cd pre,.cd kbd") || !p.data.includes("font-variant-ligatures:none"))
+        FAIL("design-system", `preview ${p.name} is missing the code/pre/kbd no-ligatures exception`);
+    }
+  }
+
   // §8 GATES — KIT FIDELITY: G1 (contrast) is a MEASUREMENT of the kit's own onColorMode choice
   // (fixed = uniform brand labels, sub-4.5 pairs accepted per ADR-003) and is DISCLOSED in the
   // receipt; every OTHER gate (G0 parse, G2 parity, G3 carrier equality, G5 refs, G6 sections,
@@ -392,6 +408,12 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
   if (!styles.includes("FULL token layers")) FAIL("design-system-make", "styles.css missing the appended full token layers");
   // the appendix must land AFTER the @theme block so the D10 parse (first :root -> .dark -> @theme) is untouched
   if (styles.indexOf("FULL token layers") < styles.indexOf("@theme inline {")) FAIL("design-system-make", "full-layer appendix must come after @theme inline (D10 parse safety)");
+  // TEXT-RENDERING BASELINE — Make carries it as REAL CSS in styles.css AND as prose in typography.md.
+  for (const probe of ["-webkit-font-smoothing:antialiased", "font-synthesis:none", "font-optical-sizing:auto", "code, pre, kbd { font-variant-ligatures: none; }"])
+    if (!styles.includes(probe)) FAIL("design-system-make", `styles.css missing the text-rendering baseline: ${probe}`);
+  const makeTypo = byName["guidelines/foundations/typography.md"];
+  for (const probe of ["font-synthesis: none", "-webkit-font-smoothing: antialiased", "code, pre, kbd { font-variant-ligatures: none; }"])
+    if (!makeTypo.includes(probe)) FAIL("design-system-make", `typography.md missing the text-rendering baseline: ${probe}`);
   // every var() link must RESOLVE to a concrete value in both schemes (the map contract survives aliasing)
   const rmap = X.dsShadcnRuntimeMap(styles);
   for (const tok of ["--background", "--primary", "--primary-foreground", "--destructive", "--border"]) {

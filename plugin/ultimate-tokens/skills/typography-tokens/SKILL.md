@@ -11,6 +11,8 @@ description: >
   apply the paragraph/single-line rhythm. Never hardcode a px font-size or a font family — this names
   the semantic type token for every job. Scope is TYPE only (colour is color-tokens; radius/spacing/
   density is geometry-tokens).
+disable-model-invocation: false
+user-invocable: false
 ---
 
 # Using Ultimate Tokens type roles
@@ -89,6 +91,22 @@ they wrap (use `-line`, not `-line-single`). Reach for `caption` on a figure cap
    modes, the `--type-*` vars are re-declared inside `@media (min-width: …)` blocks — the same class
    restyles automatically. Don't write fluid `clamp()` type or manual `@media` font-size overrides;
    the modes already did it (see [`references/responsive.md`](references/responsive.md)).
+7. **The text-rendering baseline is always on.** Include it once in the app's global CSS — it is part
+   of the system, not an option:
+   ```css
+   html {
+     -webkit-font-smoothing: antialiased;  /* macOS pair: consistent weight in light AND dark */
+     -moz-osx-font-smoothing: grayscale;
+     text-rendering: optimizeLegibility;   /* kerning + ligatures engaged */
+     font-optical-sizing: auto;            /* variable fonts use their optical axes */
+     font-synthesis: none;                 /* no faux bold/italic — weights resolve from the font */
+     font-kerning: normal;
+     font-variant-ligatures: common-ligatures;
+   }
+   code, pre, kbd { font-variant-ligatures: none; } /* code-like units never ligate */
+   ```
+   `font-synthesis: none` means a weight the font can't resolve renders at the nearest REAL weight —
+   if something looks un-bold, fix the loaded font (or the `-weight` var), never fake it.
 
 ## Surface map — where to look things up
 
