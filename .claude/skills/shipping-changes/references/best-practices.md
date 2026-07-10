@@ -42,7 +42,7 @@ it. Isolate:
 1. **Worktree off clean main**: `git worktree add /tmp/wt-<branch> -b <branch> origin/main`. This is a
    pristine checkout of `origin/main` — none of the churn, none of the foreign edits.
 2. **Symlink `node_modules`** so vite/tsc resolve without a reinstall (and **never** commit it):
-   `ln -s /Users/kimba/Projects/nonoun/nonoun-color-tokens/node_modules /tmp/wt-<branch>/node_modules`.
+   `ln -s /Users/kimba/Projects/nonoun/ultimate-tokens/node_modules /tmp/wt-<branch>/node_modules`.
    (A symlink to the real dir is fine; a *circular self-symlink* is the exit-194 regression — don't create
    one inside the tree.)
 3. **Identify your-vs-foreign files** in the churning primary tree:
