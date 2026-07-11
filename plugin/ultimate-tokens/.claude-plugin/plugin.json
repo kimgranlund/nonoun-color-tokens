@@ -1,7 +1,7 @@
 {
   "name": "ultimate-tokens",
-  "description": "Consume an exported Ultimate Tokens design-token kit correctly in any project. Three skills teach a coding agent to pick the right semantic role for every UI surface instead of guessing values: color-tokens (the 53-role colour layer — buttons, text, containers, feedback, navigation), typography-tokens (the seven-voice type scale), and geometry-tokens (the two-tier dimensional system — controls, containers, the Material-3-aligned radius scale). Each binds to the project's real exported variable names (including Material --md-sys-* naming) and carries a maintainer parity gate against the engine.",
-  "version": "0.1.0",
+  "description": "Consume an exported Ultimate Tokens design-token kit correctly in any project. Three skills teach a coding agent to pick the right semantic role for every UI surface instead of guessing values: color-tokens (the 53-role colour layer — buttons, text, containers, feedback, navigation), typography-tokens (the eleven-voice type scale), and geometry-tokens (the two-tier dimensional system — controls, containers, the Material-3-aligned radius scale). Each binds to the project's real exported variable names (including Material --md-sys-* naming) and carries a maintainer parity gate against the engine.",
+  "version": "0.2.0",
   "author": {
     "name": "Kim Granlund",
     "email": "kim.granlund@gmail.com"
