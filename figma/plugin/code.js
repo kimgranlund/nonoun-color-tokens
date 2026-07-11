@@ -14,8 +14,18 @@
 // The bundle comes from the UI's figmaBundle() = exportDTCG(state, { rawColl:"Color Primitives" }),
 // so this file is palette-agnostic: it walks the tree, it does NOT hard-code the role table.
 
-const RAW_COLLECTION = "Color Primitives";   // the raw color primitives (one "Value" mode)
-const SEMANTIC_COLLECTION = "Color Modes";   // the semantic Light/Dark tokens
+const RAW_COLLECTION = "Color Primitives";   // the raw color primitives (one "Value" mode) — the DEFAULT name
+const SEMANTIC_COLLECTION = "Color Modes";   // the semantic Light/Dark tokens — the DEFAULT name
+// COLL — the ACTIVE color-collection names. Settings › Token mapping can override the defaults
+// (doc.figmaCollections); the apply message carries the override and sets these before any write, and
+// readRawColors resolves them from the SAVED config so a renamed file still round-trips at boot. An
+// override applies to the collections the next apply touches — an existing collection under the old
+// name is left as-is (the apply gate's same-name-overwrite warning covers the semantics).
+var COLL = { raw: RAW_COLLECTION, semantic: SEMANTIC_COLLECTION };
+function setCollectionNames(c) {
+  COLL.raw = c && typeof c.raw === "string" && c.raw.trim() ? c.raw.trim() : RAW_COLLECTION;
+  COLL.semantic = c && typeof c.semantic === "string" && c.semantic.trim() ? c.semantic.trim() : SEMANTIC_COLLECTION;
+}
 
 figma.showUI(__html__, { width: 1440, height: 900, themeColors: true });
 // Tell the UI it is running inside Figma so it reveals its "Apply to Figma" button.
@@ -80,6 +90,8 @@ figma.ui.onmessage = async (msg) => {
   if (!msg) return;
   try {
     if (msg.type === "apply") {
+      // the Settings-overridable color-collection names ride the message; set BEFORE any write.
+      setCollectionNames(msg.collections);
       // `dtcg` is OMITTED when the Color system is toggled off in the UI — skip the color collections
       // entirely (the existing ones are left untouched, not pruned). Type/Geometry filtering happens UI-side.
       const r = msg.dtcg ? await applyBundle(msg.dtcg, { rebuildSemantic: !!msg.rebuildSemantic }) : null;
@@ -192,8 +204,15 @@ function rgbaToHex(c) {
 // readRawColors — the live Color Primitives variable values, as { "{n}/{key}": "#RRGGBB(AA)" }. Read-only
 // reference for the drift diff (NO reverse-derive of params — colors only). Returns {} if absent.
 async function readRawColors() {
+  // resolve a possibly-renamed raw collection from the SAVED config (boot's read-variables arrives
+  // before the UI knows the doc), falling back to the active/default name.
+  var rawName = COLL.raw;
+  try {
+    const cfg = readConfig();
+    if (cfg && cfg.figmaCollections && typeof cfg.figmaCollections.raw === "string" && cfg.figmaCollections.raw.trim()) rawName = cfg.figmaCollections.raw.trim();
+  } catch (e) { /* unreadable config → default name */ }
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const raw = cols.find((c) => c.name === RAW_COLLECTION);
+  const raw = cols.find((c) => c.name === rawName);
   if (!raw) return { found: false, raw: {} };
   const mode = raw.modes[0].modeId;
   const all = await figma.variables.getLocalVariablesAsync();
@@ -314,7 +333,7 @@ async function applyStylePlans(sp) {
   const paints = Array.isArray(sp.paints) ? sp.paints : [];
   if (paints.length) {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const sem = cols.find(function (c) { return c.name === SEMANTIC_COLLECTION; });
+    const sem = cols.find(function (c) { return c.name === COLL.semantic; });
     const semVars = sem ? await varsByName(sem.id) : {};
     const local = await figma.getLocalPaintStylesAsync();
     const byName = {};
@@ -454,7 +473,7 @@ async function applyBundle(dtcg, opts) {
   if (!rawTree || !semLight || !semDark) throw new Error("bundle missing palette/Light/Dark files");
 
   // 1) RAW collection — single "Value" mode, one COLOR var per stop/scrim.
-  const raw = await ensureCollection(RAW_COLLECTION);
+  const raw = await ensureCollection(COLL.raw);
   raw.renameMode(raw.modes[0].modeId, "Value");
   const rawMode = raw.modes[0].modeId;
   const rawByName = await varsByName(raw.id);
@@ -477,10 +496,10 @@ async function applyBundle(dtcg, opts) {
   let rebuilt = false;
   if (opts.rebuildSemantic) {
     const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-    const old = cols0.find((c) => c.name === SEMANTIC_COLLECTION);
+    const old = cols0.find((c) => c.name === COLL.semantic);
     if (old) { old.remove(); rebuilt = true; }
   }
-  const sem = await ensureCollection(SEMANTIC_COLLECTION);
+  const sem = await ensureCollection(COLL.semantic);
   const lightMode = sem.modes[0].modeId;
   sem.renameMode(lightMode, "Light");
   const darkMode = (sem.modes[1] && sem.modes[1].modeId) || sem.addMode("Dark");

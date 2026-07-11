@@ -16,6 +16,7 @@ import {
   hctToRgb,
   STOPS,
   figmaBundle,
+  figmaCollectionNames,
   configFromVariables,
   seedFromKeyColor,
   hexToOklch,
@@ -582,6 +583,8 @@ class HctApp extends HTMLElement {
     this.mapTextMode = false; // Mapping table raw-token editor: false = select menu, true = free text input
     this.viewport = { panX: 0, panY: 0, zoom: 1 };
     this.theme = "system"; // app chrome color scheme: system (follows OS) | light | dark
+    this.motion = "system"; // animation preference: system (respect prefers-reduced-motion) | reduced (always minimal) — app pref
+    this._loadAppPrefs(); // persisted APP prefs (theme/canvasTheme/motion) — loaded before setColorScheme below
     this.exportOpen = false;
     this.exportTab = "css";
     // which token SYSTEMS the Download-All .zip + the Brand-Kit MCP bundle (export-time opt-in, all on
@@ -962,6 +965,7 @@ class HctApp extends HTMLElement {
     const focus = this._captureFocus();
     this.replaceChildren(this.view === "gallery" ? this.renderGallery() : this.renderEditor());
     this.dataset.theme = this.theme;
+    this.dataset.motion = this.motion; // styles.css gates transitions/animations on [data-motion]
     // The app-footer renders an empty shell with stable hooks; paint its dynamic
     // readouts now (the same path liveRefresh uses during a drag).
     if (this.view === "editor") this.paintAppFooter(this._view);
@@ -1798,6 +1802,7 @@ class HctApp extends HTMLElement {
         // Flip the CHROME too: color-scheme on :root so every generated light-dark() --c-*
         // token resolves to the new mode ("system" → "light dark" → follows the OS).
         setColorScheme(this.theme);
+        this._saveAppPrefs(); // the header cycle is the same pref as Settings › Appearance
         this.render();
       },
     });
@@ -1812,6 +1817,7 @@ class HctApp extends HTMLElement {
       ariaLabel: "Canvas preview scheme: " + this.canvasTheme + " — cycle system / light / dark",
       onclick: () => {
         this.canvasTheme = SCHEME_NEXT[this.canvasTheme] || "system";
+        this._saveAppPrefs(); // the header cycle is the same pref as Settings › Appearance
         this.render();
       },
     });
@@ -5785,6 +5791,33 @@ class HctApp extends HTMLElement {
     this.applyGateOpen = true;
     this.render();
   }
+  // ── persisted APP prefs (theme · canvas preview · motion) — per-USER, not doc-bound → localStorage,
+  // versioned like the apply consent. Absent/invalid keys keep the constructor defaults, so a fresh
+  // profile (or Figma's session-scoped iframe storage) boots identically to pre-prefs builds.
+  _appPrefsKey() { return "ultimate-tokens-app-prefs-v1"; }
+  _loadAppPrefs() {
+    try {
+      const raw = localStorage.getItem(this._appPrefsKey());
+      if (!raw) return;
+      const p = JSON.parse(raw);
+      const scheme = (v) => (v === "light" || v === "dark" || v === "system" ? v : null);
+      if (scheme(p.theme)) this.theme = p.theme;
+      if (scheme(p.canvasTheme)) this.canvasTheme = p.canvasTheme;
+      if (p.motion === "reduced" || p.motion === "system") this.motion = p.motion;
+    } catch { /* storage unavailable / corrupt record → defaults */ }
+  }
+  _saveAppPrefs() {
+    try { localStorage.setItem(this._appPrefsKey(), JSON.stringify({ theme: this.theme, canvasTheme: this.canvasTheme, motion: this.motion })); } catch { /* storage unavailable */ }
+  }
+  _resetAppPrefs() {
+    this.theme = "system";
+    this.canvasTheme = "system";
+    this.motion = "system";
+    try { localStorage.removeItem(this._appPrefsKey()); } catch { /* storage unavailable */ }
+    this.dataset.theme = this.theme;
+    setColorScheme(this.theme);
+    this.render();
+  }
   closeApplyGate() { this.applyGateOpen = false; this.render(); }
   // confirm the gate: persist consent (normal apply only) + run the real apply.
   confirmApplyGate() {
@@ -5810,7 +5843,7 @@ class HctApp extends HTMLElement {
       // system is NOT written to the file. Color omits `dtcg` (code.js then skips the color collections);
       // Type/Geometry are filtered out of floatPlans below. The config embed travels regardless.
       const sys = this.exportSystems || {};
-      const msg = { type: "apply", config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans() };
+      const msg = { type: "apply", config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans(), collections: figmaCollectionNames(this.doc) };
       if (sys.color !== false) msg.dtcg = this.figmaBundle();
       // STYLES (opt-out): the swatch layer bound to the variables — paint styles per semantic role
       // (color on), text styles per voice×step×weight (type on). Pure plans (style-plan.mjs); the
@@ -6057,12 +6090,19 @@ class HctApp extends HTMLElement {
     if (sec === "appearance") {
       const schemes = [{ id: "system", label: "System" }, { id: "light", label: "Light" }, { id: "dark", label: "Dark" }];
       return {
-        title: "Appearance", desc: "How the editor chrome and the canvas preview render.",
+        title: "Appearance", desc: "How the editor chrome and the canvas preview render. These preferences are remembered on this device.",
         body: [this._settingsGroup(null, [
           this._settingRow("App theme", "The editor chrome. System follows your OS.", schemes, this.theme,
-            (id) => { this.theme = id; this.dataset.theme = id; setColorScheme(id); this.render(); }, "setapptheme"),
+            (id) => { this.theme = id; this.dataset.theme = id; setColorScheme(id); this._saveAppPrefs(); this.render(); }, "setapptheme"),
           this._settingRow("Canvas preview", "The scheme the canvas previews in — independent of the chrome.", schemes, this.canvasTheme,
-            (id) => { this.canvasTheme = id; this.render(); }, "setcanvastheme"),
+            (id) => { this.canvasTheme = id; this._saveAppPrefs(); this.render(); }, "setcanvastheme"),
+          this._settingRow("Motion", "Editor animations and transitions. System respects your OS reduce-motion setting; Reduced keeps them minimal always.",
+            [{ id: "system", label: "System" }, { id: "reduced", label: "Reduced" }], this.motion,
+            (id) => { this.motion = id; this._saveAppPrefs(); this.render(); }, "setmotion"),
+          h("div", { class: "settings-row" },
+            h("div", { class: "settings-row-text" }, h("b", {}, "Reset app preferences"),
+              h("small", {}, "Theme, canvas preview, and motion return to System; the saved record is cleared. Documents are untouched.")),
+            btn("Reset to defaults", { cls: "settings-reset", ariaLabel: "Reset app preferences to defaults", onclick: () => this._resetAppPrefs() })),
         ])],
       };
     }
@@ -6158,6 +6198,16 @@ class HctApp extends HTMLElement {
     // mapping (default)
     const accentRef = d.accentRef === "single" ? "single" : "mode";
     const onColorMode = d.onColorMode === "contrast" ? "contrast" : "fixed";
+    const collNames = figmaCollectionNames(d);
+    const collInput = (key, label, dflt) =>
+      h("div", { class: "settings-row" },
+        h("div", { class: "settings-row-text" }, h("b", {}, label),
+          h("small", {}, key === "raw" ? "The raw stop/scrim variables (one Value mode)." : "The semantic role variables (Light / Dark modes), aliased to the primitives.")),
+        h("input", {
+          class: "settings-input", type: "text", placeholder: dflt, "aria-label": label,
+          value: (d.figmaCollections && d.figmaCollections[key]) || "",
+          onchange: (e) => this._setFigmaCollection(key, e.target.value),
+        }));
     return {
       title: "Token mapping", desc: "How semantic roles resolve and export. These choices travel with the set.",
       body: [
@@ -6175,9 +6225,29 @@ class HctApp extends HTMLElement {
             onColorMode, (id) => this.commit((doc) => { doc.onColorMode = id; }), "setoncolor",
           ),
         ]),
+        // Figma collection names — per-doc overrides for the two color collections the plugin
+        // creates. Empty = the defaults. An override applies from the NEXT apply; collections already
+        // in the file keep their name (the apply-gate warning covers the overwrite semantics).
+        this._settingsGroup("Figma collections", [
+          collInput("raw", "Primitives collection", "Color Primitives"),
+          collInput("semantic", "Semantic collection", "Color Modes"),
+          ...(collNames.raw.toLowerCase() === collNames.semantic.toLowerCase()
+            ? [h("p", { class: "settings-note settings-warn" }, "The two collections need distinct names — identical names would merge the primitives and roles into one collection on apply.")]
+            : []),
+        ]),
         h("p", { class: "settings-note" }, "These are resolution-layer mapping choices — they re-point how roles resolve, not the ramps, and apply to every export."),
       ],
     };
+  }
+  // _setFigmaCollection(key, value) — write one collection-name override ("raw" | "semantic"). Empty
+  // clears back to the default; the record is dropped entirely when both are default (identity gate).
+  _setFigmaCollection(key, value) {
+    const v = String(value || "").trim().slice(0, 60);
+    this.commit((d) => {
+      const fc = { ...(d.figmaCollections || {}) };
+      if (v) fc[key] = v; else delete fc[key];
+      if (Object.keys(fc).length) d.figmaCollections = fc; else delete d.figmaCollections;
+    });
   }
 
   // _accountPanel — the Settings « Account » home (item 7, Layer 3): the effective plan (Free/Pro badge),

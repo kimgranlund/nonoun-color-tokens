@@ -250,6 +250,7 @@ export function hydrate(snapshot) {
     palettes,
     ...clampExport(s.export),
     ...clampIcons(s.icons),
+    ...clampFigmaCollections(s.figmaCollections),
     ...(typeof s.vol === "string" && s.vol ? { vol: s.vol } : {}),
     ...(story ? { story } : {}),
   };
@@ -260,6 +261,20 @@ export function hydrate(snapshot) {
 // agent binds to it. Identity-gated like every other optional block: the DEFAULT system at its DEFAULT
 // variant round-trips as ABSENT (so an untouched kit's config is byte-identical), and an unknown id drops
 // the whole block. `custom` keeps the user's typed name/variantName verbatim (trimmed + capped).
+// clampFigmaCollections — per-doc overrides for the two Figma color-collection names (Settings ›
+// Token mapping). OPTIONAL, like icons: only non-empty, non-default names attach, so a config with
+// the standard names round-trips identically (the hydrate identity gate).
+function clampFigmaCollections(fc) {
+  if (!fc || typeof fc !== "object") return {};
+  const pick = (v, dflt) => {
+    const s = typeof v === "string" ? v.trim().slice(0, 60) : "";
+    return s && s !== dflt ? s : "";
+  };
+  const raw = pick(fc.raw, "Color Primitives");
+  const semantic = pick(fc.semantic, "Color Modes");
+  if (!raw && !semantic) return {};
+  return { figmaCollections: { ...(raw ? { raw } : {}), ...(semantic ? { semantic } : {}) } };
+}
 function clampIcons(ic) {
   if (!ic || typeof ic !== "object") return {};
   const sys = ICON_SYSTEMS.find((x) => x.id === ic.id);

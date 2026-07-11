@@ -76,6 +76,29 @@ ultimate-tokens[data-theme="system"] { color-scheme: light dark; } /* follow the
 ultimate-tokens[data-theme="light"]  { color-scheme: light; }
 ultimate-tokens[data-theme="dark"]   { color-scheme: dark; }
 
+/* Reduced motion — Settings › Appearance › Motion. "Reduced" forces it; "System" (the default)
+   respects the OS prefers-reduced-motion. Durations collapse to near-zero (0.01ms, not 0 — a zero
+   duration can skip transitionend listeners) rather than being removed, so state changes still land
+   instantly and nothing waits on an event that never fires. */
+ultimate-tokens[data-motion="reduced"] *,
+ultimate-tokens[data-motion="reduced"] *::before,
+ultimate-tokens[data-motion="reduced"] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  ultimate-tokens[data-motion="system"] *,
+  ultimate-tokens[data-motion="system"] *::before,
+  ultimate-tokens[data-motion="system"] *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Hidden scrollbars — content still scrolls; the bar is just not painted. Keeps the
    chrome clean and avoids the bright native scrollbar in a Figma plugin iframe. */
 * { scrollbar-width: none; }                    /* Firefox / modern */

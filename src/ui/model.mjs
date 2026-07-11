@@ -230,12 +230,18 @@ function stateOf(doc) {
   };
 }
 
-// figmaBundle — the DTCG export with raw-collection aliasing ON ("Color Primitives"): the
-// exact shape the Figma plugin's code.js turns into a "Color Primitives" collection + a
-// "Color Modes" collection (Light/Dark modes) aliased to it. Each semantic leaf carries
-// com.figma.aliasData.targetVariableName/targetVariableSetName so the plugin can build the cascade.
+// figmaBundle — the DTCG export with raw-collection aliasing ON: the exact shape the Figma plugin's
+// code.js turns into a raw-primitives collection + a semantic Light/Dark collection aliased to it.
+// Each semantic leaf carries com.figma.aliasData.targetVariableName/targetVariableSetName so the
+// plugin can build the cascade. Collection names default to "Color Primitives"/"Color Modes" and are
+// overridable per-doc (Settings › Token mapping → doc.figmaCollections; figmaCollectionNames resolves).
+export function figmaCollectionNames(doc) {
+  const fc = (doc && doc.figmaCollections) || {};
+  const pick = (v, dflt) => (typeof v === "string" && v.trim() ? v.trim() : dflt);
+  return { raw: pick(fc.raw, "Color Primitives"), semantic: pick(fc.semantic, "Color Modes") };
+}
 export function figmaBundle(doc) {
-  return exportDTCG(stateOf(doc), { rawColl: "Color Primitives" });
+  return exportDTCG(stateOf(doc), { rawColl: figmaCollectionNames(doc).raw });
 }
 
 // brandKit — the resolved brand-kit data the downloadable MCP server (`mcp/brand-kit-server.mjs`) reads:

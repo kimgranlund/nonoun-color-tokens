@@ -764,6 +764,30 @@ ok(!posted.pluginMessage.rebuildSemantic, "(x) a normal apply does NOT set rebui
 // the LIVE path: the posted message also carries floatPlans (_figmaFloatPlans()) — the sandbox's
 // applyFloatPlans creates the Typography/Geometry breakpoint collections from this, alongside dtcg.
 ok(Array.isArray(posted.pluginMessage.floatPlans), "(x) applyToFigma's posted message carries a floatPlans array (the live Type/Geometry apply path)");
+// the Settings-overridable collection names ride the apply message (defaults when no override set).
+ok(posted.pluginMessage.collections && posted.pluginMessage.collections.raw === "Color Primitives" && posted.pluginMessage.collections.semantic === "Color Modes",
+  `(x) the apply message carries the default collection names (got ${JSON.stringify(posted.pluginMessage.collections)})`);
+// with a doc override, the message AND the bundle's aliasData follow the custom raw name.
+app.commit((d) => { d.figmaCollections = { raw: "Brand Primitives", semantic: "Brand Modes" }; }); flushRaf();
+posted = null; app.applyToFigma();
+ok(posted.pluginMessage.collections.raw === "Brand Primitives" && posted.pluginMessage.collections.semantic === "Brand Modes",
+  "(x) a doc figmaCollections override rides the apply message");
+{
+  const lt = posted.pluginMessage.dtcg && posted.pluginMessage.dtcg["Light_tokens.json"];
+  const fam = lt && Object.keys(lt).find((k) => k[0] !== "$");
+  const role = fam && Object.keys(lt[fam]).find((k) => k[0] !== "$");
+  const ad = role && lt[fam][role].$extensions && lt[fam][role].$extensions["com.figma.aliasData"];
+  ok(ad && ad.targetVariableSetName === "Brand Primitives", `(x) the bundle's aliasData targets the overridden raw collection (got ${ad && ad.targetVariableSetName})`);
+}
+// round-trip: the override persists through serialize→hydrate; clearing restores the identity (absent).
+{
+  const { serialize: ser, hydrate: hyd } = await import("../../src/ui/persist.js");
+  const round = hyd(ser(app.doc));
+  ok(round.figmaCollections && round.figmaCollections.raw === "Brand Primitives", "(x) figmaCollections round-trips through persist");
+  app._setFigmaCollection("raw", ""); app._setFigmaCollection("semantic", ""); flushRaf();
+  ok(!app.doc.figmaCollections, "(x) clearing both overrides drops the record entirely (identity gate)");
+  ok(!("figmaCollections" in hyd(ser(app.doc))), "(x) a default-named doc hydrates with NO figmaCollections key");
+}
 // the opt-in Regroup path posts rebuildSemantic:true so code.js re-creates Color Modes in grouped order
 posted = null;
 const realConfirm = globalThis.confirm;
@@ -1439,6 +1463,30 @@ ok(app.querySelectorAll(".settings-nav-item").length >= 3, `(set) Settings has t
 ok((txtOfSet(app.querySelector(".settings-pagehead")) || "").includes("Token mapping"), "(set) the page header reflects the active section (Token mapping)");
 app.settingsSection = "appearance"; app.render(); flushRaf();
 ok((txtOfSet(app.querySelector(".settings-pagehead")) || "").includes("Appearance") && app.querySelectorAll(".settings-row").length >= 2, "(set) switching nav to Appearance swaps the panel (theme + canvas rows)");
+// (pref) persisted app prefs: theme/canvasTheme/motion save to localStorage, load at boot, reset clears.
+{
+  const PREFS_KEY = "ultimate-tokens-app-prefs-v1";
+  try { localStorage.removeItem(PREFS_KEY); } catch {}
+  ok(app.querySelectorAll(".settings-row").length >= 4, `(pref) Appearance carries theme + canvas + Motion + Reset rows (got ${app.querySelectorAll(".settings-row").length})`);
+  const appearTxt = txtOfSet(app.querySelector(".settings")) || "";
+  ok(/Motion/.test(appearTxt) && /Reset app preferences/.test(appearTxt), "(pref) the Motion and Reset rows render");
+  app.motion = "reduced"; app._saveAppPrefs(); app.render(); flushRaf();
+  ok(app.getAttribute("data-motion") === "reduced" || app.dataset.motion === "reduced", "(pref) the motion pref lands as [data-motion] on the element (the CSS gate)");
+  const savedPrefs = JSON.parse(localStorage.getItem(PREFS_KEY));
+  ok(savedPrefs && savedPrefs.motion === "reduced", "(pref) _saveAppPrefs writes the versioned record");
+  app.theme = "dark"; app._saveAppPrefs();
+  ok(JSON.parse(localStorage.getItem(PREFS_KEY)).theme === "dark", "(pref) the theme pref persists too");
+  // _loadAppPrefs (the boot path) adopts a valid record and rejects junk values
+  app.theme = "system"; app.motion = "system";
+  app._loadAppPrefs();
+  ok(app.theme === "dark" && app.motion === "reduced", "(pref) _loadAppPrefs restores the saved prefs (the boot path)");
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ theme: "neon", motion: "off" })); } catch {}
+  app.theme = "system"; app.motion = "system"; app._loadAppPrefs();
+  ok(app.theme === "system" && app.motion === "system", "(pref) invalid pref values are rejected (defaults kept)");
+  app._resetAppPrefs(); flushRaf();
+  ok(app.theme === "system" && app.canvasTheme === "system" && app.motion === "system" && localStorage.getItem(PREFS_KEY) === null,
+    "(pref) Reset returns every pref to System and clears the record");
+}
 // (ico) Settings › Icons — the library grid (9 tiles), default Phosphor·regular, variant control,
 // the Custom escape hatch, and the geometry fence (sizes are NOT redefined here).
 app.settingsSection = "icons"; app.render(); flushRaf();

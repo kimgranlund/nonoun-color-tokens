@@ -128,13 +128,14 @@ function mockFigma() {
 }
 
 // ── END-TO-END contract: figmaBundle() -> applyBundle() on the mock ──────────────
-let applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans;
+let applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, setCollectionNames;
 const F = mockFigma();
 try {
-  const load = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans };");
+  const load = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, setCollectionNames };");
   const loaded = load(F.figma, "<html>", undefined); // closes over the MOCK figma
   applyBundle = loaded.applyBundle; applyFloatPlans = loaded.applyFloatPlans;
   applyFontPrimitives = loaded.applyFontPrimitives; applyStylePlans = loaded.applyStylePlans;
+  setCollectionNames = loaded.setCollectionNames;
 } catch (e) { FAIL("parse", "code.js failed to load: " + e.message); }
 
 if (applyBundle) {
@@ -218,6 +219,23 @@ if (applyBundle) {
     if (semNames4.join(",") !== wantOrder.join(",")) FAIL("regroup", "regrouped Color Modes order != bundle (canonical) order");
     const lastSeven = semNames4.slice(-7);
     if (!lastSeven.every((nm) => /\/scrim/.test(nm))) FAIL("regroup", `last 7 regrouped vars are not scrims: ${lastSeven}`);
+
+    // ── COLLECTION-NAME OVERRIDES: setCollectionNames (the apply message's `collections`) routes the
+    //    SAME bundle into custom-named collections; the default constants are the empty/absent fallback. ──
+    if (typeof setCollectionNames !== "function") FAIL("collnames", "code.js does not export setCollectionNames");
+    else {
+      setCollectionNames({ raw: "Brand Primitives", semantic: "Brand Modes" });
+      const res5 = await applyBundle(bundle);
+      const braw = F.collections.find((c) => c.name === "Brand Primitives");
+      const bsem = F.collections.find((c) => c.name === "Brand Modes");
+      if (!braw || !bsem) FAIL("collnames", "override apply did not create the custom-named collections");
+      if (res5.raw !== rawExpect || res5.semantic !== semExpect) FAIL("collnames", `override apply created ${res5.raw}/${res5.semantic} vars, want ${rawExpect}/${semExpect}`);
+      // the default-named collections from the earlier legs are left untouched (no rename, no prune)
+      if (!F.collections.some((c) => c.name === "Color Primitives")) FAIL("collnames", "override apply disturbed the existing default-named Color Primitives");
+      setCollectionNames(null); // empty/absent → the defaults (the fallback contract)
+      const res6 = await applyBundle(bundle);
+      if (res6.raw !== rawExpect) FAIL("collnames", "setCollectionNames(null) did not fall back to the default names");
+    }
   } catch (e) { FAIL("apply", "applyBundle threw: " + e.message); }
 
   // ── CONFIG round-trip via the file's root pluginData (the project source of truth, travels with the
@@ -379,7 +397,7 @@ if (applyFloatPlans) {
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "floatapply", "floatidem", "floatprune", "floatprov", "applysys", "applydone", "config", "read", "fonts"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "applysys", "applydone", "config", "read", "fonts"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

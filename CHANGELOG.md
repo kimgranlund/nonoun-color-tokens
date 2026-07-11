@@ -8,6 +8,23 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 
 ## [Unreleased]
 
+### 2026-07-11
+
+#### Added
+- **Settings grew its missing preferences.** Token mapping gains **Figma collections** — per-document
+  overrides for the two color-collection names the plugin creates (defaults `Color Primitives` /
+  `Color Modes`); the override rides the export's aliasData and the apply message, `code.js` falls
+  back to the defaults, and a renamed file still round-trips at boot (the saved config resolves the
+  name). Appearance gains **Motion** (System respects your OS reduce-motion setting — which the
+  editor previously ignored entirely — Reduced forces minimal animations) and **Reset to defaults**;
+  the theme, canvas-preview, and motion preferences now **persist on the device**
+  (`ultimate-tokens-app-prefs-v1`) instead of resetting every session. (#255)
+- **Backlog note:** the "back up your variables first" consent gate (backlog item 2) was verified
+  already fully shipped — the road-block before Apply/Regroup, the versioned don't-show-again
+  consent, and the always-warning destructive Regroup all predate this wave; no change was needed.
+  Stop-density/scrim-step preferences are deliberately deferred: `EXPORT_STOPS` is a lockstep engine
+  contract (role refs + count gates ride on it), not a settings row. (#255)
+
 ### 2026-07-10
 
 #### Added
