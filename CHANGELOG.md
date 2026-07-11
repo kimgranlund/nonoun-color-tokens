@@ -11,6 +11,13 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-07-11
 
 #### Fixed
+- **The Download-All zip's root README stays honest under a renamed Figma collection.** The
+  `figma-aliased/` row now names the actual collections its aliasData targets when Settings ›
+  Token mapping has renamed them — previously the README always said "Color Primitives" / "Color
+  Modes" even when the export pointed somewhere else, leaving a plugin-free importer no way to
+  know what collection to create. Also de-duplicated the repo link onto the existing `REPO_URL`
+  constant instead of a second hardcoded literal (one fewer copy to miss at the eventual
+  domain/private-repo cutover). (#261)
 - **Every install-instruction surface pointed at the retired GitHub marketplace channel.** The
   plugin's own README (which ships as the npm package's README too), the Download-All zip's root
   README, and four marketing docs (fact sheet, store copy, the Claude-plugin product page, the

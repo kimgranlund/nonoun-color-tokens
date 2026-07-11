@@ -1100,6 +1100,17 @@ const zipText = Buffer.from(zb).toString("latin1");
 // pointer, and the responsive/text-rendering notes.
 ok(/README\.md/.test(zipText) && /plugin marketplace add https:\/\/unpkg\.com\/@ultimate-tokens\/claude\/marketplace\.json/.test(zipText) && /plugin install ultimate-tokens/.test(zipText), "(ee) the zip root README carries the consumption-plugin install commands (the npm-hosted marketplace, not the retired GitHub channel)");
 ok(/Download Brand-Kit MCP/.test(zipText) && /text-rendering baseline/.test(zipText), "(ee) the README points at the Brand-Kit MCP + the text-rendering baseline note");
+ok(!/renamed in Settings/.test(zipText), "(ee) a default-named doc's README carries no custom-collection-name note (nothing to explain)");
+// with a renamed Figma collection (Settings › Token mapping), the README's figma-aliased/ row names
+// the ACTUAL collections the aliasData targets — otherwise a plugin-free importer has no way to know.
+app.commit((d) => { d.figmaCollections = { raw: "Brand Primitives", semantic: "Brand Modes" }; }); flushRaf();
+let zipCap2 = null;
+app.downloadBytes = (bytes, filename) => { zipCap2 = { bytes, filename }; };
+app.doc.name = "My Set"; app.downloadAllZip(projectViewZ(app.doc)); app.doc.name = setName0;
+app.downloadBytes = realDB;
+const zipText2 = Buffer.from(zipCap2.bytes).toString("latin1");
+ok(/renamed in Settings/.test(zipText2) && /Token mapping/.test(zipText2) && /Brand Primitives/.test(zipText2) && /Brand Modes/.test(zipText2), `(ee) a renamed Figma collection surfaces its real name in the README's figma-aliased/ row`);
+app.commit((d) => { delete d.figmaCollections; }); flushRaf(); // restore default names for later legs
 const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "design-system-for-claude-code/DESIGN.md", "design-system-for-claude-code/tokens.json", "design-system-for-claude-code/components/colors.html", "design-system-for-claude-code/README.md", "design-system-for-google-stitch/DESIGN.md", "design-system-for-google-stitch/README.md", "design-system-for-figma-make/guidelines/Guidelines.md", "design-system-for-figma-make/guidelines/setup.md", "design-system-for-figma-make/guidelines/styles.css", "design-system-for-figma-make/guidelines/foundations/color.md", "design-system-for-figma-make/guidelines/foundations/typography.md", "design-system-for-figma-make/guidelines/foundations/spacing.md", "design-system-for-figma-make/guidelines/components/overview.md", "design-system-for-figma-make/guidelines/components/button.md", "design-system-for-figma-make/README.md", "ultimate-tokens-my-set-config.json",
   "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt",
   "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "figma/typography.modes.variables.json", "figma/typography.primitives.variables.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.variables.json", "figma/dimension.modes.variables.json"];
