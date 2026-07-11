@@ -9,6 +9,8 @@ description: >
   enforceable language rules, fact-pinning against the pinned fact sheet, the mechanical voice-check
   script, and the two-layer ship gate. The marketing-manager agent loads this first for ALL
   brand/marketing writing.
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Writing in the Ultimate Tokens voice

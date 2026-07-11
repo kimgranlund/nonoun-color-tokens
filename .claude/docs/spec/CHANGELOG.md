@@ -1,5 +1,62 @@
 # CHANGELOG
 
+## 1.54 — 2026-07-11 — Settings completes: collection names · persisted app prefs · reduce-motion
+
+Backlog items 1 + 2 close. Item 2 (the backup-consent gate) was verified **already fully shipped** —
+the Apply/Regroup road-block, versioned don't-show-again, always-warning Regroup, post-debrand docs
+link; no change. Item 1's actual delta:
+
+- **Figma collection names are per-doc overridable** — Settings › Token mapping › "Figma collections"
+  writes `doc.figmaCollections {raw, semantic}` (persisted, optional, absent = the defaults). The
+  override rides the bundle's aliasData `targetVariableSetName` and the apply message's
+  `collections`; `code.js#setCollectionNames` adopts it with constant fallbacks, and `readRawColors`
+  resolves a renamed file from the SAVED config at boot. The standalone Binder keeps the default
+  names. Gate: the `collnames` leg in `test/figma/plugin.mjs`.
+- **App prefs persist** (`ultimate-tokens-app-prefs-v1`): theme · canvas preview · the NEW Motion
+  pref. **The editor now respects `prefers-reduced-motion`** (previously ignored entirely); Reduced
+  forces minimal animations via the `[data-motion]` CSS gate (0.01ms durations — `transitionend`
+  still fires). Appearance gains Reset-to-defaults. Gate: the headless `(pref)` group.
+- **Deliberately deferred:** stop density (19/25) + scrim steps — `EXPORT_STOPS` is a lockstep engine
+  contract (role refs 550/450 + count gates ride it); its own intake, never a settings row.
+
+Landed as #255.
+
+## 1.53 — 2026-07-10 — the text-rendering baseline: always in every design-system export
+
+Every DS export now carries, gated: the macOS smoothing pair (consistent weight in both schemes) ·
+`text-rendering: optimizeLegibility` · `font-optical-sizing: auto` · `font-synthesis: none` (weights
+resolve from the real font, never synthesized) · kerning + common ligatures · `code, pre, kbd
+{ font-variant-ligatures: none }`. One source (`DS_TEXT_RENDERING_PROPS/_MD` in exports.js), four
+carriers: the DESIGN.md Typography spine (all three profiles), Figma Make `styles.css` (real CSS) +
+`typography.md`, every `@dsCard` preview. "Always" is a verifier gate, not prose. The consumption
+plugin's `typography-tokens` skill carries the same rule as law 7; the estate shipped
+design-systems 0.5.6 + typography 0.2.3 in lockstep.
+
+Landed as #254.
+
+## 1.52 — 2026-07-10 — breakpoints: intrinsic, desktop-anchored, hierarchy-aware (#251–#253)
+
+Size modes moved from opt-in to INTRINSIC in three steps, ending at the ratified canon:
+
+- **#251** — the Standard set became **Desktop (1280) · Tablet (992) · Mobile (≤476)** with the base
+  renamed Mobile, desktop-first order, Desktop = Figma's default mode; the emitters gained
+  `{baseName, baseLast}`; responsive CSS sorts `@media` ascending internally. (Also fixed the root
+  CHANGELOG's header — the one "by NONOUN" line the #250 debrand missed.)
+- **#252** — size modes became **intrinsic, the Light/Dark technique**: a doc with no configured
+  modes synthesizes the standard set at export/apply (`_typeModeScales`/`_geomModeScales`); every
+  export and Figma apply carries the three modes with zero setup. Engine emitter identity
+  (`modes=[]` ⇒ `["Base"]`) is untouched — synthesis is app-level.
+- **#253** — the anchor flipped and the stepping became **hierarchy-aware**: the DESIGNED scale IS
+  Desktop; Tablet/Mobile derive DOWN via `typeScale({modeFactor})` — log-interpolated from ×1 at
+  `bodyBase` to ×5/6 (Tablet) / ×2/3 (Mobile) at the ramp's top, so body-class text is FROZEN while
+  Display compresses fully (≈90→75→60); geometry mirrors (heights −2/−4, composing type at the same
+  rung); responsive CSS re-anchors mobile-first via `_typeCssArgs`/`_geomCssArgs` (`:root` = Mobile).
+  The category presets' type slots moved to **strict %-strings** (`"leading": "96%"`,
+  `"tracking": "-2%"` — % of font size; 7 files, 3,360 fields); `gen-categories` parses strings only
+  and the categories gate rejects the retired numeric shape.
+
+Landed as #251, #252, #253.
+
 ## 1.51 — 2026-07-09 — the debrand: the product is unattributed (ADR-015)
 
 "Ultimate Tokens by NONOUN" becomes **Ultimate Tokens**. No maker brand, no "by" line, no monogram.

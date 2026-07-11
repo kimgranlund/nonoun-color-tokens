@@ -8,6 +8,8 @@ description: >
   src/engine/exports.js, type.mjs, or geometry.mjs. Covers a new color
   serializer, a Tailwind/shadcn/DTCG/Figma variant, or a type/geometry emitter,
   plus its export-drawer tab and Download-All zip entry.
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Adding (or changing) an export format — ultimate-tokens

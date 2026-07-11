@@ -6,6 +6,8 @@ description: >
   any edit to src/engine/semantic.js, or a red count gate ("53 vs N"). Walks the
   lockstep parity procedure so the answer key, Figma copy, count literals, and
   spec prose all move together.
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Adding (or changing) a semantic role — ultimate-tokens

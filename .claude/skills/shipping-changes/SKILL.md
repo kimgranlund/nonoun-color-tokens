@@ -7,6 +7,8 @@ description: >
   the two gates (npm test, npm run build), PR, CI watch (build · test ·
   smoke), squash-merge, local-main sync, plus commit guards and worktree
   isolation for fan-outs.
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Shipping changes (ultimate-tokens)

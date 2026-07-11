@@ -6,6 +6,8 @@ description: >
   workbench editor. Covers the Color · Typography · Geometry pattern — canvas
   + left-analysis + right-inspector, this.section routing, tokenOverrides
   matrix, lettered headless + smoke tests.
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Building editor sections (ultimate-tokens workbench)

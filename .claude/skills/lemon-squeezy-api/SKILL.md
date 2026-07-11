@@ -8,6 +8,8 @@ description: >
   filtering, rate limits, test mode ("create a checkout link", "verify X-Signature", "why am I
   getting 429/403", "change a subscriber's plan", "handle subscription_payment_failed"). For what an
   LS payload CONTAINS (attributes, enums, relationships), use lemon-squeezy-schemas.
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Calling the Lemon Squeezy API

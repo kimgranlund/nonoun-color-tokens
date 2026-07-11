@@ -10,6 +10,8 @@ description: >
   discount · discount-redemption · license-key · license-key-instance · file · webhook · affiliate),
   attributes + enums + relationship graph. For calling the API (auth, endpoints, webhook signing),
   use lemon-squeezy-api.
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Lemon Squeezy object schemas

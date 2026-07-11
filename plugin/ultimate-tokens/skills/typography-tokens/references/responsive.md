@@ -2,16 +2,23 @@
 
 ## Breakpoint modes (not `clamp()`, not `vw`)
 
-If the kit was exported with breakpoint modes, the `--type-*` variables are **re-declared inside
-`@media (min-width: …)` blocks** — one block per breakpoint (the standard web set is 476/768/992/
-1280/1540). Because a `.type-{voice}-{step}` class reads the *variables*, the same class restyles
-automatically at each breakpoint: you write `.type-body-md` once and it grows with the viewport.
+Every kit carries breakpoint modes — the `--type-*` variables are **re-declared inside
+`@media (min-width: …)` blocks**. The standard set (synthesized automatically when the designer
+configured none) is **Mobile ≤476 → Tablet (992) → Desktop (1280)**; a hand-configured kit may carry
+its own ladder — read the actual widths from the blocks. Because a `.type-{voice}-{step}` class reads
+the *variables*, the same class restyles automatically at each breakpoint: you write `.type-body-md`
+once and it grows with the viewport.
+
+The stepping is **hierarchy-aware**, not uniform: body-class text (body · UI · caption · code) is
+**frozen** across breakpoints, headings compress partially on smaller screens, and display-class type
+compresses fully (a 90px Desktop display lands near 75 on Tablet, 60 on Mobile). So don't "fix" a
+heading that shrinks on mobile while body text doesn't — that asymmetry IS the system.
 
 - **Do not** author fluid `clamp()` type or `vw`-based font sizes — the modes are the responsive
   mechanism, and they land on the kit's exact quantized sizes at each breakpoint (no fractional px).
 - **Do not** hand-write `@media` font-size overrides — you'd fight the exported blocks.
-- Base (the smallest, ≤476) is the mobile scale; each larger breakpoint steps up. If the export has
-  no `@media` blocks, the kit shipped Base-only — the type is fixed, which is a valid choice.
+- The `:root` block (no media query) is the mobile scale; each `@media` block steps up. An export
+  with no `@media` blocks is from an old kit (pre-2026-07) — regenerating it adds the standard set.
 
 ## Single-line vs multi-line height
 

@@ -12,6 +12,8 @@ description: >
   "get_type / get_geometry / get_semantic / resolve_token / nearest_token",
   "a brand:// resource", "the apply_brand prompt", or "the MCP opt-in
   (Color / Typography / Geometry) is wrong".
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Brand-Kit MCP server — ultimate-tokens

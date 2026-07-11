@@ -7,6 +7,8 @@ description: >
   mode", "tune the damping/chroma floor". Covers the perceptual color engine:
   tonal ramp, gamut mapping, CAM16/HCT · OKLCH · OKHSL · sRGB conversions, tone
   modes, chroma shaping, neutral/relative derivation.
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Color math — the perceptual engine (ultimate-tokens)

@@ -10,6 +10,8 @@ description: >
   control text doesn't match the brand font", or "a geometry gate is red". The
   geometry sibling of the color-math skill (same shape: a few params → a
   systematic ramp → tokens).
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Geometry / dimensional engine — ultimate-tokens
@@ -52,9 +54,12 @@ optical correction): two tuned power laws of height — `icon` (roundEven) and `
 font` — that reproduce the hand-tuned reference table to **±1px**: one rule sampled six times. `CANON_MD =
 28`; `baseHeight` scales the whole ramp by `baseHeight/28`. **`rampContrast` (0…1, default 1 = identity)
 is the responsive knob**: at 0 the expressive band loses its gear and continues the compact +4 linear step
-(bh 24 · c 0 = 18·20·24·28·32·36 — the compressed ≤476 ramp; the geometry Standard-set button seeds Base
-compressed and steps contrast +0.25 per rung to the full ramp at 1540). The constants + the reference
-table: `references/foundations.md` §4.
+(bh 24 · c 0 = 18·20·24·28·32·36 — a compressed mobile ramp). **Breakpoints are DESKTOP-ANCHORED and
+INTRINSIC (#252/#253)**: the designed ramp IS Desktop (1280, Figma's default mode); Tablet (992, heights
+−2) and Mobile (≤476, −4, floor 20) are SYNTHESIZED at export/apply when the doc carries no modes
+(`_geomModeScales`), each composing type at the same rung; the Standard-set button just materializes the
+same modes for matrix editing. Responsive CSS re-anchors mobile-first via `_geomCssArgs` (`:root` =
+Mobile, `@media` up to Desktop). The constants + the reference table: `references/foundations.md` §4.
 
 ## THE COMPOSITION — one number, two engines (the JOIN)
 

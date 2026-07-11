@@ -7,6 +7,8 @@ description: >
   type gate. Covers the eleven named voices (Display · Heading · Sub-heading · Kicker · Lead ·
   Body · Quote · Caption · UI · Code · Legal), the five treatments, and the self-hosted fonts. TYPE sibling of
   color-math (COLOR only).
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # The typography engine — the type scale (ultimate-tokens)
@@ -25,8 +27,8 @@ this skill never touches color.
 | **`cat(role, base, ratio, leading, weight, trackingEm, steps, transform, box)`** | builds ONE voice's param record | `{role, base, ratio, leading, weight, trackingEm, steps, transform, box}` — no resolved sizes yet; `steps` defaults `STEPS_5`, `transform` `"none"`, `box` defaults from the role (`ui`/`mono` ⇒ `true`, else `false`) |
 | **`make11(o={})`** | the FACTORY — returns the ELEVEN named voices, sharing structure, reading per-voice knobs from `o` | `Display · Heading · Sub-heading · Kicker · Lead · Body · Quote · Caption · UI · Code · Legal` (the four editorial voices — Lead · Quote · Caption · Legal — are ADR-013) |
 | **`TYPE_TREATMENTS`** (5) | each = `{id,label,note,fonts,categories:make11({...})}` | ids `product · luxury · editorial · technical · statement` (`statement` = Brutalist) |
-| **`typeScale(config={treatment,bodyBase,overrides?,voices?,fonts?})`** | resolves a treatment → `{treatment,label,fonts,roleOf,categories}` | `roleOf` maps each voice→font role; `categories[voice][step]` = the resolved step. The three optional channels are **per-kit overrides** layered over the treatment, each **identity-gated** (absent/empty/non-finite ⇒ byte-identical output): `overrides` = flat per-cell `"<voice>\|<step>"`→size map (moves SIZE only); `voices` = `{<voice>:{weight,tracking,leading,ratio}}` reshaping a whole voice; `fonts` = `{<role>:family}` per-role font swap |
-| **`typeTokensCSS` / `typeTokensResponsiveCSS` / `typeTokensDTCG` / `typeTokensFigmaModes`** | the emitters (operate on a resolved `scale`; px/rem/em via `dimUnit`) | CSS custom props + a utility class per step (+ per-breakpoint `@media` blocks) · DTCG composite `typography` tokens · a breakpoint-moded Figma collection |
+| **`typeScale(config={treatment,bodyBase,modeFactor?,overrides?,voices?,fonts?})`** | resolves a treatment → `{treatment,label,fonts,roleOf,categories}` | `roleOf` maps each voice→font role; `categories[voice][step]` = the resolved step. The optional channels are **per-kit overrides** layered over the treatment, each **identity-gated** (absent/empty/non-finite/1 ⇒ byte-identical output): `overrides` = flat per-cell `"<voice>\|<step>"`→size map (moves SIZE only); `voices` = `{<voice>:{weight,tracking,leading,ratio}}` reshaping a whole voice; `fonts` = `{<role>:family}` per-role font swap; **`modeFactor`** = the hierarchy-aware BREAKPOINT compression (#253): each step's size scales by a factor log-interpolated from ×1 at `bodyBase` to ×`modeFactor` at the ramp's top — body-class frozen, Display fully compressed (Tablet 5/6 · Mobile 2/3 canonical); line/tracking/para re-derive from the compressed size |
+| **`typeTokensCSS` / `typeTokensResponsiveCSS` / `typeTokensDTCG` / `typeTokensFigmaModes`** | the emitters (operate on a resolved `scale`; px/rem/em via `dimUnit`) | CSS custom props + a utility class per step (+ ascending `@media` blocks — sorted internally, so desktop-first storage can't break the cascade) · DTCG composite `typography` tokens · a breakpoint-moded Figma collection (`{baseName, baseLast}` name/position the base layer — the intrinsic set emits **Desktop · Tablet · Mobile** with the DESIGNED scale as Desktop = Figma's default mode; synthesis lives app-side in `_typeModeScales`) |
 
 ## The taxonomy + the math — owned by `references/foundations.md`
 

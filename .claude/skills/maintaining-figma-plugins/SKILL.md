@@ -8,6 +8,8 @@ description: >
   gate, the config round-trip out of variables, or someone says "apply to Figma
   isn't working", "the binder skipped roles", "fix the cascade", "Figma plugin
   fails to run / syntax error in the sandbox".
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # Figma variable binder — ultimate-tokens
@@ -59,9 +61,14 @@ canonical raw-colors name (solid → pad3 `"50"→"050"`; scrim → `"500-{step}
 **App apply path** (grep `src/ui/app.js`): the buttons call `requestApplyToFigma(rebuild)` →
 `renderApplyGate()` (a consent road-block: *back up your file first*; normal apply is cookieable via a
 versioned localStorage key, the destructive **Regroup** ALWAYS warns) → `applyToFigma` posts
-`{type:"apply", dtcg: this.figmaBundle(), config: serialize(this.doc), rebuildSemantic}`.
+`{type:"apply", dtcg: this.figmaBundle(), config: serialize(this.doc), rebuildSemantic, collections}`.
 `figma/plugin/code.js#applyBundle` creates Color Primitives + Color Modes, prunes orphans, embeds the config
-in `figma.root` pluginData. **STYLES (2026-07-09, PRs #231–#236):** when the drawer's Styles chip is on
+in `figma.root` pluginData. **The two collection NAMES are per-doc overridable (#255)** — Settings ›
+Token mapping › "Figma collections" writes `doc.figmaCollections {raw, semantic}` (persisted, absent =
+defaults); `figmaCollectionNames(doc)` (model.mjs) resolves, rides the bundle's aliasData
+`targetVariableSetName` AND `msg.collections`; code.js `setCollectionNames()` adopts it with constant
+fallbacks, and `readRawColors` resolves a renamed file from the SAVED config at boot. The standalone
+Binder still looks up the DEFAULT names only. **STYLES (2026-07-09, PRs #231–#236):** when the drawer's Styles chip is on
 (opt-OUT), `msg.stylePlans` + `msg.fontPrimitives` ride the same apply — pure plans from
 `figma/binder/style-plan.mjs` (the THIRD planner sibling: paint styles per semantic role bound to Color
 Modes via `setBoundVariableForPaint`; text styles per voice×step×sibling-weight bound to

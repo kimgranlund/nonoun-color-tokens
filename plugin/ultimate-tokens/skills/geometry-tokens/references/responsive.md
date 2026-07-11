@@ -2,11 +2,12 @@
 
 ## Breakpoint modes (not media-query hand-tuning)
 
-If the kit was exported with breakpoint modes, `--size-*` is **re-declared inside `@media (min-width:
-…)` blocks** — read the actual breakpoints from the `@media` blocks in the export (the kit chooses
-its own set; a common default is a mobile-first ladder of five widths). A `.control-{step}` class reads the
-variables, so the same control restyles automatically at each breakpoint. Don't hand-write size
-`@media` overrides — you'd fight the exported blocks.
+Every kit carries breakpoint modes — `--size-*` is **re-declared inside `@media (min-width: …)`
+blocks**. The standard set (synthesized automatically when the designer configured none) is
+**Mobile ≤476 → Tablet (992) → Desktop (1280)**; a hand-configured kit may carry its own ladder —
+read the actual widths from the blocks. A `.control-{step}` class reads the variables, so the same
+control restyles automatically at each breakpoint. Don't hand-write size `@media` overrides — you'd
+fight the exported blocks.
 
 **Mode-independent (declared once, auto-track):** the radius ladder (`--radius-*`), the space ladder
 (`--space-*`), the container tier (`--inset-*`, `--gap-*`), borders, and the focus ring. Only the
@@ -28,9 +29,9 @@ compression.
 
 ## What to reason about
 
-- Base (≤476) is the mobile ramp; larger breakpoints step control heights up.
-- If the export has no `@media` blocks, the kit shipped Base-only — geometry is fixed, a valid
-  choice.
+- The `:root` block (≤476) is the mobile ramp; larger breakpoints step control heights up.
+- An export with no `@media` blocks is from an old kit (pre-2026-07) — regenerating it adds the
+  standard set.
 - Never author fluid `clamp()`/`vw` sizing for controls or spacing — the modes are the mechanism and
   they land on the kit's exact quantized values (no fractional px, so no sub-pixel control edges).
 
