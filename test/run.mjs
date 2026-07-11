@@ -14,7 +14,7 @@ const TESTS = [
   "ui/persist.mjs", "ui/shell.mjs", "ui/zip.mjs", "ui/headless-boot.mjs",
   "figma/plugin.mjs", "figma/binder.mjs", "figma/mode-apply.mjs", "figma/style-plan.mjs",
   "mcp/core.mjs", "mcp/brand-kit.mjs",
-  "plugin/manifest.mjs", "plugin/color-tokens.mjs", "plugin/typography-tokens.mjs", "plugin/geometry-tokens.mjs",
+  "plugin/manifest.mjs", "plugin/color-tokens.mjs", "plugin/typography-tokens.mjs", "plugin/geometry-tokens.mjs", "plugin/hosted-pack.mjs",
   "repo/branding.mjs",
 ];
 

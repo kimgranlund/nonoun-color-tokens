@@ -11,6 +11,17 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-07-11
 
 #### Added
+- **The hosted plugin-distribution pack** — the repo is going private, so the consumption plugin's
+  public channel moves to a URL-hosted marketplace at
+  `ultimate-tokens.com/plugins/claude/marketplace.json`, backed by an npm package
+  (`ultimate-tokens-claude`). The split is forced by a verified platform constraint: a URL-hosted
+  marketplace downloads only `marketplace.json` — plugin bytes must come from an npm/git source.
+  `npm run gen:plugin-pack` emits the deployable pack (`dist/plugins/claude/` catalog + the
+  npm-publishable package) from the one plugin source of truth; `test/plugin/hosted-pack.mjs` (the
+  27th test file) gates version lockstep across plugin.json · the catalog's npm pin · the npm
+  package, and rejects relative-path sources in the hosted catalog. Public copy keeps the working
+  GitHub commands until the domain is live (never ship a 404); the one-PR flip list + release flow
+  live in `plugin/HOSTING.md`. (#258)
 - **The Download-All zip is self-describing.** A generated root `README.md` maps every included
   folder (respecting the system toggles AND the Pro-export gate — a folder absent from the archive
   is absent from the map), carries the consumption-plugin install commands
