@@ -1,56 +1,64 @@
-# Hosting the consumption plugin — the private-repo distribution plan
+# Distributing the consumption plugin — the pure-npm channel
 
-> Ratified 2026-07-11. The repo is going PRIVATE; the public distribution channel for the
-> consumption plugin moves from the GitHub marketplace to a URL-hosted marketplace at
-> **`https://ultimate-tokens.com/plugins/claude/marketplace.json`**, backed by an **npm package**
-> (`ultimate-tokens-claude`).
+> Ratified 2026-07-11 (supersedes the same-day ultimate-tokens.com hosting plan — nothing is
+> hosted anywhere). The repo is going PRIVATE; the plugin's only public artifact is the npm
+> package **`@ultimate-tokens/claude`** (the npm org Kim owns), published **automatically by
+> GitHub Actions** on every version bump that lands on main.
 
-## Why this shape (the verified platform constraint)
-
-A URL-hosted marketplace downloads **only** `marketplace.json` — Claude Code cannot fetch plugin
-files from plain HTTPS paths, and a relative-path plugin source fails with "path not found"
-(code.claude.com/docs/en/plugin-marketplaces → *Plugins with relative paths fail in URL-based
-marketplaces*). Plugin sources for a URL-hosted catalog must be **npm, GitHub, or a git URL**.
-With the repo private, npm is the only backing that needs no public git anywhere; users only ever
-see the domain:
+## The user-facing channel
 
 ```
-/plugin marketplace add https://ultimate-tokens.com/plugins/claude/marketplace.json
+/plugin marketplace add https://unpkg.com/@ultimate-tokens/claude/marketplace.json
 /plugin install ultimate-tokens
 ```
 
-## The release flow (per plugin change)
+(jsdelivr mirror, same file: `https://cdn.jsdelivr.net/npm/@ultimate-tokens/claude/marketplace.json`.)
 
-1. Edit the plugin under `plugin/ultimate-tokens/` and **bump `plugin.json` `version`** — it is the
-   update cache key AND the npm/site pin; a content change without a bump is a release nobody
-   receives. `test/plugin/hosted-pack.mjs` fails on any version drift between the three artifacts.
-2. `npm test` green (parity + the hosted-pack gate).
-3. `npm run gen:plugin-pack` → `dist/plugins/`:
-   - `dist/plugins/claude/` — `marketplace.json` (npm-pinned to the exact version) + `index.md`
-   - `dist/plugins/npm/ultimate-tokens-claude/` — the publishable package
-4. `npm publish dist/plugins/npm/ultimate-tokens-claude` (public registry; first publish claims the
-   name — needs the npm account login).
-5. Upload `dist/plugins/claude/` to the site at `/plugins/claude/` (the catalog must go live AFTER
-   the npm version exists — it pins exactly).
-6. Users refresh with `/plugin marketplace update ultimate-tokens` → `/plugin update ultimate-tokens`.
+## Why this shape (verified platform facts, 2026-07-11)
 
-## The staged flip (when ultimate-tokens.com is LIVE — one PR)
+- **No direct-from-npm install exists** — a marketplace is always the entry point (GitHub repo ·
+  git URL · local path · remote URL). So `marketplace.json` rides *inside* the npm package and the
+  npm CDNs serve it as a remote-URL marketplace: the registry is the only infrastructure.
+- **A remote-URL marketplace downloads only marketplace.json** — its plugin source must be an
+  npm/git source. Here it is the package itself, **unpinned** (floating latest): releases only
+  touch npm, and a downloaded catalog never goes stale. `/plugin marketplace update
+  ultimate-tokens` + marketplace auto-update deliver new versions.
 
-Interim policy (ratified): all public copy keeps the WORKING GitHub commands until the domain
-serves — never ship a 404. At domain-live, flip these in one PR:
+## The release flow (fully automatic)
 
-| Surface | Today | Flips to |
-|---|---|---|
-| `_zipReadme()` (src/ui/app.js) install commands | `kimgranlund/ultimate-tokens` marketplace add | the two-command domain form above |
-| `.claude/docs/marketing/fact-sheet.md` plugin row | GitHub install commands | the domain form |
-| `plugin/ultimate-tokens/.claude-plugin/plugin.json` `homepage`/`repository` | GitHub URLs | `https://ultimate-tokens.com` (drop `repository` or point at the site) |
-| The root `.claude-plugin/marketplace.json` | the in-repo (GitHub-channel) catalog | retire or keep as the private/dev channel |
-| README / store copy pointers | GitHub | the domain (re-run voice-check) |
+1. Edit the plugin under `plugin/ultimate-tokens/` and **bump `plugin.json` `version`** — the
+   version is the update cache key AND the publish trigger; a content change without a bump is a
+   release nobody receives. `test/plugin/hosted-pack.mjs` gates the lockstep.
+2. Merge to main. `.github/workflows/publish-plugin.yml` compares the local version against
+   `npm view @ultimate-tokens/claude version`; on a difference it runs the zero-dep suite, builds
+   the pack (`npm run gen:plugin-pack`), and `npm publish --access public`. Same version → no-op.
 
-## Going private also breaks (tracked, not this file's fix)
+Manual escape hatch: `npm run gen:plugin-pack` then
+`npm publish dist/plugins/npm/ultimate-tokens-claude --access public`.
+
+## One-time setup (Kim)
+
+1. **`NPM_TOKEN` repo secret** — npmjs.com → Access Tokens → **Granular** token, packages
+   read/write scoped to the `@ultimate-tokens` org → GitHub repo → Settings → Secrets → Actions.
+2. The **first successful workflow run claims `@ultimate-tokens/claude`** on the registry. From
+   that moment the channel is LIVE — flip the public install copy (below).
+
+## The flip (at first publish — one PR)
+
+Interim policy: public copy keeps the working GitHub commands until the package exists. Then:
+
+| Surface | Flips to |
+|---|---|
+| `_zipReadme()` (src/ui/app.js) install commands | the unpkg two-command form above |
+| `.claude/docs/marketing/fact-sheet.md` plugin row | same |
+| `plugin/ultimate-tokens/.claude-plugin/plugin.json` `homepage`/`repository` | drop `repository` (private) or point at ultimate-tokens.com when it exists |
+| The root `.claude-plugin/marketplace.json` (the GitHub channel) | retire — or keep as the local/dev channel |
+| README / store copy pointers | the unpkg command (re-run voice-check) |
+
+## Going private also breaks (tracked here, fixed at cutover)
 
 The #250 debrand pointed **support** (GitHub Issues), **docs** (the README), and the **homepage**
-(GitHub Pages — unavailable on private repos without a paid plan) at this repo. Privatizing without
-re-homing those ships dead links everywhere the debrand just cleaned. ultimate-tokens.com must take
-over homepage + docs + a support channel at the same cutover; the hosted-MCP spec's `<APP_DOMAIN>`
-placeholder resolves to the same domain.
+(GitHub Pages — unavailable on private repos without a paid plan; `pages.yml` stops working) at
+this repo. Privatizing without re-homing those ships dead links everywhere the debrand just
+cleaned. ultimate-tokens.com (or another public home) must take over homepage + docs + a support
+channel at the same cutover; the hosted-MCP spec's `<APP_DOMAIN>` placeholder resolves the same way.

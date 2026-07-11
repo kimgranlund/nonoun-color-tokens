@@ -1,0 +1,58 @@
+name: Publish plugin to npm
+
+# The consumption plugin's ONLY distribution channel (ratified 2026-07-11): every version bump of
+# plugin/ultimate-tokens/.claude-plugin/plugin.json that lands on main auto-publishes
+# @ultimate-tokens/claude. The in-package marketplace.json is served by the npm CDNs
+# (unpkg/jsdelivr) as a remote-URL marketplace — nothing is hosted anywhere else.
+#
+#   /plugin marketplace add https://unpkg.com/@ultimate-tokens/claude/marketplace.json
+#   /plugin install ultimate-tokens
+#
+# Idempotent by construction: the job compares the local version against the registry and skips
+# when they match (the version IS the release trigger — no tags, no manual step). First publish
+# claims the name under the @ultimate-tokens org.
+#
+# Auth: the NPM_TOKEN repo secret — an npm GRANULAR automation token scoped to the
+# @ultimate-tokens org with read/write packages permission (npmjs.com → Access Tokens →
+# Generate New Token → Granular). Rotate per npm's expiry policy.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugin/**"
+      - "scripts/gen-plugin-pack.mjs"
+      - ".github/workflows/publish-plugin.yml"
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+      - name: Compare local vs published version
+        id: ver
+        run: |
+          LOCAL=$(node -p "require('./plugin/ultimate-tokens/.claude-plugin/plugin.json').version")
+          PUBLISHED=$(npm view @ultimate-tokens/claude version 2>/dev/null || echo "unpublished")
+          echo "local=$LOCAL"      >> "$GITHUB_OUTPUT"
+          echo "published=$PUBLISHED" >> "$GITHUB_OUTPUT"
+          echo "Local $LOCAL vs published $PUBLISHED"
+      - name: Gate — the zero-dependency suite (parity + hosted-pack lockstep)
+        if: steps.ver.outputs.local != steps.ver.outputs.published
+        run: npm test
+      - name: Build the pack
+        if: steps.ver.outputs.local != steps.ver.outputs.published
+        run: node scripts/gen-plugin-pack.mjs
+      - name: Publish
+        if: steps.ver.outputs.local != steps.ver.outputs.published
+        run: npm publish dist/plugins/npm/ultimate-tokens-claude --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Skip note
+        if: steps.ver.outputs.local == steps.ver.outputs.published
+        run: echo "v${{ steps.ver.outputs.local }} already published — nothing to do (bump plugin.json to release)"

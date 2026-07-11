@@ -11,17 +11,21 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-07-11
 
 #### Added
-- **The hosted plugin-distribution pack** — the repo is going private, so the consumption plugin's
-  public channel moves to a URL-hosted marketplace at
-  `ultimate-tokens.com/plugins/claude/marketplace.json`, backed by an npm package
-  (`ultimate-tokens-claude`). The split is forced by a verified platform constraint: a URL-hosted
-  marketplace downloads only `marketplace.json` — plugin bytes must come from an npm/git source.
-  `npm run gen:plugin-pack` emits the deployable pack (`dist/plugins/claude/` catalog + the
-  npm-publishable package) from the one plugin source of truth; `test/plugin/hosted-pack.mjs` (the
-  27th test file) gates version lockstep across plugin.json · the catalog's npm pin · the npm
-  package, and rejects relative-path sources in the hosted catalog. Public copy keeps the working
-  GitHub commands until the domain is live (never ship a 404); the one-PR flip list + release flow
-  live in `plugin/HOSTING.md`. (#258)
+- **The plugin distribution goes pure-npm, published by CI** — the repo is going private, retiring
+  the GitHub marketplace channel; nothing is hosted anywhere (supersedes the same-day
+  ultimate-tokens.com hosting shape of #258). The plugin publishes as **`@ultimate-tokens/claude`**
+  (the npm org), **automatically**: `.github/workflows/publish-plugin.yml` publishes on every
+  `plugin.json` version bump that lands on main (idempotent — same version is a no-op; needs the
+  one-time `NPM_TOKEN` org secret). The `marketplace.json` rides *inside* the package and the npm
+  CDNs serve it as a remote-URL marketplace
+  (`/plugin marketplace add https://unpkg.com/@ultimate-tokens/claude/marketplace.json`), its
+  plugin source the package itself, deliberately UNPINNED so downloaded catalogs never go stale.
+  Two verified platform facts shape this: no direct-from-npm install exists (a marketplace is
+  always the entry point), and a URL-added marketplace downloads only the one file.
+  `npm run gen:plugin-pack` builds the publishable package; `test/plugin/hosted-pack.mjs` (the
+  27th test file) gates version lockstep, the unpinned in-package catalog, and surface
+  completeness. Public install copy keeps the working GitHub commands until the first publish
+  claims the name; the flip list + runbook live in `plugin/HOSTING.md`. (#258, #259)
 - **The Download-All zip is self-describing.** A generated root `README.md` maps every included
   folder (respecting the system toggles AND the Pro-export gate — a folder absent from the archive
   is absent from the map), carries the consumption-plugin install commands
