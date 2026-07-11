@@ -11,6 +11,17 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 ### 2026-07-11
 
 #### Added
+- **The Download-All zip is self-describing.** A generated root `README.md` maps every included
+  folder (respecting the system toggles AND the Pro-export gate — a folder absent from the archive
+  is absent from the map), carries the consumption-plugin install commands
+  (`/plugin marketplace add kimgranlund/ultimate-tokens` → `/plugin install ultimate-tokens`), points
+  at the Download Brand-Kit MCP, and notes the responsive anchor + the text-rendering baseline. The
+  skills layer itself stays deliberately un-bundled — it updates centrally via the marketplace, so a
+  copy frozen into every zip would go stale. (#257)
+- **The consumption plugin is versioned honestly:** `0.1.0 → 0.2.0` — the installed-copy update
+  signal for this week's skill changes (the breakpoint canon, text-rendering law 7, invocation
+  dials); its descriptions also said "seven-voice type scale" — the scale has been **eleven** voices
+  since ADR-013. (#257)
 - **Settings grew its missing preferences.** Token mapping gains **Figma collections** — per-document
   overrides for the two color-collection names the plugin creates (defaults `Color Primitives` /
   `Color Modes`); the override rides the export's aliasData and the apply message, `code.js` falls
