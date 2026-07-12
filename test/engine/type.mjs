@@ -316,15 +316,16 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
 
 // ── SIBLING WEIGHTS: siblingWeightDefaults + the voices[].weights channel + emitter coverage ──
 {
-  // defaults table — the ratified derivation (heavy → two below; ≤400 → one below + two above; mid → ±200)
+  // defaults table — the ratified derivation: the two LADDER-ADJACENT stops, stepping from the core
+  // toward the ladder's center (< 550 → up, ≥ 550 → down), nearer neighbor first.
   const w = (list) => list.map((x) => x.weight).join(",");
-  ok(w(T.siblingWeightDefaults(900)) === "700,500", "defaults: core 900 → Bold 700 + Medium 500");
-  ok(w(T.siblingWeightDefaults(400)) === "300,500,600", "defaults: core 400 → Light 300 + Medium 500 + Semi-bold 600");
-  ok(w(T.siblingWeightDefaults(600)) === "400,800", "defaults: mid core 600 → ±200");
-  ok(w(T.siblingWeightDefaults(700)) === "500,900", "defaults: mid core 700 → ±200");
+  ok(w(T.siblingWeightDefaults(900)) === "800,700", "defaults: core 900 → Extra-bold 800 + Bold 700");
+  ok(w(T.siblingWeightDefaults(400)) === "500,600", "defaults: core 400 (Regular) → Medium 500 + Semi-bold 600");
+  ok(w(T.siblingWeightDefaults(600)) === "500,400", "defaults: core 600 (Semi-bold) → Medium 500 + Regular 400");
+  ok(w(T.siblingWeightDefaults(700)) === "600,500", "defaults: core 700 (Bold) → Semi-bold 600 + Medium 500");
   ok(w(T.siblingWeightDefaults(100)) === "200,300", "defaults: floor core 100 → above only (no 0 weight)");
-  ok(w(T.siblingWeightDefaults(440)) === "300,500,600", "defaults: non-ladder core snaps (440→400)");
-  ok(T.siblingWeightDefaults(900)[0].name === "Bold" && T.siblingWeightDefaults(400)[2].name === "Semi-bold", "defaults carry the ladder's semantic names");
+  ok(w(T.siblingWeightDefaults(440)) === "500,600", "defaults: non-ladder core snaps (440→400)");
+  ok(T.siblingWeightDefaults(900)[0].name === "Extra-bold" && T.siblingWeightDefaults(400)[1].name === "Semi-bold", "defaults carry the ladder's semantic names");
   ok(T.siblingWeightDefaults(NaN).length === 0, "defaults: non-finite core → empty");
 
   // identity gate — no weights config ⇒ no `weights` key, emitters byte-identical

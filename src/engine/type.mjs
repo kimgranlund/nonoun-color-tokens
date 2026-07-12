@@ -285,20 +285,20 @@ export function typeScale(config = {}) {
 export const WEIGHT_LADDER = [100, 200, 300, 400, 500, 600, 700, 800, 900];
 export const WEIGHT_NAMES = { 100: "Thin", 200: "Extra-light", 300: "Light", 400: "Regular", 500: "Medium", 600: "Semi-bold", 700: "Bold", 800: "Extra-bold", 900: "Black" };
 
-// siblingWeightDefaults(core) — the SUGGESTED sibling set around a voice's core weight, from the
-// ladder (never the core itself). Applied once when the user opts a voice in; after that the list
-// is user-owned (add/remove/rename) and never silently regenerated. The shape:
-//   heavy cores (≥800, e.g. Black 900) → two below:      900 → Bold 700 · Medium 500
-//   light-to-regular cores (≤400)      → one below + two above:  400 → Light 300 · Medium 500 · Semi-bold 600
-//   mid cores (500–700)                → one below + one above (±200, clamped): 600 → Regular 400 · Extra-bold 800
+// siblingWeightDefaults(core) — the SUGGESTED sibling set around a voice's core weight: the two
+// LADDER-ADJACENT stops (immediate neighbors, never a skipped step), stepping from the core TOWARD
+// the ladder's center — the 400–600 band real UIs actually reach for when they need an emphasis
+// variant next to a body/label weight. Below-center cores step up, above-center cores step down; the
+// nearer neighbor is listed first, matching how a designer would name them ("Regular → Medium, then
+// Semi-bold"). The core itself is never in the list. Applied once when the user opts a voice in;
+// after that the list is user-owned (add/remove/rename) and never silently regenerated. The shape:
+//   core < 550 (Thin…Medium)  → two ABOVE, nearer first:  400 → Medium 500 · Semi-bold 600
+//   core ≥ 550 (Semi-bold…Black) → two BELOW, nearer first: 700 → Semi-bold 600 · Medium 500
 export function siblingWeightDefaults(core) {
   const c = Number(core);
   if (!Number.isFinite(c)) return [];
   const snap = WEIGHT_LADDER.reduce((a, b) => (Math.abs(b - c) < Math.abs(a - c) ? b : a));
-  let picks;
-  if (snap >= 800) picks = [snap - 200, snap - 400];
-  else if (snap <= 400) picks = [snap - 100, snap + 100, snap + 200];
-  else picks = [snap - 200, snap + 200];
+  const picks = snap < 550 ? [snap + 100, snap + 200] : [snap - 100, snap - 200];
   return picks
     .filter((w) => w >= 100 && w <= 900 && w !== snap)
     .map((w) => ({ name: WEIGHT_NAMES[w], weight: w }));

@@ -25,6 +25,7 @@ import { cam16FromRgb, lstarFromRgb } from "../src/engine/hct.js";
 import { toneAt, DEFAULT_CONTROLS } from "../src/engine/tonal.js";
 import { deriveNeutral } from "../src/engine/derive.mjs";
 import { seedFromKeyColor } from "../src/ui/model.mjs";
+import { siblingWeightDefaults } from "../src/engine/type.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SRCDIR = resolve(here, "../.claude/docs/spec/colors/categories");
@@ -184,6 +185,11 @@ function design5ToTypeConfig(t) {
     const ld = pct(s.leading); //                                 clampType range [0.8, 3]
     if (Number.isFinite(ld)) v.leading = ld;
     if (Number.isFinite(s.weight)) v.weight = s.weight; //        clampType range [100, 1000]
+    // ADJACENT WEIGHT SIBLINGS — every designed voice ships the two ladder-adjacent weight variants
+    // around its own core (see siblingWeightDefaults), so the preset's exported text styles (Figma
+    // `Voice/step/Name`, CSS/DTCG weight tokens) carry emphasis options out of the box, not just the
+    // single core weight. Rides the SAME core weight this slot already resolved above.
+    if (Number.isFinite(v.weight)) { const sibs = siblingWeightDefaults(v.weight); if (sibs.length) v.weights = sibs; }
     if (Object.keys(v).length) voices[TYPE_VOICE_OF[role]] = v;
   }
   if (Object.keys(fonts).length) out.fonts = fonts;

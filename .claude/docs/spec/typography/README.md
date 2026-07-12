@@ -70,4 +70,25 @@ coefficient, font roles }`:
 A set of **treatments** (Product/Lifestyle, Luxury, Editorial, Technical/Data, Brutalist) seed these
 params, exactly as the color "Color Categories" presets seed palette params.
 
+## Sibling weights — adjacent emphasis variants
+
+A voice's core weight is one number; real UIs also need a *nearby* weight for inline emphasis (a bold
+word in body text, a medium label next to a regular one) without inventing an unrelated weight.
+`siblingWeightDefaults(core)` (`src/engine/type.mjs`) derives exactly that: the **two ladder-adjacent
+stops** (immediate neighbors on the 9-stop `WEIGHT_LADDER` — 100…900 — never a skipped step), stepping
+from the core **toward the ladder's center** (the 400–600 band), nearer neighbor first — `Regular 400`
+→ `Medium 500, Semi-bold 600`; `Bold 700` → `Semi-bold 600, Medium 500`. The core itself is never
+included.
+
+A voice opts in by carrying `weights: [{name, weight}, …]` (`config.voices[voice].weights` in
+`typeScale`) — absent/empty is the identity gate (no `weights` key on the scale, every emitter
+byte-identical). Once set, siblings emit everywhere the core does: a `--type-{voice}-weight-{slug}` CSS
+custom prop, a DTCG `weights.{voice}.{Name}` `fontWeight` token, a `weight/{voice}/{slug}` Font
+Primitives variable, and — the reason this exists — a **sibling Figma text style** per variant
+(`Voice/step/Name`, e.g. `Body/md/Semi-bold`, alongside the bare `Voice/step` core; see
+`figma/binder/style-plan.mjs`). Every Color Categories preset (336 palettes × the 5 designed roles —
+Display/Heading/Body/UI/Kicker) ships its siblings pre-populated at generation time
+(`scripts/gen-categories.mjs#design5ToTypeConfig`), computed from that slot's own designed weight — so
+opening any curated palette already exports emphasis-ready text styles, not just a single core weight.
+
 > Status: **shipped** — `src/engine/type.mjs` (`typeScale` + `typeTokensCSS`/`typeTokensDTCG`) and the Typography editor section generate these tokens.

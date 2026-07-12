@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { typeScale, DEFAULT_TYPE } from "../../src/engine/type.mjs";
+import { typeScale, DEFAULT_TYPE, siblingWeightDefaults } from "../../src/engine/type.mjs";
 import { hydrate } from "../../src/ui/persist.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -25,7 +25,11 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // order-INSENSITIVE deep equality (clampType re-emits fonts/voices in its own allowlist order — same
 // values, different key order — so a stringify compare would false-fail; compare key SETS + field values).
 const sameKeys = (a, b) => { const ka = Object.keys(a || {}).sort(), kb = Object.keys(b || {}).sort(); return eq(ka, kb); };
-const sameVoices = (a, b) => sameKeys(a, b) && Object.keys(a || {}).every((v) => sameKeys(a[v], b[v]) && Object.keys(a[v]).every((k) => a[v][k] === b[v][k]));
+// per-field compare via `eq` (not `===`) — `weights` is an ARRAY (the sibling-weight variants), and
+// clampType/the mapper each construct a fresh array of fresh objects, so `===` would always be false
+// even when the contents match; `eq`'s JSON.stringify compare handles both the primitive fields and
+// the array field uniformly (both sides build `{name, weight}` in the same key order).
+const sameVoices = (a, b) => sameKeys(a, b) && Object.keys(a || {}).every((v) => sameKeys(a[v], b[v]) && Object.keys(a[v]).every((k) => eq(a[v][k], b[v][k])));
 
 let totalPresets = 0, totalTyped = 0;
 for (const slug of CATS) {
@@ -73,6 +77,12 @@ for (const slug of CATS) {
       if (Number.isFinite(pct(s.tracking)) && vv.tracking !== pct(s.tracking)) FAIL("faithful", `${slug}[${i}] ${r} tracking: preset ${vv.tracking} != spec ${s.tracking}`);
       if (Number.isFinite(pct(s.leading)) && vv.leading !== pct(s.leading)) FAIL("faithful", `${slug}[${i}] ${r} leading: preset ${vv.leading} != spec ${s.leading}`);
       if (Number.isFinite(s.weight) && vv.weight !== s.weight) FAIL("faithful", `${slug}[${i}] ${r} weight: preset ${vv.weight} != spec ${s.weight}`);
+      // ADJACENT WEIGHT SIBLINGS — every designed slot's voice carries the ladder-adjacent variants
+      // around ITS OWN weight (not a stale/copied set), so exported text styles get emphasis options.
+      if (Number.isFinite(s.weight)) {
+        const want = siblingWeightDefaults(s.weight);
+        if (!eq(vv.weights || [], want)) FAIL("faithful", `${slug}[${i}] ${r} weights: preset ${JSON.stringify(vv.weights)} != derived ${JSON.stringify(want)}`);
+      }
     }
     // (e) typeScale RESOLVES the design fonts (the picker reads scale.fonts[role])
     const sc = typeScale(t);
