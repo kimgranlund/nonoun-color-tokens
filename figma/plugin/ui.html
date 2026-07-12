@@ -2978,7 +2978,24 @@ function typeScale(config = {}) {
     }
     if (list.length) weights[name] = list;
   }
-  return { treatment: t.id, label: t.label, fonts, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories, ...(Object.keys(styleNames).length ? { styleNames } : {}), ...(Object.keys(weights).length ? { weights } : {}) };
+  // per-voice FONT overrides (config.voices[v].font) — the escape hatch off the 5 shared ROLES: any of the
+  // 11 voices may carry its own family instead of riding its role's default (TKT-0002 — e.g. Sub-heading no
+  // longer forced to share Heading's font). Identity-gated like styleNames/weights: absent ⇒ no voiceFonts
+  // key, and every emitter below stays byte-identical. Resolve via `resolvedFontFor`, never read directly.
+  const voiceFonts = {};
+  if (voices) for (const [name, v] of Object.entries(voices)) {
+    if (t.categories[name] && v && typeof v.font === "string" && v.font.trim()) voiceFonts[name] = v.font.trim();
+  }
+  return { treatment: t.id, label: t.label, fonts, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories, ...(Object.keys(styleNames).length ? { styleNames } : {}), ...(Object.keys(weights).length ? { weights } : {}), ...(Object.keys(voiceFonts).length ? { voiceFonts } : {}) };
+}
+
+// resolvedFontFor(scale, voice) — the ONE resolution point for a voice's actual family: its own per-voice
+// override (config.voices[v].font, scale.voiceFonts) if set, else its role's shared default
+// (scale.fonts[scale.roleOf[voice]]). Every consumer that needs a voice's real font (emitters, the Figma
+// style planner, the UI specimen) calls this instead of reading scale.fonts[role] directly, so an override
+// can never be silently bypassed by a new call site.
+function resolvedFontFor(scale, voice) {
+  return (scale.voiceFonts && scale.voiceFonts[voice]) || scale.fonts[scale.roleOf[voice]];
 }
 
 // ── sibling-weight defaults ────────────────────────────────────────────────────────────────────
@@ -3062,6 +3079,10 @@ function typeVarLines(scale, indent = "  ", unit = "px", pfx = "type") {
 function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   const lines = [":root {"];
   for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
+  // per-voice FONT overrides — one custom prop per OVERRIDDEN voice (`--font-voice-sub-heading: '...'`),
+  // quoted like the role fonts above (same Safari trap). Absent when no voice carries an override (identity
+  // gate — un-overridden CSS is byte-identical to before this channel existed).
+  if (scale.voiceFonts) for (const [voice, family] of Object.entries(scale.voiceFonts)) lines.push(`  --font-voice-${kebab(voice)}: '${family}';`);
   // per-voice SIBLING WEIGHTS — one custom prop per named variant (`--type-display-weight-bold: 700`),
   // per VOICE (never duplicated per step). Absent when the kit defines none (identity gate).
   if (scale.weights) for (const [cName, list] of Object.entries(scale.weights)) {
@@ -3072,10 +3093,13 @@ function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   lines.push("}");
   for (const [cName, steps] of Object.entries(scale.categories)) {
     const role = scale.roleOf[cName] || "body";
+    // an overridden voice's utility classes bind to ITS OWN --font-voice-* prop; every other voice is
+    // unaffected — still --font-{role}, byte-identical to before this channel existed.
+    const fontVar = scale.voiceFonts && scale.voiceFonts[cName] ? `--font-voice-${kebab(cName)}` : `--font-${role}`;
     for (const [sName, s] of Object.entries(steps)) {
       const c = kebab(cName), sk = kebab(sName);
       const tt = s.textTransform && s.textTransform !== "none" ? ` text-transform: ${s.textTransform};` : "";
-      lines.push(`.${prefix}-${c}-${sk} { font-family: var(--font-${role}); font-size: var(--${prefix}-${c}-${sk}-size); line-height: var(--${prefix}-${c}-${sk}-line); letter-spacing: var(--${prefix}-${c}-${sk}-tracking); font-weight: var(--${prefix}-${c}-${sk}-weight);${tt} }`);
+      lines.push(`.${prefix}-${c}-${sk} { font-family: var(${fontVar}); font-size: var(--${prefix}-${c}-${sk}-size); line-height: var(--${prefix}-${c}-${sk}-line); letter-spacing: var(--${prefix}-${c}-${sk}-tracking); font-weight: var(--${prefix}-${c}-${sk}-weight);${tt} }`);
     }
   }
   return lines.join("\n") + "\n";
@@ -3119,12 +3143,13 @@ function typeTokensDTCG(scale, { unit = "px" } = {}) {
   for (const [role, family] of Object.entries(scale.fonts)) fontFamily[role] = { $type: "fontFamily", $value: family };
   const typography = {};
   for (const [cName, steps] of Object.entries(scale.categories)) {
-    const role = scale.roleOf[cName] || "body";
     typography[cName] = {};
     for (const [sName, s] of Object.entries(steps)) {
       typography[cName][sName] = {
         $type: "typography",
-        $value: { fontFamily: scale.fonts[role], fontSize: dimUnit(s.size, unit), lineHeight: relLine(s.lineHeight, s.size), letterSpacing: relTrackEm(s.letterSpacing, s.size), fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: dimUnit(s.paragraphSpacing, unit), paragraphIndent: dimUnit(s.paragraphIndent, unit), ...(s.singleLineHeight != null ? { singleLineHeight: relLine(s.singleLineHeight, s.size) } : {}) },
+        // fontFamily resolves the per-voice override (if any) — an overridden voice's DTCG carries its own
+        // family; an un-overridden voice still reads its role's family (identical to before this channel).
+        $value: { fontFamily: resolvedFontFor(scale, cName), fontSize: dimUnit(s.size, unit), lineHeight: relLine(s.lineHeight, s.size), letterSpacing: relTrackEm(s.letterSpacing, s.size), fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: dimUnit(s.paragraphSpacing, unit), paragraphIndent: dimUnit(s.paragraphIndent, unit), ...(s.singleLineHeight != null ? { singleLineHeight: relLine(s.singleLineHeight, s.size) } : {}) },
       };
     }
   }
@@ -3199,24 +3224,36 @@ function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base", baseLa
 }
 
 // typeTokensFigmaPrimitives — the "Font Primitives" COMPANION collection to typeTokensFigmaModes: the
-// distinct font families deduped into `family/<role>` STRING primitives, a `font/<voice>` ALIAS per
-// voice pointing at its family primitive (edit the primitive; every voice follows), and a
-// `weight/<voice>` FLOAT primitive (the voice's uniform weight — one edit point per voice). Alias
-// entries carry `{ type:"ALIAS", target:"<variable key>" }` INSTEAD of `values` — a consumer resolves
-// them within the same collection. Single "Value" mode (families/weights don't vary by breakpoint;
-// breakpoints live in the Typography collection). This file is an IMPORT artifact only — the in-Figma
-// apply path (`_figmaFloatPlans`) never consumes it, so the plugin executor stays float-only.
+// distinct font families deduped into `family/<role>` STRING primitives (plus a `family/voice/<voice>`
+// primitive for a family that's ONLY reached via a per-voice override — never shared with a role or
+// another voice), a `font/<voice>` ALIAS per voice pointing at its resolved family primitive (edit the
+// primitive; every voice sharing it follows), and a `weight/<voice>` FLOAT primitive (the voice's uniform
+// weight — one edit point per voice). Alias entries carry `{ type:"ALIAS", target:"<variable key>" }`
+// INSTEAD of `values` — a consumer resolves them within the same collection. Single "Value" mode
+// (families/weights don't vary by breakpoint; breakpoints live in the Typography collection). This file is
+// an IMPORT artifact only — the in-Figma apply path (`_figmaFloatPlans`) never consumes it, so the plugin
+// executor stays float-only.
 function typeTokensFigmaPrimitives(scale) {
   const variables = {};
-  const famKey = {}; // family string → the primitive key that owns it (first role wins = dedupe)
+  const famKey = {}; // family string → the primitive key that owns it (dedupe by VALUE — first writer wins)
   for (const [role, fam] of Object.entries(scale.fonts || {})) {
     if (!fam || famKey[fam]) continue;
     famKey[fam] = `family/${role}`;
     variables[famKey[fam]] = { type: "STRING", values: { Value: fam } };
   }
   for (const [voice, steps] of Object.entries(scale.categories || {})) {
-    const fam = (scale.fonts || {})[(scale.roleOf || {})[voice]];
-    if (fam && famKey[fam]) variables[`font/${voice}`] = { type: "ALIAS", target: famKey[fam] };
+    const fam = resolvedFontFor(scale, voice);
+    if (fam) {
+      // a family already owned by a role (or an earlier voice override) aliases that SAME primitive; a
+      // genuinely distinct override family (matching no existing primitive's value) mints its own —
+      // dedupe by VALUE, not by source, so two voices overridden to the same custom family share one.
+      if (!famKey[fam]) {
+        const key = `family/voice/${kebab(voice)}`;
+        famKey[fam] = key;
+        variables[key] = { type: "STRING", values: { Value: fam } };
+      }
+      variables[`font/${voice}`] = { type: "ALIAS", target: famKey[fam] };
+    }
     const first = Object.values(steps)[0];
     if (first && Number.isFinite(first.weight)) variables[`weight/${voice}`] = { type: "FLOAT", values: { Value: first.weight } };
     // the weight STYLE NAME (non-variable families) — a STRING primitive beside the numeric weight,
@@ -3238,7 +3275,7 @@ function typeTokensFigmaPrimitives(scale) {
   };
 }
 
-return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, typeScale, WEIGHT_LADDER, WEIGHT_NAMES, siblingWeightDefaults, weightNameFor, dimUnit, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes, typeTokensFigmaPrimitives };
+return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, typeScale, resolvedFontFor, WEIGHT_LADDER, WEIGHT_NAMES, siblingWeightDefaults, weightNameFor, dimUnit, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes, typeTokensFigmaPrimitives };
 })();
 __M.geometry = (function(){
 // geometry.mjs — the GEOMETRY / dimensional engine: the spatial analog of the color & type engines.
@@ -4313,6 +4350,9 @@ function clampType(t) {
       const ra = num(v.ratio, 1, 2, false); if (ra !== undefined) o.ratio = ra;
       // styleName — the Figma weight-style string for non-variable families; trimmed, capped, non-empty only.
       if (typeof v.styleName === "string" && v.styleName.trim()) o.styleName = v.styleName.trim().slice(0, 60);
+      // font — the per-voice FONT override (TKT-0002): a voice's own family, overriding its shared role
+      // default (resolvedFontFor in type.mjs). Same shape as styleName: trimmed, capped, non-empty only.
+      if (typeof v.font === "string" && v.font.trim()) o.font = v.font.trim().slice(0, 60);
       // weights — SIBLING weight variants [{name, weight}] around the voice's core (the styles feature).
       // Capped at 8 per voice; each entry needs a finite clamped weight AND a non-empty name (name capped
       // at 40 chars). Kept only when non-empty, so a config without siblings round-trips identically.
@@ -4938,6 +4978,7 @@ const { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAc
 const { iconSystem, iconSystemLabel } = __M.iconSystems;
 const { motionTokens, MOTION_EASING, MOTION_DURATION, MOTION_NEVER } = __M.motion;
 const { oklchToSrgb8, hexToSrgb8, pyRound, dsBundleGates } = __M.dsGates; // §8 carrier primitives + the gate itself — the receipt cites the SAME run the gate measures
+const { resolvedFontFor } = __M.type; // per-voice font resolution (TKT-0002) — a voice's own override, else its role's shared default
 
 // WCAG relative luminance of an [r,g,b] (0..255) triple — for the opt-in contrast on-color pick.
 const relLumExp = (rgb) => {
@@ -5807,8 +5848,6 @@ function exportDesignSystemSpine(state, typeSc, geomSc) {
   const flat = {};
   if (typeSc && typeSc.categories) for (const [cName, steps] of Object.entries(typeSc.categories))
     for (const [sName, s] of Object.entries(steps)) flat[`${cName.toLowerCase()}-${sName.toLowerCase()}`] = { voice: cName, s };
-  const roleOf = (typeSc && typeSc.roleOf) || {};
-  const fonts = (typeSc && typeSc.fonts) || {};
   const typeLines = [];
   const usedLevels = [];
   for (const key of DS_TYPE_LEVELS) {
@@ -5817,7 +5856,7 @@ function exportDesignSystemSpine(state, typeSc, geomSc) {
     usedLevels.push(key);
     const s = hit.s;
     typeLines.push(`  ${key}:`);
-    typeLines.push(`    fontFamily: ${fonts[roleOf[hit.voice] || "body"] || "sans-serif"}`);
+    typeLines.push(`    fontFamily: ${resolvedFontFor(typeSc, hit.voice) || "sans-serif"}`);
     typeLines.push(`    fontSize: ${s.size}px`);
     typeLines.push(`    fontWeight: ${s.weight}`);
     typeLines.push(`    lineHeight: ${dsFactor(s.lineHeight, s.size)}`);
@@ -6621,7 +6660,6 @@ function dsMakeColorMd(ds, pfx, shadcnCss) {
 // (a unitless factor)/weight, tracking in em where present. Never px (D11).
 function dsMakeTypographyMd(typeSc) {
   const fonts = (typeSc && typeSc.fonts) || {};
-  const roleOf = (typeSc && typeSc.roleOf) || {};
   const flat = {};
   if (typeSc && typeSc.categories) for (const [cName, steps] of Object.entries(typeSc.categories))
     for (const [sName, s] of Object.entries(steps)) flat[`${cName.toLowerCase()}-${sName.toLowerCase()}`] = { voice: cName, s };
@@ -6630,7 +6668,7 @@ function dsMakeTypographyMd(typeSc) {
     const hit = flat[key];
     if (!hit) continue;
     const { voice, s } = hit;
-    const fam = fonts[roleOf[voice] || "body"] || "sans-serif";
+    const fam = resolvedFontFor(typeSc, voice) || "sans-serif";
     const factor = dsFactor(s.lineHeight, s.size);
     const track = s.letterSpacing && Math.abs(s.letterSpacing) >= 0.01
       ? `, ${Number((s.letterSpacing / s.size).toFixed(3))}em tracking` : "";
@@ -7566,7 +7604,7 @@ __M.stylePlan = (function(){
 // their core in list order. Same inputs ⇒ byte-identical plan (the executor's idempotency rides on it).
 
 const { semanticRoles } = __M.semantic;
-const { weightNameFor } = __M.type;
+const { weightNameFor, resolvedFontFor } = __M.type;
 
 // styleGroupOf — the ratified paint-style sub-folder for a role key: the 7 scrim roles under scrims/,
 // the surface + container ladders under surfaces/, everything else flat under the family.
@@ -7591,8 +7629,11 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
   const texts = [];
   if (inc.type && scale && scale.categories && typeof scale.categories === "object") {
     for (const [voice, steps] of Object.entries(scale.categories)) {
-      const role = (scale.roleOf || {})[voice] || "body";
-      const family = (scale.fonts || {})[role] || "";
+      // the LITERAL fallback family (used when the binding target can't resolve) is the voice's RESOLVED
+      // font — its own override if set, else its role's shared default (TKT-0002). The BINDING target
+      // (`font/${voice}` below) was already per-voice; it needs no change — typeTokensFigmaPrimitives
+      // already aliases an overridden voice's primitive to the override family.
+      const family = resolvedFontFor(scale, voice) || "";
       const coreStyleName = (scale.styleNames && scale.styleNames[voice]) || null;
       const sibs = (scale.weights && scale.weights[voice]) || [];
       for (const [step, s] of Object.entries(steps)) {
@@ -8292,7 +8333,7 @@ const { MCP_BRAND_KIT } = __M.mcpAssets;
 const { TYPE_FONTS_CSS } = __M.typeFonts;
 const { CATEGORY_INDEX, loadCategory } = __M.categoryIndex;
 const { deriveNeutral, deriveRelative, RELATIONSHIPS } = __M.derive;
-const { typeScale, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, siblingWeightDefaults, WEIGHT_NAMES } = __M.type;
+const { typeScale, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, siblingWeightDefaults, WEIGHT_NAMES, resolvedFontFor } = __M.type;
 const { geomScale, geomTokensCSS, geomTokensBreakpointCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } = __M.geometry;
 const { zipStore } = __M.zip;
 const { modeApplyPlan, validateModeInterchange } = __M.modeApplyPlan;
@@ -12086,7 +12127,7 @@ class HctApp extends HTMLElement {
     ensureTypeFonts();
     const cfg = this._activeType();
     const scale = this._activeTypeScale();
-    ensureWebFonts(scale.fonts, this.inFigma); // TIER 2: lazy-load this palette's non-bundled faces (web app only)
+    ensureWebFonts({ ...scale.fonts, ...(scale.voiceFonts || {}) }, this.inFigma); // TIER 2: lazy-load this palette's non-bundled faces, incl. per-voice overrides (web app only)
     const t = TYPE_TREATMENTS.find((x) => x.id === cfg.treatment) || TYPE_TREATMENTS[0];
     const PARA = TYPE_PARA(scale.treatment);
     const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -12094,7 +12135,7 @@ class HctApp extends HTMLElement {
       const s = scale.categories[cat] && scale.categories[cat][step];
       if (!s) return false;
       const role = scale.roleOf[cat] || "body";
-      const fam = scale.fonts[role] || "Inter";
+      const fam = resolvedFontFor(scale, cat) || "Inter";
       const generic = genericFor(fam, role);
       const token = `type-${kebab(cat)}-${kebab(step)}`;
       const tt = s.textTransform && s.textTransform !== "none" ? `text-transform:${s.textTransform};` : "";
@@ -12123,11 +12164,10 @@ class HctApp extends HTMLElement {
       // render the specimen LARGEST → smallest (biggest example first) — sort by resolved size descending,
       // robust to the engine's step-key order. (The `steps.length` count is order-independent.)
       const ordered = [...steps].sort((a, b) => (scale.categories[cat][b]?.size || 0) - (scale.categories[cat][a]?.size || 0));
-      const role = scale.roleOf[cat] || "body";
       return h(
         "div",
         { class: "type-spec-group" },
-        h("div", { class: "type-spec-grouphead" }, h("b", {}, cat), h("small", {}, scale.fonts[role]), h("span", { class: "type-spec-count" }, `${steps.length} steps`)),
+        h("div", { class: "type-spec-grouphead" }, h("b", {}, cat), h("small", {}, resolvedFontFor(scale, cat)), h("span", { class: "type-spec-count" }, `${steps.length} steps`)),
         ...ordered.map((step) => line(cat, step)),
       );
     });
@@ -12635,7 +12675,7 @@ class HctApp extends HTMLElement {
   // fuzz generator, so it is FLAGGED out-of-scope, not faked.
   renderTypeInspector(view) {
     ensureTypeFonts();
-    ensureWebFonts(this._activeTypeScale().fonts, this.inFigma); // TIER 2: the inspector specimen + examples render the real faces
+    { const s = this._activeTypeScale(); ensureWebFonts({ ...s.fonts, ...(s.voiceFonts || {}) }, this.inFigma); } // TIER 2: the inspector specimen + examples render the real faces, incl. per-voice overrides
     const seg = this.typeSegment === "fonts" || this.typeSegment === "specimen" ? this.typeSegment : "scale";
     const body = seg === "fonts" ? this.typeFontsTab() : seg === "specimen" ? this.typeSpecimenTab(view) : this.typeScaleTab();
     const tabs = [{ id: "scale", label: "Scale" }, { id: "fonts", label: "Fonts" }, { id: "specimen", label: "Specimen" }];
@@ -12691,7 +12731,7 @@ class HctApp extends HTMLElement {
               { type: "button", class: "tyi-voice-name", "data-fk": "tyvoice:" + cName, "aria-expanded": sel ? "true" : "false",
                 onclick: () => { this.typeVoice = sel ? null : cName; this.render(); } },
               h("span", { class: "tyi-voice-label" }, cName, tuned ? h("span", { class: "tyi-voice-dot", title: "Tuned off the treatment" }, " ●") : false),
-              h("span", { class: "tyi-voice-font" }, scale.fonts[scale.roleOf[cName]]),
+              h("span", { class: "tyi-voice-font" }, resolvedFontFor(scale, cName)),
             ),
             sel
               ? h(
@@ -12701,6 +12741,13 @@ class HctApp extends HTMLElement {
                   this.slider("Tracking", val("tracking", p.trackingEm), -0.05, 0.3, 0.001, (v) => (v >= 0 ? "+" : "") + fmt(v, 3) + "em", (v) => this._setTypeVoice(cName, "tracking", v)),
                   this.slider("Leading", val("leading", p.leading), 0.9, 2, 0.01, (v) => fmt(v, 2), (v) => this._setTypeVoice(cName, "leading", v)),
                   this.slider("Ratio", val("ratio", p.ratio), 1, 1.7, 0.005, (v) => fmt(v, 3), (v) => this._setTypeVoice(cName, "ratio", v)),
+                  // the per-voice FONT override (TKT-0002) — this voice's own family, instead of sharing
+                  // its role's default (e.g. give Sub-heading a different face than Heading, though both
+                  // ride the `heading` role). Empty clears it (falls back to the role's font); exported
+                  // into the Font Primitives font/<voice> alias + a --font-voice-* CSS prop.
+                  h("label", { class: "mode-editor-label", for: "fld-voice-font-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-") }, "Font"),
+                  h("input", { id: "fld-voice-font-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-"), type: "text", value: vp.font || "", placeholder: scale.fonts[scale.roleOf[cName]], "data-fk": "tyvoice-font:" + cName,
+                    "aria-label": "Font override for " + cName, onchange: (e) => this._setTypeVoiceFont(cName, e.target.value) }),
                   // the Figma weight-STYLE name — only meaningful for non-variable families (GT America
                   // "Condensed Black Italic"), where a numeric weight can't name the face. Exported into
                   // the Font Primitives collection as weight-style/<voice>; empty = none.
@@ -12936,6 +12983,24 @@ class HctApp extends HTMLElement {
     });
   }
 
+  // _setTypeVoiceFont(voice, value) — the FONT sibling of _setTypeVoiceStyleName (TKT-0002): a per-voice
+  // family override, instead of sharing the voice's role default. Empty/whitespace clears (falls back to
+  // scale.fonts[roleOf[voice]] via resolvedFontFor); one undo step. A new family must be re-probed (the
+  // fonts-availability cache + web-font loader), same as _setTypeFont.
+  _setTypeVoiceFont(voice, value) {
+    this._faceCache.clear(); this._fontsReadyHooked = false;
+    const fam = String(value || "").trim().slice(0, 60);
+    this.commit((doc) => {
+      const t = { ...(doc.type || DEFAULT_TYPE) };
+      const voices = { ...(t.voices || {}) };
+      const v = { ...(voices[voice] || {}) };
+      if (fam) v.font = fam; else delete v.font;
+      if (Object.keys(v).length) voices[voice] = v; else delete voices[voice];
+      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
+      doc.type = t;
+    });
+  }
+
   // _setVoiceWeights(voice, list) — write a voice's SIBLING weight variants ([{name, weight}]) onto
   // doc.type.voices, normalized (name trimmed/capped, weight clamped 100..1000, invalid dropped); an
   // empty list clears the key so a sibling-free voice round-trips identically. One undo step.
@@ -12985,7 +13050,7 @@ class HctApp extends HTMLElement {
           h(
             "div",
             { class: "typo-cat" },
-            h("div", { class: "typo-cat-head" }, h("b", {}, cat), h("small", {}, scale.fonts[scale.roleOf[cat]])),
+            h("div", { class: "typo-cat-head" }, h("b", {}, cat), h("small", {}, resolvedFontFor(scale, cat))),
             this._typeSample(scale, cat, repStep(cat), TYPE_SAMPLE(cat, scale.treatment)),
           ),
         ),
@@ -13007,7 +13072,7 @@ class HctApp extends HTMLElement {
     const main = roles.find((r) => r.suffix === "");
     const onMain = roles.find((r) => r.suffix === "-on-" + sl);
     const hStep = scale.categories["Heading"].MD, bStep = scale.categories.Body.MD;
-    const fam = (cat) => { const role = scale.roleOf[cat]; const fm = scale.fonts[role] || "Inter"; return `'${fm}', ${genericFor(fm, role)}`; };
+    const fam = (cat) => { const role = scale.roleOf[cat]; const fm = resolvedFontFor(scale, cat) || "Inter"; return `'${fm}', ${genericFor(fm, role)}`; };
     return h(
       "div",
       { class: "example-card tyi-example", style: "background:" + pick(byKey.surface) },
@@ -14750,7 +14815,7 @@ class HctApp extends HTMLElement {
     const s = scale.categories[cat] && scale.categories[cat][step];
     if (!s) return false;
     const role = scale.roleOf[cat] || "body";
-    const fam = scale.fonts[role] || "Inter";
+    const fam = resolvedFontFor(scale, cat) || "Inter";
     const generic = genericFor(fam, role);
     const tt = s.textTransform && s.textTransform !== "none" ? `text-transform:${s.textTransform};` : "";
     return h(

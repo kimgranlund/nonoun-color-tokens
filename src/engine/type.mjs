@@ -276,7 +276,24 @@ export function typeScale(config = {}) {
     }
     if (list.length) weights[name] = list;
   }
-  return { treatment: t.id, label: t.label, fonts, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories, ...(Object.keys(styleNames).length ? { styleNames } : {}), ...(Object.keys(weights).length ? { weights } : {}) };
+  // per-voice FONT overrides (config.voices[v].font) — the escape hatch off the 5 shared ROLES: any of the
+  // 11 voices may carry its own family instead of riding its role's default (TKT-0002 — e.g. Sub-heading no
+  // longer forced to share Heading's font). Identity-gated like styleNames/weights: absent ⇒ no voiceFonts
+  // key, and every emitter below stays byte-identical. Resolve via `resolvedFontFor`, never read directly.
+  const voiceFonts = {};
+  if (voices) for (const [name, v] of Object.entries(voices)) {
+    if (t.categories[name] && v && typeof v.font === "string" && v.font.trim()) voiceFonts[name] = v.font.trim();
+  }
+  return { treatment: t.id, label: t.label, fonts, roleOf: Object.fromEntries(Object.entries(t.categories).map(([k, v]) => [k, v.role])), categories, ...(Object.keys(styleNames).length ? { styleNames } : {}), ...(Object.keys(weights).length ? { weights } : {}), ...(Object.keys(voiceFonts).length ? { voiceFonts } : {}) };
+}
+
+// resolvedFontFor(scale, voice) — the ONE resolution point for a voice's actual family: its own per-voice
+// override (config.voices[v].font, scale.voiceFonts) if set, else its role's shared default
+// (scale.fonts[scale.roleOf[voice]]). Every consumer that needs a voice's real font (emitters, the Figma
+// style planner, the UI specimen) calls this instead of reading scale.fonts[role] directly, so an override
+// can never be silently bypassed by a new call site.
+export function resolvedFontFor(scale, voice) {
+  return (scale.voiceFonts && scale.voiceFonts[voice]) || scale.fonts[scale.roleOf[voice]];
 }
 
 // ── sibling-weight defaults ────────────────────────────────────────────────────────────────────
@@ -360,6 +377,10 @@ function typeVarLines(scale, indent = "  ", unit = "px", pfx = "type") {
 export function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   const lines = [":root {"];
   for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
+  // per-voice FONT overrides — one custom prop per OVERRIDDEN voice (`--font-voice-sub-heading: '...'`),
+  // quoted like the role fonts above (same Safari trap). Absent when no voice carries an override (identity
+  // gate — un-overridden CSS is byte-identical to before this channel existed).
+  if (scale.voiceFonts) for (const [voice, family] of Object.entries(scale.voiceFonts)) lines.push(`  --font-voice-${kebab(voice)}: '${family}';`);
   // per-voice SIBLING WEIGHTS — one custom prop per named variant (`--type-display-weight-bold: 700`),
   // per VOICE (never duplicated per step). Absent when the kit defines none (identity gate).
   if (scale.weights) for (const [cName, list] of Object.entries(scale.weights)) {
@@ -370,10 +391,13 @@ export function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   lines.push("}");
   for (const [cName, steps] of Object.entries(scale.categories)) {
     const role = scale.roleOf[cName] || "body";
+    // an overridden voice's utility classes bind to ITS OWN --font-voice-* prop; every other voice is
+    // unaffected — still --font-{role}, byte-identical to before this channel existed.
+    const fontVar = scale.voiceFonts && scale.voiceFonts[cName] ? `--font-voice-${kebab(cName)}` : `--font-${role}`;
     for (const [sName, s] of Object.entries(steps)) {
       const c = kebab(cName), sk = kebab(sName);
       const tt = s.textTransform && s.textTransform !== "none" ? ` text-transform: ${s.textTransform};` : "";
-      lines.push(`.${prefix}-${c}-${sk} { font-family: var(--font-${role}); font-size: var(--${prefix}-${c}-${sk}-size); line-height: var(--${prefix}-${c}-${sk}-line); letter-spacing: var(--${prefix}-${c}-${sk}-tracking); font-weight: var(--${prefix}-${c}-${sk}-weight);${tt} }`);
+      lines.push(`.${prefix}-${c}-${sk} { font-family: var(${fontVar}); font-size: var(--${prefix}-${c}-${sk}-size); line-height: var(--${prefix}-${c}-${sk}-line); letter-spacing: var(--${prefix}-${c}-${sk}-tracking); font-weight: var(--${prefix}-${c}-${sk}-weight);${tt} }`);
     }
   }
   return lines.join("\n") + "\n";
@@ -417,12 +441,13 @@ export function typeTokensDTCG(scale, { unit = "px" } = {}) {
   for (const [role, family] of Object.entries(scale.fonts)) fontFamily[role] = { $type: "fontFamily", $value: family };
   const typography = {};
   for (const [cName, steps] of Object.entries(scale.categories)) {
-    const role = scale.roleOf[cName] || "body";
     typography[cName] = {};
     for (const [sName, s] of Object.entries(steps)) {
       typography[cName][sName] = {
         $type: "typography",
-        $value: { fontFamily: scale.fonts[role], fontSize: dimUnit(s.size, unit), lineHeight: relLine(s.lineHeight, s.size), letterSpacing: relTrackEm(s.letterSpacing, s.size), fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: dimUnit(s.paragraphSpacing, unit), paragraphIndent: dimUnit(s.paragraphIndent, unit), ...(s.singleLineHeight != null ? { singleLineHeight: relLine(s.singleLineHeight, s.size) } : {}) },
+        // fontFamily resolves the per-voice override (if any) — an overridden voice's DTCG carries its own
+        // family; an un-overridden voice still reads its role's family (identical to before this channel).
+        $value: { fontFamily: resolvedFontFor(scale, cName), fontSize: dimUnit(s.size, unit), lineHeight: relLine(s.lineHeight, s.size), letterSpacing: relTrackEm(s.letterSpacing, s.size), fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: dimUnit(s.paragraphSpacing, unit), paragraphIndent: dimUnit(s.paragraphIndent, unit), ...(s.singleLineHeight != null ? { singleLineHeight: relLine(s.singleLineHeight, s.size) } : {}) },
       };
     }
   }
@@ -497,24 +522,36 @@ export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
 }
 
 // typeTokensFigmaPrimitives — the "Font Primitives" COMPANION collection to typeTokensFigmaModes: the
-// distinct font families deduped into `family/<role>` STRING primitives, a `font/<voice>` ALIAS per
-// voice pointing at its family primitive (edit the primitive; every voice follows), and a
-// `weight/<voice>` FLOAT primitive (the voice's uniform weight — one edit point per voice). Alias
-// entries carry `{ type:"ALIAS", target:"<variable key>" }` INSTEAD of `values` — a consumer resolves
-// them within the same collection. Single "Value" mode (families/weights don't vary by breakpoint;
-// breakpoints live in the Typography collection). This file is an IMPORT artifact only — the in-Figma
-// apply path (`_figmaFloatPlans`) never consumes it, so the plugin executor stays float-only.
+// distinct font families deduped into `family/<role>` STRING primitives (plus a `family/voice/<voice>`
+// primitive for a family that's ONLY reached via a per-voice override — never shared with a role or
+// another voice), a `font/<voice>` ALIAS per voice pointing at its resolved family primitive (edit the
+// primitive; every voice sharing it follows), and a `weight/<voice>` FLOAT primitive (the voice's uniform
+// weight — one edit point per voice). Alias entries carry `{ type:"ALIAS", target:"<variable key>" }`
+// INSTEAD of `values` — a consumer resolves them within the same collection. Single "Value" mode
+// (families/weights don't vary by breakpoint; breakpoints live in the Typography collection). This file is
+// an IMPORT artifact only — the in-Figma apply path (`_figmaFloatPlans`) never consumes it, so the plugin
+// executor stays float-only.
 export function typeTokensFigmaPrimitives(scale) {
   const variables = {};
-  const famKey = {}; // family string → the primitive key that owns it (first role wins = dedupe)
+  const famKey = {}; // family string → the primitive key that owns it (dedupe by VALUE — first writer wins)
   for (const [role, fam] of Object.entries(scale.fonts || {})) {
     if (!fam || famKey[fam]) continue;
     famKey[fam] = `family/${role}`;
     variables[famKey[fam]] = { type: "STRING", values: { Value: fam } };
   }
   for (const [voice, steps] of Object.entries(scale.categories || {})) {
-    const fam = (scale.fonts || {})[(scale.roleOf || {})[voice]];
-    if (fam && famKey[fam]) variables[`font/${voice}`] = { type: "ALIAS", target: famKey[fam] };
+    const fam = resolvedFontFor(scale, voice);
+    if (fam) {
+      // a family already owned by a role (or an earlier voice override) aliases that SAME primitive; a
+      // genuinely distinct override family (matching no existing primitive's value) mints its own —
+      // dedupe by VALUE, not by source, so two voices overridden to the same custom family share one.
+      if (!famKey[fam]) {
+        const key = `family/voice/${kebab(voice)}`;
+        famKey[fam] = key;
+        variables[key] = { type: "STRING", values: { Value: fam } };
+      }
+      variables[`font/${voice}`] = { type: "ALIAS", target: famKey[fam] };
+    }
     const first = Object.values(steps)[0];
     if (first && Number.isFinite(first.weight)) variables[`weight/${voice}`] = { type: "FLOAT", values: { Value: first.weight } };
     // the weight STYLE NAME (non-variable families) — a STRING primitive beside the numeric weight,

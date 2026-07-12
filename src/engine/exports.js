@@ -22,6 +22,7 @@ import { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyA
 import { iconSystem, iconSystemLabel } from "./icon-systems.mjs";
 import { motionTokens, MOTION_EASING, MOTION_DURATION, MOTION_NEVER } from "./motion.mjs";
 import { oklchToSrgb8, hexToSrgb8, pyRound, dsBundleGates } from "./ds-gates.js"; // §8 carrier primitives + the gate itself — the receipt cites the SAME run the gate measures
+import { resolvedFontFor } from "./type.mjs"; // per-voice font resolution (TKT-0002) — a voice's own override, else its role's shared default
 
 // WCAG relative luminance of an [r,g,b] (0..255) triple — for the opt-in contrast on-color pick.
 const relLumExp = (rgb) => {
@@ -891,8 +892,6 @@ export function exportDesignSystemSpine(state, typeSc, geomSc) {
   const flat = {};
   if (typeSc && typeSc.categories) for (const [cName, steps] of Object.entries(typeSc.categories))
     for (const [sName, s] of Object.entries(steps)) flat[`${cName.toLowerCase()}-${sName.toLowerCase()}`] = { voice: cName, s };
-  const roleOf = (typeSc && typeSc.roleOf) || {};
-  const fonts = (typeSc && typeSc.fonts) || {};
   const typeLines = [];
   const usedLevels = [];
   for (const key of DS_TYPE_LEVELS) {
@@ -901,7 +900,7 @@ export function exportDesignSystemSpine(state, typeSc, geomSc) {
     usedLevels.push(key);
     const s = hit.s;
     typeLines.push(`  ${key}:`);
-    typeLines.push(`    fontFamily: ${fonts[roleOf[hit.voice] || "body"] || "sans-serif"}`);
+    typeLines.push(`    fontFamily: ${resolvedFontFor(typeSc, hit.voice) || "sans-serif"}`);
     typeLines.push(`    fontSize: ${s.size}px`);
     typeLines.push(`    fontWeight: ${s.weight}`);
     typeLines.push(`    lineHeight: ${dsFactor(s.lineHeight, s.size)}`);
@@ -1705,7 +1704,6 @@ function dsMakeColorMd(ds, pfx, shadcnCss) {
 // (a unitless factor)/weight, tracking in em where present. Never px (D11).
 function dsMakeTypographyMd(typeSc) {
   const fonts = (typeSc && typeSc.fonts) || {};
-  const roleOf = (typeSc && typeSc.roleOf) || {};
   const flat = {};
   if (typeSc && typeSc.categories) for (const [cName, steps] of Object.entries(typeSc.categories))
     for (const [sName, s] of Object.entries(steps)) flat[`${cName.toLowerCase()}-${sName.toLowerCase()}`] = { voice: cName, s };
@@ -1714,7 +1712,7 @@ function dsMakeTypographyMd(typeSc) {
     const hit = flat[key];
     if (!hit) continue;
     const { voice, s } = hit;
-    const fam = fonts[roleOf[voice] || "body"] || "sans-serif";
+    const fam = resolvedFontFor(typeSc, voice) || "sans-serif";
     const factor = dsFactor(s.lineHeight, s.size);
     const track = s.letterSpacing && Math.abs(s.letterSpacing) >= 0.01
       ? `, ${Number((s.letterSpacing / s.size).toFixed(3))}em tracking` : "";

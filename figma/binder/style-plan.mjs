@@ -30,7 +30,7 @@
 // their core in list order. Same inputs ⇒ byte-identical plan (the executor's idempotency rides on it).
 
 import { semanticRoles } from "../../src/engine/semantic.js";
-import { weightNameFor } from "../../src/engine/type.mjs";
+import { weightNameFor, resolvedFontFor } from "../../src/engine/type.mjs";
 
 // styleGroupOf — the ratified paint-style sub-folder for a role key: the 7 scrim roles under scrims/,
 // the surface + container ladders under surfaces/, everything else flat under the family.
@@ -55,8 +55,11 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
   const texts = [];
   if (inc.type && scale && scale.categories && typeof scale.categories === "object") {
     for (const [voice, steps] of Object.entries(scale.categories)) {
-      const role = (scale.roleOf || {})[voice] || "body";
-      const family = (scale.fonts || {})[role] || "";
+      // the LITERAL fallback family (used when the binding target can't resolve) is the voice's RESOLVED
+      // font — its own override if set, else its role's shared default (TKT-0002). The BINDING target
+      // (`font/${voice}` below) was already per-voice; it needs no change — typeTokensFigmaPrimitives
+      // already aliases an overridden voice's primitive to the override family.
+      const family = resolvedFontFor(scale, voice) || "";
       const coreStyleName = (scale.styleNames && scale.styleNames[voice]) || null;
       const sibs = (scale.weights && scale.weights[voice]) || [];
       for (const [step, s] of Object.entries(steps)) {

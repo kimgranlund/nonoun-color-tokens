@@ -36,7 +36,7 @@ import { MCP_BRAND_KIT } from "./mcp-assets.js";
 import { TYPE_FONTS_CSS } from "./type-fonts.js";
 import { CATEGORY_INDEX, loadCategory } from "./categories/index.js";
 import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.mjs";
-import { typeScale, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, siblingWeightDefaults, WEIGHT_NAMES } from "../engine/type.mjs";
+import { typeScale, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, siblingWeightDefaults, WEIGHT_NAMES, resolvedFontFor } from "../engine/type.mjs";
 import { geomScale, geomTokensCSS, geomTokensBreakpointCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
 import { modeApplyPlan, validateModeInterchange } from "../../figma/binder/mode-apply-plan.mjs";
@@ -3830,7 +3830,7 @@ class HctApp extends HTMLElement {
     ensureTypeFonts();
     const cfg = this._activeType();
     const scale = this._activeTypeScale();
-    ensureWebFonts(scale.fonts, this.inFigma); // TIER 2: lazy-load this palette's non-bundled faces (web app only)
+    ensureWebFonts({ ...scale.fonts, ...(scale.voiceFonts || {}) }, this.inFigma); // TIER 2: lazy-load this palette's non-bundled faces, incl. per-voice overrides (web app only)
     const t = TYPE_TREATMENTS.find((x) => x.id === cfg.treatment) || TYPE_TREATMENTS[0];
     const PARA = TYPE_PARA(scale.treatment);
     const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -3838,7 +3838,7 @@ class HctApp extends HTMLElement {
       const s = scale.categories[cat] && scale.categories[cat][step];
       if (!s) return false;
       const role = scale.roleOf[cat] || "body";
-      const fam = scale.fonts[role] || "Inter";
+      const fam = resolvedFontFor(scale, cat) || "Inter";
       const generic = genericFor(fam, role);
       const token = `type-${kebab(cat)}-${kebab(step)}`;
       const tt = s.textTransform && s.textTransform !== "none" ? `text-transform:${s.textTransform};` : "";
@@ -3867,11 +3867,10 @@ class HctApp extends HTMLElement {
       // render the specimen LARGEST → smallest (biggest example first) — sort by resolved size descending,
       // robust to the engine's step-key order. (The `steps.length` count is order-independent.)
       const ordered = [...steps].sort((a, b) => (scale.categories[cat][b]?.size || 0) - (scale.categories[cat][a]?.size || 0));
-      const role = scale.roleOf[cat] || "body";
       return h(
         "div",
         { class: "type-spec-group" },
-        h("div", { class: "type-spec-grouphead" }, h("b", {}, cat), h("small", {}, scale.fonts[role]), h("span", { class: "type-spec-count" }, `${steps.length} steps`)),
+        h("div", { class: "type-spec-grouphead" }, h("b", {}, cat), h("small", {}, resolvedFontFor(scale, cat)), h("span", { class: "type-spec-count" }, `${steps.length} steps`)),
         ...ordered.map((step) => line(cat, step)),
       );
     });
@@ -4379,7 +4378,7 @@ class HctApp extends HTMLElement {
   // fuzz generator, so it is FLAGGED out-of-scope, not faked.
   renderTypeInspector(view) {
     ensureTypeFonts();
-    ensureWebFonts(this._activeTypeScale().fonts, this.inFigma); // TIER 2: the inspector specimen + examples render the real faces
+    { const s = this._activeTypeScale(); ensureWebFonts({ ...s.fonts, ...(s.voiceFonts || {}) }, this.inFigma); } // TIER 2: the inspector specimen + examples render the real faces, incl. per-voice overrides
     const seg = this.typeSegment === "fonts" || this.typeSegment === "specimen" ? this.typeSegment : "scale";
     const body = seg === "fonts" ? this.typeFontsTab() : seg === "specimen" ? this.typeSpecimenTab(view) : this.typeScaleTab();
     const tabs = [{ id: "scale", label: "Scale" }, { id: "fonts", label: "Fonts" }, { id: "specimen", label: "Specimen" }];
@@ -4435,7 +4434,7 @@ class HctApp extends HTMLElement {
               { type: "button", class: "tyi-voice-name", "data-fk": "tyvoice:" + cName, "aria-expanded": sel ? "true" : "false",
                 onclick: () => { this.typeVoice = sel ? null : cName; this.render(); } },
               h("span", { class: "tyi-voice-label" }, cName, tuned ? h("span", { class: "tyi-voice-dot", title: "Tuned off the treatment" }, " ●") : false),
-              h("span", { class: "tyi-voice-font" }, scale.fonts[scale.roleOf[cName]]),
+              h("span", { class: "tyi-voice-font" }, resolvedFontFor(scale, cName)),
             ),
             sel
               ? h(
@@ -4445,6 +4444,13 @@ class HctApp extends HTMLElement {
                   this.slider("Tracking", val("tracking", p.trackingEm), -0.05, 0.3, 0.001, (v) => (v >= 0 ? "+" : "") + fmt(v, 3) + "em", (v) => this._setTypeVoice(cName, "tracking", v)),
                   this.slider("Leading", val("leading", p.leading), 0.9, 2, 0.01, (v) => fmt(v, 2), (v) => this._setTypeVoice(cName, "leading", v)),
                   this.slider("Ratio", val("ratio", p.ratio), 1, 1.7, 0.005, (v) => fmt(v, 3), (v) => this._setTypeVoice(cName, "ratio", v)),
+                  // the per-voice FONT override (TKT-0002) — this voice's own family, instead of sharing
+                  // its role's default (e.g. give Sub-heading a different face than Heading, though both
+                  // ride the `heading` role). Empty clears it (falls back to the role's font); exported
+                  // into the Font Primitives font/<voice> alias + a --font-voice-* CSS prop.
+                  h("label", { class: "mode-editor-label", for: "fld-voice-font-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-") }, "Font"),
+                  h("input", { id: "fld-voice-font-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-"), type: "text", value: vp.font || "", placeholder: scale.fonts[scale.roleOf[cName]], "data-fk": "tyvoice-font:" + cName,
+                    "aria-label": "Font override for " + cName, onchange: (e) => this._setTypeVoiceFont(cName, e.target.value) }),
                   // the Figma weight-STYLE name — only meaningful for non-variable families (GT America
                   // "Condensed Black Italic"), where a numeric weight can't name the face. Exported into
                   // the Font Primitives collection as weight-style/<voice>; empty = none.
@@ -4680,6 +4686,24 @@ class HctApp extends HTMLElement {
     });
   }
 
+  // _setTypeVoiceFont(voice, value) — the FONT sibling of _setTypeVoiceStyleName (TKT-0002): a per-voice
+  // family override, instead of sharing the voice's role default. Empty/whitespace clears (falls back to
+  // scale.fonts[roleOf[voice]] via resolvedFontFor); one undo step. A new family must be re-probed (the
+  // fonts-availability cache + web-font loader), same as _setTypeFont.
+  _setTypeVoiceFont(voice, value) {
+    this._faceCache.clear(); this._fontsReadyHooked = false;
+    const fam = String(value || "").trim().slice(0, 60);
+    this.commit((doc) => {
+      const t = { ...(doc.type || DEFAULT_TYPE) };
+      const voices = { ...(t.voices || {}) };
+      const v = { ...(voices[voice] || {}) };
+      if (fam) v.font = fam; else delete v.font;
+      if (Object.keys(v).length) voices[voice] = v; else delete voices[voice];
+      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
+      doc.type = t;
+    });
+  }
+
   // _setVoiceWeights(voice, list) — write a voice's SIBLING weight variants ([{name, weight}]) onto
   // doc.type.voices, normalized (name trimmed/capped, weight clamped 100..1000, invalid dropped); an
   // empty list clears the key so a sibling-free voice round-trips identically. One undo step.
@@ -4729,7 +4753,7 @@ class HctApp extends HTMLElement {
           h(
             "div",
             { class: "typo-cat" },
-            h("div", { class: "typo-cat-head" }, h("b", {}, cat), h("small", {}, scale.fonts[scale.roleOf[cat]])),
+            h("div", { class: "typo-cat-head" }, h("b", {}, cat), h("small", {}, resolvedFontFor(scale, cat))),
             this._typeSample(scale, cat, repStep(cat), TYPE_SAMPLE(cat, scale.treatment)),
           ),
         ),
@@ -4751,7 +4775,7 @@ class HctApp extends HTMLElement {
     const main = roles.find((r) => r.suffix === "");
     const onMain = roles.find((r) => r.suffix === "-on-" + sl);
     const hStep = scale.categories["Heading"].MD, bStep = scale.categories.Body.MD;
-    const fam = (cat) => { const role = scale.roleOf[cat]; const fm = scale.fonts[role] || "Inter"; return `'${fm}', ${genericFor(fm, role)}`; };
+    const fam = (cat) => { const role = scale.roleOf[cat]; const fm = resolvedFontFor(scale, cat) || "Inter"; return `'${fm}', ${genericFor(fm, role)}`; };
     return h(
       "div",
       { class: "example-card tyi-example", style: "background:" + pick(byKey.surface) },
@@ -6494,7 +6518,7 @@ class HctApp extends HTMLElement {
     const s = scale.categories[cat] && scale.categories[cat][step];
     if (!s) return false;
     const role = scale.roleOf[cat] || "body";
-    const fam = scale.fonts[role] || "Inter";
+    const fam = resolvedFontFor(scale, cat) || "Inter";
     const generic = genericFor(fam, role);
     const tt = s.textTransform && s.textTransform !== "none" ? `text-transform:${s.textTransform};` : "";
     return h(

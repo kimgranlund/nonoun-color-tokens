@@ -101,6 +101,23 @@ const plans = stylePlans({ families, scale });
   ok(stylePlans({}).paints.length === 0 && stylePlans({}).texts.length === 0, "empty inputs ⇒ empty plan, no throw");
 }
 
+// ── per-voice FONT override (TKT-0002): the literal fallback family resolves the voice's OWN font, not
+// always its shared role's — while the BINDING target shape (font/<voice>) is unchanged (already per-voice) ──
+{
+  const ovScale = typeScale({ treatment: "product", voices: { "Sub-heading": { font: "Custom Voice Font" } } });
+  const ovPlans = stylePlans({ families, scale: ovScale });
+  const subMd = ovPlans.texts.find((t) => t.voice === "Sub-heading" && t.step === "MD");
+  ok(!!subMd && subMd.literal.family === "Custom Voice Font", `an overridden voice's literal fallback family resolves its OWN font (got ${subMd && subMd.literal.family})`);
+  ok(subMd.bind.fontFamily === "font/Sub-heading", "the BINDING target is unchanged — already per-voice (font/<voice>)");
+  // an un-overridden voice sharing the SAME role (Heading rides `heading`, like Sub-heading) still gets the
+  // role's shared family — the override doesn't leak to its role-mates.
+  const headMd = ovPlans.texts.find((t) => t.voice === "Heading" && t.step === "MD");
+  ok(!!headMd && headMd.literal.family === ovScale.fonts[ovScale.roleOf.Heading], "an un-overridden voice sharing the same role still gets the role's shared family, untouched");
+  // no override anywhere ⇒ literal.family matches the role's family exactly as before (identity).
+  const bareSubMd = plans.texts.find((t) => t.voice === "Sub-heading" && t.step === "MD");
+  ok(bareSubMd.literal.family === scale.fonts[scale.roleOf["Sub-heading"]], "no override ⇒ literal.family is the role's shared family (unchanged behavior)");
+}
+
 // ── primitivesApplyPlan: ordered flatten of the Font Primitives interchange ──
 {
   const plan = primitivesApplyPlan(typeTokensFigmaPrimitives(scale));

@@ -1626,6 +1626,24 @@ ok(app.doc.type.voices && app.doc.type.voices.Body.weight === 600 && app._active
 ok(hydSet(serSet(app.doc)).type.voices.Body.weight === 600, "(tyv) the per-voice override round-trips through persist");
 app._resetTypeVoice("Body"); flushRaf();
 ok(!app.doc.type.voices, "(tyv) reset clears the only voice override (back to the treatment)");
+// (tyvf) per-voice FONT override (TKT-0002) — a text input beside the other per-voice fields;
+// _setTypeVoiceFont writes doc.type.voices[voice].font, flows into the resolved scale's voiceFonts + the
+// live specimen, and round-trips through persist. Sub-heading rides the `heading` role (shared with
+// Heading today) — this is the exact "give Sub-heading its own font" gap the ticket names.
+app.typeVoice = "Sub-heading"; app.render(); flushRaf();
+const fontInput = walk(app, (e) => e.tagName === "INPUT" && e.getAttribute && e.getAttribute("data-fk") === "tyvoice-font:Sub-heading")[0];
+ok(!!fontInput, "(tyvf) the per-voice editor renders a Font override input");
+app._setTypeVoiceFont("Sub-heading", "  Fraunces  "); flushRaf();
+ok(app.doc.type.voices && app.doc.type.voices["Sub-heading"].font === "Fraunces", "(tyvf) a per-voice font override writes to doc.type.voices (trimmed)");
+ok(app._activeTypeScale().voiceFonts && app._activeTypeScale().voiceFonts["Sub-heading"] === "Fraunces", "(tyvf) the override flows into the resolved scale's voiceFonts");
+ok(hydSet(serSet(app.doc)).type.voices["Sub-heading"].font === "Fraunces", "(tyvf) the per-voice font override round-trips through persist");
+app.render(); flushRaf();
+ok(txtOf(app.querySelectorAll(".type-spec-grouphead")[2]).includes("Fraunces"), "(tyvf) the canvas specimen re-renders the overridden voice (Sub-heading) in its own font");
+ok(txtOf(app.querySelectorAll(".tyi-voice-font")[2]).includes("Fraunces"), "(tyvf) the Scale tab's per-voice font label reflects the override too");
+ok(!txtOf(app.querySelectorAll(".type-spec-grouphead")[1]).includes("Fraunces"), "(tyvf) Heading — sharing the SAME role as Sub-heading — is untouched by the override");
+app._resetTypeVoice("Sub-heading"); flushRaf();
+ok(!app.doc.type.voices, "(tyvf) reset clears the only voice override (font included)");
+app.typeVoice = null; app.render(); flushRaf();
 // (tyw) SIBLING WEIGHTS — Suggest seeds the ratified defaults from the CORE weight; rows render;
 // add appends a free ladder weight; remove drops one; the list flows into the scale + persists.
 app.typeVoice = "Display"; app.render(); flushRaf();
