@@ -4555,6 +4555,12 @@ class HctApp extends HTMLElement {
         }),
       ),
       h("p", { class: "insp-sub tyi-future" }, "Custom families export in the CSS / DTCG / Figma tokens. In the web app the specimen loads each face from Google Fonts on demand; a face that isn't a Google font (or the Figma plugin, which stays offline) falls back to the closest generic."),
+      // this pane only ever shows the 5 shared ROLES — the other 6 of the 11 exported voices (Sub-heading,
+      // Kicker, Lead, Quote, Caption, Code, Legal) can still escape their role font, but that control lives
+      // in the Scale tab's per-voice editor (TKT-0002), which nothing here points to otherwise.
+      h("p", { class: "insp-sub tyi-voice-hint" },
+        "Need to set a font for just one voice — Kicker, Legal, Code…? ",
+        h("button", { type: "button", class: "linklike", onclick: () => { this.typeSegment = "scale"; this.render(); } }, "Open the Scale tab's per-voice editor →")),
     );
   }
 
