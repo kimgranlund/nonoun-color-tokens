@@ -2,7 +2,7 @@
 
 > **Status:** as-built (descriptive LLD for the shipped shell — the *how* below is read from the
 > current source, not proposed).
-> **Governing spec:** `.claude/docs/spec/references/ui-plan.md` — the front-end plan. There is no
+> **Governing spec:** `docs/reference/references/ui-plan.md` — the front-end plan. There is no
 > separate numbered SPEC for the shell, so §0.1 assigns stable **`SPEC-R#`** handles to ui-plan's own
 > clauses (its **tasks T1–T9** and **Revision A** arrangement) — the IDs are new, the requirements are
 > not. Every component traces to a `SPEC-R#`. Engine/role contracts live in `knowledge-01…06` +

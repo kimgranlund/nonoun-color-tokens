@@ -324,7 +324,7 @@ Annual, per user
 Context (not customer copy): `has_license_keys: true`; `license_activation_limit` is a high abuse
 ceiling (e.g. 25), never the binding constraint for one person — **direction (2026-07-02):
 enforcement moves to email-bound identity** (the key works on unlimited devices when the holder's
-email matches the key's `customer_email`; see `.claude/docs/site/licensing-identity-spec.md`). Keys
+email matches the key's `customer_email`; see `docs/site/licensing-identity-spec.md`). Keys
 track the subscription. The customer copy moves to "tied to your email" phrasing only when Phase 1
 ships.
 
@@ -346,7 +346,7 @@ seats); extra seats bill usage-based at $19/seat/year via usage records on the s
 device `/activate` (instance) consumes one seat; removing the instance frees it (shipped #131). This is
 the source of the seat copy above and in the Studio email (§5). **Direction (2026-07-02): Studio seats
 become NAMED EMAILS (a seat = a person, devices unlimited per person) when the account system ships —
-`.claude/docs/site/licensing-identity-spec.md` Phase 2; the copy above describes shipped behavior until
+`docs/site/licensing-identity-spec.md` Phase 2; the copy above describes shipped behavior until
 then.**
 
 ---

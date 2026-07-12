@@ -3,7 +3,7 @@
 These are the load-bearing ideas behind every emitter in this repo. If adding a format feels like it needs a
 new color-math path or a per-role special case, you are probably fighting one of these. The full per-format
 output shapes + the Figma-import constraints are owned by
-`.claude/docs/spec/references/knowledge-04-export-formats.md` — this file is only the mental model the *procedure*
+`docs/reference/references/knowledge-04-export-formats.md` — this file is only the mental model the *procedure*
 assumes.
 
 ### 1. One derivation, every emitter — `derivePalette` / `derivedAll`

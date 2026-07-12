@@ -37,15 +37,15 @@ const SKIP_FILES = new Set([
   "figma/plugin/ui.html", "src/ui/figma-plugin-assets.js", "src/ui/mcp-assets.js",
   "test/repo/branding.mjs",
 ]);
-const SKIP_DIRS = new Set([".git", "node_modules", "dist", "other"]); // .claude/docs/other is local-only
+const SKIP_DIRS = new Set([".git", "node_modules", "dist", "other"]); // .claude/docs/other/ is local-only
 // RECORDS: files whose job is to say what the product used to be. A changelog entry keeps the name it
 // shipped under; ADR-014 records the rename and ADR-015 records the debrand — each must NAME the thing it
 // retired to be worth reading. Rewriting them would be the one dishonest way to pass this gate, so they
 // are exempt rather than swept.
 const RECORDS = new Set([
   "CHANGELOG.md",
-  ".claude/docs/spec/CHANGELOG.md",
-  ".claude/docs/spec/references/decision-records.md",
+  "docs/reference/CHANGELOG.md",
+  "docs/reference/references/decision-records.md",
 ]);
 
 const TEXT = /\.(js|mjs|ts|json|html|css|md|yml|yaml|svg|webmanifest)$/;

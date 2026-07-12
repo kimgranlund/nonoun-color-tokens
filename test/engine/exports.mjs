@@ -6,7 +6,7 @@ import { dsBundleGates } from "../../src/engine/ds-gates.js";
 import { typeScale } from "../../src/engine/type.mjs";
 import { geomScale } from "../../src/engine/geometry.mjs";
 
-const RT = JSON.parse(readFileSync(new URL("../../.claude/docs/spec/data/role-table.json", import.meta.url), "utf8"));
+const RT = JSON.parse(readFileSync(new URL("../../docs/reference/data/role-table.json", import.meta.url), "utf8"));
 const C = (palettes) => ({ palettes, curve: "logistic", tension: 0, lmin: 5, lmax: 100, damp: 80, hueSpace: "cam16", theme: "auto" });
 const ALL = RT.defaults.map((p) => ({ ...p, on: true }));
 const enabledCount = (st) => st.palettes.filter((p) => p.on !== false).length;

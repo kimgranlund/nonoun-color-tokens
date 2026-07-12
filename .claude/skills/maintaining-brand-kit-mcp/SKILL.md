@@ -21,7 +21,7 @@ user-invocable: true
 The Brand-Kit MCP is two **zero-dependency** files: `mcp/brand-kit-core.mjs` — the PURE, transport-agnostic
 surface (`SERVER` · `buildSurface(kit)` · `handle(msg, surface)`) — and `mcp/brand-kit-server.mjs`, the thin
 STDIO entry that frames newline-delimited **JSON-RPC 2.0** around it for AI agents (Claude Code / Cursor /
-VS Code / ChatGPT). The hosted Cloudflare Worker (spec: `.claude/docs/site/mcp-hosting-spec.md`) imports the
+VS Code / ChatGPT). The hosted Cloudflare Worker (spec: `docs/site/mcp-hosting-spec.md`) imports the
 SAME core — parity by construction (`test/mcp/core.mjs`). The server reads a sibling `brand-kit.json`; the
 core exposes the palettes, perceptual ramps, the semantic layer (per palette **53** roles, light + dark), the
 typography scale, and the geometry scale as MCP **resources + tools + a prompt** — so an agent builds with

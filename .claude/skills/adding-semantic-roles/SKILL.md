@@ -15,7 +15,7 @@ user-invocable: true
 Each palette resolves **53** roles (`semanticRoles(n)` in `src/engine/semantic.js`). The role set lives in
 ONE place but is **mirrored and counted in eight others**; the classic break is a half-applied count (one
 gate left at the old number — usually `test/ui/shell.mjs`). This skill is the lockstep procedure + the
-exact parity sites. The taxonomy/rationale is owned by `.claude/docs/spec` — point to it, don't re-derive it.
+exact parity sites. The taxonomy/rationale is owned by `docs/reference` — point to it, don't re-derive it.
 
 ## The role model (depth in `references/foundations.md`)
 
@@ -39,7 +39,7 @@ colors→containers→surfaces→scrims); and on-color roles can be **re-pointed
    `SCRIM_SUFFIXES` + `SCRIM_KEYS` together (they index in lockstep, weakest→strongest). Bump the
    **header count comment** (line 1 "the N semantic token roles") AND the `semanticRoles` docstring just
    above the function — both state the count in prose (not gated; bump them so the file doesn't drift).
-2. **`.claude/docs/spec/data/role-table.json`** — the canonical ANSWER KEY. It has **no generator** (there is no
+2. **`docs/reference/data/role-table.json`** — the canonical ANSWER KEY. It has **no generator** (there is no
    `gen:role-table` script) — hand-edit `roleTable` (the primary-palette rows: `key`/`suffix`/`light`/`dark`,
    same ORDER as semantic.js) and bump `rolesPerPalette`. `test/engine/semantic.mjs`'s `refs-canonical`
    gate deep-equals `semanticRoles("primary")` against it, ordered key set included.
@@ -61,7 +61,7 @@ colors→containers→surfaces→scrims); and on-color roles can be **re-pointed
    `test/engine/semantic.mjs` and the `=== 7` group assert `(z)` in `headless-boot.mjs`.
 6. **`src/ui/app.js`** — the Roles inspector label (the `"… semantic roles · light / dark refs"` string;
    grep `semantic roles`).
-7. **`.claude/docs/spec` prose** — bump CURRENT-state counts (`knowledge-03-semantic-system.md`,
+7. **`docs/reference` prose** — bump CURRENT-state counts (`knowledge-03-semantic-system.md`,
    `rubrics/parity-checklist.md` P1, this repo's `CLAUDE.md`). **LEAVE historical counts**: the "36 vs 37"
    `surfaceHighest`-divergence anecdote, CHANGELOG entries, OD/ADR decision records ("37 (not 51)"), and
    color-data files (e.g. `nature.json`).
@@ -74,7 +74,7 @@ appears in it — surface it there only by deliberately wiring it into `MAP`, an
 a gate. (The per-palette count also recurs in PROSE across the emitters, `model.mjs`, `app.js`,
 `bind-plan.mjs`, the MCP server + READMEs, and the root `README.md`. After a count change, sweep them:
 `git grep -nE "\b<oldcount>\b" -- src test mcp '*.md' | grep -iE "role|semantic"`, fix the current-state
-hits, LEAVE the historical (CHANGELOG, decision-records, the "36 vs 37" anecdote, .claude/docs/spec history,
+hits, LEAVE the historical (CHANGELOG, decision-records, the "36 vs 37" anecdote, docs/reference history,
 color-data) — see `references/best-practices.md`.)
 
 ## Validate (draft → check → fix → re-check)
@@ -92,7 +92,7 @@ npm test                         # all of the above + headless-boot (s4) + shell
 The gate that catches a stale answer key is `refs-canonical` in `semantic.mjs` (ordered key set +
 ref deep-equal). The gate that catches a half-applied count is whichever count literal you forgot —
 most often `test/ui/shell.mjs`. Don't call it done until `npm test` is green AND
-`git grep -nE "\b37\b|\b49\b" src test .claude/docs/spec | grep -i role` shows only the intentional historical
+`git grep -nE "\b37\b|\b49\b" src test docs/reference | grep -i role` shows only the intentional historical
 references.
 
 ## References
@@ -102,8 +102,8 @@ references.
 | `references/foundations.md` | the two-layer model, ref grammar (solid vs scrim), name-prefixed vs shared, the resolution layer (on-color contrast, accent-ref, overrides) |
 | `references/best-practices.md` | the lockstep do/don't, which prose is historical, the on-state contrast decision, a worked walkthrough from the interaction-states change |
 | `references/rubric.md` | score the change before calling it done (parity completeness is the gate) |
-| `.claude/docs/spec/references/knowledge-03-semantic-system.md` · `.claude/docs/spec/data/role-table.json` | the canonical taxonomy + rationale + answer key (owned there — cite, don't copy) |
-| `.claude/docs/spec/rubrics/parity-checklist.md` | the P1–P5 parity checks the tests mechanize |
+| `docs/reference/references/knowledge-03-semantic-system.md` · `docs/reference/data/role-table.json` | the canonical taxonomy + rationale + answer key (owned there — cite, don't copy) |
+| `docs/reference/rubrics/parity-checklist.md` | the P1–P5 parity checks the tests mechanize |
 
 **Peers:** [[color-math]] (roles ride the tonal ramps) · [[maintaining-figma-plugins]] (the Figma copy parity
 site) · [[maintaining-brand-kit-mcp]] (serves the full role set) · [[adding-export-formats]] (a new role must reach

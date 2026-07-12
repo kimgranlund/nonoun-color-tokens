@@ -20,22 +20,22 @@ path; a question the corpus doesn't answer is reported as absent, never guessed.
 
 | Ask | Look in |
 |---|---|
-| Problem, users, outcomes — the why | `docs/prd/` (PRD-*) |
-| Requirements, exact behavior, acceptance criteria | `docs/spec/` (SPEC-*) |
-| How something is built internally | `docs/lld/` (LLD-*) |
-| A ratified decision and its alternatives | `docs/adr/` (ADR-*, accepted = append-only) |
+| Problem, users, outcomes — the why | `docs/prd/` (PRD-*) — not present yet |
+| Requirements, exact behavior, acceptance criteria (scribe-authored) | `docs/spec/` (SPEC-*) — not present yet |
+| A ratified decision and its alternatives | `docs/adr/` (ADR-*, accepted = append-only) — not present yet |
 | What's queued, in flight, or done | `docs/tickets/` (TKT-*; frontmatter `kind:` bug/feature, `size:`, status) |
-| Sequenced steps with done-whens | `docs/plan/` (PLAN-*) |
-| Horizons of intent — Now / Next / Later | `docs/roadmap/` (ROADMAP-*) |
-| One actor, one sitting, one done-when | `docs/task/` (TASK-*) |
+| Sequenced steps with done-whens | `docs/plan/` (PLAN-*) — not present yet |
+| Horizons of intent — Now / Next / Later | `docs/roadmap/` (ROADMAP-*) — not present yet |
+| One actor, one sitting, one done-when | `docs/task/` (TASK-*) — not present yet |
+| The color/type/geometry ENGINE's own canonical reference (role tables, export-format shapes, typography/geometry specs, rubrics) | `docs/reference/` — pre-existing, own conventions (not scribe TICKET/SPEC frontmatter); the role-answer-key is `docs/reference/data/role-table.json` |
+| Marketing corpus (voice platform, fact sheet, store copy, launch kit) | `docs/marketing/` — author via the `marketing-manager` agent + `ultimate-tokens-brand-voice` skill, not this skill |
+| Hosting/licensing design docs, one architecture LLD | `docs/site/`, `docs/lld/` — pre-existing, informal headers (no `doc-type:` frontmatter), predate the scribe TICKET workflow |
+| Generated README preview asset | `docs/img/` — not a document, skip for doc-shaped asks |
 
-Note for this repo specifically: canonical SPEC/reference material for the color/type/geometry
-engines lives under `.claude/docs/spec/` (a separate, pre-existing corpus — role tables, export
-format shapes, typography/geometry reference docs). `docs/` (this table) is the NEWER, narrower
-work-item corpus (tickets, and any future PRD/SPEC/LLD/PLAN/ROADMAP) bootstrapped by scribe's
-`/feature` and `/bug-report`. Don't conflate the two: a design/architecture question about the
-engines is answered from `.claude/docs/spec/`; "what's queued/open/decided as a work item" is
-answered from `docs/`.
+All of the above live under one `docs/` root (migrated from `.claude/docs/` on 2026-07-12).
+`.claude/docs/other/` is the one exception: it is PRIVATE and local-only (gitignored via
+`.git/info/exclude`) and never moves here — if asked about its content, say it's local scratch
+material outside this corpus, don't read it speculatively.
 
 (A directory that doesn't exist usually means the project has none of that record type yet —
 but before answering "absent", sweep for near-miss locations: misnamed dirs (`docs/specs/`,

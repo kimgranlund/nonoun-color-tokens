@@ -10,7 +10,7 @@ import * as TYPE from "../../src/engine/type.mjs";
 import * as GEOM from "../../src/engine/geometry.mjs";
 
 const HERE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "figma", "binder"); // the binder lives in figma/binder/
-const RT = JSON.parse(readFileSync(new URL("../../.claude/docs/spec/data/role-table.json", import.meta.url), "utf8"));
+const RT = JSON.parse(readFileSync(new URL("../../docs/reference/data/role-table.json", import.meta.url), "utf8"));
 const { EXPORT_STOPS, SCRIM_BASES, SCRIM_STEPS } = RT.constants;
 const NAMES = RT.defaults.map((p) => p.name.toLowerCase());
 const fails = [];

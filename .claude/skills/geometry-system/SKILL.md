@@ -21,7 +21,7 @@ six-size ramp → derived control geometry → DTCG / CSS / Figma tokens.** Pure
 law and TWO families; the verifier proves both on every change. Geometry is unforgiving the same way color is —
 a pad hand-tuned to "look right", a density that leaks into the frame, or a font that nudges the box ships
 un-centered controls that *look* plausible. This skill is the procedure + the gotchas + the gates. The
-conceptual *why* is owned by `.claude/docs/spec/geometry/README.md` (de-staled — accurate to cite) and the
+conceptual *why* is owned by `docs/reference/geometry/README.md` (de-staled — accurate to cite) and the
 `design-skills:component-decomposer` skill's geometry-system reference — **cite them, don't re-derive.**
 
 ## THE ONE LAW (read first)
@@ -145,7 +145,7 @@ state what each group proves.
 | `references/foundations.md` | the pipeline, the centering law's derivations, the two families (why density skips the frame), the power-law ramp + reference table, the composition JOIN, treatments/ladders/space, the three emitters — the mental model the procedure assumes |
 | `references/best-practices.md` | the non-obvious do/don't (law-is-a-derivation, density-rides-the-rhythm, constants-are-tuned, frame-untouched-by-composition, emitter-lockstep) + a worked walkthrough from the typography-composition history |
 | `references/rubric.md` | score the change before calling it done — the centering law + the two families + the ramp + the composition are the gates |
-| `.claude/docs/spec/geometry/README.md` | the reference token shape + the law + the table + the Figma export (de-staled — cite, don't copy) |
+| `docs/reference/geometry/README.md` | the reference token shape + the law + the table + the Figma export (de-staled — cite, don't copy) |
 | `design-skills:component-decomposer` (its geometry-system reference) | the centering law's first principles + the WHY (the square cell, the forced asymmetric pad); its `bin/geometry-check.py` mechanizes the same law |
 
 Peers: [[type-scale]] (composition with type) · [[adding-export-formats]] (the geometry emitter) ·

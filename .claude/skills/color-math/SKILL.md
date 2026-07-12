@@ -17,8 +17,8 @@ Four files, one rule: **every emitted color is in-gamut by construction, hits it
 constant CAM16 hue along the ramp** — and the verifiers prove all three on every change. Color math is
 unforgiving: a wrong space, a swapped constant, an un-clamped chroma, or the wrong ramp branch ships broken
 swatches that *look* plausible. This skill is the procedure + the gotchas + the gates for changing the
-engine safely. The conceptual *why* is owned by `.claude/docs/spec/references/knowledge-0{1,2,6}-*.md` +
-`.claude/docs/spec/color-neutral-derivation.md` — **cite them, don't re-derive.**
+engine safely. The conceptual *why* is owned by `docs/reference/references/knowledge-0{1,2,6}-*.md` +
+`docs/reference/color-neutral-derivation.md` — **cite them, don't re-derive.**
 
 ## Map — which file owns what (depth in `references/foundations.md`)
 
@@ -86,7 +86,7 @@ of `paletteStops`, which hands `perceptual`/`peak` to `okhslStops`):
    stop-consistency check). Don't reintroduce index-based math.
 5. **Derivation is OKLCH + circular.** `derive.mjs` works in OKLCH `[L, C, H]` (C ~0..0.4), all hue math
    circular (vector sum → `atan2`, never average degrees). The `deriveNeutral` formula + the two-number
-   rule (hue + the C_max clamp) are owned by `.claude/docs/spec/color-neutral-derivation.md` — cite, don't copy.
+   rule (hue + the C_max clamp) are owned by `docs/reference/color-neutral-derivation.md` — cite, don't copy.
 
 ## Validate (the anchor-based gate — draft → check → fix → re-check)
 
@@ -102,7 +102,7 @@ npm test                      # all of the above + ui/figma/exports + the figma-
 ```
 
 **The correctness backstop is the anchors.** The `anchor-roundtrip` gate in `test/engine/hct.mjs` checks the 6
-reference colors (red/green/blue/white/black/mid-gray) against `.claude/docs/spec/data/verification-anchors.json`. For
+reference colors (red/green/blue/white/black/mid-gray) against `docs/reference/data/verification-anchors.json`. For
 each CHROMATIC anchor it asserts the FOUR tolerances owned by `references/rubric.md` C1 (forward L\* · CAM16
 hue · CAM16 chroma · forward+inverse RGB roundtrip; current engine: Δ0 on all). If a change breaks ANY of
 them, the engine is broken — **revert; do not loosen a tolerance.** Don't call it done until all four
@@ -115,8 +115,8 @@ verifiers AND `npm test` are green.
 | `references/foundations.md` | the two ramp paths, the HCT transform chain + `hctToRgb` branch order, gamut search (`maxChromaInGamut`/`peakC`), the damping multiplier `m`, the OKHSL bijection, derivation — the mental model the procedure assumes |
 | `references/best-practices.md` | the non-obvious do/don't (verbatim constants, in-gamut clamp, both-paths damping, stop-vs-index, anchors-are-truth) + a worked walkthrough from the chroma-floor / distribution-mode history |
 | `references/rubric.md` | score the change before calling it done — in-gamut + tone-fidelity + hue-stability + the four anchor tolerances are the gates |
-| `.claude/docs/spec/references/knowledge-01-color-engine.md` | the HCT engine math (matrices, VC, CAM16 fwd/inv, the contracts) — owned there, cite |
-| `.claude/docs/spec/references/knowledge-02-tonal-scale.md` | the tonal-scale math (curves, `toneAt`, chroma targeting, damping) — owned there, cite |
-| `.claude/docs/spec/references/knowledge-06-palette-derivation.md` · `.claude/docs/spec/color-neutral-derivation.md` | New-Palette derivation + the `deriveNeutral` formula / neutral two-number rule — owned there, cite |
+| `docs/reference/references/knowledge-01-color-engine.md` | the HCT engine math (matrices, VC, CAM16 fwd/inv, the contracts) — owned there, cite |
+| `docs/reference/references/knowledge-02-tonal-scale.md` | the tonal-scale math (curves, `toneAt`, chroma targeting, damping) — owned there, cite |
+| `docs/reference/references/knowledge-06-palette-derivation.md` · `docs/reference/color-neutral-derivation.md` | New-Palette derivation + the `deriveNeutral` formula / neutral two-number rule — owned there, cite |
 
 Peers: [[adding-semantic-roles]] (roles ride the ramps) · [[adding-export-formats]] (serializers consume derivePalette) · [[building-editor-sections]] (the Color section) · [[shipping-changes]].

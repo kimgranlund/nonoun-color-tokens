@@ -1,8 +1,8 @@
 ## Foundations — the model an engine change leans on
 
 The load-bearing ideas. If a change feels like it needs a new mechanism, you are probably fighting one of
-these. The full math is owned by `.claude/docs/spec/references/knowledge-0{1,2,6}-*.md` +
-`.claude/docs/spec/color-neutral-derivation.md` — this file is only the mental model the *procedure* assumes.
+these. The full math is owned by `docs/reference/references/knowledge-0{1,2,6}-*.md` +
+`docs/reference/color-neutral-derivation.md` — this file is only the mental model the *procedure* assumes.
 
 ### 1. Three color spaces, three jobs
 
@@ -123,7 +123,7 @@ in the 19-stop display ramp and the 25-stop export ramp.
   contributes almost nothing.
 - `deriveNeutral(samples)` — seeds the neutral as a first PALETTE (NOT a separate strip); the standard ramp
   supplies the lightness steps + chroma taper. The formula and the two-number rule (hue + the C_max clamp)
-  are owned by `.claude/docs/spec/color-neutral-derivation.md` — cite, don't copy.
+  are owned by `docs/reference/color-neutral-derivation.md` — cite, don't copy.
 - `deriveRelative(id, samples)` over `RELATIONSHIPS` (`extend +30°`, `complete` largest-gap, `contrast +180°`,
   `bridge` shorter-arc midpoint, `anchor` same hue, `recontextualize` complement·0.6 chroma); empty context
   → `[0.6, 0.12, 0]`. Single-reference relationships (extend/contrast/anchor/recontextualize) pivot on the

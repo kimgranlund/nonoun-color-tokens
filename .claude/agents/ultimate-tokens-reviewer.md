@@ -31,7 +31,7 @@ untouched code. Cite every finding as `path:line`.
    may touch `.claude/docs/other/` — it is local-only and must never be committed. `node_modules` must not be
    re-added (it was de-tracked; a tracked dir/symlink is a blocker).
 2. **Semantic-role parity (BLOCKER if roles touched).** If `src/engine/semantic.js` changed the role set,
-   then `.claude/docs/spec/data/role-table.json` (the answer key, must deep-equal `semanticRoles`), the Figma
+   then `docs/reference/data/role-table.json` (the answer key, must deep-equal `semanticRoles`), the Figma
    `figma/binder/figma-semantic-binder/code.js` table, and the count-gate literals in
    `test/engine/{semantic,exports}.mjs` + `test/figma/{binder,plugin}.mjs` + `test/ui/{shell,headless-boot}`
    must ALL move together. A half-applied count is the classic break here.

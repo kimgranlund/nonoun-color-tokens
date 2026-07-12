@@ -2,7 +2,7 @@
 
 The load-bearing ideas. If a change feels like it needs a hand-authored size or a new branch, you are
 probably fighting one of these. The full *why* (the eleven voices, the system relationships, the leading
-bands, the target token shape) is owned by `.claude/docs/spec/typography/README.md` — this file is only the mental
+bands, the target token shape) is owned by `docs/reference/typography/README.md` — this file is only the mental
 model the *procedure* assumes.
 
 ### 1. Five layers, one direction of flow
@@ -38,7 +38,7 @@ layer.
 
 ### 2. The eleven named voices + the three step sets
 
-The canonical taxonomy (.claude/docs/spec/typography): **Display · Heading · Sub-heading · Kicker · Lead ·
+The canonical taxonomy (docs/reference/typography): **Display · Heading · Sub-heading · Kicker · Lead ·
 Body · Quote · Caption · UI · Code · Legal** — Sub-heading + Kicker are LABELS (not headings), which is why
 they lost the "Heading" prefix; the four editorial voices (Lead · Quote · Caption · Legal) are ADR-013.
 Three step ramps (`STEPS_3`/`STEPS_5`/`STEPS_UI` in type.mjs):

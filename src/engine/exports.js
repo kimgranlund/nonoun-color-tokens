@@ -663,7 +663,7 @@ export function exportShadcn(state, opts = {}) {
 // role set uses the Ultimate Tokens grammar `{family}[-slot]` (spec §6.5) with MEASURED
 // on-colors per fill per scheme (§7 R1). One source — dsColorRoles — renders tokens.json, the
 // DESIGN.md frontmatter, and the previews, so §8 carrier-equality holds by construction.
-// Spec: .claude/docs/spec (design-system-files-for-llms.md in the export repo).
+// Spec: docs/reference (design-system-files-for-llms.md in the export repo).
 
 const DS_AA = 4.5;
 // ── the TEXT-RENDERING BASELINE — always included, never optional (Kim's standing rule, 2026-07-10) ──

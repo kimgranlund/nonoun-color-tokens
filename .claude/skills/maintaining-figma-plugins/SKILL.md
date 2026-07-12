@@ -27,7 +27,7 @@ who creates what:
 | Verifier | `test/figma/binder.mjs` | `test/figma/plugin.mjs` |
 
 The conceptual model — *why* aliasing is the only thing giving a live raw→semantic cascade — is owned by
-`.claude/docs/spec/references/knowledge-05-figma-plugin.md`. **Cite it; don't re-derive it.** Role-table parity (the
+`docs/reference/references/knowledge-05-figma-plugin.md`. **Cite it; don't re-derive it.** Role-table parity (the
 `code.js#roleTable(n)` copy) is owned by `adding-semantic-roles` — **cite it; don't duplicate the procedure.**
 
 ## The four load-bearing constraints (depth in `references/foundations.md`)
@@ -125,7 +125,7 @@ verifiers and `npm test` are green.
 | `references/foundations.md` | the two-plugin split, the alias-cascade mechanism, the binder bind loop, the app apply/prune/rebuild contract, the parity model, the four constraints |
 | `references/best-practices.md` | the non-obvious do/don't (offline, `catch (e)`, friendly errors, idempotent find-or-create, the binder `missing` list) + a worked debug walkthrough |
 | `references/rubric.md` | score a Figma-plugin change before calling it done (offline + parity + VM-safe are the gates) |
-| `.claude/docs/spec/references/knowledge-05-figma-plugin.md` | the conceptual model — why aliasing gives the cascade, files/manifest, run instructions, failure modes (owned there — cite, don't copy) |
+| `docs/reference/references/knowledge-05-figma-plugin.md` | the conceptual model — why aliasing gives the cascade, files/manifest, run instructions, failure modes (owned there — cite, don't copy) |
 | `.claude/skills/adding-semantic-roles/` | the `code.js#roleTable(n)` role-row edit + every parity site (owned there — a role change is THAT skill, not this one) |
 
 Peers: [[adding-semantic-roles]] (the alias-cascade parity site) · [[adding-export-formats]] (the Figma

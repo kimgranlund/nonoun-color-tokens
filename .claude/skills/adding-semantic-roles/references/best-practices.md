@@ -6,7 +6,7 @@ The non-obvious do/don'ts (each one is a real trap in this repo), then a worked 
 
 - **The answer key is hand-maintained — there is NO `gen:role-table` script.** (The `gen:*` scripts cover
   figma-assets / mcp-assets / categories / type-fonts / preview / figma-ui only.) Editing
-  `.claude/docs/spec/data/role-table.json#roleTable` is a manual mirror of the `role(...)` calls, in the same order,
+  `docs/reference/data/role-table.json#roleTable` is a manual mirror of the `role(...)` calls, in the same order,
   for the **primary** palette only (shared rows are name-independent; name-prefixed rows use the `primary`
   substitution — `primaryHover`, `onPrimaryActive`). Bump `rolesPerPalette`. The `refs-canonical` gate in
   `test/engine/semantic.mjs` deep-equals `semanticRoles("primary")` against it, key-order included — so a
@@ -27,11 +27,11 @@ The non-obvious do/don'ts (each one is a real trap in this repo), then a worked 
 
 ### Which prose is current vs historical
 
-- **Bump CURRENT counts:** `.claude/docs/spec/references/knowledge-03-semantic-system.md` (the "53 roles" headers),
-  `.claude/docs/spec/rubrics/parity-checklist.md` (P1: `semanticRoles('primary').length === 53`), and `CLAUDE.md`
+- **Bump CURRENT counts:** `docs/reference/references/knowledge-03-semantic-system.md` (the "53 roles" headers),
+  `docs/reference/rubrics/parity-checklist.md` (P1: `semanticRoles('primary').length === 53`), and `CLAUDE.md`
   (the "53 semantic roles" mentions), plus the `src/ui/app.js` inspector label (grep `semantic roles`).
 - **LEAVE historical counts untouched:** the "36 vs 37" `surfaceHighest`-divergence anecdote in knowledge-03
-  (line ~132) and `references/decomposition.md`; `.claude/docs/spec/CHANGELOG.md` entries (which say "37"); OD/ADR
+  (line ~132) and `references/decomposition.md`; `docs/reference/CHANGELOG.md` entries (which say "37"); OD/ADR
   decision records ("37 (not 51)"); and color-data files (e.g. `nature.json`). Those record what WAS true at
   a point in time. Bumping them rewrites history and destroys the cautionary tale.
 - **Stale comment drift is real and is NOT a gate.** The per-palette role count is repeated in PROSE across
@@ -66,7 +66,7 @@ The non-obvious do/don'ts (each one is a real trap in this repo), then a worked 
 Run `node test/engine/semantic.mjs` first — it is the fastest signal and the one that catches a stale
 answer key (`refs-canonical`) or a miscounted scrim block (`roles`). Then `node test/engine/exports.mjs`,
 `node test/figma/binder.mjs`, `node test/figma/plugin.mjs`, then `npm test`. Finish with
-`git grep -nE "\b37\b|\b49\b" src test .claude/docs/spec | grep -i role` and confirm every hit is an intentional
+`git grep -nE "\b37\b|\b49\b" src test docs/reference | grep -i role` and confirm every hit is an intentional
 historical reference.
 
 ## Worked walkthrough — the interaction-states addition (condensed)

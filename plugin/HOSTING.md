@@ -50,7 +50,7 @@ Interim policy: public copy keeps the working GitHub commands until the package 
 | Surface | Flips to |
 |---|---|
 | `_zipReadme()` (src/ui/app.js) install commands | the unpkg two-command form above |
-| `.claude/docs/marketing/fact-sheet.md` plugin row | same |
+| `docs/marketing/fact-sheet.md` plugin row | same |
 | `plugin/ultimate-tokens/.claude-plugin/plugin.json` `homepage`/`repository` | drop `repository` (private) or point at ultimate-tokens.com when it exists |
 | The root `.claude-plugin/marketplace.json` (the GitHub channel) | retire — or keep as the local/dev channel |
 | README / store copy pointers | the unpkg command (re-run voice-check) |

@@ -3,9 +3,9 @@
 // Display · Heading · Sub-heading · Kicker · Body · UI · Code — each a size ramp whose every step
 // carries size, line-height, letter-spacing, weight, and paragraph spacing, all DERIVED from the
 // treatment's params (no hand-authored magic numbers). (The DTCG shape follows the Figma-variable
-// export at .claude/docs/spec/typography/typography.tokens.json, a frozen snapshot kept for reference.)
+// export at docs/reference/typography/typography.tokens.json, a frozen snapshot kept for reference.)
 //
-// The system relationships (see .claude/docs/spec/typography/README.md):
+// The system relationships (see docs/reference/typography/README.md):
 //   size          = base · ratio^n           (a modular scale; n = the step's distance from the base)
 //   lineHeight     = round(size · leading)     (per-role leading; single-line = size)
 //   letterSpacing = round(size · trackingEm)  (optical: negative tightens big display, positive loosens UI)
@@ -45,7 +45,7 @@ export const TYPE_RATIOS = [
 const cat = (role, base, ratio, leading, weight, trackingEm, steps = STEPS_5, transform = "none", box = role === "ui" || role === "mono") => ({ role, base, ratio, leading, weight, trackingEm, steps, transform, box });
 
 // make11 — the ELEVEN named type ROLES (each a FUNCTION, not a size register — the taxonomy in
-// .claude/docs/spec/typography): Display · Heading · Sub-heading · Kicker · Lead · Body · Quote · Caption ·
+// docs/reference/typography): Display · Heading · Sub-heading · Kicker · Lead · Body · Quote · Caption ·
 // UI · Code · Legal. A role carries CHARACTER (weight, tracking, leading, case, font cut) that travels
 // with it across every LEVEL; the level (the step) is chosen by hierarchy depth and the size is DERIVED
 // from it (base × ratio^level), never picked to hit a number. Sub-heading is the secondary heading below

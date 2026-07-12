@@ -12,7 +12,7 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 | Maker | **none** — the product is unattributed; no "by" line, no maker brand, no monogram | `test/repo/branding.mjs` (gated) |
 | Internal id (kebab form; never customer-facing) | `ultimate-tokens` | `package.json` |
 | Live app | `https://kimgranlund.github.io/ultimate-tokens/` (no custom domain) | README badge |
-| Semantic roles per palette | **53**, resolved for Light + Dark | `.claude/docs/spec/data/role-table.json` `rolesPerPalette` |
+| Semantic roles per palette | **53**, resolved for Light + Dark | `docs/reference/data/role-table.json` `rolesPerPalette` |
 | Default palettes | **8** | `role-table.json` `defaults` |
 | Tonal ramp | **050–950** (19 display stops; 25 in exports with the extra stops) | `src/engine/tonal.js` `STOPS`/`EXPORT_STOPS` |
 | Color model | **OKLCH-native** source of truth; HCT/CAM16 + OKHSL modeling; HEX derived for output only | `src/engine/` |
@@ -40,7 +40,7 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 | Refund | **14 days**, full, no questions | store policy |
 | Store | Lemon Squeezy (`ultimate-tokens.lemonsqueezy.com`) | store-copy.md |
 | Support channel | **GitHub Issues** on `kimgranlund/ultimate-tokens` — there is no support inbox (decided 2026-07-09) | store-copy.md placeholders |
-| Licensing direction | email-bound identity: unlimited devices for the key's owner; Studio seats become named emails (Phase 2) — customer copy describes SHIPPED behavior until each phase lands | `.claude/docs/site/licensing-identity-spec.md` |
+| Licensing direction | email-bound identity: unlimited devices for the key's owner; Studio seats become named emails (Phase 2) — customer copy describes SHIPPED behavior until each phase lands | `docs/site/licensing-identity-spec.md` |
 | Dogfooding | the app chrome runs on the very tokens it generates | README |
 
 **Rules of use**
@@ -50,7 +50,7 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 2. A feature behind a flag that isn't live (hosted MCP; enforcement pre-flip) is **never marketed as
    available**; "when live" phrasing or omission only.
 3. When the product changes a value, update this sheet **in the same change**, then sweep **every
-   customer-facing surface** — not just this corpus: `grep -rn "<old>" .claude/docs/marketing/
+   customer-facing surface** — not just this corpus: `grep -rn "<old>" docs/marketing/
    README.md index.html src/ui/app.js` (the 53-defect lived *outside* the corpus; the sweep that only
    covers the corpus recreates it).
 4. **Deployed surfaces don't grep.** Copy already pasted into external dashboards must be re-pasted

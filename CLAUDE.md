@@ -8,7 +8,7 @@ an **MCP brand-kit** server. A brand kit is **one document** with three composin
 **sections of one editor**: **Color** (palettes → 53 semantic roles) · **Typography** · **Geometry**
 (its per-step text size composes *from* the Type UI scale).
 
-Canonical specs + rubrics: `.claude/docs/spec/` (e.g. `.claude/docs/spec/data/role-table.json` is the role answer key).
+Canonical specs + rubrics: `docs/reference/` (e.g. `docs/reference/data/role-table.json` is the role answer key).
 
 ## Commands
 
@@ -35,9 +35,13 @@ Canonical specs + rubrics: `.claude/docs/spec/` (e.g. `.claude/docs/spec/data/ro
   `mcp/` · `plugin/` (skill↔role-table parity) · `smoke/smoke.mjs`. `scripts/` — the generators.
   `mcp/` — the MCP server. `plugin/ultimate-tokens/` — the CONSUMER-side Claude plugin: skills that
   teach agents to use exported kits in THEIR projects (parity-gated against the engine).
-- `.claude/docs/spec/` — canonical specs, rubrics, role-table answer key. `.claude/docs/marketing/` — the
+- `docs/reference/` — canonical specs, rubrics, role-table answer key. `docs/marketing/` — the
   marketing corpus (voice platform · pinned fact sheet · store copy · launch kit); author via the
-  `marketing-manager` agent + `ultimate-tokens-brand-voice` skill. `.claude/docs/other/` — **PRIVATE** (see below).
+  `marketing-manager` agent + `ultimate-tokens-brand-voice` skill. `docs/tickets/` — bug/feature work
+  items (`kind: bug`/`kind: feature` TICKETs, minted via scribe's `/bug-report`/`/feature`); routed by
+  the `project-docs` skill. `docs/site/`, `docs/lld/`, `docs/img/` — hosting/licensing specs, one
+  architecture doc, and the generated README preview SVG, respectively. `.claude/docs/other/` —
+  **PRIVATE** (see below).
 
 ## Conventions (non-obvious only)
 
@@ -46,7 +50,7 @@ Canonical specs + rubrics: `.claude/docs/spec/` (e.g. `.claude/docs/spec/data/ro
 - **Sections.** `this.section` (`color`|`typography`|`geometry`) routes `renderCenter`/`renderLeftPane`/
   `renderRightPane`. A section = a canvas header + a pannable `.canvas-scene` (the full dataset) + left
   analysis cards + a right inspector.
-- **53 semantic roles / palette.** `.claude/docs/spec/data/role-table.json` deep-equals `semanticRoles`; the
+- **53 semantic roles / palette.** `docs/reference/data/role-table.json` deep-equals `semanticRoles`; the
   Figma `code.js` table mirrors it (parity-gated) — so a role-count change moves several files in lockstep.
 - **Quote interpolated font-family names** with digits/spaces — `font-family:'Source Serif 4', serif`.
   Unquoted, WebKit/Safari drops the declaration (the digit is invalid); Chrome tolerates it.
@@ -79,4 +83,4 @@ concurrently, isolate your commit in a `git worktree` off `origin/main`.
   local-only working folder (ignored via `.git/info/exclude`); it must never reach a commit.
 
 <!-- Enforcement: there are NO local hooks yet. The guards above (role-table parity, .claude/docs/other, font-quoting) are conventions + CI + the test gates, not enforced pre-commit. A Stop/pre-commit hook for the .claude/docs/other + parity guards would be the place to make them reliable. -->
-<!-- This file is the always-loaded INDEX of cross-cutting, always-true facts only. Domain PROCEDURES (changing an engine, adding a role/format, the Figma binder, building a section, shipping, palette research) are owned by on-demand skills/agents in .claude/ — discovered via their frontmatter descriptions, NOT routed from here. Conceptual depth: .claude/docs/spec/ + the engine files' header comments. Keep this thin; let the frontmatter system do the routing. -->
+<!-- This file is the always-loaded INDEX of cross-cutting, always-true facts only. Domain PROCEDURES (changing an engine, adding a role/format, the Figma binder, building a section, shipping, palette research) are owned by on-demand skills/agents in .claude/ — discovered via their frontmatter descriptions, NOT routed from here. Conceptual depth: docs/reference/ + the engine files' header comments. Keep this thin; let the frontmatter system do the routing. -->

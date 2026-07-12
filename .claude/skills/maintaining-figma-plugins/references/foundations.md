@@ -1,7 +1,7 @@
 ## Foundations — the model the Figma plugins lean on
 
 The load-bearing ideas behind both plugins. The conceptual *why* (aliasing as the only cascade mechanism) is
-owned by `.claude/docs/spec/references/knowledge-05-figma-plugin.md`; this file is the mental model the *procedure*
+owned by `docs/reference/references/knowledge-05-figma-plugin.md`; this file is the mental model the *procedure*
 assumes, grounded in the actual `code.js` files.
 
 ### 1. Two plugins, one vocabulary, different jobs
@@ -65,7 +65,7 @@ The Figma VM can't `import` the `.mjs`, so the binder's `roleTable(n)` is a **li
 
 - `bindingTargets(names)` → de-duped, sorted set of every `"{n}/{refKey(ref)}"` target the binder aliases.
 - `bindingPlan(names)` → one `{semanticVar, lightTarget, darkTarget}` per (palette, role), length
-  **`rolesPerPalette` × palette names** (owned by `.claude/docs/spec/data/role-table.json` — 59 at the time
+  **`rolesPerPalette` × palette names** (owned by `docs/reference/data/role-table.json` — 59 at the time
   of writing; 8 default palettes).
 
 The parity gate (`test/figma/binder.mjs`) loads `roleTable`/`refKey` straight out of `code.js` (strips the

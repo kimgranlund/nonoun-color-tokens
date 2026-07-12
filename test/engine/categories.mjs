@@ -9,7 +9,7 @@ import { typeScale, DEFAULT_TYPE, siblingWeightDefaults } from "../../src/engine
 import { hydrate } from "../../src/ui/persist.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SPECDIR = join(HERE, "..", "..", ".claude", "docs", "spec", "colors", "categories");
+const SPECDIR = join(HERE, "..", "..", "docs", "reference", "colors", "categories");
 const CATS = ["architecture", "cuisine", "film", "literature", "music", "nature", "travel"];
 const ROLES = ["display", "heading", "body", "ui", "mono"];
 // slot ROLE → the primary voice the mapper (gen-categories.design5ToTypeConfig) shapes with the slot's

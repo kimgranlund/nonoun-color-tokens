@@ -2,7 +2,7 @@
 // voice-check.mjs — the mechanical half of the Ultimate Tokens voice gate. Checks customer-facing copy for the
 // failures a machine can catch: banned lexicon, hype-price phrasing, exclamation discipline, drifted
 // pinned facts, and em-dash-pivot overuse. The judged half (persona, posture, claim discipline) is the
-// rubric in .claude/docs/marketing/voice/voice-platform.md §6 — this script never scores those.
+// rubric in docs/marketing/voice/voice-platform.md §6 — this script never scores those.
 //
 // Usage: node voice-check.mjs <file.md> [more files…]   (exit 1 on any ERROR; warnings don't fail)
 import { readFileSync } from "node:fs";

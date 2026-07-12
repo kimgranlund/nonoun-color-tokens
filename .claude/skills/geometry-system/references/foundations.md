@@ -1,7 +1,7 @@
 ## Foundations — the model a geometry change leans on
 
 The load-bearing ideas behind `src/engine/geometry.mjs`. If a change feels like it needs a new mechanism, you
-are probably fighting one of these. The conceptual *why* is owned by `.claude/docs/spec/geometry/README.md` (the
+are probably fighting one of these. The conceptual *why* is owned by `docs/reference/geometry/README.md` (the
 de-staled reference shape) and the `design-skills:component-decomposer` skill's geometry-system reference
 (the law's first principles) — this file is only the mental model the *procedure* assumes.
 

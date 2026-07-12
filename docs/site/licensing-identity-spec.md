@@ -7,7 +7,7 @@ counts stop being the seat model; they remain only as an abuse backstop.
 
 Related records: `mcp-hosting-spec.md` (Phase B introduces the Ultimate Tokens account = email magic-link —
 the same identity this spec leans on) · `storage-and-sync-spec.md` (the account the kits sync to) ·
-`.claude/docs/marketing/store-copy.md` §3 (the customer-facing seat copy this eventually rewrites).
+`docs/marketing/store-copy.md` §3 (the customer-facing seat copy this eventually rewrites).
 
 ## What Lemon Squeezy already gives us (no new purchase-side work)
 

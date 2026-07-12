@@ -17,7 +17,7 @@ One file, `src/engine/type.mjs`, the type analog of the color engine: a few per-
 scale → DTCG / CSS tokens. Pure, no DOM, no magic numbers — every step's size, line-height, letter-spacing,
 weight, and case is **derived** from the treatment's knobs. The conceptual *why* (the eleven voices, the
 system relationships, the leading constants, the target token shape) is owned by
-`.claude/docs/spec/typography/README.md` — **cite it, don't re-derive.** Color lives next door in `color-math`;
+`docs/reference/typography/README.md` — **cite it, don't re-derive.** Color lives next door in `color-math`;
 this skill never touches color.
 
 ## The shape — five layers (depth in `references/foundations.md`)
@@ -99,6 +99,6 @@ The guard that catches the Safari font break is the `typeTokensCSS(luxury)` quot
 | `references/foundations.md` | the SINGLE OWNER of the model: the five layers (`cat`→`make11`→treatment→`typeScale`→emitter), the voice taxonomy + step sets, the `buildCategory` math (nice ladder + override channels), `bodyBase` scaling, the emitter shapes, the font-rendering path |
 | `references/best-practices.md` | the non-obvious do/don't (derive-don't-hardcode, the quoting guard, case-is-per-treatment, the manual font regen, both-ends font wiring) + a worked walkthrough from the treatment/specimen history |
 | `references/rubric.md` | score the change before calling it done — the eleven voices, the math invariants, the quoting guard, and the font wiring are the gates |
-| `.claude/docs/spec/typography/README.md` | the eleven named voices, the system relationships, the leading constants, the target token shape — owned there, cite |
+| `docs/reference/typography/README.md` | the eleven named voices, the system relationships, the leading constants, the target token shape — owned there, cite |
 
 Peers: [[geometry-system]] (composition with type) · [[adding-export-formats]] (the type emitter) · [[building-editor-sections]] (the Typography section) · [[shipping-changes]].

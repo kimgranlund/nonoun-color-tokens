@@ -20,7 +20,7 @@ treatment/specimen history.
   Lead **1.4** · Quote **1.35** · Caption · Legal **1.5** · Kicker **1.4** · code **~1.5** · UI **~1.4**).
   They're the `font.modes.json` design intent, held uniform
   across treatments (only UI keeps a small `1.35–1.45` lever) and owned by
-  `.claude/docs/spec/typography/README.md`. Display is deliberately **< 1** (large type sets tight); a Body
+  `docs/reference/typography/README.md`. Display is deliberately **< 1** (large type sets tight); a Body
   leading of 1.2 would render cramped prose. Retune a `*Lead` knob only for a deliberate character exception.
 
 ### The font-family QUOTING guard (the Safari trap)
@@ -59,7 +59,7 @@ treatment/specimen history.
   - the **`test/smoke/smoke.mjs`** Typography-section count (`type-spec-line`===53 / `type-spec-group`===11)
     — **Chrome-only, so `npm test` won't catch it; only CI's smoke leg does** (the classic Safari-blind-spot
     trap in reverse — a green local gate can still red the smoke leg on a stale count);
-  - `.claude/docs/spec/typography/README.md`'s voice table and the `TYPE_SPECIMENS`/`SHORT` specimen maps.
+  - `docs/reference/typography/README.md`'s voice table and the `TYPE_SPECIMENS`/`SHORT` specimen maps.
 
   There is NO code-enforced type answer-key (unlike colour's `role-table.json`) — the consumption plugin's
   `voice-parity.mjs` auto-derives the voice list from the live engine, so the guard is the tests + these

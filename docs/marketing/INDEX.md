@@ -29,7 +29,7 @@ voice-check script and the platform rubric before it ships.
   `node .claude/skills/ultimate-tokens-brand-voice/scripts/voice-check.mjs <file>` → §6 rubric ≥ 4 on
   every axis. A pinned-fact error fails the piece outright.
 - **Drift is a defect.** A product change that alters a stated fact updates `fact-sheet.md` in the
-  same change, then sweeps this corpus (`grep -rn "<old>" .claude/docs/marketing/`) — plus the README
+  same change, then sweeps this corpus (`grep -rn "<old>" docs/marketing/`) — plus the README
   marketing prose and `index.html` meta if they carry it.
 - **This corpus is public** (the repo is public). Strategy, pricing experiments, and anything
   pre-decision live in `.claude/docs/other/` (private, uncommitted) until decided.

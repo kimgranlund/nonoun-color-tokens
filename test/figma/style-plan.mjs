@@ -12,7 +12,7 @@ import { typeScale, typeTokensFigmaModes, typeTokensFigmaPrimitives, siblingWeig
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
 
-const RT = JSON.parse(readFileSync(new URL("../../.claude/docs/spec/data/role-table.json", import.meta.url), "utf8"));
+const RT = JSON.parse(readFileSync(new URL("../../docs/reference/data/role-table.json", import.meta.url), "utf8"));
 const state = { palettes: RT.defaults, curve: "logistic", tension: 0, lmin: 5, lmax: 100, damp: 80, hueSpace: "cam16", theme: "auto" };
 
 // ── ground truth: the semantic variable name set, from exportUI3 (a different code path) ──

@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SKILL_DIR = join(HERE, "..");
-const TABLE = join(HERE, "../../../../../.claude/docs/spec/data/role-table.json");
+const TABLE = join(HERE, "../../../../../docs/reference/data/role-table.json");
 if (!existsSync(TABLE)) { console.log("role-parity: canonical role table not found (outside the product repo) — skipping"); process.exit(0); }
 
 const rt = JSON.parse(readFileSync(TABLE, "utf8"));
