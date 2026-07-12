@@ -8,6 +8,28 @@ they landed on `main` and reference the squash-merged PR that introduced them.
 
 ## [Unreleased]
 
+### 2026-07-12
+
+#### Added
+- **Adjacent weight siblings, made systematic** (#263) — `siblingWeightDefaults(core)` now suggests the
+  two LADDER-ADJACENT weights (immediate neighbors, never a skipped step), stepping from the core toward
+  the 400–600 emphasis band: `Regular 400` → `Medium 500, Semi-bold 600`; `Bold 700` → `Semi-bold 600,
+  Medium 500`. Replaces the old ±200 skip-a-step heuristic from #231. Every Color Categories preset (336
+  palettes × the 5 designed voices — Display/Heading/Body/UI/Kicker) now ships these siblings
+  pre-populated at generation time, so opening any curated palette already exports emphasis-ready Figma
+  text style variants, not just the single core weight.
+
+#### Changed
+- **The type/geometry CSS export is now SEPARATE, self-contained files, not one @media-embedded
+  stylesheet** (#264) — `type.css` / `geometry.css` carry the designed (Desktop) scale unconditionally,
+  no media query, a complete valid stylesheet on their own; `type-tablet.css` / `type-mobile.css` (and
+  the geometry equivalents) are optional bolt-ons, each bounded on both ends (`min-width` AND `max-width`,
+  except the narrowest tier which stays open below) so a consumer can add any subset in any load order.
+  Replaces `typeTokensResponsiveCSS`/`geomTokensResponsiveCSS`'s single mobile-first `:root`-is-actually-Mobile
+  file, which — because the Figma/DTCG exports are Desktop-anchored while the CSS was silently
+  mobile-first — was the likely source of "why do we only see Desktop tokens" confusion: the file's
+  unlabeled `:root` block held the smallest (Mobile) sizes, not the designed Desktop ones.
+
 ### 2026-07-11
 
 #### Added

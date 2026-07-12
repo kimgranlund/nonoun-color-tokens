@@ -32,7 +32,7 @@ layer.
   `{<voice>:{weight, tracking, leading, ratio}}` reshaping a whole voice; `fonts` = `{<role>: family}`
   per-role custom family (blank/non-string ignored). Unknown `treatment` → `TYPE_TREATMENTS[0]`;
   unknown/`0` `bodyBase` → the treatment's `Body.base`.
-- **The emitters** (`typeTokensCSS`, `typeTokensResponsiveCSS`, `typeTokensDTCG`, `typeTokensFigmaModes`)
+- **The emitters** (`typeTokensCSS`, `typeTokensBreakpointCSS`, `typeTokensDTCG`, `typeTokensFigmaModes`)
   operate on the resolved `scale` — they never re-run the math, they read `scale.categories` /
   `scale.fonts` / `scale.roleOf`.
 
@@ -158,10 +158,15 @@ these clean: 16px→1rem, 24px→1.5rem).
   `--type-{voice}-{step}-{size,line,tracking,weight}`) PLUS a utility class per step
   (`.type-display-xl { font-family: var(--font-display); … text-transform: … }`). The class points at the
   voice's role via `roleOf`; `kebab()` lowercases + dash-joins voice/step names.
-- **`typeTokensResponsiveCSS(scale, modes, {unit})`** → the full base CSS plus one `@media (min-width: …)`
-  block per breakpoint mode (`modes = [{name, minWidth, scale}]`) re-declaring the per-step size vars at
-  that mode's scale — utilities + font vars are unchanged, so they auto-track. A mode without a positive
-  `minWidth` is skipped; `modes = []` ⇒ identical to the base CSS.
+- **`typeTokensBreakpointCSS(modes, {unit, desktopMinWidth=1280})`** → one SEPARATE, self-contained file
+  PER breakpoint mode (`modes = [{name, minWidth, scale}]`) — NOT one @media-embedded stylesheet (#264).
+  `typeTokensCSS(baseScale)` is the complete, unconditional base file (the designed/Desktop scale, no
+  media query — a consumer can drop it in alone and be done); each entry here is an independent bolt-on:
+  `@media (min-width: …) and (max-width: …) { :root { …that mode's vars… } }`, bounded on BOTH ends except
+  the NARROWEST mode, which stays open below (`max-width` only, so the smallest viewports still land
+  somewhere). Bounds mean load order never matters — add any subset, any order. Returns
+  `[{name, minWidth, css}]`, sorted DESCENDING by minWidth; a mode without a positive `minWidth` is
+  skipped; `modes = []` ⇒ `[]`.
 - **`typeTokensDTCG(scale, {unit})`** → `{fontFamily, typography}`: a `fontFamily` group
   (one `{$type:"fontFamily",$value}` per role) and a `typography` group of composite
   `{$type:"typography",$value:{fontFamily, fontSize, lineHeight, letterSpacing, fontWeight:number,

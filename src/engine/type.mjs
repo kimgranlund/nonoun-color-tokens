@@ -367,19 +367,35 @@ export function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   return lines.join("\n") + "\n";
 }
 
-// typeTokensResponsiveCSS — the base CSS plus a `@media (min-width: …)` block per breakpoint mode that
-// re-declares the per-step size vars at that mode's scale (the utilities + font vars are unchanged, so they
-// auto-track). `modes` = [{ name, minWidth, scale }]; a mode without a positive minWidth is skipped.
-// Blocks emit ASCENDING by minWidth regardless of array order — mobile-first CSS needs the widest block
-// last to win the cascade, and the doc may store modes desktop-first (the standard set's display order).
-export function typeTokensResponsiveCSS(scale, modes = [], { unit = "px", prefix = "type" } = {}) {
-  let css = typeTokensCSS(scale, { unit, prefix });
-  const ordered = [...(modes || [])].sort((a, b) => (Number(a.minWidth) || 0) - (Number(b.minWidth) || 0));
-  for (const m of ordered) {
-    if (!(Number(m.minWidth) > 0) || !m.scale) continue;
-    css += `\n/* ${m.name || "Mode"} */\n@media (min-width: ${Math.round(m.minWidth)}px) {\n  :root {\n${typeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`;
-  }
-  return css;
+// typeTokensBreakpointCSS — ONE self-contained override file PER breakpoint mode, the SEPARATE-FILE
+// alternative to a single @media-embedded stylesheet: `typeTokensCSS(baseScale)` is a complete, valid
+// stylesheet on its own (the DESIGNED — Desktop — scale, unconditional `:root`, no media query needed),
+// and each entry this returns is an independent bolt-on a consumer may or may not add. Every entry is
+// BOUNDED on the ceiling — always `max-width`, so its condition can never leak into a wider mode's band
+// — and on the floor too EXCEPT the NARROWEST mode, which stays open-ended below (`max-width` only, so
+// the smallest viewports — narrower than any configured mode — still land somewhere instead of falling
+// through to the unconditional Desktop values). A consumer can add any subset, in ANY load order (even
+// one <link> per file, or all concatenated), and the cascade still resolves correctly; nothing here
+// depends on file/rule order. `desktopMinWidth` (default 1280 — this app's own Desktop anchor, the same
+// constant `addStandardTypeModes` commits and Figma's default mode uses) bounds the WIDEST mode's
+// ceiling, since Desktop itself is the unconditional base and never appears in `modes`. `modes` =
+// [{ name, minWidth, scale }] (the same shape typeTokensFigmaModes / the per-breakpoint DTCG files
+// take); a mode without a positive minWidth is skipped (preview-only, mirrors the DTCG files). Sorted
+// DESCENDING by minWidth regardless of storage order, so a narrower mode's ceiling is always its
+// next-wider sibling's floor minus one.
+export function typeTokensBreakpointCSS(modes = [], { unit = "px", prefix = "type", desktopMinWidth = 1280 } = {}) {
+  const ordered = (modes || []).filter((m) => m && m.scale && Number(m.minWidth) > 0).sort((a, b) => (Number(b.minWidth) || 0) - (Number(a.minWidth) || 0));
+  return ordered.map((m, i) => {
+    const lower = Math.round(m.minWidth);
+    const upper = (i === 0 ? desktopMinWidth : Math.round(ordered[i - 1].minWidth)) - 1;
+    const narrowest = i === ordered.length - 1;
+    const name = m.name || "Mode";
+    const cond = narrowest ? `(max-width: ${upper}px)` : `(min-width: ${lower}px) and (max-width: ${upper}px)`;
+    return {
+      name, minWidth: lower,
+      css: `/* ${name} — ${narrowest ? `≤${upper}` : `${lower}–${upper}`}px */\n@media ${cond} {\n  :root {\n${typeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`,
+    };
+  });
 }
 
 // typeTokensDTCG — the type scale as DTCG tokens: a fontFamily group + a typography group per

@@ -93,7 +93,7 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(md.includes("--md-sys-radius-default: var(--md-sys-radius-md);"), "the radius-default alias threads the prefix on both sides");
   ok(md.includes(".md-sys-control-md {") && md.includes("var(--md-sys-size-md-height)") && !md.includes("--size-md-height"), "the .control-* class + its refs thread the prefix (no stray --size-*)");
   ok(G.geomTokensCSS(g, { prefix: "" }) === css, "empty prefix is byte-identical to the native default (identity gate)");
-  ok(G.geomTokensResponsiveCSS(g, [{ name: "M", minWidth: 768, scale: g }], { prefix: "md-sys" }).includes("--md-sys-size-md-height:"), "responsive CSS threads the prefix into the @media blocks");
+  ok(G.geomTokensBreakpointCSS([{ name: "M", minWidth: 768, scale: g }], { prefix: "md-sys" })[0].css.includes("--md-sys-size-md-height:"), "a breakpoint file threads the prefix too");
 }
 
 // ── CSS export unit (px/rem/em): even-grid geometry converts clean to rem ──
@@ -104,15 +104,24 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(G.geomTokensDTCG(g, { unit: "rem" }).size.MD.height.$value === "2rem" && G.geomTokensDTCG(g).size.MD.height.$value === "32px", "geometry DTCG carries the unit + defaults to px");
 }
 
-// ── responsive CSS: per-breakpoint @media blocks re-declaring the per-size vars (Phase 5.4) ──
+// ── breakpoint CSS: SEPARATE, self-contained per-mode override FILES (not one @media-embedded file) —
+// each bounded on both ends except the narrowest, which stays open below (#264) ──
 {
   const base = G.geomScale({ treatment: "comfortable", baseHeight: 28 });
   const touch = G.geomScale({ treatment: "comfortable", baseHeight: 40 });
-  const css = G.geomTokensResponsiveCSS(base, [{ name: "Touch", minWidth: 600, scale: touch }, { name: "NoWidth", scale: touch }]);
-  ok(css.startsWith(G.geomTokensCSS(base)), "responsive CSS begins with the full base CSS");
-  ok(/@media \(min-width: 600px\) \{\s*:root \{[^}]*--size-md-height: 40px/.test(css), "a mode with minWidth emits @media re-declaring the size vars at the mode's base height");
-  ok((css.match(/@media/g) || []).length === 1, "a mode WITHOUT a minWidth is skipped (no @media)");
-  ok(G.geomTokensResponsiveCSS(base, []) === G.geomTokensCSS(base), "no modes → identical to the base CSS");
+  const tablet = G.geomScale({ treatment: "comfortable", baseHeight: 26 });
+
+  const solo = G.geomTokensBreakpointCSS([{ name: "Touch", minWidth: 600, scale: touch }, { name: "NoWidth", scale: touch }]);
+  ok(solo.length === 1 && solo[0].name === "Touch", "a mode WITHOUT a minWidth is skipped (preview-only, mirrors the DTCG files)");
+  ok(/@media \(max-width: 1279px\) \{\s*:root \{[^}]*--size-md-height: 40px/.test(solo[0].css) && !/min-width/.test(solo[0].css), "a lone mode is the NARROWEST too: open-ended below, bounded above by desktopMinWidth-1 (default 1280)");
+  ok(G.geomTokensBreakpointCSS([]).length === 0, "no modes → no files");
+
+  const two = G.geomTokensBreakpointCSS([{ name: "Tablet", minWidth: 992, scale: tablet }, { name: "Mobile", minWidth: 476, scale: touch }]);
+  ok(two.length === 2 && two[0].name === "Tablet" && two[1].name === "Mobile", "sorted DESCENDING by minWidth regardless of storage order");
+  ok(/@media \(min-width: 992px\) and \(max-width: 1279px\)/.test(two[0].css), "the wider mode is bounded BOTH ends: [own minWidth, desktopMinWidth-1]");
+  ok(/@media \(max-width: 991px\)/.test(two[1].css) && !/min-width/.test(two[1].css), "the narrowest mode is open-ended below");
+  const reversed = G.geomTokensBreakpointCSS([{ name: "Mobile", minWidth: 476, scale: touch }, { name: "Tablet", minWidth: 992, scale: tablet }]);
+  ok(JSON.stringify(reversed) === JSON.stringify(two), "order-independent: reversed storage order yields the identical file set");
 }
 
 // ── DTCG emit: size composite + radius + space dimension groups ──

@@ -1093,7 +1093,7 @@ const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
 // design-system-for-figma-make/ bundle: guidelines/{Guidelines.md, setup.md, styles.css,
 // foundations/{color,typography,spacing}.md, components/{overview,button}.md} + README.md (9, a routed tree),
 // all riding systems.color) + 4 figma-aliased + 5 typography (incl. figma/ + figma/ moded + figma/ primitives) + 4 geometry + config = 45.
-ok(eocdSig && entries === 51, `(ee) the EOCD reports 51 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (7, incl. the intrinsic type.1280/type.992 per-mode DTCG) + geometry (6, incl. geometry.1280/geometry.992) + figma/styles.plan.json (1) + config + the root README (got ${entries})`);
+ok(eocdSig && entries === 55, `(ee) the EOCD reports 55 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (9, incl. type-tablet.css/type-mobile.css [#264] + the intrinsic type.1280/type.992 per-mode DTCG) + geometry (8, incl. geometry-tablet.css/geometry-mobile.css [#264] + geometry.1280/geometry.992) + figma/styles.plan.json (1) + config + the root README (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
 // the root README makes the zip self-describing: the folder map, the consumption-plugin install
 // commands (the skills layer deliberately NOT bundled — it updates via the marketplace), the MCP
@@ -1706,11 +1706,11 @@ app.setTypeTokenOverride("Display", "XL", "base", 9999); flushRaf();
 ok(app.doc.type.tokenOverrides["Display|XL|base"] === 512, `(ty-tok-clamp) an over-max type edit (9999) is clamped to 512 LIVE (got ${app.doc.type.tokenOverrides["Display|XL|base"]})`);
 ok(hydSet(serSet(app.doc)).type.tokenOverrides["Display|XL|base"] === 512, "(ty-tok-clamp) the clamped live value equals the persisted value (live === persist)");
 app.clearTypeTokenOverride("Display", "XL", "base"); flushRaf();
-// the override flows to the export: the BASE @media CSS carries 40px for --type-body-md-size.
+// the override flows to the export: the base (Desktop) CSS file carries 40px for --type-body-md-size.
 {
-  const { typeTokensResponsiveCSS: tcss } = await import("../../src/engine/type.mjs");
-  const css = tcss(app._typeScaleFor("base"), app._typeModeScales());
-  ok(/--type-body-md-size: 40px/.test(css), "(ty-tok-ov) the responsive CSS export carries the overridden Base size (40px)");
+  const { typeTokensCSS: tcss } = await import("../../src/engine/type.mjs");
+  const css = tcss(app._typeScaleFor("base"));
+  ok(/--type-body-md-size: 40px/.test(css), "(ty-tok-ov) the base CSS export carries the overridden Base size (40px)");
 }
 // a per-MODE override reaches that mode's DTCG file too.
 app.setTypeTokenOverride("Body", "MD", _bpId, 33); flushRaf();
@@ -1855,9 +1855,9 @@ app.setGeomTokenOverride("XS", "base", 9999); flushRaf();
 ok(app.doc.geometry.tokenOverrides["XS|base"] === 256, `(geo-tok-clamp) an over-max geom edit (9999) is clamped to 256 LIVE (got ${app.doc.geometry.tokenOverrides["XS|base"]})`);
 app.clearGeomTokenOverride("XS", "base"); flushRaf();
 {
-  const { geomTokensResponsiveCSS: gcss } = await import("../../src/engine/geometry.mjs");
-  const css = gcss(app._geomScaleFor("base"), app._geomModeScales());
-  ok(/--size-md-height: 50px/.test(css), "(geo-tok-ov) the responsive CSS export carries the overridden Base height (50px)");
+  const { geomTokensCSS: gcss } = await import("../../src/engine/geometry.mjs");
+  const css = gcss(app._geomScaleFor("base"));
+  ok(/--size-md-height: 50px/.test(css), "(geo-tok-ov) the base CSS export carries the overridden Base height (50px)");
 }
 // a per-MODE override reaches that mode's DTCG file too.
 app.setGeomTokenOverride("MD", _gbpId, 44); flushRaf();
@@ -2090,14 +2090,17 @@ app.addStandardGeomModes(); flushRaf();
   ok(geo && JSON.stringify(geo.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && geo.defaultMode === "Desktop", `(std) the Geometry float plan is [Desktop, Tablet, Mobile], default Desktop (got ${geo && JSON.stringify(geo.modes)})`);
 }
 {
-  // responsive CSS re-anchors mobile-first: :root = the MOBILE scale, then ascending @media blocks up to
-  // the designed Desktop scale at 1280 (_typeCssArgs owns the assembly for the desktop-anchored shapes).
-  const { typeTokensResponsiveCSS: rcss } = await import("../../src/engine/type.mjs");
-  const a = app._typeCssArgs(app._typeScaleFor("base"));
-  const css = rcss(a.root, a.modes);
-  const at992 = css.indexOf("min-width: 992px"), at1280 = css.indexOf("min-width: 1280px");
-  ok(at992 > -1 && at1280 > at992, `(std) responsive type CSS is mobile-first — :root=Mobile, @media 992 then 1280 (992 @ ${at992}, 1280 @ ${at1280})`);
-  ok(a.root.categories.Body.MD.size === app._typeScaleFor("base").categories.Body.MD.size, "(std) the CSS :root (Mobile) keeps Body/MD identical to the designed scale — the frozen-body law in CSS");
+  // the split CSS export (#264) is DESKTOP-ANCHORED and SEPARATE-FILE, not one @media-embedded
+  // stylesheet: the base file is the designed scale, unconditional (no media query at all); the
+  // breakpoint files are bounded bolt-ons (Tablet [992,1279], Mobile open-ended below 991).
+  const { typeTokensCSS: tcss, typeTokensBreakpointCSS: bpcss } = await import("../../src/engine/type.mjs");
+  const baseCss = tcss(app._typeScaleFor("base"));
+  ok(!/@media/.test(baseCss), "(std) the base type CSS file is unconditional — no @media at all (add it alone and it just works)");
+  ok(baseCss.includes(`--type-body-md-size: ${app._typeScaleFor("base").categories.Body.MD.size}px`), "(std) the base file carries the designed (Desktop) scale directly");
+  const files = bpcss(app._typeModeScales());
+  ok(files.length === 2 && files[0].name === "Tablet" && files[1].name === "Mobile", `(std) two breakpoint files, Tablet then Mobile (got ${files.map((f) => f.name)})`);
+  ok(/@media \(min-width: 992px\) and \(max-width: 1279px\)/.test(files[0].css), "(std) the Tablet file is bounded both ends");
+  ok(/@media \(max-width: 991px\)/.test(files[1].css) && !/min-width/.test(files[1].css), "(std) the Mobile file is open-ended below (no gap for the smallest viewports)");
 }
 
 // ── report ──────────────────────────────────────────────────────────────────────────

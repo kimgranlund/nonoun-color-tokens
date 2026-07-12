@@ -36,8 +36,8 @@ import { MCP_BRAND_KIT } from "./mcp-assets.js";
 import { TYPE_FONTS_CSS } from "./type-fonts.js";
 import { CATEGORY_INDEX, loadCategory } from "./categories/index.js";
 import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.mjs";
-import { typeScale, typeTokensCSS, typeTokensResponsiveCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, siblingWeightDefaults, WEIGHT_NAMES } from "../engine/type.mjs";
-import { geomScale, geomTokensCSS, geomTokensResponsiveCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
+import { typeScale, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, siblingWeightDefaults, WEIGHT_NAMES } from "../engine/type.mjs";
+import { geomScale, geomTokensCSS, geomTokensBreakpointCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
 import { modeApplyPlan, validateModeInterchange } from "../../figma/binder/mode-apply-plan.mjs";
 import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
@@ -3074,8 +3074,8 @@ class HctApp extends HTMLElement {
   // desktop-anchored law, 2026-07-10): the designed scale IS Desktop (the base, first, Figma's default
   // mode — baseName "Desktop"); Tablet (992) and Mobile (≤476, marker minWidth 476) derive DOWN via the
   // hierarchy-aware `factor` (body frozen, display ×5/6 / ×2/3). Same values the synthesized (no-modes)
-  // shape exports — committing just makes them matrix-editable. The responsive CSS re-anchors via
-  // _typeCssArgs (root = Mobile, @media up to Desktop), so the mobile-first cascade holds.
+  // shape exports — committing just makes them matrix-editable. The split CSS export (typeTokensCSS for
+  // the unconditional Desktop base + typeTokensBreakpointCSS per mode) reads these directly, no re-anchor.
   addStandardTypeModes() {
     const seed = Date.now().toString(36);
     const rungs = [{ name: "Tablet", w: 992, factor: 5 / 6 }, { name: "Mobile", w: 476, factor: 2 / 3 }];
@@ -5393,10 +5393,18 @@ class HctApp extends HTMLElement {
     const u = { unit: this._exportUnit() }; // the CSS unit preference (Settings › Export); Figma stays px
     const ut = { ...u, prefix: this._typePrefix() }; // + the naming-scheme prefix for the type CSS
     const ug = { ...u, prefix: this._geomPrefix() }; // + the naming-scheme prefix for the geometry CSS
+    // splitCssPreview — a single-pane, read-only preview of the SEPARATE files Download-All actually
+    // zips (base + one file per breakpoint), each fenced with its real filename so "one tab" still shows
+    // the true multi-file shape: add just the base file, or additionally the breakpoint file(s) below it.
+    const splitCssPreview = (baseCss, files, baseFilename) => {
+      const parts = [`/* ${baseFilename} — the only file most sites need */\n${baseCss}`];
+      for (const f of files) parts.push(`/* ${baseFilename.replace(/\.css$/, "")}-${slug(f.name)}.css — optional, add for the ${f.name} breakpoint */\n${f.css}`);
+      return parts.join("\n");
+    };
     const SYSTEM_CODE = {
-      "type-css": () => (() => { const a = this._typeCssArgs(typeSc); return typeTokensResponsiveCSS(a.root, a.modes, ut); })(),
+      "type-css": () => splitCssPreview(typeTokensCSS(typeSc, ut), typeTokensBreakpointCSS(this._typeModeScales(), ut), "type.css"),
       "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
-      "geom-css": () => (() => { const a = this._geomCssArgs(geomSc); return geomTokensResponsiveCSS(a.root, a.modes, ug); })(),
+      "geom-css": () => splitCssPreview(geomTokensCSS(geomSc, ug), geomTokensBreakpointCSS(this._geomModeScales(), ug), "geometry.css"),
       "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
       // the Design System export — the universal-dialect DESIGN.md core + tokens.json (the LLM generation
       // system); the component previews ride the Download-All bundle only (a folder, not a single preview).
@@ -5662,8 +5670,13 @@ class HctApp extends HTMLElement {
     if (sys.type) {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
       const tDtcg = JSON.stringify(typeTokensDTCG(tsc, u), null, 2); // the chosen unit — for the typography/ folder
+      const tCssOpts = { ...u, prefix: this._typePrefix() };
       files.push(
-        { name: "typography/type.css", data: (() => { const a = this._typeCssArgs(tsc); return typeTokensResponsiveCSS(a.root, a.modes, { ...u, prefix: this._typePrefix() }); })() },
+        // SEPARATE files, not one @media-embedded stylesheet: type.css alone is a complete, valid,
+        // Desktop-anchored stylesheet (drop it in and you're done); type-tablet.css / type-mobile.css are
+        // optional, self-contained bolt-ons (each internally bounded — add any subset, any load order).
+        { name: "typography/type.css", data: typeTokensCSS(tsc, tCssOpts) },
+        ...typeTokensBreakpointCSS(this._typeModeScales(), tCssOpts).map((f) => ({ name: `typography/type-${slug(f.name)}.css`, data: f.css })),
         { name: "typography/type.tokens.json", data: tDtcg },
         ...this._typeModeDTCGFiles("typography/type", u),
         { name: "figma/type.tokens.json", data: JSON.stringify(typeTokensDTCG(tsc), null, 2) }, // ALWAYS px — Figma import (a tokens plugin)
@@ -5678,8 +5691,12 @@ class HctApp extends HTMLElement {
     if (sys.geometry) {
       const gsc = this._geomScaleFor("base"); // composed with the type scale (the per-step `font` is shared); override-aware (Phase 3)
       const gDtcg = JSON.stringify(geomTokensDTCG(gsc, u), null, 2); // the chosen unit — for the geometry/ folder
+      const gCssOpts = { ...u, prefix: this._geomPrefix() };
       files.push(
-        { name: "geometry/geometry.css", data: (() => { const a = this._geomCssArgs(gsc); return geomTokensResponsiveCSS(a.root, a.modes, { ...u, prefix: this._geomPrefix() }); })() },
+        // SEPARATE files (mirrors typography/ above): geometry.css alone is a complete, Desktop-anchored
+        // stylesheet; geometry-tablet.css / geometry-mobile.css are optional bolt-ons.
+        { name: "geometry/geometry.css", data: geomTokensCSS(gsc, gCssOpts) },
+        ...geomTokensBreakpointCSS(this._geomModeScales(), gCssOpts).map((f) => ({ name: `geometry/geometry-${slug(f.name)}.css`, data: f.css })),
         { name: "geometry/geometry.tokens.json", data: gDtcg },
         ...this._geomModeDTCGFiles("geometry/geometry", u),
         { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
@@ -5742,8 +5759,8 @@ class HctApp extends HTMLElement {
         "| `design-system-for-figma-make/` | The routed `guidelines/` tree for Figma Make (paste-ready `styles.css`) |",
       );
     }
-    if (sys.type) rows.push("| `typography/` | The eleven-voice type scale — responsive CSS (`@media` per breakpoint) + DTCG, incl. per-breakpoint files |");
-    if (sys.geometry) rows.push("| `geometry/` | The dimensional system — control ramp, radii, spacing, container tier — responsive CSS + DTCG |");
+    if (sys.type) rows.push("| `typography/` | The eleven-voice type scale — `type.css` (Desktop, complete on its own) + optional `type-tablet.css` / `type-mobile.css` bolt-ons + DTCG, incl. per-breakpoint files |");
+    if (sys.geometry) rows.push("| `geometry/` | The dimensional system — control ramp, radii, spacing, container tier — `geometry.css` (Desktop) + optional `geometry-tablet.css` / `geometry-mobile.css` + DTCG |");
     rows.push(`| \`ultimate-tokens-${s}-config.json\` | The re-importable parametric config — open it in Ultimate Tokens to edit this kit |`);
     return [
       `# ${name} — Ultimate Tokens export`, "",
@@ -5759,7 +5776,7 @@ class HctApp extends HTMLElement {
       "offline server wrapping this same kit (palettes · roles · type · geometry) as queryable tools.", "",
       "## Notes", "",
       "- Colors are high-resolution OKLCH at the source; hex files are derived for consumption.",
-      "- Responsive CSS is mobile-first (`:root` = Mobile ≤476, `@media` steps at 992 and 1280); the Figma collections are Desktop-first with Desktop as the default mode. Body-class type is frozen across breakpoints while display-class compresses — that asymmetry is the system.",
+      "- The CSS is Desktop-anchored and split into separate files, matching the Figma collections (Desktop as the default mode): add just `type.css`/`geometry.css` for a non-responsive site, or additionally drop in `-tablet`/`-mobile` — each is a self-contained, bounded `@media` override, so any subset in any load order resolves correctly. Body-class type is frozen across breakpoints while display-class compresses — that asymmetry is the system.",
       "- Include the text-rendering baseline from the design-system `DESIGN.md` Typography section in your global CSS — it is part of the system.",
     ].join("\n") + "\n";
   }
@@ -6528,26 +6545,6 @@ class HctApp extends HTMLElement {
     const n = (g.baseName || (synthesized ? "Desktop" : "Base")).trim() || "Base";
     return { baseName: n, baseLast: n.toLowerCase() === "mobile" };
   }
-  // _typeCssArgs/_geomCssArgs — the RESPONSIVE-CSS assembly, which is always MOBILE-FIRST regardless of
-  // the design anchor: for a Desktop-anchored doc (synthesized, or committed with baseName "Desktop")
-  // the :root block carries the MOBILE scale and the designed scale enters as a Desktop @media block at
-  // 1280; the legacy shapes keep root = the doc base. Consumed by every responsive-CSS call site.
-  _typeCssArgs(baseScale) {
-    const { baseName } = this._typeBaseOpts();
-    const modes = this._typeModeScales();
-    if (baseName.toLowerCase() !== "desktop") return { root: baseScale, modes };
-    const mobile = modes.find((m) => String(m.name).toLowerCase() === "mobile");
-    if (!mobile) return { root: baseScale, modes };
-    return { root: mobile.scale, modes: [...modes.filter((m) => m !== mobile), { name: "Desktop", minWidth: 1280, scale: baseScale }] };
-  }
-  _geomCssArgs(baseScale) {
-    const { baseName } = this._geomBaseOpts();
-    const modes = this._geomModeScales();
-    if (baseName.toLowerCase() !== "desktop") return { root: baseScale, modes };
-    const mobile = modes.find((m) => String(m.name).toLowerCase() === "mobile");
-    if (!mobile) return { root: baseScale, modes };
-    return { root: mobile.scale, modes: [...modes.filter((m) => m !== mobile), { name: "Desktop", minWidth: 1280, scale: baseScale }] };
-  }
   // per-breakpoint DTCG files — one valid standalone DTCG per mode that has a minWidth, keyed by the width
   // (self-documenting + collision-free). No-width modes are preview-only, so they don't export (mirrors CSS).
   _typeModeDTCGFiles(prefix = "type", opts = {}) {
@@ -6588,8 +6585,9 @@ class HctApp extends HTMLElement {
   // desktop-anchored law): the designed ramp IS Desktop (the base, first, Figma's default mode —
   // baseName "Desktop", nothing about it changes); Tablet (992, heights −2) and Mobile (≤476, marker
   // minWidth 476, heights −4, floor 20) derive DOWN — the same values the synthesized (no-modes) shape
-  // exports; committing just makes them matrix-editable. Responsive CSS re-anchors via _geomCssArgs
-  // (root = Mobile, @media up to Desktop). One commit = one undo step.
+  // exports; committing just makes them matrix-editable. The split CSS export (geomTokensCSS for the
+  // unconditional Desktop base + geomTokensBreakpointCSS per mode) reads these directly, no re-anchor.
+  // One commit = one undo step.
   addStandardGeomModes() {
     const bh = (this.doc.geometry && this.doc.geometry.baseHeight) ?? 28;
     const seed = Date.now().toString(36);

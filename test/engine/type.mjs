@@ -156,20 +156,31 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(md.includes("--md-sys-typescale-body-md-size:") && md.includes(".md-sys-typescale-body-md {") && !md.includes("--type-body-md"), "prefix rewrites --type-*/.type-* to the scheme prefix (no stray --type-*)");
   ok(md.includes("--font-body:") && md.includes("var(--font-body)"), "font families stay --font-* under a scale prefix");
   ok(T.typeTokensCSS(s, { prefix: "type" }) === T.typeTokensCSS(s), "prefix 'type' is byte-identical to the default (identity gate)");
-  ok(T.typeTokensResponsiveCSS(s, [{ name: "M", minWidth: 768, scale: s }], { prefix: "md-sys-typescale" }).includes("--md-sys-typescale-body-md-size:"), "responsive CSS threads the prefix into the @media blocks");
   ok(T.typeTokensDTCG(s, { unit: "rem" }).typography.Body.MD.$value.fontSize === "1rem" && T.typeTokensDTCG(s).typography.Body.MD.$value.fontSize === "16px", "DTCG carries the unit (fontSize 1rem) + defaults to px");
-  ok(T.typeTokensResponsiveCSS(s, [{ name: "M", minWidth: 768, scale: T.typeScale({ treatment: "product", bodyBase: 13 }) }], { unit: "rem" }).includes("--type-body-md-size: 0.8125rem;"), "the @media breakpoint block honors the unit (13px = 0.8125rem)");
 }
 
-// ── responsive CSS: per-breakpoint @media blocks re-declaring the size vars (Phase 5.4) ──
+// ── breakpoint CSS: SEPARATE, self-contained per-mode override FILES (not one @media-embedded file) —
+// each bounded on both ends except the narrowest, which stays open below (#264) ──
 {
   const base = T.typeScale({ treatment: "product", bodyBase: 16 });
   const mobile = T.typeScale({ treatment: "product", bodyBase: 13 });
-  const css = T.typeTokensResponsiveCSS(base, [{ name: "Mobile", minWidth: 768, scale: mobile }, { name: "NoWidth", scale: mobile }]);
-  ok(css.startsWith(T.typeTokensCSS(base)), "responsive CSS begins with the full base CSS");
-  ok(/@media \(min-width: 768px\) \{\s*:root \{[^}]*--type-body-md-size: 13px/.test(css), "a mode with minWidth emits @media (min-width) re-declaring the size vars at the mode's body size");
-  ok((css.match(/@media/g) || []).length === 1, "a mode WITHOUT a minWidth is skipped (no @media)");
-  ok(T.typeTokensResponsiveCSS(base, []) === T.typeTokensCSS(base), "no modes → identical to the base CSS");
+  const tablet = T.typeScale({ treatment: "product", bodyBase: 15 });
+
+  const solo = T.typeTokensBreakpointCSS([{ name: "Mobile", minWidth: 768, scale: mobile }, { name: "NoWidth", scale: mobile }]);
+  ok(solo.length === 1 && solo[0].name === "Mobile", "a mode WITHOUT a minWidth is skipped (preview-only, mirrors the DTCG files)");
+  ok(/@media \(max-width: 1279px\) \{\s*:root \{[^}]*--type-body-md-size: 13px/.test(solo[0].css) && !/min-width/.test(solo[0].css), "a lone mode is the NARROWEST too: open-ended below, bounded above by desktopMinWidth-1 (default 1280), no min-width");
+  ok(T.typeTokensBreakpointCSS([]).length === 0, "no modes → no files");
+
+  const two = T.typeTokensBreakpointCSS([{ name: "Tablet", minWidth: 992, scale: tablet }, { name: "Mobile", minWidth: 476, scale: mobile }]);
+  ok(two.length === 2 && two[0].name === "Tablet" && two[1].name === "Mobile", "sorted DESCENDING by minWidth regardless of storage order");
+  ok(/@media \(min-width: 992px\) and \(max-width: 1279px\)/.test(two[0].css), "the wider mode is bounded BOTH ends: [own minWidth, desktopMinWidth-1]");
+  ok(/@media \(max-width: 991px\)/.test(two[1].css) && !/min-width/.test(two[1].css), "the narrowest mode is open-ended below: (max-width: next-wider.minWidth-1) only");
+  const reversed = T.typeTokensBreakpointCSS([{ name: "Mobile", minWidth: 476, scale: mobile }, { name: "Tablet", minWidth: 992, scale: tablet }]);
+  ok(JSON.stringify(reversed) === JSON.stringify(two), "order-independent: reversed storage order yields the identical file set");
+
+  ok(T.typeTokensBreakpointCSS([{ name: "M", minWidth: 768, scale: base }], { prefix: "md-sys-typescale" })[0].css.includes("--md-sys-typescale-body-md-size:"), "the prefix threads into a breakpoint file too");
+  ok(T.typeTokensBreakpointCSS([{ name: "M", minWidth: 768, scale: T.typeScale({ treatment: "product", bodyBase: 13 }) }], { unit: "rem" })[0].css.includes("--type-body-md-size: 0.8125rem;"), "a breakpoint file honors the unit (13px = 0.8125rem)");
+  ok(T.typeTokensBreakpointCSS([{ name: "Wide", minWidth: 1400, scale: base }], { desktopMinWidth: 1600 })[0].css.includes("@media (max-width: 1599px)"), "desktopMinWidth is overridable (a custom mode wider than the app's own 1280 default)");
 }
 
 // ── per-cell SIZE overrides (Tokens-matrix Phase 3): the size lever; line re-derives; tracking+weight stay ──

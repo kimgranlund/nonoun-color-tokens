@@ -58,8 +58,10 @@ is the responsive knob**: at 0 the expressive band loses its gear and continues 
 INTRINSIC (#252/#253)**: the designed ramp IS Desktop (1280, Figma's default mode); Tablet (992, heights
 −2) and Mobile (≤476, −4, floor 20) are SYNTHESIZED at export/apply when the doc carries no modes
 (`_geomModeScales`), each composing type at the same rung; the Standard-set button just materializes the
-same modes for matrix editing. Responsive CSS re-anchors mobile-first via `_geomCssArgs` (`:root` =
-Mobile, `@media` up to Desktop). The constants + the reference table: `references/foundations.md` §4.
+same modes for matrix editing. The CSS export is SEPARATE FILES, not one @media-embedded stylesheet
+(#264): `geometry.css` is the unconditional Desktop base (`geomTokensCSS`, complete on its own);
+`geometry-tablet.css` / `geometry-mobile.css` are bounded, self-contained bolt-ons (`geomTokensBreakpointCSS`)
+a consumer adds in any subset, any order. The constants + the reference table: `references/foundations.md` §4.
 
 ## THE COMPOSITION — one number, two engines (the JOIN)
 
