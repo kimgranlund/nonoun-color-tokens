@@ -1147,14 +1147,46 @@ class HctApp extends HTMLElement {
   }
 
   // presetTile — one read-only preset card. Clicking opens an editable copy into the user's sets.
+  // The strip's per-swatch WIDTH tracks the preset's own authored dominant/supporting/accent hierarchy
+  // (story.groups[].pct, via each palette's colorRole — TKT-0003) instead of a fixed template, so a
+  // strip is evocative of ITS concept rather than generically neutral-heavy. Neutral (no colorRole)
+  // keeps a small fixed backdrop share (8%); the groups' pcts are scaled to fill the remaining 92% and
+  // split EQUALLY across however many enabled palettes share each colorRole (dominant:1, supporting:3,
+  // accent:2 — split even when the strip shows only some of a group, e.g. accent's 2nd swatch is
+  // sliced off below). A palette with no matching colorRole/group gets a small fallback share (5%),
+  // never the old fixed template. Sets with no `story` (a user's own "Your Palettes" set) fall back to
+  // the fixed SAMPLED_W template exactly as before — no regression there.
   presetTile(preset) {
     const v = projectView(hydrate(preset));
     const enabled = v.palettes.filter((p) => p.on);
+    const shown = enabled.slice(0, 6); // same 6 bands as before — neutral + primary/-muted + secondary/-muted + accent
     const SAMPLED_W = [36, 19, 19, 16, 6, 4];
+    const groups = preset.story?.groups;
+    let widths;
+    if (Array.isArray(groups) && groups.length) {
+      const NEUTRAL_PCT = 8, FALLBACK_PCT = 5;
+      const HIER_OF_ROLE = { dominant: "d", supporting: "s", accent: "a" };
+      const scaledByHier = {};
+      for (const g of groups) scaledByHier[g.hier] = (g.pct || 0) * ((100 - NEUTRAL_PCT) / 100);
+      // how many ENABLED palettes (not just the shown 6) share each colorRole — dominant:1, supporting:3,
+      // accent:2 — so the authored share splits evenly across the real cohort even when one sibling
+      // (accent-muted) doesn't make the sliced strip.
+      const roleCounts = {};
+      for (const p of enabled) if (p.colorRole) roleCounts[p.colorRole] = (roleCounts[p.colorRole] || 0) + 1;
+      widths = shown.map((p) => {
+        if (p.name === "neutral") return NEUTRAL_PCT;
+        const hier = HIER_OF_ROLE[p.colorRole];
+        const scaled = hier != null ? scaledByHier[hier] : undefined;
+        if (scaled == null) return FALLBACK_PCT; // defensive: curated preset missing a colorRole tag
+        return scaled / (roleCounts[p.colorRole] || 1);
+      });
+    } else {
+      widths = shown.map((_, i) => SAMPLED_W[i] || 1); // no authored story — the original fixed template
+    }
     const strip = h(
       "div",
       { class: "strip" },
-      ...enabled.slice(0, 6).map((p, i) => h("i", { style: `background:${p.key};flex:${SAMPLED_W[i] || 1}` })),
+      ...shown.map((p, i) => h("i", { style: `background:${p.key};flex:${widths[i]}` })),
     );
     return h(
       "button",

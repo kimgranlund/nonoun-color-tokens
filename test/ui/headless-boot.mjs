@@ -1072,6 +1072,37 @@ ok(filteredHH >= 1 && filteredHH < 48, `(hh) the search box filters the category
 app.search = ""; app.closeCategory(); flushRaf();
 ok(app.category === null && app.querySelectorAll(".category-card").length === 7, "(hh) closing a category returns to the hub");
 
+// ── (jj) preset strip weighting (TKT-0003): a preset's strip WIDTH tracks its OWN authored
+// dominant/supporting/accent hierarchy (story.groups[].pct via colorRole), not a fixed template — so
+// the widest band is the preset's dominant color, not unconditionally neutral, and two presets with
+// different authored hierarchies visibly differ in PROPORTION, not just hue.
+const flexOf = (i) => { const m = /flex:\s*([\d.]+)/.exec(i.getAttribute("style") || ""); return m ? Number(m[1]) : NaN; };
+const stripWidths = (preset) => [...app.presetTile(preset).querySelector(".strip").children].map(flexOf);
+const jjPreset0 = TP[0]; // d:60,s:30,a:10
+const jj0 = stripWidths(jjPreset0);
+ok(jj0.length === 6, `(jj) the strip still shows 6 bands (same count as the old fixed template, got ${jj0.length})`);
+// band order is [neutral, primary(dominant), primary-muted(supporting), secondary(supporting), secondary-muted(supporting), accent]
+const [jjNeutral, jjDominant, ...jjRest] = jj0;
+ok(jjDominant > jjNeutral && jjRest.every((w) => jjDominant > w), `(jj) the widest band is the preset's DOMINANT-tier color, not neutral (got neutral=${jjNeutral}, dominant=${jjDominant}, rest=${jjRest.join(",")})`);
+ok(Math.abs(jjNeutral - 8) < 0.01, `(jj) neutral keeps its small fixed 8% backdrop share (got ${jjNeutral})`);
+// independent re-derivation of the exact expected widths from story.groups, to catch drift in the
+// weighting formula itself (not just the ordering property above).
+const jjExpectDominant = jjPreset0.story.groups.find((g) => g.hier === "d").pct * 0.92;
+ok(Math.abs(jjDominant - jjExpectDominant) < 0.01, `(jj) dominant band = groups.d.pct scaled to fill the 92% non-neutral pool (want ${jjExpectDominant.toFixed(2)}, got ${jjDominant.toFixed(2)})`);
+const jjExpectSupportingEach = (jjPreset0.story.groups.find((g) => g.hier === "s").pct * 0.92) / 3;
+ok(jjRest.slice(0, 3).every((w) => Math.abs(w - jjExpectSupportingEach) < 0.01), `(jj) supporting's scaled pct splits equally across its 3 palettes (want ${jjExpectSupportingEach.toFixed(2)} each, got ${jjRest.slice(0, 3).join(",")})`);
+const jjExpectAccentEach = (jjPreset0.story.groups.find((g) => g.hier === "a").pct * 0.92) / 2; // accent-muted is sliced off the shown strip; still divides by its full 2-palette cohort
+ok(Math.abs(jjRest[3] - jjExpectAccentEach) < 0.01, `(jj) accent's scaled pct is split across its full 2-palette cohort even though only 1 accent swatch is shown (want ${jjExpectAccentEach.toFixed(2)}, got ${jjRest[3]})`);
+// two presets with DIFFERENT authored hierarchies (d:60 vs d:50) visibly differ in PROPORTION
+const jjPreset5 = TP[5]; // d:50,s:40,a:10
+const jj5 = stripWidths(jjPreset5);
+ok(Math.abs(jj0[1] - jj5[1]) > 3, `(jj) two presets with different authored dominant shares (60 vs 50) render visibly different dominant-band widths (got ${jj0[1].toFixed(2)} vs ${jj5[1].toFixed(2)})`);
+// a set with NO story.groups (a user's own "Your Palettes" set) falls back EXACTLY to the original
+// fixed SAMPLED_W template — no regression there.
+const jjNoStory = { ...jjPreset0, story: undefined };
+const jjFallback = stripWidths(jjNoStory);
+ok(JSON.stringify(jjFallback) === JSON.stringify([36, 19, 19, 16, 6, 4]), `(jj) a preset/set with no story.groups falls back to the fixed SAMPLED_W template exactly (got ${JSON.stringify(jjFallback)})`);
+
 // ── (ee) "Download all (.zip)": one foldered archive of every format + the re-importable config ──
 const setName0 = app.doc.name;
 let zipCap = null;
