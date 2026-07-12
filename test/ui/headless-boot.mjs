@@ -1019,7 +1019,7 @@ const TPm = await LS("travel"); // one category lazily loaded
 const TP = TPm.PRESETS;
 ok(Array.isArray(TP) && TP.length === 48, `(hh) travel category lazily loads 48 presets (got ${TP && TP.length})`);
 ok(TP.every((p) => p.palettes.length === 11), "(hh) each preset has 11 palettes (a derived neutral + 6 sampled + info/success/warning/danger)");
-const SLOTS = ["neutral","primary-base","primary-muted","secondary-base","secondary-muted","accent-base","accent-muted","info","success","warning","danger"];
+const SLOTS = ["neutral","primary","primary-muted","secondary","secondary-muted","accent","accent-muted","info","success","warning","danger"];
 ok(TP.every((p) => JSON.stringify(p.palettes.map((x) => x.name)) === JSON.stringify(SLOTS)), "(hh) every preset leads with the derived neutral, then the {tier}-{rank} + status model, identically");
 // the leading neutral is DERIVED from the character palettes' key colors (environment tone): a
 // low-chroma tinted grey retaining the derived target as its dominant key color.
@@ -1041,10 +1041,10 @@ for (const c of SI) {
     `(hh) category "${c.slug}" loads 48 presets × 11 palettes`);
 }
 // lift-anchoring (EVEN mode): a LIGHT dominant must open LIGHT, not the old mid-dark L*≈46 grey.
-// This is the "colors look really wrong" fix. Keyed on any preset whose primary-base source is light.
+// This is the "colors look really wrong" fix. Keyed on any preset whose primary source is light.
 const { projectView: _pvHH } = await import("../../src/ui/model.mjs");
 const { hydrate: _hydHH } = await import("../../src/ui/persist.js");
-const _light = TP.find((p) => p.palettes[1].keyColors[0].oklch[0] > 0.85); // primary-base (after the neutral at [0])
+const _light = TP.find((p) => p.palettes[1].keyColors[0].oklch[0] > 0.85); // primary (after the neutral at [0])
 const _lightPrime = _pvHH(_hydHH({ ..._light, toneMode: "even" })).palettes[1].ramp.find((s) => s.stop === 550);
 ok(_lightPrime.tone > 72, `(hh) [even] lift anchors the prime to source lightness — a light dominant opens LIGHT (550 L*=${_lightPrime.tone.toFixed(0)})`);
 app.toGallery(); flushRaf();
@@ -1060,7 +1060,7 @@ const setsBeforeHH = app.sets.length;
 const openPreset = TP[0];
 app.openConfigAsSet(openPreset, "Opened");
 ok(app.view === "editor" && app.sets.length === setsBeforeHH + 1, "(hh) opening a preset adds an EDITABLE copy to your sets + enters the editor");
-ok(app.doc.palettes.length === 11 && app.doc.palettes[0].name === "neutral" && app.doc.palettes[1].name === "primary-base", "(hh) the opened copy carries the 11 named palettes (neutral first, then primary-base)");
+ok(app.doc.palettes.length === 11 && app.doc.palettes[0].name === "neutral" && app.doc.palettes[1].name === "primary", "(hh) the opened copy carries the 11 named palettes (neutral first, then primary)");
 ok(["info","success","warning","danger"].every((n) => app.doc.palettes.some((p) => p.name === n)), "(hh) the status palettes (info/success/warning/danger) are present in the copy");
 app.toGallery(); flushRaf();
 ok(app.category === "travel", "(hh) returning from the editor lands back on the open category page");
@@ -1358,7 +1358,7 @@ ok(app.doc.story && app.doc.story.title === storyPreset.story.title, "(st5) open
 app.setSegment("story"); flushRaf();
 ok(!!app.querySelector(".story-pane"), "(st6) the Story tab renders for a set with a story");
 ok(app.querySelectorAll(".story-color").length >= 1, "(st7) the Story tab lists the curated colors");
-// the Palette tab shows the per-color story line — select a CURATED palette (primary-base, now at
+// the Palette tab shows the per-color story line — select a CURATED palette (primary, now at
 // index 1 after the derived neutral; the neutral carries no curated story line of its own).
 app.setSegment("palette"); app.selectPalette(1); flushRaf();
 ok(!!app.querySelector(".color-story"), "(st8) the Palette tab shows the curated color's story line");

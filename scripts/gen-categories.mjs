@@ -10,12 +10,14 @@
 //                               (the 48 sets as read-only gallery presets the generator opens as copies).
 //
 // NAMING — per docs/reference/colors/color-model-function.md:
-//   sampled 6 colors → {tier}-{rank}: primary-base/muted, secondary-base/muted, accent-base/muted
+//   sampled 6 colors → {tier}[-muted]: primary/primary-muted, secondary/secondary-muted, accent/accent-muted
+//   (the base tier of each family carries NO "-base" suffix — only the muted sibling is suffixed;
+//   the "-base"/"-muted" symmetric split was retired in favor of bare-name/"-muted", 2026-07-12)
 //   status 4 colors  → info/success/warning/danger  (NOT in the category JSON — the canonical semantic
 //                      status set is appended, matching the product's Info/Success/Warning/Danger families)
 //
-// 1/3/2 → 2-2-2 MAPPING: dominant → primary-base; supporting nearest the ground → primary-muted;
-//   the other two supporting (by chroma) → secondary-base/muted; the two accents → accent-base/muted.
+// 1/3/2 → 2-2-2 MAPPING: dominant → primary; supporting nearest the ground → primary-muted;
+//   the other two supporting (by chroma) → secondary/secondary-muted; the two accents → accent/accent-muted.
 //
 // Run via `npm run gen:categories`.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
@@ -108,11 +110,11 @@ function mapColors(swatches) {
   const secondary = byNearGround.slice(1).sort((a, b) => C(b) - C(a));
   const p = (name, s) => palette(name, s.hex, s.ok, s);
   return [
-    p("primary-base", dom),
+    p("primary", dom),
     p("primary-muted", primaryMuted),
-    p("secondary-base", secondary[0]),
+    p("secondary", secondary[0]),
     p("secondary-muted", secondary[1]),
-    p("accent-base", acc[0]),
+    p("accent", acc[0]),
     p("accent-muted", acc[1]),
     palette("info", STATUS.info.hex, STATUS.info.oklch),
     palette("success", STATUS.success.hex, STATUS.success.oklch),
