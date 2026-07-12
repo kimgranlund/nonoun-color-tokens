@@ -698,7 +698,7 @@ const dsContrast = (a, b) => {
 };
 
 // The neutral-duty (chrome) family carries the surface + state slots: the neutral-named palette,
-// else the first enabled one (the reference theme's near-achromatic primary-base leads the list).
+// else the first enabled one (the reference theme's near-achromatic primary leads the list).
 const dsChrome = (palettes) =>
   palettes.find((p) => /neutral|gray|grey|slate|stone|zinc|mono/.test(p.name.toLowerCase())) || palettes[0];
 const dsRole = (p, suffix) => p && p.roles.find((r) => r.suffix === suffix);

@@ -30,6 +30,16 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   mobile-first — was the likely source of "why do we only see Desktop tokens" confusion: the file's
   unlabeled `:root` block held the smallest (Mobile) sizes, not the designed Desktop ones.
 
+- **Curated preset palette naming drops the redundant "-base" suffix** — `primary-base`, `secondary-base`,
+  `accent-base` are now `primary`, `secondary`, `accent` (their `-muted` siblings are unchanged). The
+  base member of a tier is the tier's canonical identity; only its variant needs a suffix, the same way
+  `primary-500` needs no `-solid` to mean the tier's main stop. Cascades to every export that derives its
+  token name from the palette name: `--{family}-base-*` custom properties become `--{family}-*`, and the
+  design-system export's role keys (`dsColorRoles`, already keyed off the palette name verbatim) drop the
+  now-unneeded Stitch-compat `primary` alias for curated presets (the brand family IS already named
+  `primary`, so `aliasDistinct` — which exists exactly for this transition — resolves to `false`).
+  Regenerated all 336 Color Categories presets (`npm run gen:categories`).
+
 #### Fixed
 - **Symmetric, explicit Figma text-style weight naming** (TKT-0001) — a voice/step with sibling weights
   configured now names EVERY entry, including the core, with its own lowercase-kebab weight segment:

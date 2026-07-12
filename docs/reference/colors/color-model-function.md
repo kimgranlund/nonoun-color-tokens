@@ -65,7 +65,9 @@ A fourth, derived concern: what text/icon color sits *on top* of a given color. 
 ## 3. Naming convention
 
 ```
-{tier}-{rank}              sampled palette colors
+{tier}[-muted]             sampled palette colors — the tier's BASE member is bare; only its muted
+                            sibling carries a suffix (2026-07-12 — was {tier}-base/{tier}-muted, a
+                            symmetric suffix on both; the base member's name is now just the tier)
 functional-{role}          status colors, derived
 on-{token}                 the legible foreground for {token}
 ```
@@ -73,13 +75,13 @@ on-{token}                 the legible foreground for {token}
 A full palette therefore reads:
 
 ```
-primary-base       primary-muted
-secondary-base     secondary-muted
-accent-base        accent-muted
+primary            primary-muted
+secondary          secondary-muted
+accent             accent-muted
 
 functional-error   functional-warning   functional-success
 
-on-primary-base    on-secondary-base    …   (as needed)
+on-primary         on-secondary         …   (as needed)
 ```
 
 **Why this and not the alternatives:**
@@ -87,7 +89,10 @@ on-primary-base    on-secondary-base    …   (as needed)
 - It is **two-axis**, so one word never carries two meanings.
 - It is **flat and predictable** — a designer can guess a token name before looking it up.
 - It **scales** — numeric ranks absorb extra colors; the functional axis absorbs new states.
-- It **survives translation to code** — these map cleanly to CSS custom properties (`--primary-base`, `--functional-error`) and to most design-token tools.
+- It **survives translation to code** — these map cleanly to CSS custom properties (`--primary`, `--functional-error`) and to most design-token tools.
+- **The base member stays unsuffixed** — `primary`, not `primary-base` — because it is the tier's
+  canonical identity; only the tier's VARIANT (`-muted`) earns a suffix, the same way `primary-500`
+  needs no `-solid` to mean the tier's main stop.
 
 ---
 
@@ -99,7 +104,11 @@ These are the heuristics that keep a palette coherent. Treat each as a default w
 Primary should dominate the field, secondary should furnish it, accent should never exceed roughly a tenth. If accent creeps past that, it stops being punctuation and starts being a second primary — the palette goes loud and loses its source.
 
 **base ↔ muted (within a tier).**
-The muted member is the base with chroma pulled down and/or hue nudged a few degrees — same lightness neighborhood. It exists to give a tier *range* without introducing a new color identity. If base and muted read as two unrelated colors, one of them belongs in a different tier.
+The muted member is the tier's base color with chroma pulled down and/or hue nudged a few degrees —
+same lightness neighborhood ("base" here names the ROLE, not a token suffix — the base member's
+token name is just the tier, e.g. `primary`; only `-muted` is a real suffix). It exists to give a tier
+*range* without introducing a new color identity. If base and muted read as two unrelated colors, one
+of them belongs in a different tier.
 
 **Primary ↔ Accent (across the spread).**
 Accent earns its loudness by contrast with the primary ground — usually a large lightness gap, a chroma jump, or a hue on the far side of the wheel. The Trans-Siberian palette works because maroon and dusk-ultramarine are the *only* saturated reads against a silver ground; drown them in more saturation and the contrast that makes them mean something evaporates.
@@ -128,7 +137,7 @@ Use this to evaluate or repair any palette. A healthy palette answers "yes" to a
 5. **Functional fit?** Do the derived status colors read as error/warning/success *and* feel sampled from this palette?
 6. **Refusal named?** Is the category cliché this palette rejects explicitly stated?
 
-> Note on the existing library: most palettes today sample as **1 dominant / 3 supporting / 2 accent**. Mapping them onto this 2-2-2 model is a *judgment call per palette*, not a pure rename — you promote one supporter to `secondary-base`, pair another as its `muted`, and fold or demote the rest. Do it with the scorecard in hand.
+> Note on the existing library: most palettes today sample as **1 dominant / 3 supporting / 2 accent**. Mapping them onto this 2-2-2 model is a *judgment call per palette*, not a pure rename — you promote one supporter to `secondary`, pair another as its `-muted`, and fold or demote the rest. Do it with the scorecard in hand.
 
 ---
 
@@ -138,16 +147,16 @@ Use this to evaluate or repair any palette. A healthy palette answers "yes" to a
 
 | Token | Color | OKLCH | HEX | Reasoning |
 |---|---|---|---|---|
-| **primary-base** | Frozen birch forest, silver | `0.918 0.005 215` | `#E3E6E7` | The ground — the whole trip read from the window. |
+| **primary** | Frozen birch forest, silver | `0.918 0.005 215` | `#E3E6E7` | The ground — the whole trip read from the window. |
 | **primary-muted** | Window condensation | `0.857 0.011 80` | `#DAD3C4` | Same near-neutral lightness, faint warm shift — the base's quiet partner. |
-| **secondary-base** | Samovar brass | `0.620 0.068 78` | `#A08361` | The most distinct working surface; furnishes the field with warmth. |
+| **secondary** | Samovar brass | `0.620 0.068 78` | `#A08361` | The most distinct working surface; furnishes the field with warmth. |
 | **secondary-muted** | Birch bark | `0.778 0.012 75` | `#C5BCB1` | Brass's lower-chroma relative — same family, recedes. |
-| **accent-base** | Kupé maroon velour | `0.322 0.045 28` | `#4B2F2C` | Dark, saturated, rare — punctuation against the silver. |
+| **accent** | Kupé maroon velour | `0.322 0.045 28` | `#4B2F2C` | Dark, saturated, rare — punctuation against the silver. |
 | **accent-muted** | 3 p.m. dusk, ultramarine | `0.303 0.048 268` | `#343C54` | The second loud read, hue thrown to the cool side. |
 | **functional-error** | *derived* | `0.535 0.110 28` | `#A35248` | Hue 28°, chroma pulled to this palette's quiet accent register. |
 | **functional-warning** | *derived* | `0.760 0.100 88` | `#CCAE63` | Reads as caution without breaking the muted mood. |
 | **functional-success** | *derived* | `0.560 0.090 150` | `#4B8358` | Green that belongs to a silver-and-brass world. |
-| **on-primary-base** | → accent-base | — | `#4B2F2C` | Dark type on the light silver ground. |
+| **on-primary** | → accent | — | `#4B2F2C` | Dark type on the light silver ground. |
 
 Field share: primary ~55%, secondary ~35%, accent ~10% — and the palette still **refuses** the Soviet-flag red it would otherwise default to.
 
