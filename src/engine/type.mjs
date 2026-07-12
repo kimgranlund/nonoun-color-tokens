@@ -304,6 +304,18 @@ export function siblingWeightDefaults(core) {
     .map((w) => ({ name: WEIGHT_NAMES[w], weight: w }));
 }
 
+// weightNameFor(weight) — the SAME nearest-ladder-stop snap siblingWeightDefaults uses, exposed
+// standalone so a consumer can name the CORE weight itself (siblingWeightDefaults deliberately EXCLUDES
+// the core — it only suggests neighbors). Used to give the core an explicit, symmetric weight segment
+// alongside its siblings in a Figma text-style path (TKT-0001) — e.g. core weight 620 snaps to 600
+// ("Semi-bold" / "semi-bold"). Non-finite ⇒ null (defensive; a real scale never yields it).
+export function weightNameFor(weight) {
+  const c = Number(weight);
+  if (!Number.isFinite(c)) return null;
+  const snap = WEIGHT_LADDER.reduce((a, b) => (Math.abs(b - c) < Math.abs(a - c) ? b : a));
+  return { weight: snap, name: WEIGHT_NAMES[snap], slug: kebab(WEIGHT_NAMES[snap]) };
+}
+
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
 const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 

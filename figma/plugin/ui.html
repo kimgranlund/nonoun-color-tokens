@@ -3006,6 +3006,18 @@ function siblingWeightDefaults(core) {
     .map((w) => ({ name: WEIGHT_NAMES[w], weight: w }));
 }
 
+// weightNameFor(weight) — the SAME nearest-ladder-stop snap siblingWeightDefaults uses, exposed
+// standalone so a consumer can name the CORE weight itself (siblingWeightDefaults deliberately EXCLUDES
+// the core — it only suggests neighbors). Used to give the core an explicit, symmetric weight segment
+// alongside its siblings in a Figma text-style path (TKT-0001) — e.g. core weight 620 snaps to 600
+// ("Semi-bold" / "semi-bold"). Non-finite ⇒ null (defensive; a real scale never yields it).
+function weightNameFor(weight) {
+  const c = Number(weight);
+  if (!Number.isFinite(c)) return null;
+  const snap = WEIGHT_LADDER.reduce((a, b) => (Math.abs(b - c) < Math.abs(a - c) ? b : a));
+  return { weight: snap, name: WEIGHT_NAMES[snap], slug: kebab(WEIGHT_NAMES[snap]) };
+}
+
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
 const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
@@ -3226,7 +3238,7 @@ function typeTokensFigmaPrimitives(scale) {
   };
 }
 
-return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, typeScale, WEIGHT_LADDER, WEIGHT_NAMES, siblingWeightDefaults, dimUnit, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes, typeTokensFigmaPrimitives };
+return { TYPE_RATIOS, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, typeScale, WEIGHT_LADDER, WEIGHT_NAMES, siblingWeightDefaults, weightNameFor, dimUnit, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, disambiguateModeNames, typeTokensFigmaModes, typeTokensFigmaPrimitives };
 })();
 __M.geometry = (function(){
 // geometry.mjs — the GEOMETRY / dimensional engine: the spatial analog of the color & type engines.
@@ -7538,7 +7550,10 @@ __M.stylePlan = (function(){
 //   paints: [{ name: "Primary/onPrimary" | "Primary/scrims/scrim" | "Primary/surfaces/surface",
 //              varName: "primary/onPrimary" }]                   // → Color Modes variable, ratified grouping:
 //                                                                //   scrim* → scrims/ · surface*|container* → surfaces/
-//   texts:  [{ name: "Display/xl" (core) | "Display/xl/Bold" (sibling),
+//   texts:  [{ name: "Display/xl" (no siblings configured — bare) |
+//                     "Display/xl/black" (core, WITH siblings — its own weight, kebab) |
+//                     "Display/xl/extra-bold" (sibling, kebab via wv.slug) (TKT-0001 — symmetric,
+//                     explicit, lowercase-kebab naming across core + every sibling),
 //              voice, step,
 //              bind:    { fontSize, lineHeight, letterSpacing,   // → Typography collection keys
 //                         paragraphSpacing?,                     //   (prose voices only)
@@ -7551,6 +7566,7 @@ __M.stylePlan = (function(){
 // their core in list order. Same inputs ⇒ byte-identical plan (the executor's idempotency rides on it).
 
 const { semanticRoles } = __M.semantic;
+const { weightNameFor } = __M.type;
 
 // styleGroupOf — the ratified paint-style sub-folder for a role key: the 7 scrim roles under scrims/,
 // the surface + container ladders under surfaces/, everything else flat under the family.
@@ -7600,18 +7616,22 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
           ...(hasPara ? { paragraphSpacing: s.paragraphSpacing } : {}),
           textCase: s.textTransform || "none",
         };
-        // the CORE style — bare `Voice/step` (ratified: no weight suffix on the core). fontWeight binds
-        // to the voice's core weight primitive (always emitted), so weight is variable-driven on cores too.
+        // the CORE style — `Voice/step` when the voice/step has NO configured siblings (nothing to
+        // disambiguate); `Voice/step/{own-weight-slug}` when it DOES (TKT-0001 — symmetric with its
+        // siblings below, so the Styles panel never leaves the default weight unlabeled next to named
+        // variants). fontWeight binds to the voice's core weight primitive either way (always emitted).
+        const coreWeightName = sibs.length ? weightNameFor(s.weight) : null;
         texts.push({
-          name: `${voice}/${stepSlug}`,
+          name: coreWeightName ? `${voice}/${stepSlug}/${coreWeightName.slug}` : `${voice}/${stepSlug}`,
           voice, step,
           bind: { ...bindBase, fontWeight: `weight/${voice}`, ...(coreStyleName ? { fontStyle: `weight-style/${voice}` } : {}) },
           literal: { ...litBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
         });
-        // the SIBLING weight variants — `Voice/step/Name`, weight + style-name swapped per sibling.
+        // the SIBLING weight variants — `Voice/step/{weight-slug}` (kebab, via wv.slug — the SAME slug
+        // already used for the binding target names below, so the display path and the bind target agree).
         for (const wv of sibs) {
           texts.push({
-            name: `${voice}/${stepSlug}/${wv.name}`,
+            name: `${voice}/${stepSlug}/${wv.slug}`,
             voice, step,
             bind: { ...bindBase, fontStyle: `weight-style/${voice}/${wv.slug}`, fontWeight: `weight/${voice}/${wv.slug}` },
             literal: { ...litBase, styleName: wv.name, weight: wv.weight },

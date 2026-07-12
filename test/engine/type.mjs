@@ -339,6 +339,12 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(T.siblingWeightDefaults(900)[0].name === "Extra-bold" && T.siblingWeightDefaults(400)[1].name === "Semi-bold", "defaults carry the ladder's semantic names");
   ok(T.siblingWeightDefaults(NaN).length === 0, "defaults: non-finite core → empty");
 
+  // weightNameFor — the SAME snap, exposed standalone to name the CORE weight itself (TKT-0001: the
+  // symmetric Figma text-style naming, core alongside its siblings).
+  ok(JSON.stringify(T.weightNameFor(900)) === JSON.stringify({ weight: 900, name: "Black", slug: "black" }), "weightNameFor: an exact ladder stop names itself");
+  ok(JSON.stringify(T.weightNameFor(620)) === JSON.stringify({ weight: 600, name: "Semi-bold", slug: "semi-bold" }), "weightNameFor: a non-ladder core snaps to its nearest stop (620→600)");
+  ok(T.weightNameFor(NaN) === null, "weightNameFor: non-finite → null");
+
   // identity gate — no weights config ⇒ no `weights` key, emitters byte-identical
   const base = T.typeScale({ treatment: "product" });
   const withEmpty = T.typeScale({ treatment: "product", voices: { Display: { weights: [] }, Body: { weights: [{ name: "", weight: 700 }, { name: "Bad", weight: 0 }] } } });

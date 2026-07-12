@@ -30,6 +30,16 @@ they landed on `main` and reference the squash-merged PR that introduced them.
   mobile-first — was the likely source of "why do we only see Desktop tokens" confusion: the file's
   unlabeled `:root` block held the smallest (Mobile) sizes, not the designed Desktop ones.
 
+#### Fixed
+- **Symmetric, explicit Figma text-style weight naming** (TKT-0001) — a voice/step with sibling weights
+  configured now names EVERY entry, including the core, with its own lowercase-kebab weight segment:
+  `Display/xs/black`, `Display/xs/extra-bold`, `Display/xs/bold`, instead of the old asymmetric shape
+  (`Display/xs` bare core + `Display/xs/Extra-Bold` title-case siblings) that left the default weight
+  unlabeled in the Styles panel. `weightNameFor(weight)` (`src/engine/type.mjs`) names the core, snapping
+  to the same `WEIGHT_LADDER` `siblingWeightDefaults` uses; siblings reuse their already-existing
+  `wv.slug`. A voice/step with NO configured siblings keeps the bare `Voice/step` name — nothing to
+  disambiguate.
+
 ### 2026-07-11
 
 #### Added
