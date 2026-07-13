@@ -305,10 +305,22 @@ function pickFallbackFamily(fontsByFamily) {
   return null;
 }
 
+// normalizeStyleName — lowercase + collapse hyphens/whitespace to a single space, so "Extra-bold"
+// and "Extra Bold" (or "ExtraBold") compare equal. Real type foundries don't agree on a separator
+// convention for compound weight names (Extra-bold/Semi-bold in this kit's own WEIGHT_NAMES vs. a
+// real font's "Extra Bold"/"Semi Bold" style catalog) — an exact-string match alone silently missed
+// the real face and fell back to the nearest-weight guess, which doesn't even preserve italic.
+function normalizeStyleName(s) { return String(s).toLowerCase().replace(/[-\s]+/g, " ").trim(); }
+
 function resolveFace(stylesOfFamily, literal) {
   if (!stylesOfFamily || !stylesOfFamily.length) return null;
   const wanted = literal && typeof literal.styleName === "string" ? literal.styleName : "";
-  if (wanted && stylesOfFamily.indexOf(wanted) >= 0) return wanted;
+  if (wanted) {
+    if (stylesOfFamily.indexOf(wanted) >= 0) return wanted;
+    const wantedNorm = normalizeStyleName(wanted);
+    const fuzzy = stylesOfFamily.find(function (st) { return normalizeStyleName(st) === wantedNorm; });
+    if (fuzzy) return fuzzy;
+  }
   const w = literal && Number.isFinite(literal.weight) ? literal.weight : 400;
   const upright = stylesOfFamily.filter(function (st) { return !/italic|oblique/i.test(st); });
   const pool = upright.length ? upright : stylesOfFamily;
