@@ -492,6 +492,21 @@ if (applyStylePlans && applyFontPrimitives) {
       if (!namedCoreStyle || !namedCoreStyle._bound.fontStyle) FAIL("styles", "named-style-cut core text style must carry a bound fontStyle field");
     }
 
+    // a voice with ONE configured leading ratio must apply the SAME constant lineHeight percent at every
+    // step — found live via BZZR's real Figma Styles panel showing 111.8%/114.3% for a single 112.5%
+    // leading, because the literal fallback used to re-derive percent from the already-rounded absolute
+    // px (round(size·leading)/size ≠ leading at most sizes). Sub-heading's fixed sizes (28/34/40) don't
+    // all divide evenly by 1.125 — exactly the drift-prone shape.
+    {
+      const driftScale = TYPE.typeScale({ treatment: "statement", voices: { "Sub-heading": { leading: 1.125, weights: [] } } });
+      const driftPlans = stylePlans({ families, scale: driftScale });
+      await applyFontPrimitives(primitivesApplyPlan(TYPE.typeTokensFigmaPrimitives(driftScale)));
+      await applyStylePlans(driftPlans);
+      const shStyles = ["lg", "md", "sm"].map((step) => F.figma._styles.find((x) => x._kind === "TEXT" && x.name === `Sub-heading/${step}`));
+      if (shStyles.some((x) => !x)) FAIL("styles", "drift fixture: Sub-heading/{lg,md,sm} text style missing");
+      else if (!shStyles.every((x) => x.lineHeight && x.lineHeight.value === 112.5)) FAIL("styles", `drift fixture: Sub-heading lineHeight% must be a CONSTANT 112.5 at every step (got ${shStyles.map((x) => x.lineHeight && x.lineHeight.value)})`);
+    }
+
     // a family Figma does not have: the style is BUILT on a placeholder face (Inter), reported as
     // SUBSTITUTED (not skipped), and its fontFamily stays BOUND to the true-family variable — so the
     // style self-heals once the font is installed. The ghost rides the FULL plan (a partial plan

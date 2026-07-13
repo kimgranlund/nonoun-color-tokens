@@ -307,11 +307,12 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
 {
   const s = T.typeScale({ treatment: "product", bodyBase: 16 });
   const b = s.categories.Body.MD;
-  const relLine = (px, sz) => Math.round((px / sz) * 1000) / 1000; // unitless factor, 3dp (mirrors engine round(,3))
-  const relPct = (px, sz) => Math.round((px / sz) * 10000) / 100; // % of size, 2dp (mirrors engine round(,2))
-  // CSS: -line is a UNITLESS factor (= line ÷ size), -tracking is `em`, -line-single unitless — and NO px on either.
+  const relLine = (ratio) => Math.round(ratio * 1000) / 1000; // unitless factor, 3dp (mirrors engine round(,3))
+  const relPct = (ratio) => Math.round(ratio * 100 * 100) / 100; // % of size, 2dp (mirrors engine round(,2))
+  // CSS: -line is a UNITLESS factor (= the voice's exact leadingRatio), -tracking is `em`, -line-single
+  // unitless — and NO px on either.
   const css = T.typeTokensCSS(s);
-  ok(css.includes(`--type-body-md-line: ${relLine(b.lineHeight, b.size)};`), `CSS -line is a unitless factor line÷size (= ${relLine(b.lineHeight, b.size)})`);
+  ok(css.includes(`--type-body-md-line: ${relLine(b.leadingRatio)};`), `CSS -line is the exact leadingRatio, not line÷size (= ${relLine(b.leadingRatio)})`);
   ok(/--type-body-md-tracking: -?\d+(?:\.\d+)?em;/.test(css), "CSS -tracking is em (relative to font size)");
   ok(/--type-label-md-line-single: \d+(?:\.\d+)?;/.test(css), "CSS -line-single is a unitless factor");
   ok(!/-line: -?\d+(?:\.\d+)?px/.test(css) && !/-tracking: -?\d+(?:\.\d+)?px/.test(css) && !/-line-single: -?\d+(?:\.\d+)?px/.test(css), "NO px leading or tracking anywhere in the CSS export");
@@ -319,15 +320,27 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(/--type-body-md-size: \d+px;/.test(css) && /--type-body-md-para: \d+px;/.test(css), "size + paragraph spacing stay absolute px (box metrics, not leading)");
   // DTCG: lineHeight a unitless NUMBER (multiplier), letterSpacing an `em` string, size/para still px.
   const dt = T.typeTokensDTCG(s).typography.Body.MD.$value;
-  ok(typeof dt.lineHeight === "number" && dt.lineHeight === relLine(b.lineHeight, b.size), "DTCG lineHeight is a unitless number (= line ÷ size)");
+  ok(typeof dt.lineHeight === "number" && dt.lineHeight === relLine(b.leadingRatio), "DTCG lineHeight is a unitless number (= the exact leadingRatio)");
   ok(typeof dt.letterSpacing === "string" && /em$/.test(dt.letterSpacing), "DTCG letterSpacing is an em string (relative)");
   ok(/px$/.test(dt.fontSize) && /px$/.test(dt.paragraphSpacing), "DTCG fontSize + paragraphSpacing stay px (absolute dims)");
   ok(typeof T.typeTokensDTCG(s).typography.Label.MD.$value.singleLineHeight === "number", "DTCG singleLineHeight is a unitless number too");
-  // Figma: leading + tracking ride as a % of font size (Figma's native relative unit); size/weight raw.
+  // Figma: leading + tracking ride as a % of the exact ratio (Figma's native relative unit); size/weight raw.
   const gv = T.typeTokensFigmaModes(s, []).collections.Typography.variables;
-  ok(gv["Body/MD/lineHeight"].values.Base === relPct(b.lineHeight, b.size), "Figma lineHeight is % of size");
-  ok(gv["Body/MD/letterSpacing"].values.Base === relPct(b.letterSpacing, b.size), "Figma letterSpacing is % of size");
-  ok(gv["Label/MD/singleLineHeight"].values.Base === relPct(s.categories.Label.MD.singleLineHeight, s.categories.Label.MD.size), "Figma singleLineHeight is % of size");
+  ok(gv["Body/MD/lineHeight"].values.Base === relPct(b.leadingRatio), "Figma lineHeight is % of the exact leadingRatio");
+  ok(gv["Body/MD/letterSpacing"].values.Base === relPct(b.trackingRatio), "Figma letterSpacing is % of the exact trackingRatio");
+  // REGRESSION (found live via BZZR's real Figma Styles panel): a voice with ONE configured leading ratio
+  // must show the SAME constant percent at every step — never drift because round(size·leading)/size ≠
+  // leading at most sizes. Sub-heading's fixed sizes (28/34/40) don't all divide evenly by 1.125, so this
+  // is exactly the shape that silently drifted before leadingRatio/trackingRatio existed.
+  const drift = T.typeScale({ treatment: "statement", voices: { "Sub-heading": { leading: 1.125, tracking: "-5%" } } });
+  const shCss = T.typeTokensCSS(drift);
+  const shLines = ["lg", "md", "sm"].map((step) => (shCss.match(new RegExp(`--type-sub-heading-${step}-line: ([\\d.]+);`)) || [])[1]);
+  ok(shLines.every((v) => v === "1.125"), `Sub-heading's CSS -line is a CONSTANT 1.125 at every step, not drifting per size (got ${shLines})`);
+  const shGv = T.typeTokensFigmaModes(drift, []).collections.Typography.variables;
+  ok(["LG", "MD", "SM"].every((step) => shGv[`Sub-heading/${step}/lineHeight`].values.Base === 112.5), "Sub-heading's Figma lineHeight % is a CONSTANT 112.5 at every step");
+  ok(["LG", "MD", "SM"].every((step) => shGv[`Sub-heading/${step}/letterSpacing`].values.Base === -5), 'Sub-heading\'s Figma letterSpacing % is a CONSTANT -5 (from the "-5%" percent-string tracking override), every step');
+  const relPctPx = (px, sz) => Math.round((px / sz) * 10000) / 100; // singleLineHeight is always exactly size — px/size stays valid (no rounding drift possible)
+  ok(gv["Label/MD/singleLineHeight"].values.Base === relPctPx(s.categories.Label.MD.singleLineHeight, s.categories.Label.MD.size), "Figma singleLineHeight is % of size");
   ok(gv["Body/MD/size"].values.Base === b.size && gv["Body/MD/weight"].values.Base === b.weight, "Figma size + weight stay raw (absolute)");
 }
 

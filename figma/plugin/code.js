@@ -432,8 +432,11 @@ async function applyStylePlans(sp) {
       st.name = t.name;
       st.fontName = { family: useFamily, style: face };
       st.fontSize = lit.size;
-      if (Number.isFinite(lit.lineHeight) && lit.size > 0) st.lineHeight = { unit: "PERCENT", value: (lit.lineHeight / lit.size) * 100 };
-      if (Number.isFinite(lit.letterSpacing) && lit.size > 0) st.letterSpacing = { unit: "PERCENT", value: (lit.letterSpacing / lit.size) * 100 };
+      // the EXACT ratio as a percent (lineHeightPct/letterSpacingPct) — NEVER (lit.lineHeight/lit.size)*100:
+      // that re-derivation from the already-rounded absolute px drifted a step's percent away from the
+      // voice's one configured ratio (round(size·leading)/size ≠ leading at most sizes).
+      if (Number.isFinite(lit.lineHeightPct)) st.lineHeight = { unit: "PERCENT", value: lit.lineHeightPct };
+      if (Number.isFinite(lit.letterSpacingPct)) st.letterSpacing = { unit: "PERCENT", value: lit.letterSpacingPct };
       if (Number.isFinite(lit.paragraphSpacing)) st.paragraphSpacing = lit.paragraphSpacing;
       try { st.textCase = lit.textCase === "uppercase" ? "UPPER" : "ORIGINAL"; } catch (e) { /* older API */ }
       // per-field bindings — only where the target variable exists; an unsupported field falls back to

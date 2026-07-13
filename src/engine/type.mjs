@@ -168,14 +168,27 @@ const nextNice = (v) => { let n = v + 1; while (niceSize(n) <= v) n += 1; return
 // on a non-reading role (Tiny/Sub-title ride the ui/mono FONT but are prose) falls back to 0.75.
 const PARA_PROSE = { display: 0.7, heading: 0.7, body: 0.75 };
 
+// parseRatio — leading/tracking accept either the legacy unitless number (a ratio: 1.125 for leading,
+// an em-fraction like -0.05 for tracking) OR a percent STRING ("112.5%", "-5%") — the self-documenting,
+// drift-proof way to author a per-voice override. Returns undefined for anything else (absent ⇒ the
+// treatment default, same as today).
+function parseRatio(v) {
+  if (Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const m = /^\s*(-?[\d.]+)\s*%\s*$/.exec(v);
+    if (m) return Number(m[1]) / 100;
+  }
+  return undefined;
+}
+
 function buildCategory(name, p, factor, overrides, vp, compress) {
   // per-VOICE shaping overrides (vp): weight · leading · tracking(em) REPLACE the treatment's for the
   // WHOLE voice (the "select a voice, retune it" lever — like a per-palette Hue). Absent ⇒ the treatment
   // values, so a voice with no override is byte-identical (the identity gate). The per-cell size `overrides`
   // are a separate, finer layer that still moves an individual step's size.
   const weight = vp && Number.isFinite(vp.weight) ? vp.weight : p.weight;
-  const leading = vp && Number.isFinite(vp.leading) ? vp.leading : p.leading;
-  const trackingEm = vp && Number.isFinite(vp.tracking) ? vp.tracking : p.trackingEm;
+  const leading = (vp && parseRatio(vp.leading)) ?? p.leading;
+  const trackingEm = (vp && parseRatio(vp.tracking)) ?? p.trackingEm;
   const out = {};
   let prevSize = 0; // running max, for the monotonic bump (quantization can collide adjacent steps)
   for (const [step, n] of p.steps) {
@@ -200,6 +213,15 @@ function buildCategory(name, p, factor, overrides, vp, compress) {
       size,
       lineHeight: Math.round(size * leading), // line-height TRACKS the override (re-derives from the resolved size)
       letterSpacing: round(derived * trackingEm, 2), // tracking STAYS on the scaled fixed size (ratified "size lever; tracking/weight unchanged")
+      // leadingRatio/trackingRatio — the EXACT, unrounded per-voice ratio (constant across every step),
+      // alongside the rounded absolute lineHeight/letterSpacing above. The absolute fields exist for LIVE
+      // rendering (whole-pixel-snapped, for crisp on-screen text); every RELATIVE-unit export (CSS ratio/em,
+      // DTCG, Figma %) must read these instead of re-deriving from the rounded absolute value — re-deriving
+      // meant round(size·leading)/size ≠ leading at most sizes, so one configured ratio rendered as a
+      // DIFFERENT decimal percent at every step (found live: BZZR's Figma Styles panel showing 111.8%/114.3%
+      // for a single configured 112.5% leading).
+      leadingRatio: leading,
+      trackingRatio: trackingEm,
       weight,
       textTransform: p.transform || "none",
       // paragraph rhythm tracks the resolved size, keyed on FLOW not just role: a BOX voice (control/label
@@ -407,15 +429,21 @@ export function dimUnit(px, unit) {
 
 // Leading (line-height) + tracking (letter-spacing) are ALWAYS relative in EVERY export — never px. A px
 // leading breaks the moment the root size changes; a px tracking breaks the moment the font size changes.
-// So they ride as ratios of the step's own font size, in each platform's native relative unit:
-//   relLine   — line ÷ size, a UNITLESS factor (the CSS `line-height`/DTCG `lineHeight` idiom)
-//   relTrackEm— tracking ÷ size as `em` (CSS `letter-spacing` / DTCG — relative to font size)
+// So they ride as ratios, in each platform's native relative unit:
+//   relLine   — a UNITLESS factor (the CSS `line-height`/DTCG `lineHeight` idiom)
+//   relTrackEm— tracking as `em` (CSS `letter-spacing` / DTCG — relative to font size)
 //   relPct    — the same ratio as a Figma % (Figma line-height/letter-spacing are %-native, not unitless)
 // size, paragraphSpacing, paragraphIndent stay ABSOLUTE dims (dimUnit) — they are box metrics, not leading.
-// size 0 ⇒ 0 (defensive; a real scale never yields it).
-const relLine = (px, size) => (size > 0 ? round(px / size, 3) : 0);
-const relTrackEm = (px, size) => `${size > 0 ? round(px / size, 4) : 0}em`;
-const relPct = (px, size) => (size > 0 ? round((px / size) * 100, 2) : 0);
+// These take the STEP's exact leadingRatio/trackingRatio directly (constant per voice) — NEVER re-derive
+// from the rounded absolute lineHeight/letterSpacing px, which broke ratio-constancy across steps (see
+// buildCategory's own leadingRatio/trackingRatio comment). singleLineHeight is the one exception that
+// still divides px/size — it's always exactly 1.0 (singleLineHeight = size), so no rounding drift is
+// possible there.
+const relLine = (ratio) => round(ratio, 3);
+const relTrackEm = (ratio) => `${round(ratio, 4)}em`;
+const relPct = (ratio) => round(ratio * 100, 2);
+const relLinePx = (px, size) => (size > 0 ? round(px / size, 3) : 0);
+const relPctPx = (px, size) => (size > 0 ? round((px / size) * 100, 2) : 0);
 
 // `pfx` — the type-scale custom-property prefix (the `type` in `--type-*` and the `.type-*` class).
 // Default "type" (historical); a Material scheme sets "md-sys-typescale". Font families stay `--font-*`
@@ -425,8 +453,8 @@ function typeVarLines(scale, indent = "  ", unit = "px", pfx = "type") {
   for (const [cName, steps] of Object.entries(scale.categories)) {
     for (const [sName, s] of Object.entries(steps)) {
       const p = `--${pfx}-${kebab(cName)}-${kebab(sName)}`;
-      const single = s.singleLineHeight != null ? ` ${p}-line-single: ${relLine(s.singleLineHeight, s.size)};` : "";
-      out.push(`${indent}${p}-size: ${dimUnit(s.size, unit)}; ${p}-line: ${relLine(s.lineHeight, s.size)}; ${p}-tracking: ${relTrackEm(s.letterSpacing, s.size)}; ${p}-weight: ${s.weight}; ${p}-para: ${dimUnit(s.paragraphSpacing, unit)};${single}`);
+      const single = s.singleLineHeight != null ? ` ${p}-line-single: ${relLinePx(s.singleLineHeight, s.size)};` : "";
+      out.push(`${indent}${p}-size: ${dimUnit(s.size, unit)}; ${p}-line: ${relLine(s.leadingRatio)}; ${p}-tracking: ${relTrackEm(s.trackingRatio)}; ${p}-weight: ${s.weight}; ${p}-para: ${dimUnit(s.paragraphSpacing, unit)};${single}`);
     }
   }
   return out.join("\n");
@@ -512,7 +540,7 @@ export function typeTokensDTCG(scale, { unit = "px" } = {}) {
         $type: "typography",
         // fontFamily resolves the per-voice override (if any) — an overridden voice's DTCG carries its own
         // family; an un-overridden voice still reads its role's family (identical to before this channel).
-        $value: { fontFamily: resolvedFontFor(scale, cName), fontSize: dimUnit(s.size, unit), lineHeight: relLine(s.lineHeight, s.size), letterSpacing: relTrackEm(s.letterSpacing, s.size), fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: dimUnit(s.paragraphSpacing, unit), paragraphIndent: dimUnit(s.paragraphIndent, unit), ...(s.singleLineHeight != null ? { singleLineHeight: relLine(s.singleLineHeight, s.size) } : {}) },
+        $value: { fontFamily: resolvedFontFor(scale, cName), fontSize: dimUnit(s.size, unit), lineHeight: relLine(s.leadingRatio), letterSpacing: relTrackEm(s.trackingRatio), fontWeight: s.weight, textCase: s.textTransform || "none", paragraphSpacing: dimUnit(s.paragraphSpacing, unit), paragraphIndent: dimUnit(s.paragraphIndent, unit), ...(s.singleLineHeight != null ? { singleLineHeight: relLinePx(s.singleLineHeight, s.size) } : {}) },
       };
     }
   }
@@ -566,14 +594,16 @@ export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
         for (const prop of TYPE_FIGMA_PROPS) {
           const key = `${cName}/${sName}/${prop}`;
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
-          // leading + tracking ride as a % of font size (Figma's native relative unit); size/weight/para stay raw.
-          variables[key].values[mode] = prop === "lineHeight" || prop === "letterSpacing" ? relPct(s[prop], s.size) : s[prop];
+          // leading + tracking ride as a % of the voice's exact ratio (Figma's native relative unit) —
+          // NEVER re-derived from the rounded absolute px, which drifted per step; size/weight/para stay raw.
+          variables[key].values[mode] = prop === "lineHeight" ? relPct(s.leadingRatio) : prop === "letterSpacing" ? relPct(s.trackingRatio) : s[prop];
         }
-        // singleLineHeight exists only on the BOX voices (Label · Body-mono · Label-mono · Kicker) — emit as a % of size too.
+        // singleLineHeight exists only on the BOX voices (Label · Body-mono · Label-mono · Kicker) — emit as a
+        // % of size too (always exactly 100 — singleLineHeight = size, no rounding drift possible here).
         if (s.singleLineHeight != null) {
           const key = `${cName}/${sName}/singleLineHeight`;
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
-          variables[key].values[mode] = relPct(s.singleLineHeight, s.size);
+          variables[key].values[mode] = relPctPx(s.singleLineHeight, s.size);
         }
       }
     }
