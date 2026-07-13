@@ -247,6 +247,61 @@
           },
           "refuses": "A calm, desaturated palette. BZZR runs hot and electric by design — near-peak chroma on both its primary and secondary.",
           "dominantHex": "#1F1DF9",
+          "type": {
+            "treatment": "statement",
+            "bodyBase": 16,
+            "fonts": {
+              "display": "GT America",
+              "heading": "GT America",
+              "body": "GT America",
+              "ui": "GT America",
+              "mono": "GT America Mono"
+            },
+            "voices": {
+              "Display": {
+                "weight": 900,
+                "tracking": -0.05,
+                "leading": 0.8,
+                "styleName": "Condensed Black Italic",
+                "weights": [{ "name": "Extra-bold", "weight": 800 }, { "name": "Bold", "weight": 700 }]
+              },
+              "Heading": {
+                "weight": 900,
+                "tracking": 0.0179,
+                "leading": 1.125,
+                "styleName": "Black",
+                "weights": [{ "name": "Extra-bold", "weight": 800 }, { "name": "Bold", "weight": 700 }]
+              },
+              "Kicker": {
+                "weight": 500,
+                "tracking": 0.357,
+                "leading": 1.125,
+                "styleName": "Medium",
+                "weights": [{ "name": "Semi-bold", "weight": 600 }, { "name": "Bold", "weight": 700 }]
+              },
+              "UI": {
+                "weight": 700,
+                "tracking": 0.286,
+                "leading": 1.125,
+                "styleName": "Condensed Bold",
+                "weights": [{ "name": "Semi-bold", "weight": 600 }, { "name": "Medium", "weight": 500 }]
+              },
+              "Lead": {
+                "weight": 400,
+                "tracking": 0.0134,
+                "leading": 1.5,
+                "styleName": "Regular",
+                "weights": [{ "name": "Medium", "weight": 500 }, { "name": "Semi-bold", "weight": 600 }]
+              },
+              "Body": {
+                "weight": 400,
+                "tracking": 0.0214,
+                "leading": 1.5,
+                "styleName": "Regular",
+                "weights": [{ "name": "Medium", "weight": 500 }, { "name": "Semi-bold", "weight": 600 }]
+              }
+            }
+          },
           "palettes": [
             {
               "name": "Neutral",
