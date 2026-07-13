@@ -748,71 +748,28 @@
           ]
         },
         {
-          "kicker": "Corsa · Cycling club culture · Italy, 1920s–1980s",
-          "title": "A bubblegum-pink cycling club identity riding on celeste, postal navy, and vintage jersey cream",
-          "source": "Color from the club: <em>Corsa pink</em> as the signature jersey, Bianchi-adjacent celeste and a deep postal navy as the road's two blues, vintage cream wool and a racing red/mustard pop for the small reads — the palette of an Italian cycling poster between the wars and the Moser era.",
-          "swatches": [
-            {
-              "name": "Corsa pink",
-              "oklch": "0.687 0.146 357.9",
-              "note": "The club's signature jersey pink.",
-              "hier": "d",
-              "hex": "#E0709A"
-            },
-            {
-              "name": "Celeste, blue-green",
-              "oklch": "0.780 0.104 183.5",
-              "note": "A nod to the classic Italian team celeste.",
-              "hier": "s",
-              "hex": "#5FCDBE"
-            },
-            {
-              "name": "Postal navy",
-              "oklch": "0.395 0.128 265.3",
-              "note": "The deep road-and-signage blue.",
-              "hier": "s",
-              "hex": "#24408A"
-            },
-            {
-              "name": "Vintage jersey, cream",
-              "oklch": "0.939 0.025 86.9",
-              "note": "Wool and old paper.",
-              "hier": "s",
-              "hex": "#F2EAD8"
-            },
-            {
-              "name": "Racing red",
-              "oklch": "0.579 0.198 28.1",
-              "note": "The sprint-finish accent.",
-              "hier": "a",
-              "hex": "#D6362E"
-            },
-            {
-              "name": "Mustard, gold",
-              "oklch": "0.864 0.139 99.8",
-              "note": "A leader's-jersey pop.",
-              "hier": "a",
-              "hex": "#E8D45E"
-            }
-          ],
+          "kicker": "Corsa · Grand Tour cycling · Italy · France · Spain",
+          "title": "A loud, graphic Grand-Tour identity — Giro rosa and Tour yellow over road blue, punctuated by the red, green, purple and blue classification jerseys",
+          "source": "Color from the three Grand Tours, read for their real jersey and newsprint origins: the Giro's <em>maglia rosa</em> (pink because <em>La Gazzetta dello Sport</em> is printed on pink paper) and the Tour's <em>maillot jaune</em> (≈Pantone 123 C, yellow because <em>L'Auto</em> was printed on yellow paper), over a road blue and a muted lagoon; the Vuelta's <em>maillot rojo</em>, a limestone-and-cream stone ground, and the classification jerseys — Giro <em>azzurra</em> (blue, mountains) and <em>ciclamino</em> (cyclamen purple, points), Tour <em>maillot vert</em> (green, points) — over gravel, redwood-brown and pine terrain neutrals. The palette of a between-the-wars-to-Moser-era cycling poster, not a faded photograph.",
           "hierarchy": {
             "d": {
               "pct": 45,
-              "text": "Corsa pink leads every jersey and screen.",
-              "c": "#E0709A"
+              "text": "Giro rosa leads as the identity's loud signature, over a cool cobble-grey ground.",
+              "c": "#EA4F93"
             },
             "s": {
-              "pct": 40,
-              "text": "Celeste, postal navy, and vintage cream carry the road and the archive.",
-              "c": "#5FCDBE"
+              "pct": 35,
+              "text": "Road blue, Tour yellow, aged newsprint, muted lagoon and limestone cream carry the working band.",
+              "c": "#1F5FA8"
             },
             "a": {
-              "pct": 15,
-              "text": "Racing red and mustard as small, loud reads.",
-              "c": "#D6362E"
+              "pct": 20,
+              "text": "Vuelta red and the azzurra, vert and ciclamino classification jerseys as graphic punctuation.",
+              "c": "#E11B2E"
             }
           },
-          "refuses": "A muted, faded-photograph nostalgia. Corsa's heritage is loud and graphic — poster pink and gas-station signage energy, not sepia.",
+          "dominantHex": "#EA4F93",
+          "refuses": "A muted, faded-photograph nostalgia. The Grand Tour's heritage is loud and graphic — maglia-rosa pink, maillot-jaune yellow, and gas-station-signage jersey reds and greens, printed on pink and yellow newsprint, not sepia.",
           "type": {
             "base": "editorial",
             "slots": {
@@ -847,7 +804,262 @@
                 "tracking": "6%"
               }
             }
-          }
+          },
+          "palettes": [
+            {
+              "name": "neutral",
+              "hue": 248,
+              "chroma": 3,
+              "skew": 0,
+              "lift": 0,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.638, 0.008, 248] }],
+              "colorName": "Cobbles grey",
+              "description": "Cool pavé cobblestone grey — the road under every tour."
+            },
+            {
+              "name": "primary",
+              "hue": 356,
+              "chroma": 64,
+              "skew": 0,
+              "lift": 13,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.640, 0.190, 356] }],
+              "colorName": "Giro d'Italia rosa",
+              "description": "The maglia rosa — a vivid poster pink from La Gazzetta's pink pages.",
+              "colorRole": "dominant"
+            },
+            {
+              "name": "primary-muted",
+              "hue": 8,
+              "chroma": 21,
+              "skew": 0,
+              "lift": 33,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.820, 0.062, 8] }],
+              "colorName": "Newspaper pink",
+              "description": "The soft, warm Gazzetta pink-paper tint beside the vivid rosa.",
+              "colorRole": "supporting"
+            },
+            {
+              "name": "secondary",
+              "hue": 263,
+              "chroma": 63,
+              "skew": 0,
+              "lift": -3,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.505, 0.135, 263] }],
+              "colorName": "Road blue",
+              "description": "The tarmac-and-signage blue of the race route.",
+              "colorRole": "supporting"
+            },
+            {
+              "name": "secondary-muted",
+              "hue": 226,
+              "chroma": 18,
+              "skew": 0,
+              "lift": 17,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.680, 0.038, 226] }],
+              "colorName": "Muted lagoon blue",
+              "description": "A desaturated Venetian-lagoon blue-grey beside the road blue.",
+              "colorRole": "supporting"
+            },
+            {
+              "name": "tertiary",
+              "hue": 27,
+              "chroma": 66,
+              "skew": 0,
+              "lift": 3,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.560, 0.200, 27] }],
+              "colorName": "Vuelta a España red",
+              "description": "The maillot rojo — the Vuelta leader jersey, red since 2010.",
+              "colorRole": "accent"
+            },
+            {
+              "name": "tertiary-muted",
+              "hue": 90,
+              "chroma": 12,
+              "skew": 0,
+              "lift": 40,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.895, 0.036, 90] }],
+              "colorName": "Limestone, cream",
+              "description": "Warm pale stone and paper — the poster stock.",
+              "colorRole": "supporting"
+            },
+            {
+              "name": "quartery",
+              "hue": 88,
+              "chroma": 51,
+              "skew": 0,
+              "lift": 36,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.845, 0.155, 88] }],
+              "colorName": "Tour de France yellow",
+              "description": "The maillot jaune, ≈Pantone 123 C — golden, from L'Auto's yellow newsprint.",
+              "colorRole": "accent"
+            },
+            {
+              "name": "quartery-muted",
+              "hue": 93,
+              "chroma": 30,
+              "skew": 0,
+              "lift": 35,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.835, 0.090, 93] }],
+              "colorName": "Yellow newspaper",
+              "description": "Aged L'Auto newsprint — a muted mustard behind the maillot jaune.",
+              "colorRole": "supporting"
+            },
+            {
+              "name": "accent-1",
+              "hue": 252,
+              "chroma": 68,
+              "skew": 0,
+              "lift": -2,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.510, 0.145, 252] }],
+              "colorName": "Blue jersey, maglia azzurra",
+              "description": "The Giro mountains jersey — blue since 2012 (Banca Mediolanum).",
+              "colorRole": "accent"
+            },
+            {
+              "name": "accent-2",
+              "hue": 150,
+              "chroma": 61,
+              "skew": 0,
+              "lift": 11,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.625, 0.160, 150] }],
+              "colorName": "Green jersey, maillot vert",
+              "description": "The Tour points jersey — a bright grass green.",
+              "colorRole": "accent"
+            },
+            {
+              "name": "accent-3",
+              "hue": 342,
+              "chroma": 61,
+              "skew": 0,
+              "lift": -7,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.470, 0.180, 342] }],
+              "colorName": "Purple jersey, maglia ciclamino",
+              "description": "The Giro points jersey — cyclamen, an intense purple-magenta.",
+              "colorRole": "accent"
+            },
+            {
+              "name": "accent-4",
+              "hue": 72,
+              "chroma": 18,
+              "skew": 0,
+              "lift": 5,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.575, 0.055, 72] }],
+              "colorName": "Gravel brown",
+              "description": "Strade-bianche gravel — a warm mid brown.",
+              "colorRole": "accent"
+            },
+            {
+              "name": "accent-5",
+              "hue": 44,
+              "chroma": 26,
+              "skew": 0,
+              "lift": -16,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.395, 0.078, 44] }],
+              "colorName": "Redwood brown",
+              "description": "A deep reddish heartwood brown.",
+              "colorRole": "accent"
+            },
+            {
+              "name": "accent-6",
+              "hue": 160,
+              "chroma": 18,
+              "skew": 0,
+              "lift": -10,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.440, 0.048, 160] }],
+              "colorName": "Redwood green",
+              "description": "A deep pine/forest green (read from 'Redwood green').",
+              "colorRole": "accent"
+            },
+            {
+              "name": "info",
+              "hue": 255,
+              "chroma": 49,
+              "skew": 0,
+              "lift": 1,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.54, 0.13, 255] }]
+            },
+            {
+              "name": "success",
+              "hue": 152,
+              "chroma": 42,
+              "skew": 0,
+              "lift": 1,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.56, 0.115, 152] }]
+            },
+            {
+              "name": "warning",
+              "hue": 73,
+              "chroma": 46,
+              "skew": 0,
+              "lift": 4,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.62, 0.118, 73] }]
+            },
+            {
+              "name": "danger",
+              "hue": 27,
+              "chroma": 76,
+              "skew": 0,
+              "lift": -6,
+              "hueShift": 0,
+              "hueSameDir": false,
+              "on": true,
+              "keyColors": [{ "role": "dominant", "oklch": [0.52, 0.176, 27] }]
+            }
+          ]
         },
         {
           "kicker": "Nike · The Swoosh · Since 1971",
