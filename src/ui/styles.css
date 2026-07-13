@@ -1213,6 +1213,16 @@ dialog.settings::backdrop { background: rgba(10,14,22,.34); }
 .account-error { color: var(--c-danger, #c0392b); }
 a.account-manage { text-decoration: none; }
 a.account-manage:hover { text-decoration: underline; }
+/* ── Settings › Figma › Cleanup: scan-then-confirm sweep for legacy Figma styles ── */
+.cleanup-list-head { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 8px; }
+.cleanup-list-head small { color: var(--ink-dim); font-size: 11.5px; }
+.cleanup-list { list-style: none; margin: 0 0 16px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm); max-height: 260px; overflow-y: auto; }
+.cleanup-item { border-bottom: 1px solid var(--line); }
+.cleanup-item:last-child { border-bottom: 0; }
+.cleanup-item-label { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; }
+.cleanup-item-label code { flex: 1; min-width: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cleanup-item-label small { flex: none; color: var(--ink-faint); font-size: 10.5px; }
+.cleanup-delete { background: var(--c-danger, #c0392b); color: #fff; }
 @media (max-width: 640px) {
   dialog.settings { flex-direction: column; }
   .settings-nav { width: auto; border-right: 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px; padding: 10px; }

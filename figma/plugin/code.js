@@ -84,6 +84,8 @@ const ACTIONS = {
   "list-fonts": "read Figma's font list",
   "load-sets": "load your palettes",
   "save-sets": "save your palettes",
+  "sweep-scan": "scan for legacy styles",
+  "sweep-delete": "remove the selected legacy styles",
 };
 
 figma.ui.onmessage = async (msg) => {
@@ -150,6 +152,22 @@ figma.ui.onmessage = async (msg) => {
     } else if (msg.type === "save-sets") {
       // persist the gallery's sets for this user (the localStorage the iframe can't use).
       await figma.clientStorage.setAsync(SETS_KEY, Array.isArray(msg.sets) ? msg.sets : []);
+    } else if (msg.type === "sweep-scan") {
+      // SCAN only — never deletes. The UI sends the names the CURRENT plan would produce; anything real
+      // in this file that looks like ours but isn't in that set is a candidate for the user to review.
+      const localTexts = await figma.getLocalTextStylesAsync();
+      const localPaints = await figma.getLocalPaintStylesAsync();
+      const cand = sweepCandidates(msg.textNames, msg.paintNames, localTexts, localPaints);
+      figma.ui.postMessage({ type: "sweep-scanned", texts: cand.texts, paints: cand.paints });
+    } else if (msg.type === "sweep-delete") {
+      // DELETE only the exact ids the user confirmed — no pattern-matching here, so a scan's false
+      // positive can never compound into an unreviewed deletion.
+      const ids = Array.isArray(msg.ids) ? msg.ids : [];
+      let removed = 0;
+      for (const id of ids) {
+        try { const st = await figma.getStyleByIdAsync(id); if (st) { st.remove(); removed++; } } catch (e) { /* already gone */ }
+      }
+      figma.ui.postMessage({ type: "sweep-done", removed: removed });
     }
   } catch (e) {
     // Log the technical detail to the console for debugging; show the user a friendly, actionable
@@ -330,6 +348,25 @@ function resolveFace(stylesOfFamily, literal) {
     if (d < bestD) { best = st; bestD = d; }
   }
   return best;
+}
+
+// sweepCandidates — find real Figma styles that LOOK like ours (their top "/" segment matches a
+// namespace the CURRENT plan still uses) but whose full name ISN'T anything the current plan would ever
+// produce — leftover styles from an older naming generation that predates this plugin's own per-style
+// registry, so no ordinary apply/prune can ever find them (the registry only tracks styles IT created).
+// Pure + read-only: it never deletes anything itself — the caller reviews the list and deletes by id.
+// Namespace-gated (not "anything unrecognized") so a user's own unrelated styles are never candidates —
+// only names that start with a prefix WE currently use, e.g. "Body/…", are ever considered.
+function sweepCandidates(knownTextNames, knownPaintNames, localTexts, localPaints) {
+  const textSet = new Set(knownTextNames || []);
+  const paintSet = new Set(knownPaintNames || []);
+  const namespaces = new Set();
+  for (const n of textSet) namespaces.add(String(n).split("/")[0]);
+  for (const n of paintSet) namespaces.add(String(n).split("/")[0]);
+  const isOurs = function (name) { return namespaces.has(String(name).split("/")[0]); };
+  const texts = (localTexts || []).filter(function (s) { return isOurs(s.name) && !textSet.has(s.name); }).map(function (s) { return { id: s.id, name: s.name }; });
+  const paints = (localPaints || []).filter(function (s) { return isOurs(s.name) && !paintSet.has(s.name); }).map(function (s) { return { id: s.id, name: s.name }; });
+  return { texts: texts, paints: paints };
 }
 
 // applyStylePlans — paint styles bound to the Color Modes variables; text styles set from the plan's
@@ -606,4 +643,4 @@ async function applyFloatPlans(plans) {
 }
 
 // Exposed for the headless verifier (a no-op inside Figma's VM).
-if (typeof module !== "undefined") module.exports = { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, resolveFace, pickFallbackFamily, styleNameWeight, rgbaOf, aliasTarget, childKeys };
+if (typeof module !== "undefined") module.exports = { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, resolveFace, pickFallbackFamily, styleNameWeight, rgbaOf, aliasTarget, childKeys, sweepCandidates };
