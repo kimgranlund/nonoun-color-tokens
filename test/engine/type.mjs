@@ -154,7 +154,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // stay --font-* (the family layer). Default "type" ⇒ byte-identical (identity gate). Responsive too.
   const md = T.typeTokensCSS(s, { prefix: "md-sys-typescale" });
   ok(md.includes("--md-sys-typescale-body-md-size:") && md.includes(".md-sys-typescale-body-md {") && !md.includes("--type-body-md"), "prefix rewrites --type-*/.type-* to the scheme prefix (no stray --type-*)");
-  ok(md.includes("--font-body:") && md.includes("var(--font-body)"), "font families stay --font-* under a scale prefix");
+  ok(md.includes("--font-body:") && md.includes("var(--font-voice-body)"), "font families stay --font-*/--font-voice-* under a scale prefix (utility classes bind to the per-voice prop, TKT-0006)");
   ok(T.typeTokensCSS(s, { prefix: "type" }) === T.typeTokensCSS(s), "prefix 'type' is byte-identical to the default (identity gate)");
   ok(T.typeTokensDTCG(s, { unit: "rem" }).typography.Body.MD.$value.fontSize === "1rem" && T.typeTokensDTCG(s).typography.Body.MD.$value.fontSize === "16px", "DTCG carries the unit (fontSize 1rem) + defaults to px");
 }
@@ -215,7 +215,8 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
 // ── DTCG emit: fontFamily group + composite typography tokens ──
 {
   const d = T.typeTokensDTCG(T.typeScale({ treatment: "editorial" }));
-  ok(d.fontFamily && d.fontFamily.display.$type === "fontFamily", "DTCG fontFamily group");
+  ok(d.fontFamily && d.fontFamily.Display.$type === "fontFamily", "DTCG fontFamily group (voice-keyed, TKT-0006)");
+  ok(Object.keys(d.fontFamily).length === 11, `DTCG fontFamily group carries all 11 voices (got ${Object.keys(d.fontFamily).length})`);
   const tok = d.typography.Body.MD;
   ok(tok.$type === "typography" && /px$/.test(tok.$value.fontSize) && typeof tok.$value.fontWeight === "number", "DTCG composite typography token (px sizes + numeric weight)");
 }
@@ -385,7 +386,14 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // identical to a scale built without this channel at all (an empty voices map ⇒ the pre-feature shape).
   const emptyV = T.typeScale({ treatment: "product", voices: {} });
   ok(T.typeTokensCSS(baseline) === T.typeTokensCSS(emptyV), "CSS byte-identical with an empty voices map (identity gate)");
-  ok(!T.typeTokensCSS(baseline).includes("--font-voice-"), "no --font-voice-* custom prop appears when no voice carries a font override");
+  // TKT-0006: --font-voice-* is now emitted for ALL 11 voices unconditionally (not just overridden
+  // ones), so this is no longer an absence check — it's a completeness + correctness check: every
+  // voice gets one, and an un-overridden voice's value matches its role's shared default exactly.
+  const baseCss = T.typeTokensCSS(baseline);
+  // count DECLARATIONS only (`  --font-voice-x: '...';`) — utility classes below also REFERENCE
+  // these vars (`var(--font-voice-x)`), which would otherwise inflate the count past 11.
+  ok((baseCss.match(/ {2}--font-voice-[a-z0-9-]+: '/g) || []).length === 11, `--font-voice-* is declared for all 11 voices even with no overrides (got ${(baseCss.match(/ {2}--font-voice-[a-z0-9-]+: '/g) || []).length})`);
+  ok(baseCss.includes(`--font-voice-sub-heading: '${baseline.fonts[baseline.roleOf["Sub-heading"]]}';`), "an un-overridden voice's --font-voice-* repeats its role's shared default");
   ok(JSON.stringify(T.typeTokensDTCG(baseline)) === JSON.stringify(T.typeTokensDTCG(emptyV)), "DTCG byte-identical with an empty voices map");
   ok(JSON.stringify(T.typeTokensFigmaPrimitives(baseline)) === JSON.stringify(T.typeTokensFigmaPrimitives(emptyV)), "Figma primitives byte-identical with an empty voices map");
   // resolvedFontFor: an un-overridden voice resolves to its role's shared default.
@@ -398,18 +406,22 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(T.resolvedFontFor(ov, "Heading") === ov.fonts[ov.roleOf.Heading], "resolvedFontFor: an UN-overridden voice sharing the same role (Heading) is untouched");
   ok(ov.fonts.heading === baseline.fonts.heading, "the shared ROLE font itself is untouched by a per-voice override (config.fonts is a separate channel)");
 
-  // CSS: a --font-voice-sub-heading prop appears; Sub-heading's utility classes reference it; Heading's don't.
+  // CSS: a --font-voice-sub-heading prop carries the override; Heading's own --font-voice-heading
+  // still carries the shared role default (TKT-0006: every voice's utility class now binds to its
+  // OWN --font-voice-* prop, overridden or not — one point of truth per voice).
   const cssOv = T.typeTokensCSS(ov);
   ok(cssOv.includes("--font-voice-sub-heading: 'Fraunces';"), "CSS emits a quoted --font-voice-* prop for the overridden voice (same Safari digit-name trap as --font-*)");
+  ok(cssOv.includes(`--font-voice-heading: '${ov.fonts.heading}';`), "an un-overridden voice sharing the same role (Heading) still gets its own --font-voice-* prop, at the role's value");
   ok(/\.type-sub-heading-md\s*\{[^}]*font-family: var\(--font-voice-sub-heading\)/.test(cssOv), "the overridden voice's utility classes reference its OWN --font-voice-* prop");
-  ok(/\.type-heading-md\s*\{[^}]*font-family: var\(--font-heading\)/.test(cssOv), "an un-overridden voice sharing the same role (Heading) still references --font-{role}, unchanged");
+  ok(/\.type-heading-md\s*\{[^}]*font-family: var\(--font-voice-heading\)/.test(cssOv), "an un-overridden voice's utility classes ALSO reference its own --font-voice-* prop now (TKT-0006), not --font-{role} directly");
 
   // DTCG: the composite fontFamily for the overridden voice carries its own family; the top-level
-  // fontFamily group stays role-keyed — no new top-level DTCG key (the ticket's non-goal).
+  // fontFamily group is voice-keyed (TKT-0006) — BOTH Sub-heading and Heading get their own entry.
   const dtOv = T.typeTokensDTCG(ov);
   ok(dtOv.typography["Sub-heading"].MD.$value.fontFamily === "Fraunces", "DTCG composite fontFamily resolves the per-voice override");
   ok(dtOv.typography.Heading.MD.$value.fontFamily === ov.fonts.heading, "DTCG composite fontFamily for an un-overridden voice still reads its role's family");
-  ok(dtOv.fontFamily.heading.$value === ov.fonts.heading && !("Sub-heading" in dtOv.fontFamily), "the top-level fontFamily group stays role-keyed — no new key for the overridden voice");
+  ok(dtOv.fontFamily["Sub-heading"].$value === "Fraunces", "the top-level fontFamily group carries the overridden voice's own family");
+  ok(dtOv.fontFamily.Heading.$value === ov.fonts.heading, "the top-level fontFamily group ALSO carries the un-overridden voice, at the role's value");
 
   // Figma primitives: a genuinely distinct override family mints its OWN family/voice/<voice> primitive,
   // aliased by font/<voice>; two voices overridden to the SAME custom family share ONE primitive (dedupe by

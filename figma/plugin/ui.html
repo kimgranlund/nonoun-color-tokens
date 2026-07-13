@@ -3119,10 +3119,12 @@ function typeVarLines(scale, indent = "  ", unit = "px", pfx = "type") {
 function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   const lines = [":root {"];
   for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
-  // per-voice FONT overrides — one custom prop per OVERRIDDEN voice (`--font-voice-sub-heading: '...'`),
-  // quoted like the role fonts above (same Safari trap). Absent when no voice carries an override (identity
-  // gate — un-overridden CSS is byte-identical to before this channel existed).
-  if (scale.voiceFonts) for (const [voice, family] of Object.entries(scale.voiceFonts)) lines.push(`  --font-voice-${kebab(voice)}: '${family}';`);
+  // per-voice FONT — one custom prop per VOICE (`--font-voice-sub-heading: '...'`), resolved via
+  // resolvedFontFor so every one of the 11 voices is directly addressable by name, not just the ones
+  // carrying an explicit override (TKT-0006: matches typeTokensFigmaPrimitives's existing density —
+  // an un-overridden voice's variable simply repeats its role's family, same value the utility classes
+  // below already apply). Quoted like the role fonts above (same Safari trap).
+  for (const voice of Object.keys(scale.categories)) lines.push(`  --font-voice-${kebab(voice)}: '${resolvedFontFor(scale, voice)}';`);
   // per-voice SIBLING WEIGHTS — one custom prop per named variant (`--type-display-weight-bold: 700`),
   // per VOICE (never duplicated per step). Absent when the kit defines none (identity gate).
   if (scale.weights) for (const [cName, list] of Object.entries(scale.weights)) {
@@ -3132,10 +3134,10 @@ function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   lines.push(typeVarLines(scale, "  ", unit, prefix));
   lines.push("}");
   for (const [cName, steps] of Object.entries(scale.categories)) {
-    const role = scale.roleOf[cName] || "body";
-    // an overridden voice's utility classes bind to ITS OWN --font-voice-* prop; every other voice is
-    // unaffected — still --font-{role}, byte-identical to before this channel existed.
-    const fontVar = scale.voiceFonts && scale.voiceFonts[cName] ? `--font-voice-${kebab(cName)}` : `--font-${role}`;
+    // every voice's utility classes bind to its own --font-voice-* prop (now emitted for all 11,
+    // not just overridden ones — TKT-0006) — one point of truth per voice, same resolved value
+    // either way.
+    const fontVar = `--font-voice-${kebab(cName)}`;
     for (const [sName, s] of Object.entries(steps)) {
       const c = kebab(cName), sk = kebab(sName);
       const tt = s.textTransform && s.textTransform !== "none" ? ` text-transform: ${s.textTransform};` : "";
@@ -3179,8 +3181,13 @@ function typeTokensBreakpointCSS(modes = [], { unit = "px", prefix = "type", des
 // typeTokensDTCG — the type scale as DTCG tokens: a fontFamily group + a typography group per
 // category/step (composite `typography` $type, the W3C-DTCG shape).
 function typeTokensDTCG(scale, { unit = "px" } = {}) {
+  // fontFamily is keyed by VOICE (11), not role (5) — TKT-0006: a consumer scanning this group for
+  // "every font family this kit actually applies" should see the real per-voice picture (matching
+  // the per-step typography tokens below, and typeTokensFigmaPrimitives's existing density), not
+  // just the 5 shared defaults. Un-overridden voices repeat their role's family — same value the
+  // composite typography tokens below already carry.
   const fontFamily = {};
-  for (const [role, family] of Object.entries(scale.fonts)) fontFamily[role] = { $type: "fontFamily", $value: family };
+  for (const voice of Object.keys(scale.categories)) fontFamily[voice] = { $type: "fontFamily", $value: resolvedFontFor(scale, voice) };
   const typography = {};
   for (const [cName, steps] of Object.entries(scale.categories)) {
     typography[cName] = {};
