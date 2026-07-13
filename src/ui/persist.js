@@ -358,14 +358,14 @@ function clampType(t) {
     for (const r of ["display", "heading", "body", "ui", "mono"]) if (typeof t.fonts[r] === "string" && t.fonts[r].trim()) fonts[r] = t.fonts[r].trim();
     if (Object.keys(fonts).length) out.fonts = fonts;
   }
-  // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading } } for the 11 known
+  // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading } } for the 13 known
   // voices; each field clamped to a sane range, kept only when finite, attached only when non-empty. This
-  // allowlist MUST track make11's voices — a voice missing here has its per-voice overrides SILENTLY DROPPED
-  // on hydrate. 2026-07-13 — voice set + `ratio` retired: Heading→Headline, UI→Label, Quote folded into
-  // Lead, Caption folded into Tiny, Legal folded into Body; Title/Sub-title/Tiny added. `ratio` no longer
+  // allowlist MUST track makeVoices's voices — a voice missing here has its per-voice overrides SILENTLY
+  // DROPPED on hydrate. 2026-07-13 — voice set + `ratio` retired: Heading→Headline, UI→Label, Quote folded
+  // into Lead, Caption folded into Tiny, Legal folded into Body; Title/Sub-title/Tiny added. `ratio` no longer
   // means anything (size is now a fixed table, not base×ratio^n — see type.mjs).
   if (t.voices && typeof t.voices === "object") {
-    const VOICES = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Code", "Label", "Kicker", "Tiny"];
+    const VOICES = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Body-mono", "Label", "Label-mono", "Kicker", "Tiny", "Tiny-mono"];
     const num = (x, lo, hi, round) => { const n = Number(x); if (!Number.isFinite(n)) return undefined; const c = Math.max(lo, Math.min(hi, n)); return round ? Math.round(c) : c; };
     const voices = {};
     for (const name of VOICES) {

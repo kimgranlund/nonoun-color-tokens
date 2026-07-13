@@ -448,9 +448,11 @@ const TYPE_SPECIMENS = {
     "Body": "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go.",
     "Lead": "The small stuff has a way of piling up. Here's a calmer place to set it down and start the day with a clear head.",
     "Label": "Today · 4 of 6 done · 2 left",
-    "Code": "GET /v1/habits/today → 200",
+    "Body-mono": "GET /v1/habits/today → 200",
+    "Label-mono": "v2.4.1 · build 1197",
     "Kicker": "Daily Brief",
     "Tiny": "Your streak keeps itself — no daily check-in required.",
+    "Tiny-mono": "sha256:a1b2c3d4 verified locally.",
     para: "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go — your streak keeps itself, so you can stay present for the part that actually counts.",
   },
   luxury: {
@@ -462,9 +464,11 @@ const TYPE_SPECIMENS = {
     "Body": "Crafted in limited number, each piece is finished by hand in our atelier and made to be kept for a lifetime.",
     "Lead": "A collection made in limited number, for those who measure luxury in decades rather than seasons.",
     "Label": "Reserve · Suite 9 · 2 nights",
-    "Code": "RES · 2026-09-14 · SUITE-09",
+    "Body-mono": "RES · 2026-09-14 · SUITE-09",
+    "Label-mono": "REF 09-14 · LOT 003",
     "Kicker": "Private Reserve",
     "Tiny": "Finished entirely by hand in the atelier, Florence.",
+    "Tiny-mono": "Serial no. MB-2026-0417.",
     para: "Crafted in limited number and finished entirely by hand, every piece leaves our atelier with the quiet confidence of something built to outlast its season — and to be passed, one day, to someone you love.",
   },
   editorial: {
@@ -476,9 +480,11 @@ const TYPE_SPECIMENS = {
     "Body": "For thirty years she walked these shores at dawn. What she saw — and what she could no longer find — became the story.",
     "Lead": "For thirty years she walked the shore at dawn — until the birds she counted began, quietly, to disappear.",
     "Label": "Issue 47 · 12 min read · Share",
-    "Code": "By J. Okonkwo · Oct 2026",
+    "Body-mono": "By J. Okonkwo · Oct 2026",
+    "Label-mono": "ISSN 2049-3630 · No. 47",
     "Kicker": "Dispatch",
     "Tiny": "Above: the north cove at first light, September.",
+    "Tiny-mono": "Archived at doi.org/10.1234/vc47.",
     para: "For thirty years she walked these shores at dawn, counting the birds the way her mother had taught her. What she saw over those decades, and what she slowly stopped finding, is the story we set out to tell.",
   },
   technical: {
@@ -490,9 +496,11 @@ const TYPE_SPECIMENS = {
     "Body": "All regions reporting nominal. Latency held under 80ms across the last 24 hours of production traffic.",
     "Lead": "Every region reporting nominal — a look at the last 24 hours of production traffic, node by node.",
     "Label": "p99 78ms · 1.2k rps · 0 err",
-    "Code": "$ kubectl get pods -n prod",
+    "Body-mono": "$ kubectl get pods -n prod",
+    "Label-mono": "v2.4.1 · commit 9f3a21c",
     "Kicker": "System Status",
     "Tiny": "Fig. 3 — p99 latency, rolling 24-hour window.",
+    "Tiny-mono": "trace-id: 7e2f9a1c-40b2-4e91.",
     para: "All regions are reporting nominal: latency held under 80ms across the last 24 hours, the error budget is untouched for the quarter, and the autoscaler released eleven nodes overnight without a single dropped request.",
   },
   statement: {
@@ -504,9 +512,11 @@ const TYPE_SPECIMENS = {
     "Body": "No openers. No encore. One set, start to finish, loud enough to feel in your chest.",
     "Lead": "One set, start to finish, three nights only — loud enough to feel in your chest and gone before the city wakes.",
     "Label": "SOLD OUT · WAITLIST OPEN",
-    "Code": "FRI 02 · WAREHOUSE 9 · DTLA",
+    "Body-mono": "FRI 02 · WAREHOUSE 9 · DTLA",
+    "Label-mono": "TICKET #04821 · GA",
     "Kicker": "Doors 9PM",
     "Tiny": "Warehouse 9, DTLA — doors at nine.",
+    "Tiny-mono": "Presented by NOCTURNE — est. 2019.",
     para: "No openers, no encore, no second chances: one set from start to finish, three nights only, loud enough to feel in your chest and gone before the city wakes up. Doors at nine — don't be the one telling it secondhand.",
   },
 };
@@ -1934,7 +1944,7 @@ class HctApp extends HTMLElement {
   typeAnalysisCards(view) {
     const scale = this._activeTypeScale();
     const card = (label, body) => h("div", { class: "an-card" }, h("div", { class: "an-label" }, label), body);
-    const SHORT = { "Display": "Disp", "Headline": "Head", "Sub-heading": "Sub", "Title": "Title", "Sub-title": "Subt", "Lead": "Lead", "Body": "Body", "Code": "Code", "Label": "Label", "Kicker": "Kick", "Tiny": "Tiny" };
+    const SHORT = { "Display": "Disp", "Headline": "Head", "Sub-heading": "Sub", "Title": "Title", "Sub-title": "Subt", "Lead": "Lead", "Body": "Body", "Body-mono": "BodyM", "Label": "Label", "Label-mono": "LabelM", "Kicker": "Kick", "Tiny": "Tiny", "Tiny-mono": "TinyM" };
     const series = Object.keys(scale.categories)
       .map((c) => ({ cat: c, short: SHORT[c] || c, steps: Object.entries(scale.categories[c] || {}).map(([name, s]) => ({ name, ...s })) }))
       .filter((x) => x.steps.length);
@@ -3457,8 +3467,8 @@ class HctApp extends HTMLElement {
   }
 
   // renderTypeTokensTable — the EDITABLE Typography token MATRIX (Phase 3). Rows = type steps GROUPED by
-  // voice (Display · Headline/Sub-heading/Title · Body/Lead · Label/Code/Kicker · Sub-title/Tiny) with a
-  // group-header row; the first (sticky) column is
+  // voice (Display · Headline/Sub-heading/Title · Body/Body-mono/Lead · Label/Label-mono/Kicker ·
+  // Sub-title/Tiny/Tiny-mono) with a group-header row; the first (sticky) column is
   // the token NAME (--type-{voice}-{step}). Columns = Base + each breakpoint mode (≥{minWidth}px). Each value
   // cell is a SIZE number input (the lever): editing it writes doc.type.tokenOverrides[<voice>|<step>|<mode>]
   // and the line/weight/tracking re-derive beneath; an overridden cell gets `.ov` + a ↺ reset. The override

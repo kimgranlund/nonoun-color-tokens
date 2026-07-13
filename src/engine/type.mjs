@@ -1,8 +1,8 @@
 // type.mjs — the perceptual TYPOGRAPHY engine: the type analog of the color engine. A few parameters
-// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Eleven named "voices" — Display ·
-// Headline · Sub-heading · Title · Sub-title · Lead · Body · Code · Label · Kicker · Tiny — each a
-// 3-step SM/MD/LG ramp whose every step carries size, line-height, letter-spacing, weight, and
-// paragraph spacing. (The DTCG shape follows the Figma-variable export at
+// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Thirteen named "voices" — Display ·
+// Headline · Sub-heading · Title · Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker ·
+// Tiny · Tiny-mono — each a 3-step SM/MD/LG ramp whose every step carries size, line-height,
+// letter-spacing, weight, and paragraph spacing. (The DTCG shape follows the Figma-variable export at
 // docs/reference/typography/typography.tokens.json, a frozen snapshot kept for reference.)
 //
 // 2026-07-13 — SIZE IS NOW A FIXED, HAND-AUTHORED TABLE, not a modular scale. Previously every voice
@@ -24,9 +24,10 @@
 
 const round = (v, d = 0) => { const f = 10 ** d; return Math.round(v * f) / f; };
 
-// FIXED SIZE TABLE — [SM, MD, LG] literal px, shared across all 5 treatments. Code aliases Body's own
-// triplet (mono role, same numbers); Kicker aliases Label's (mono role, same numbers) — both are the
-// SAME voice-scale, dressed in the mono font, not a distinct size register of their own.
+// FIXED SIZE TABLE — [SM, MD, LG] literal px, shared across all 5 treatments. Body-mono aliases Body's
+// own triplet (mono role, same numbers); Label-mono and Kicker both alias Label's (mono role, same
+// numbers); Tiny-mono aliases Tiny's — every "-mono" voice and Kicker are the SAME voice-scale as
+// their non-mono sibling, dressed in the mono font, not a distinct size register of their own.
 const SIZES = {
   Display: [72, 96, 120],
   Headline: [32, 40, 48],
@@ -36,7 +37,7 @@ const SIZES = {
   Lead: [20, 24, 28],
   Body: [14, 15, 16],
   Label: [12, 13, 14],
-  Tiny: [10, 11, 12],
+  Tiny: [9, 10, 11],
 };
 const RANKS = ["SM", "MD", "LG"];
 const stepsFor = (sizeKey) => RANKS.map((r, i) => [r, SIZES[sizeKey][i]]);
@@ -53,26 +54,30 @@ const stepsFor = (sizeKey) => RANKS.map((r, i) => [r, SIZES[sizeKey][i]]);
 // not a control label).
 const cat = (role, sizeKey, leading, weight, trackingEm, transform = "none", box = role === "ui" || role === "mono") => ({ role, base: SIZES[sizeKey][1], leading, weight, trackingEm, steps: stepsFor(sizeKey), transform, box });
 
-// make11 — the ELEVEN named type VOICES (docs/reference/typography): Display · Headline · Sub-heading ·
-// Title · Sub-title · Lead · Body · Code · Label · Kicker · Tiny. A voice carries CHARACTER (weight,
-// tracking, leading, case, font cut) that travels with it across every step; the SIZE is now a fixed
-// literal per voice+step (SIZES above), never derived. Sub-heading is a bold, all-caps CONTEXT heading
-// (a section label like "LATEST STORIES" sitting above a list/grid — not a subordinate H2); Title is a
-// smaller Headline; Sub-title is a smaller sub-heading in an alternate (mono-by-default) typeface; Lead
-// is a larger body intro (a former "Quote" folds in here — both are large, single-emphasis body-
-// adjacent text); Code and Kicker ride the MONO role at Body's and Label's own sizes respectively
-// (former "Legal" folds into Body; former "Caption" folds into Tiny).
+// makeVoices — the THIRTEEN named type VOICES (docs/reference/typography): Display · Headline ·
+// Sub-heading · Title · Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker · Tiny ·
+// Tiny-mono. A voice carries CHARACTER (weight, tracking, leading, case, font cut) that travels with it
+// across every step; the SIZE is now a fixed literal per voice+step (SIZES above), never derived.
+// Sub-heading is a bold, all-caps CONTEXT heading (a section label like "LATEST STORIES" sitting above
+// a list/grid — not a subordinate H2); Title is a smaller Headline; Sub-title is a smaller sub-heading
+// in an alternate (mono-by-default) typeface; Lead is a larger body intro (a former "Quote" folds in
+// here — both are large, single-emphasis body-adjacent text); Body-mono, Label-mono, and Tiny-mono each
+// ride the MONO role at their non-mono sibling's own sizes — a font-only variant, not a distinct size
+// register (former "Legal" folds into Body; former "Caption" folds into Tiny). Kicker also rides the
+// MONO role at Label's sizes, but stays its own distinct uppercase/wide-tracked voice (a section-label
+// job, not a mono-font swap of Label).
 //
 // CASE is a per-treatment decision, not a blanket rule. The Display role defaults to TITLE/SENTENCE case
 // (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. The one
 // genuine "caps role" left is Sub-heading; it stays uppercase and tracks POSITIVE so small caps open up
-// (Kicker, now pegged to Label's smaller size, keeps the same uppercase/positive-tracking character).
+// (Kicker, pegged to Label's smaller size, keeps the same uppercase/positive-tracking character).
 // Display tracks NEGATIVE — big type tightens. LEADINGS are a system constant, uniform across
 // treatments: display 0.8 (< 1 — large type sets tight), heading-family (Headline/Sub-heading/Title)
-// 1.125, prose (Body/Lead/Sub-title/Tiny) 1.4–1.5, single-line control text (Label/Kicker/Code) 1.0.
-// Treatments express voice through font, weight, tracking, and case — NOT leading, which is fixed to
-// the intent (retune a per-voice `*Lead` knob only for a deliberate character exception).
-function make11(o = {}) {
+// 1.125, prose (Body/Lead/Sub-title/Tiny) 1.4–1.5, single-line control text (Label/Label-mono/Kicker/
+// Body-mono) 1.0. Treatments express voice through font, weight, tracking, and case — NOT leading,
+// which is fixed to the intent (retune a per-voice `*Lead` knob only for a deliberate character
+// exception).
+function makeVoices(o = {}) {
   return {
     "Display": cat("display", "Display", o.dLead ?? 0.8, o.dWeight ?? 700, o.dTrack ?? -0.02, o.dTransform ?? "none"),
     "Headline": cat("heading", "Headline", o.hLead ?? 1.125, o.hWeight ?? 700, o.hTrack ?? -0.005, "none"),
@@ -81,10 +86,12 @@ function make11(o = {}) {
     "Sub-title": cat("mono", "Sub-title", o.stLead ?? 1.3, o.stWeight ?? 500, o.stTrack ?? 0.02, "none", false), // mono-by-default but PROSE (a small heading, not a control label)
     "Lead": cat("body", "Lead", o.leadLead ?? 1.4, o.leadWeight ?? 400, o.leadTrack ?? -0.005, "none"),
     "Body": cat("body", "Body", o.bLead ?? 1.5, o.bWeight ?? 440, 0, "none"),
-    "Code": cat("mono", "Body", o.codeLead ?? 1.5, o.codeWeight ?? 460, o.codeTrack ?? 0, "none"),
+    "Body-mono": cat("mono", "Body", o.bodyMonoLead ?? 1.5, o.bodyMonoWeight ?? 460, o.bodyMonoTrack ?? 0, "none"),
     "Label": cat("ui", "Label", o.labelLead ?? 1.4, o.labelWeight ?? 480, o.labelTrack ?? 0.006, "none"),
+    "Label-mono": cat("mono", "Label", o.labelMonoLead ?? 1.4, o.labelMonoWeight ?? 480, o.labelMonoTrack ?? 0, "none"),
     "Kicker": cat("mono", "Label", o.kickLead ?? 1.4, o.kickWeight ?? 600, o.kickTrack ?? 0.16, "uppercase"),
     "Tiny": cat("ui", "Tiny", o.tinyLead ?? 1.5, o.tinyWeight ?? 440, 0, "none", false), // ui FONT, prose flow (former Caption's job)
+    "Tiny-mono": cat("mono", "Tiny", o.tinyMonoLead ?? 1.5, o.tinyMonoWeight ?? 440, 0, "none", false), // mono FONT, still prose (mirrors Tiny)
   };
 }
 
@@ -96,23 +103,23 @@ export const TYPE_TREATMENTS = [
   // Product — calm geometric sans, gentle hierarchy, title-case display. The everyday system voice.
   { id: "product", label: "Product / Lifestyle", note: "Neutral geometric sans, title-case display — screen-native, calm, versatile.",
     fonts: { display: "Inter Tight", heading: "Inter Tight", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
-    categories: make11({ dWeight: 700, dTrack: -0.02, hWeight: 620, labelLead: 1.35, kickTrack: 0.14 }) },
+    categories: makeVoices({ dWeight: 700, dTrack: -0.02, hWeight: 620, labelLead: 1.35, kickTrack: 0.14 }) },
   // Luxury — high-contrast serif set LIGHT and large, airy prose, wide-tracked labels. Restraint, not shout.
   { id: "luxury", label: "Luxury / Premium", note: "High-contrast serif display set light and large, airy sans body, wide-tracked labels — restraint over shout.",
     fonts: { display: "Source Serif 4", heading: "Source Serif 4", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
-    categories: make11({ dWeight: 400, dTrack: -0.005, hWeight: 500, hTrack: 0, shWeight: 500, shTrack: 0.18, bWeight: 400, labelTrack: 0.04, labelLead: 1.45, kickWeight: 500, kickTrack: 0.26, leadWeight: 300 }) },
+    categories: makeVoices({ dWeight: 400, dTrack: -0.005, hWeight: 500, hTrack: 0, shWeight: 500, shTrack: 0.18, bWeight: 400, labelTrack: 0.04, labelLead: 1.45, kickWeight: 500, kickTrack: 0.26, leadWeight: 300 }) },
   // Editorial — serif headlines in title case, tight sans subheads, sans body tuned for long-form reading.
   { id: "editorial", label: "Editorial / Magazine", note: "Serif headlines in title case, tight sans subheads, sans body for long-form reading, mono metadata.",
     fonts: { display: "Source Serif 4", heading: "Inter Tight", body: "Inter", ui: "JetBrains Mono", mono: "JetBrains Mono" },
-    categories: make11({ dWeight: 650, dTrack: -0.015, hWeight: 750, hTrack: -0.01, kickTrack: 0.2, leadLead: 1.45 }) },
+    categories: makeVoices({ dWeight: 650, dTrack: -0.015, hWeight: 750, hTrack: -0.01, kickTrack: 0.2, leadLead: 1.45 }) },
   // Technical — mono-forward, tabular, dense, tight leading. Display reads as data, not a slogan.
   { id: "technical", label: "Technical / Data", note: "Mono-forward — tabular figures, dense, tight leading, restrained scale. Display reads as data, not slogan.",
     fonts: { display: "Inter", heading: "Inter", body: "Inter", ui: "JetBrains Mono", mono: "JetBrains Mono" },
-    categories: make11({ dWeight: 650, dTrack: -0.01, hWeight: 600, shTrack: 0.08, labelTrack: 0, labelLead: 1.35 }) },
+    categories: makeVoices({ dWeight: 650, dTrack: -0.01, hWeight: 600, shTrack: 0.08, labelTrack: 0, labelLead: 1.35 }) },
   // Brutalist — one heavy grotesque, the earned ALL-CAPS display, tight tracking, dramatic size jumps.
   { id: "statement", label: "Brutalist / Statement", note: "One heavy grotesque, ALL-CAPS display, tight tracking, dramatic size jumps — the loud voice, used on purpose.",
     fonts: { display: "Inter Tight", heading: "Inter Tight", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
-    categories: make11({ dWeight: 900, dTrack: -0.04, dTransform: "uppercase", hWeight: 800, hTrack: -0.02, shWeight: 700, shTrack: 0.12, bWeight: 500, labelWeight: 550, labelTrack: 0.02, kickWeight: 700, kickTrack: 0.12 }) },
+    categories: makeVoices({ dWeight: 900, dTrack: -0.04, dTransform: "uppercase", hWeight: 800, hTrack: -0.02, shWeight: 700, shTrack: 0.12, bWeight: 500, labelWeight: 550, labelTrack: 0.02, kickWeight: 700, kickTrack: 0.12 }) },
 ];
 
 export const DEFAULT_TYPE = { treatment: "product", bodyBase: 15 };
@@ -196,13 +203,13 @@ function buildCategory(name, p, factor, overrides, vp, compress) {
       weight,
       textTransform: p.transform || "none",
       // paragraph rhythm tracks the resolved size, keyed on FLOW not just role: a BOX voice (control/label
-      // text — Label · Kicker · Code) uses 1.0×size (its "paragraph" is its own height); a PROSE voice
+      // text — Label · Body-mono · Label-mono · Kicker) uses 1.0×size (its "paragraph" is its own height); a PROSE voice
       // breathes at its reading factor (display/heading ~0.7, body 0.75, and a ui/mono-font prose voice —
       // Tiny/Sub-title — falls back to 0.75). Indent is a constant 0 (schema parity).
       paragraphSpacing: Math.round(size * (p.box ? 1 : (PARA_PROSE[p.role] ?? 0.75))),
       paragraphIndent: 0,
       // single-line height (= size, leading 1.0) — the CONTROL-text intent, distinct from the
-      // multi-line lineHeight above. Emitted only for the BOX voices (Label · Kicker · Code), where text
+      // multi-line lineHeight above. Emitted only for the BOX voices (Label · Body-mono · Label-mono · Kicker), where text
       // sits in a box and the box owns the rhythm — NOT for the prose voices (Tiny · Sub-title).
       ...(p.box ? { singleLineHeight: size } : {}),
     };
@@ -256,30 +263,40 @@ export function typeScale(config = {}) {
   if (voices) for (const [name, v] of Object.entries(voices)) {
     if (t.categories[name] && v && typeof v.styleName === "string" && v.styleName.trim()) styleNames[name] = v.styleName.trim();
   }
-  // per-voice SIBLING WEIGHTS (config.voices[v].weights) — named weight variants AROUND the voice's core
-  // weight ([{name:"Bold", weight:700}, …]; the core itself is never in the list). They ship as per-voice
-  // weight tokens (CSS custom props, DTCG fontWeight group, Figma weight/… primitives) and drive the
-  // Figma text-style variants (`Display/xl/Bold`). Validation: finite 1..1000 weight + non-empty name;
-  // the kebab slug is the token key (duplicate slugs collapse, first wins). Identity-gated: no valid
-  // entries ⇒ no `weights` key on the scale and every emitter is byte-identical.
+  // per-voice SIBLING WEIGHTS — named weight variants AROUND the voice's core weight ([{name:"Bold",
+  // weight:700}, …]; the core itself is never in the list). They ship as per-voice weight tokens (CSS
+  // custom props, DTCG fontWeight group, Figma weight/… primitives) and drive the Figma text-style
+  // variants (`Display/lg/Bold`). 2026-07-13 — AUTO-POPULATED for every voice by default, from
+  // `siblingWeightDefaults` on that voice's own RESOLVED core weight (after any per-voice weight
+  // override above): a voice with no `config.voices[v].weights` still gets its 3 suggested siblings,
+  // not none. `config.voices[v].weights` — an array, even `[]` — REPLACES the default entirely (the
+  // per-voice override channel, unchanged): validation is finite 1..1000 weight + non-empty name; the
+  // kebab slug is the token key (duplicate slugs collapse, first wins); an explicit `[]` (or an array
+  // with no valid entries) opts that voice OUT of siblings altogether.
   const weights = {};
-  if (voices) for (const [name, v] of Object.entries(voices)) {
-    if (!t.categories[name] || !v || !Array.isArray(v.weights)) continue;
-    const list = [], seen = new Set();
-    for (const e of v.weights) {
-      if (!e || typeof e !== "object") continue;
-      const w = Math.round(Number(e.weight));
-      const nm = typeof e.name === "string" ? e.name.trim() : "";
-      if (!Number.isFinite(w) || w < 1 || w > 1000 || !nm) continue;
-      const slug = kebab(nm);
-      if (!slug || seen.has(slug)) continue;
-      seen.add(slug);
-      list.push({ name: nm, slug, weight: w });
+  for (const name of Object.keys(t.categories)) {
+    const v = voices && voices[name];
+    if (v && Array.isArray(v.weights)) {
+      const list = [], seen = new Set();
+      for (const e of v.weights) {
+        if (!e || typeof e !== "object") continue;
+        const w = Math.round(Number(e.weight));
+        const nm = typeof e.name === "string" ? e.name.trim() : "";
+        if (!Number.isFinite(w) || w < 1 || w > 1000 || !nm) continue;
+        const slug = kebab(nm);
+        if (!slug || seen.has(slug)) continue;
+        seen.add(slug);
+        list.push({ name: nm, slug, weight: w });
+      }
+      if (list.length) weights[name] = list;
+    } else {
+      const core = categories[name] && categories[name].MD && categories[name].MD.weight;
+      const auto = siblingWeightDefaults(core).map((x) => ({ ...x, slug: kebab(x.name) }));
+      if (auto.length) weights[name] = auto;
     }
-    if (list.length) weights[name] = list;
   }
   // per-voice FONT overrides (config.voices[v].font) — the escape hatch off the 5 shared ROLES: any of the
-  // 11 voices may carry its own family instead of riding its role's default (TKT-0002 — e.g. Sub-heading no
+  // 13 voices may carry its own family instead of riding its role's default (TKT-0002 — e.g. Sub-heading no
   // longer forced to share Heading's font). Identity-gated like styleNames/weights: absent ⇒ no voiceFonts
   // key, and every emitter below stays byte-identical. Resolve via `resolvedFontFor`, never read directly.
   const voiceFonts = {};
@@ -304,20 +321,23 @@ export function resolvedFontFor(scale, voice) {
 export const WEIGHT_LADDER = [100, 200, 300, 400, 500, 600, 700, 800, 900];
 export const WEIGHT_NAMES = { 100: "Thin", 200: "Extra-light", 300: "Light", 400: "Regular", 500: "Medium", 600: "Semi-bold", 700: "Bold", 800: "Extra-bold", 900: "Black" };
 
-// siblingWeightDefaults(core) — the SUGGESTED sibling set around a voice's core weight: the two
-// LADDER-ADJACENT stops (immediate neighbors, never a skipped step), stepping from the core TOWARD
-// the ladder's center — the 400–600 band real UIs actually reach for when they need an emphasis
-// variant next to a body/label weight. Below-center cores step up, above-center cores step down; the
-// nearer neighbor is listed first, matching how a designer would name them ("Regular → Medium, then
-// Semi-bold"). The core itself is never in the list. Applied once when the user opts a voice in;
-// after that the list is user-owned (add/remove/rename) and never silently regenerated. The shape:
-//   core < 550 (Thin…Medium)  → two ABOVE, nearer first:  400 → Medium 500 · Semi-bold 600
-//   core ≥ 550 (Semi-bold…Black) → two BELOW, nearer first: 700 → Semi-bold 600 · Medium 500
+// siblingWeightDefaults(core) — the SUGGESTED sibling set around a voice's core weight: THREE
+// LADDER-ADJACENT stops (immediate neighbors, never a skipped step) — one stepping AWAY from the
+// ladder's center, two stepping TOWARD it (nearer first). Below-center cores step up toward center
+// (away = down); above-center cores step down toward center (away = up). 2026-07-13 — every voice's
+// `weights` is now AUTO-POPULATED from this by default (see typeScale); an explicit
+// `config.voices[v].weights` still overrides it entirely (including an explicit `[]` to opt a voice
+// OUT of siblings). The shape (away, toward-near, toward-far), core never included:
+//   core < 550 (Thin…Medium)     → one BELOW (away), two ABOVE (toward), e.g. 400 → 300 · 500 · 600
+//   core ≥ 550 (Semi-bold…Black) → one ABOVE (away), two BELOW (toward), e.g. 800 → 900 · 700 · 600
+// An edge core (100/900) has nowhere for its "away" stop to go — it drops, leaving the old 2-stop set.
 export function siblingWeightDefaults(core) {
   const c = Number(core);
   if (!Number.isFinite(c)) return [];
   const snap = WEIGHT_LADDER.reduce((a, b) => (Math.abs(b - c) < Math.abs(a - c) ? b : a));
-  const picks = snap < 550 ? [snap + 100, snap + 200] : [snap - 100, snap - 200];
+  const toward = snap < 550 ? 100 : -100;
+  const away = -toward;
+  const picks = [snap + away, snap + toward, snap + 2 * toward];
   return picks
     .filter((w) => w >= 100 && w <= 900 && w !== snap)
     .map((w) => ({ name: WEIGHT_NAMES[w], weight: w }));
@@ -380,7 +400,7 @@ export function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
   const lines = [":root {"];
   for (const [role, family] of Object.entries(scale.fonts)) lines.push(`  --font-${role}: '${family}';`); // quote — names with digits (e.g. "Source Serif 4") are invalid unquoted in strict parsers (Safari)
   // per-voice FONT — one custom prop per VOICE (`--font-voice-sub-heading: '...'`), resolved via
-  // resolvedFontFor so every one of the 11 voices is directly addressable by name, not just the ones
+  // resolvedFontFor so every one of the 13 voices is directly addressable by name, not just the ones
   // carrying an explicit override (TKT-0006: matches typeTokensFigmaPrimitives's existing density —
   // an un-overridden voice's variable simply repeats its role's family, same value the utility classes
   // below already apply). Quoted like the role fonts above (same Safari trap).
@@ -513,7 +533,7 @@ export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
           // leading + tracking ride as a % of font size (Figma's native relative unit); size/weight/para stay raw.
           variables[key].values[mode] = prop === "lineHeight" || prop === "letterSpacing" ? relPct(s[prop], s.size) : s[prop];
         }
-        // singleLineHeight exists only on the BOX voices (UI · Code · Kicker) — emit as a % of size too.
+        // singleLineHeight exists only on the BOX voices (Label · Body-mono · Label-mono · Kicker) — emit as a % of size too.
         if (s.singleLineHeight != null) {
           const key = `${cName}/${sName}/singleLineHeight`;
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };

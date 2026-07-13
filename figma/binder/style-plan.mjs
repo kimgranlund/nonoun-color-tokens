@@ -92,12 +92,14 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           textCase: s.textTransform || "none",
         };
         // the CORE style — `Voice/step` when the voice/step has NO configured siblings (nothing to
-        // disambiguate); `Voice/step/{own-weight-slug}` when it DOES (TKT-0001 — symmetric with its
-        // siblings below, so the Styles panel never leaves the default weight unlabeled next to named
-        // variants). fontWeight binds to the voice's core weight primitive either way (always emitted).
+        // disambiguate — a voice explicitly opted out via `weights:[]`); `Voice/step/• Name` when it
+        // DOES (TKT-0001 — every voice by default, since 2026-07-13's auto-populated siblings). The
+        // `• ` (dot) prefix + Title-Case name visually marks the default pick among its named siblings
+        // (which stay lowercase-kebab, e.g. `bold`) — not a plain weight-slug segment, so it can never
+        // collide with a sibling's own name.
         const coreWeightName = sibs.length ? weightNameFor(s.weight) : null;
         texts.push({
-          name: coreWeightName ? `${voice}/${stepSlug}/${coreWeightName.slug}` : `${voice}/${stepSlug}`,
+          name: coreWeightName ? `${voice}/${stepSlug}/• ${coreWeightName.name}` : `${voice}/${stepSlug}`,
           voice, step,
           bind: { ...bindBase, fontWeight: `weight/${voice}`, ...(coreStyleName ? { fontStyle: `weight-style/${voice}` } : {}) },
           literal: { ...litBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
@@ -114,17 +116,17 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         }
         // SINGLE-LINE variants (Body/Label only) — a `/single` sibling of every style above (core + each
         // configured weight), same font/size/tracking, but 1.0 leading (line-height = size, no multi-line
-        // reading rhythm). `singleLineHeight` only exists as engine DATA on the BOX voices (Label/Code/
-        // Kicker) — Label binds live to that Figma variable; Body has no such variable (it's prose), so
-        // its single-line lineHeight is a LITERAL (size, unbound) — the plan's own bind-or-literal-
-        // fallback pattern, not a special case.
+        // reading rhythm). `singleLineHeight` only exists as engine DATA on the BOX voices (Label/
+        // Body-mono/Label-mono/Kicker) — Label binds live to that Figma variable; Body has no such
+        // variable (it's prose), so its single-line lineHeight is a LITERAL (size, unbound) — the plan's
+        // own bind-or-literal-fallback pattern, not a special case.
         if (SINGLE_LINE_VOICES.has(voice)) {
           const singleLineHeight = s.singleLineHeight ?? s.size;
           const singleBindBase = { ...bindBase, ...(s.singleLineHeight != null ? { lineHeight: `${voice}/${step}/singleLineHeight` } : {}) };
           if (s.singleLineHeight == null) delete singleBindBase.lineHeight; // no live variable for Body — literal only
           const singleLitBase = { ...litBase, lineHeight: singleLineHeight };
           texts.push({
-            name: (coreWeightName ? `${voice}/${stepSlug}/${coreWeightName.slug}` : `${voice}/${stepSlug}`) + "/single",
+            name: (coreWeightName ? `${voice}/${stepSlug}/• ${coreWeightName.name}` : `${voice}/${stepSlug}`) + "/single",
             voice, step,
             bind: { ...singleBindBase, fontWeight: `weight/${voice}`, ...(coreStyleName ? { fontStyle: `weight-style/${voice}` } : {}) },
             literal: { ...singleLitBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },

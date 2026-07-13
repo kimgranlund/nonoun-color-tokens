@@ -2,8 +2,9 @@
 
 Running text you *read* (as opposed to interface chrome you *operate*) is the **body** voice on
 `--font-body`. Interface text is `label` — see interface.md; the split matters. Prose also has two
-dedicated voices — **lead** and **tiny** — plus **sub-title**, a smaller alternate-typeface heading
-that's still prose flow. Reach for the specific voice over a body step when one fits.
+dedicated voices — **lead** and **tiny** (plus **tiny-mono**, its monospace sibling) — plus
+**sub-title**, a smaller alternate-typeface heading that's still prose flow. Reach for the specific
+voice over a body step when one fits.
 
 ## The prose voices
 
@@ -13,6 +14,7 @@ that's still prose flow. Reach for the specific voice over a body step when one 
 | default body copy, paragraphs | `.type-body-md` | — |
 | dense or secondary prose, fine print, legal, footnotes | `.type-body-sm` | body's own smallest step covers legal/fine-print — there's no separate "legal" voice |
 | figure / image / table caption, small supporting text | `.type-tiny-md` | **tiny** — the ui font, but prose (wraps, reading leading) — this is also where a figure caption belongs, not a dedicated "caption" voice |
+| small monospace print — build hash, trace ID, technical footnote | `.type-tiny-mono-md` | **tiny-mono** — same size/flow as `tiny`, mono face; still prose (wraps), not a control label |
 | a smaller sub-heading in an alternate typeface | `.type-sub-title-md` | **sub-title** — mono-by-default face, but prose flow (it's a small heading, not a control label) |
 
 Every voice rides the same **SM · MD · LG** ramp (`.type-{voice}-sm|md|lg`); default to `-md`.
@@ -45,10 +47,11 @@ underline). Don't bump the weight or size for a link; that's the color layer's j
 
 ## Inline code & code blocks
 
-- Inline code: `.type-code-sm` (or match the surrounding step) — mono family, tabular, pegged to
+- Inline code: `.type-body-mono-sm` (or match the surrounding step) — mono family, tabular, pegged to
   `body`'s own sizes.
-- Code block: `.type-code-sm` / `-md` with `--type-code-{step}-line` for comfortable multi-line
-  leading. The surface/color come from color-tokens; the type here is only the mono voice + step.
+- Code block: `.type-body-mono-sm` / `-md` with `--type-body-mono-{step}-line` for comfortable
+  multi-line leading. The surface/color come from color-tokens; the type here is only the mono voice
+  + step.
 
 ## Don't
 

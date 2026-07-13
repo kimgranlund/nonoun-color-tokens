@@ -257,6 +257,32 @@ Format: Context → Decision → Rationale → Consequences → Status.
   treatments — instead of a per-treatment `base × ratio^step` modular scale; `ratio` is retired as a
   per-voice/per-treatment knob entirely. See `src/engine/type.mjs`'s header comment and
   `docs/reference/typography/README.md` for the current shape.
+- **Update (2026-07-13, later the same day).** Voice count moved eleven → **thirteen**: `Code` renamed
+  to `Body-mono` (same behavior — mono role, sentence case, pegged to Body's own sizes — pure rename,
+  matching the Sub-heading/Sub-title hyphenated-compound convention); `Label-mono` added (mirrors
+  Label — mono role, sentence case, box:true control text, pegged to Label's own sizes — the same
+  relationship Code/Body-mono has to Body, applied to Label; Kicker is untouched, still its own
+  distinct uppercase/wide-tracked voice); `Tiny-mono` added (mirrors Tiny — mono role, box:false prose,
+  pegged to Tiny's own sizes). Tiny's own fixed sizes also moved 10/11/12 → **9/10/11** in the same
+  change (Kim: "Tiny should be size 9, 10, 11") — this does NOT touch the `bodyBase`/`factor` identity
+  anchor (only Body's own MD literal feeds that), so no ripple to `DEFAULT_TYPE` was needed this time.
+  `makeVoices()` (renamed from `make11()`, which now understates the count) still returns 5 primary
+  voices consumed by the Color Categories 5-slot preset design (Display/Headline/Body/Label/Kicker) —
+  the 3 new mono siblings and Kicker are NOT part of that per-preset design surface, so no preset
+  regeneration was required beyond the mechanical `gen:categories` re-run.
+- **Update (2026-07-13, again the same day).** Sibling weights: `siblingWeightDefaults(core)` moves
+  from 2 stops to **3** — one stepping AWAY from the ladder's center, two TOWARD it (nearer first),
+  e.g. core Extra-bold 800 → Black 900 (away), Bold 700, Semi-bold 600 (toward). More consequentially,
+  every voice's `weights` is now **AUTO-POPULATED by default** in `typeScale()` — no
+  `config.voices[v].weights` opt-in required anymore (Kim: "they should all have it"); an explicit
+  `weights: [...]` (including `[]`) still replaces the default entirely per voice, `[]` being the one
+  remaining opt-OUT lever. Because siblings now exist for nearly every voice by default, the Figma
+  CORE style also always carries a name segment now — **dot-prefixed, Title-Case** (`Voice/step/•
+  Name`, e.g. `Body/md/• Regular`), not the old bare kebab-slug — so it can never collide with a
+  sibling's own lowercase-kebab name (`Body/md/semi-bold`) and reads visually as "the default" in the
+  Figma Styles panel. A voice explicitly opted OUT via `weights: []` is the only remaining case that
+  keeps the bare `Voice/step` name. See `figma/binder/style-plan.mjs` and the "Sibling weights"
+  section of `docs/reference/typography/README.md`.
 
 ---
 

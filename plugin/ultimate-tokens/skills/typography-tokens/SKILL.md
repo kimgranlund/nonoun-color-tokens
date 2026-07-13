@@ -5,7 +5,7 @@ description: >
   font/size/weight/leading/tracking for a heading, body copy, label, button, caption, code, or
   kicker ("what type token for this", "which voice/step should this text use", "size this heading",
   "make the type responsive", "why is this text the wrong size/weight", "wire the fonts"). The
-  consumption guide for the eleven-role type scale (role=function × level=hierarchy-depth, size
+  consumption guide for the thirteen-role type scale (role=function × level=hierarchy-depth, size
   derived): how to find and bind the exported `--type-*` /
   `--font-*` variables, choose the right VOICE for a text's job and the right STEP for its size, and
   apply the paragraph/single-line rhythm. Never hardcode a px font-size or a font family — this names
@@ -17,7 +17,7 @@ user-invocable: false
 
 # Using Ultimate Tokens type roles
 
-An Ultimate Tokens export gives eleven named **voices**, each a ramp of **steps**, as CSS custom
+An Ultimate Tokens export gives thirteen named **voices**, each a ramp of **steps**, as CSS custom
 properties. Your job is never to pick a px size or a font stack — it is to pick the right **voice**
 (the text's role) and **step** (its size within that role).
 
@@ -33,8 +33,8 @@ properties. Your job is never to pick a px size or a font stack — it is to pic
    `--font-ui`, `--font-mono`. Every voice resolves to one of these — you never name a family
    directly, you use the voice's `--font-*` var (the utility classes already do this).
 3. **Know the grammar.** `--type-{voice}-{step}-{prop}` where prop ∈
-   `size · line · tracking · weight · para` (+ `line-single` on the box voices — Label/Code/Kicker —
-   only). Prefer the ready-made utility class `.type-{voice}-{step}` (it wires
+   `size · line · tracking · weight · para` (+ `line-single` on the box voices — Label/Body-mono/
+   Label-mono/Kicker — only). Prefer the ready-made utility class `.type-{voice}-{step}` (it wires
    family+size+line+tracking+weight in one) over composing the vars by hand.
 
 ## Two axes — role (function) × level (hierarchy depth)
@@ -46,7 +46,7 @@ level hosts different roles. **You pick the role by function and the level by hi
 a role to hit a size, never a step to hit a px.** Choosing `display` because you want big text, or a
 larger step because you want line-height 26, is the mistake this split exists to prevent.
 
-## The eleven roles — pick by the text's FUNCTION
+## The thirteen roles — pick by the text's FUNCTION
 
 Every voice is now a fixed **SM–LG** (3-step) ramp — sizes are a hand-authored table, not a modular
 scale, and identical across every treatment (only font/weight/tracking/leading/case vary by treatment).
@@ -60,17 +60,22 @@ scale, and identical across every treatment (only font/weight/tracking/leading/c
 | **sub-title** | mono (prose) | a smaller sub-heading in an alternate typeface — still prose flow, not a control label |
 | **lead** | body | the standfirst / intro paragraph, or a block quote / pull-quote — larger than body |
 | **body** | body | running prose, paragraphs, descriptions, long-form reading, and fine-print/legal (body's own smallest step) |
-| **code** | mono | code, tabular figures, keyboard shortcuts, technical values — pegged to body's own sizes |
+| **body-mono** | mono | code snippets, tabular figures, keyboard shortcuts, technical values in running text — pegged to body's own sizes |
 | **label** | ui | interface text: buttons, labels, inputs, menus, table cells, badges |
+| **label-mono** | mono | monospace interface text — IDs, version tags, status readouts — pegged to label's own sizes |
 | **kicker** | mono | the smallest overline / metadata label — mono, uppercase, tracked, pegged to label's own sizes |
 | **tiny** | ui (prose) | figure/image/media captions, table captions, chart annotations, small supporting text |
+| **tiny-mono** | mono (prose) | monospace small print — build hashes, trace IDs, technical footnotes — pegged to tiny's own sizes |
 
 Note the split: **body** is for *prose you read*; **label** is for *interface chrome you operate*. A
 button label is `label`, not `body`. A paragraph is `body`, not `label`. **Sub-title** and **tiny**
 are prose too, even though they render in the *mono*/*ui* font respectively; they wrap (use `-line`,
 not `-line-single`). Reach for `tiny` on a figure caption, not `label`. There's no separate
 "quote"/"caption"/"legal"/"UI" voice — those jobs live on `lead`, `tiny`, `body`, and `label`
-respectively.
+respectively. **body-mono**, **label-mono**, and **tiny-mono** are mono-font SIBLINGS of `body`,
+`label`, and `tiny` respectively — same sizes, same flow (box vs. prose), just the mono family, for
+when the text itself is code-like (an ID, a version tag, a snippet) rather than prose or chrome that
+merely LOOKS technical. Don't reach for a `-mono` voice just because the surrounding UI is a dev tool.
 
 ## The laws (violating any of these is a defect)
 
@@ -85,8 +90,8 @@ respectively.
 3. **`line` and `para` come with the size.** Line-height (`-line`) and paragraph spacing (`-para`)
    are derived per step — use them; don't set your own `line-height: 1.5` or `margin-bottom`. For
    single-line control text (a button, an input value, an overline) use `-line-single` (leading
-   1.0), which exists on the box-text voices — **Label, Code, and Kicker** (the `ui`/`mono`
-   roles); for multi-line text use `-line`.
+   1.0), which exists on the box-text voices — **Label, Body-mono, Label-mono, and Kicker** (the
+   `ui`/`mono` roles); for multi-line text use `-line`.
 4. **Tracking is baked and optical.** `-tracking` is tuned per step (tight on display, open on
    kicker) — apply it; never add your own `letter-spacing`.
 5. **Weight is the voice's, and case is the treatment's.** Use `-weight`; don't bold a voice by

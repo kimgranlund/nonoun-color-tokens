@@ -435,11 +435,11 @@ if (applyStylePlans && applyFontPrimitives) {
     const textStyles = F.figma._styles.filter((x) => x._kind === "TEXT");
     if (sr.texts !== plans.texts.length || textStyles.length !== plans.texts.length) FAIL("styles", `text styles ${textStyles.length}/${sr.texts}, expected ${plans.texts.length}`);
     // Display's core weight (the product treatment's 700) snaps to "Bold"; WITH a sibling configured,
-    // the core carries its own weight-slug segment too (symmetric naming, TKT-0001) — lowercase-kebab,
-    // like the sibling's "Medium" → "medium".
-    const core = textStyles.find((x) => x.name === "Display/md/bold");
+    // the core carries a dot-prefixed `• Bold` segment too (symmetric naming, TKT-0001) — the sibling
+    // itself stays lowercase-kebab, "Medium" → "medium".
+    const core = textStyles.find((x) => x.name === "Display/md/• Bold");
     const sib = textStyles.find((x) => x.name === "Display/md/medium");
-    if (!core || !sib) FAIL("styles", "Display/md/bold core or Display/md/medium sibling text style missing");
+    if (!core || !sib) FAIL("styles", "Display/md/• Bold core or Display/md/medium sibling text style missing");
     if (core && (!core.fontName || core.fontName.style !== "Bold")) FAIL("styles", `Display core face = ${core && core.fontName && core.fontName.style}, want Bold (700 candidates)`);
     if (sib && (!sib.fontName || sib.fontName.style !== "Medium")) FAIL("styles", `Display sibling face = ${sib && sib.fontName && sib.fontName.style}, want Medium`);
     if (core && (!core.lineHeight || core.lineHeight.unit !== "PERCENT")) FAIL("styles", "text style lineHeight is not PERCENT-united");
@@ -486,12 +486,15 @@ if (applyStylePlans && applyFontPrimitives) {
     const before = F.figma._styles.length;
     await applyStylePlans(plans);
     if (F.figma._styles.length !== before) FAIL("styles", "re-apply is not idempotent (style count moved)");
-    const reduced = stylePlans({ families, scale: TYPE.typeScale({ treatment: "product", bodyBase: 16 }) }); // siblings dropped
+    // siblings dropped via an EXPLICIT weights:[] opt-out (2026-07-13: omitting voices config no longer
+    // means "no siblings" — every voice auto-populates by default — so an explicit opt-out is the only
+    // way left to get a bare, undisambiguated core).
+    const reduced = stylePlans({ families, scale: TYPE.typeScale({ treatment: "product", bodyBase: 16, voices: { Display: { weights: [] } } }) });
     const sr2 = await applyStylePlans(reduced);
     if (F.figma._styles.some((x) => x.name === "Display/md/medium")) FAIL("styles", "prune did not remove the dropped sibling style");
-    // the core RENAMES too when its siblings disappear (Display/md/bold → bare Display/md, nothing left
-    // to disambiguate) — the old suffixed name must prune, and the bare name must exist fresh.
-    if (F.figma._styles.some((x) => x.name === "Display/md/bold")) FAIL("styles", "prune did not remove the core's old suffixed name after its siblings were dropped");
+    // the core RENAMES too when its siblings disappear (Display/md/• Bold → bare Display/md, nothing
+    // left to disambiguate) — the old suffixed name must prune, and the bare name must exist fresh.
+    if (F.figma._styles.some((x) => x.name === "Display/md/• Bold")) FAIL("styles", "prune did not remove the core's old suffixed name after its siblings were dropped");
     if (!F.figma._styles.some((x) => x.name === "Display/md")) FAIL("styles", "the core did not revert to its bare name once siblings were dropped");
     if (!F.figma._styles.some((x) => x.name === "My Own/keep-me")) FAIL("styles", "prune touched a USER style (provenance violated)");
     if (!sr2.pruned) FAIL("styles", "prune count not reported");

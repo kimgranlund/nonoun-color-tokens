@@ -1,10 +1,10 @@
-# Interface text — the `label` voice (and `code`, `kicker`)
+# Interface text — the `label` voice (and `body-mono`, `label-mono`, `kicker`)
 
 Everything you *operate* rather than *read* is the **label** voice on `--font-ui`: buttons, inputs,
 labels, menus, tabs, table cells, badges, tooltips. It's a 3-step ramp (**sm/md/lg**) — like the other
-box-text voices (`code` and `kicker`, the `mono`-role voices, pegged to the same sizes as `body` and
-`label` respectively) — it has a **single-line height** (`-line-single`, leading 1.0) for text that
-sits locked in a box.
+box-text voices (`body-mono`, `label-mono`, and `kicker`, the `mono`-role voices, pegged to the same
+sizes as `body` and `label` respectively) — it has a **single-line height** (`-line-single`, leading
+1.0) for text that sits locked in a box.
 
 ## Control & component text
 
@@ -34,10 +34,13 @@ SM, MD ↔ MD, LG ↔ LG. Geometry's other steps (XS, and the expressive band XL
 counterpart (Label is SM/MD/LG-only) and fall back to geometry's own standalone size law instead —
 match the step across the two systems where both exist and the box fits the text.
 
-## Code in the interface
+## Monospace in the interface
 
-`code` voice (mono, pegged to `body`'s own sizes) for keyboard shortcuts (`.type-code-sm`), technical
-values, tabular figures in a table (`.type-code-md` for alignment), inline tokens in settings.
+`body-mono` (pegged to `body`'s own sizes) for keyboard shortcuts (`.type-body-mono-sm`), technical
+values, tabular figures in a table (`.type-body-mono-md` for alignment), inline tokens in settings.
+`label-mono` (pegged to `label`'s own sizes) is the same idea at control-text scale — an ID, a
+version tag, a status readout sitting inside a chip or a compact control (`.type-label-mono-sm`)
+where `label` itself would be the right size but the wrong (proportional) face.
 
 ## Don't
 
