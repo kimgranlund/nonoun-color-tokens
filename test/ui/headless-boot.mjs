@@ -1589,17 +1589,18 @@ const tysc = tScale(app.doc.type);
 ok(tysc.treatment === "luxury" && tysc.categories.Body.MD.size === 18, `(ty) treatment + base apply (treatment ${tysc.treatment}, body MD ${tysc.categories.Body.MD.size})`);
 ok(hydSet(serSet(app.doc)).type.treatment === "luxury" && hydSet(serSet(app.doc)).type.bodyBase === 18, "(ty) the type config round-trips through persist");
 ok(bkTy(app.doc).type && bkTy(app.doc).type.categories.Body && bkTy(app.doc).type.treatment === "luxury", "(ty) brandKit carries the type scale (the MCP serves it)");
-// (tyf) Fonts tab — an editable combobox per role; a custom family overrides the treatment + flows to the scale + persist.
+// (tyf) Fonts tab — an editable combobox per VOICE (all 11, matching 1:1 what's exported); a custom
+// family overrides that voice directly — there is no shared-role row — and flows to the scale + persist.
 app.typeSegment = "fonts"; app.render(); flushRaf();
-ok(app.querySelectorAll(".tyi-font-input").length === 5, `(tyf) the Fonts tab renders an editable combobox per role (5) (got ${app.querySelectorAll(".tyi-font-input").length})`);
-app._setTypeFont("body", "Custom Sans"); flushRaf();
-ok(app.doc.type.fonts && app.doc.type.fonts.body === "Custom Sans" && app._activeTypeScale().fonts.body === "Custom Sans", "(tyf) a custom family writes to doc.type.fonts and flows into the resolved scale");
-ok(hydSet(serSet(app.doc)).type.fonts.body === "Custom Sans", "(tyf) the custom font round-trips through persist");
-app._setTypeFont("body", ""); flushRaf();
-ok(!app.doc.type.fonts, "(tyf) clearing the only override removes doc.type.fonts (reverts to the treatment)");
+ok(app.querySelectorAll(".tyi-font-input").length === 11, `(tyf) the Fonts tab renders an editable combobox per voice (11) (got ${app.querySelectorAll(".tyi-font-input").length})`);
+app._setTypeVoiceFont("Body", "Custom Sans"); flushRaf();
+ok(app.doc.type.voices && app.doc.type.voices.Body.font === "Custom Sans" && app._activeTypeScale().voiceFonts.Body === "Custom Sans", "(tyf) a custom family writes to doc.type.voices[voice].font and flows into the resolved scale's voiceFonts");
+ok(hydSet(serSet(app.doc)).type.voices.Body.font === "Custom Sans", "(tyf) the custom font round-trips through persist");
+app._setTypeVoiceFont("Body", ""); flushRaf();
+ok(!app.doc.type.voices, "(tyf) clearing the only override removes doc.type.voices (reverts to the treatment)");
 // (tyfa) font AVAILABILITY badges — two different truths, never conflated.
 app.render(); flushRaf();
-ok(app.querySelectorAll(".tyi-font-badge").length === 5, `(tyfa) one availability badge per font role (got ${app.querySelectorAll(".tyi-font-badge").length})`);
+ok(app.querySelectorAll(".tyi-font-badge").length === 11, `(tyfa) one availability badge per voice (got ${app.querySelectorAll(".tyi-font-badge").length})`);
 // web: the 4 self-hosted faces are "bundled"; an unmeasurable env never cries wolf (assumes it renders)
 ok(!app.inFigma && app._fontStatus("Inter").label === "bundled" && app._fontStatus("Inter").state === "ok", "(tyfa) a self-hosted face reads 'bundled' in the web app");
 ok(app._fontStatus("Bodoni Moda").state === "ok", "(tyfa) with no DOM measurement available the probe assumes the face renders (never a false 'falls back')");
@@ -1626,21 +1627,23 @@ ok(app.doc.type.voices && app.doc.type.voices.Body.weight === 600 && app._active
 ok(hydSet(serSet(app.doc)).type.voices.Body.weight === 600, "(tyv) the per-voice override round-trips through persist");
 app._resetTypeVoice("Body"); flushRaf();
 ok(!app.doc.type.voices, "(tyv) reset clears the only voice override (back to the treatment)");
-// (tyvf) per-voice FONT override (TKT-0002) — a text input beside the other per-voice fields;
-// _setTypeVoiceFont writes doc.type.voices[voice].font, flows into the resolved scale's voiceFonts + the
-// live specimen, and round-trips through persist. Sub-heading rides the `heading` role (shared with
-// Heading today) — this is the exact "give Sub-heading its own font" gap the ticket names.
-app.typeVoice = "Sub-heading"; app.render(); flushRaf();
-const fontInput = walk(app, (e) => e.tagName === "INPUT" && e.getAttribute && e.getAttribute("data-fk") === "tyvoice-font:Sub-heading")[0];
-ok(!!fontInput, "(tyvf) the per-voice editor renders a Font override input");
+// (tyvf) per-voice FONT override (TKT-0002/#273) — set on the Fonts tab, the ONE editing surface for all
+// 11 voices' fonts; _setTypeVoiceFont writes doc.type.voices[voice].font, flows into the resolved scale's
+// voiceFonts + the live specimen + the Scale tab's read-only per-voice label, and round-trips through
+// persist. Sub-heading rides the `heading` role (shared with Heading today) — this is the exact "give
+// Sub-heading its own font" gap the ticket names.
+app.typeSegment = "fonts"; app.render(); flushRaf();
+const fontInput = walk(app, (e) => e.tagName === "INPUT" && e.getAttribute && e.getAttribute("data-fk") === "tyfont:Sub-heading")[0];
+ok(!!fontInput, "(tyvf) the Fonts tab renders a Font input for Sub-heading");
 app._setTypeVoiceFont("Sub-heading", "  Fraunces  "); flushRaf();
 ok(app.doc.type.voices && app.doc.type.voices["Sub-heading"].font === "Fraunces", "(tyvf) a per-voice font override writes to doc.type.voices (trimmed)");
 ok(app._activeTypeScale().voiceFonts && app._activeTypeScale().voiceFonts["Sub-heading"] === "Fraunces", "(tyvf) the override flows into the resolved scale's voiceFonts");
 ok(hydSet(serSet(app.doc)).type.voices["Sub-heading"].font === "Fraunces", "(tyvf) the per-voice font override round-trips through persist");
 app.render(); flushRaf();
 ok(txtOf(app.querySelectorAll(".type-spec-grouphead")[2]).includes("Fraunces"), "(tyvf) the canvas specimen re-renders the overridden voice (Sub-heading) in its own font");
-ok(txtOf(app.querySelectorAll(".tyi-voice-font")[2]).includes("Fraunces"), "(tyvf) the Scale tab's per-voice font label reflects the override too");
 ok(!txtOf(app.querySelectorAll(".type-spec-grouphead")[1]).includes("Fraunces"), "(tyvf) Heading — sharing the SAME role as Sub-heading — is untouched by the override");
+app.typeSegment = "scale"; app.typeVoice = "Sub-heading"; app.render(); flushRaf();
+ok(txtOf(app.querySelectorAll(".tyi-voice-font")[2]).includes("Fraunces"), "(tyvf) the Scale tab's per-voice font label reflects the override too (read-only there)");
 app._resetTypeVoice("Sub-heading"); flushRaf();
 ok(!app.doc.type.voices, "(tyvf) reset clears the only voice override (font included)");
 app.typeVoice = null; app.render(); flushRaf();

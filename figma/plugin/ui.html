@@ -12809,13 +12809,9 @@ class HctApp extends HTMLElement {
                   this.slider("Tracking", val("tracking", p.trackingEm), -0.05, 0.3, 0.001, (v) => (v >= 0 ? "+" : "") + fmt(v, 3) + "em", (v) => this._setTypeVoice(cName, "tracking", v)),
                   this.slider("Leading", val("leading", p.leading), 0.9, 2, 0.01, (v) => fmt(v, 2), (v) => this._setTypeVoice(cName, "leading", v)),
                   this.slider("Ratio", val("ratio", p.ratio), 1, 1.7, 0.005, (v) => fmt(v, 3), (v) => this._setTypeVoice(cName, "ratio", v)),
-                  // the per-voice FONT override (TKT-0002) — this voice's own family, instead of sharing
-                  // its role's default (e.g. give Sub-heading a different face than Heading, though both
-                  // ride the `heading` role). Empty clears it (falls back to the role's font); exported
-                  // into the Font Primitives font/<voice> alias + a --font-voice-* CSS prop.
-                  h("label", { class: "mode-editor-label", for: "fld-voice-font-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-") }, "Font"),
-                  h("input", { id: "fld-voice-font-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-"), type: "text", value: vp.font || "", placeholder: scale.fonts[scale.roleOf[cName]], "data-fk": "tyvoice-font:" + cName,
-                    "aria-label": "Font override for " + cName, onchange: (e) => this._setTypeVoiceFont(cName, e.target.value) }),
+                  // the per-voice font override (TKT-0002) is set on the Fonts tab (all 11 voices live
+                  // there, one editing surface) — this panel shows the resolved family read-only, in the
+                  // collapsed row's tyi-voice-font span, so it's not duplicated/editable in two places.
                   // the Figma weight-STYLE name — only meaningful for non-variable families (GT America
                   // "Condensed Black Italic"), where a numeric weight can't name the face. Exported into
                   // the Font Primitives collection as weight-style/<voice>; empty = none.
@@ -12877,55 +12873,55 @@ class HctApp extends HTMLElement {
     );
   }
 
-  // typeFontsTab — an editable combobox per role: pick a bundled font or TYPE any custom family. The value
-  // resolves to scale.fonts[role] (treatment default, or the custom override on doc.type.fonts).
+  // typeFontsTab — an editable combobox per VOICE, all 11, matching 1:1 what every export actually emits
+  // (font/<voice> in Figma Primitives, --font-voice-<kebab> in CSS, fontFamily in DTCG) — so what's
+  // editable here never diverges from what ships. A voice with no override shows its role's shared
+  // default (from the treatment) as its live value; editing always writes a per-voice override
+  // (_setTypeVoiceFont, TKT-0002) — there is no separate role-level row, and no second place to edit a
+  // voice's font (the Scale tab's per-voice panel shows the resolved family read-only, not editable).
   typeFontsTab() {
     const cfg = this._activeType();
     const scale = this._activeTypeScale();
-    const ROLE_LABEL = { display: "Display", heading: "Heading", body: "Body", ui: "UI", mono: "Mono" };
     const treatment = TYPE_TREATMENTS.find((t) => t.id === cfg.treatment) || TYPE_TREATMENTS[0];
     const opts = [...BUNDLED_FONTS, "system-ui", "Georgia", "Arial"]; // bundled families + a few common system ones
     return h(
       "div",
       { class: "insp-body" },
       h("h3", { class: "insp-title" }, icon("type"), "Fonts"),
-      h("div", { class: "insp-sub" }, "Pick a bundled font or type any family for each role."),
+      h("div", { class: "insp-sub" }, "Pick a bundled font or type any family for each voice."),
       this._fontsPanelSideEffects(),
       h(
         "div",
         { class: "tyi-fonts" },
-        ...Object.entries(scale.fonts).map(([role, family]) => {
+        ...Object.keys(scale.categories).map((cName) => {
+          const role = scale.roleOf[cName];
+          const family = resolvedFontFor(scale, cName);
           const generic = genericFor(family, role);
-          const custom = !!(cfg.fonts && cfg.fonts[role]);
+          const custom = !!(cfg.voices && cfg.voices[cName] && cfg.voices[cName].font);
+          const id = "tyfont-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
           return h(
             "div",
             { class: "tyi-font-row" },
-            h("label", { class: "tyi-font-role", for: "tyfont-" + role }, ROLE_LABEL[role] || role),
+            h("label", { class: "tyi-font-role", for: id }, cName),
             h("input", {
-              id: "tyfont-" + role,
+              id,
               class: "tyi-font-input",
               type: "text",
-              list: "tyfonts-" + role,
+              list: id + "-list",
               value: family,
               placeholder: treatment.fonts[role],
-              "aria-label": (ROLE_LABEL[role] || role) + " font family",
-              "data-fk": "tyfont:" + role,
+              "aria-label": cName + " font family",
+              "data-fk": "tyfont:" + cName,
               title: custom ? "Custom family — exports as-is; the web-app specimen loads it from Google Fonts (falls back if it isn't a Google font)" : "From the " + treatment.label + " treatment",
               style: `font-family:'${family}', ${generic}`,
-              onchange: (e) => this._setTypeFont(role, e.target.value),
+              onchange: (e) => this._setTypeVoiceFont(cName, e.target.value),
             }),
-            h("datalist", { id: "tyfonts-" + role }, ...opts.map((f) => h("option", { value: f }))),
-            (() => { const st = this._fontStatus(family); return h("span", { class: "tyi-font-badge is-" + st.state, title: st.title, "data-fk": "tyfontbadge:" + role }, st.label); })(),
+            h("datalist", { id: id + "-list" }, ...opts.map((f) => h("option", { value: f }))),
+            (() => { const st = this._fontStatus(family); return h("span", { class: "tyi-font-badge is-" + st.state, title: st.title, "data-fk": "tyfontbadge:" + cName }, st.label); })(),
           );
         }),
       ),
       h("p", { class: "insp-sub tyi-future" }, "Custom families export in the CSS / DTCG / Figma tokens. In the web app the specimen loads each face from Google Fonts on demand; a face that isn't a Google font (or the Figma plugin, which stays offline) falls back to the closest generic."),
-      // this pane only ever shows the 5 shared ROLES — the other 6 of the 11 exported voices (Sub-heading,
-      // Kicker, Lead, Quote, Caption, Code, Legal) can still escape their role font, but that control lives
-      // in the Scale tab's per-voice editor (TKT-0002), which nothing here points to otherwise.
-      h("p", { class: "insp-sub tyi-voice-hint" },
-        "Need to set a font for just one voice — Kicker, Legal, Code…? ",
-        h("button", { type: "button", class: "linklike", onclick: () => { this.typeSegment = "scale"; this.render(); } }, "Open the Scale tab's per-voice editor →")),
     );
   }
 
