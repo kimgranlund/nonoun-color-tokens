@@ -39,10 +39,9 @@
 //                                                                //   face. A custom styleName wins (fontStyle
 //                                                                //   only); otherwise fontWeight binds alone.
 //              literal: { family, styleName?, weight, size, lineHeight, letterSpacing,
-//                         lineHeightPct, letterSpacingPct,       // the EXACT ratio as a Figma percent —
-//                                                                //   the literal-fallback path reads THESE,
-//                                                                //   never (lineHeight/size)*100 (that
-//                                                                //   re-derivation drifts per step)
+//                                                                // PIXELS, not a % — a Figma-bound percent
+//                                                                //   FLOAT displays as a bare, unit-less
+//                                                                //   number in Figma's own Properties panel
 //                         paragraphSpacing?, textCase } }]       // resolved values: loadFontAsync + per-field
 //                                                                // fallback when a binding target is absent
 // Deterministic: paints in families×roles order, texts in the scale's voice/step order, siblings after
@@ -110,14 +109,11 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           family,
           weight: s.weight,
           size: s.size,
+          // lineHeight/letterSpacing ride as PIXELS here (not the CSS/DTCG ratio/em) — a Figma-bound
+          // percent FLOAT displays as a bare number in Figma's own Properties panel, indistinguishable
+          // from a pixel value at a glance; an absolute pixel is legible on its own there.
           lineHeight: s.lineHeight,
           letterSpacing: s.letterSpacing,
-          // the EXACT leading/tracking ratio as a Figma percent — constant per voice, never re-derived
-          // from the rounded absolute lineHeight/letterSpacing above (that re-derivation drifted per step:
-          // round(size·leading)/size ≠ leading at most sizes). The plugin's literal-fallback path
-          // (figma/plugin/code.js) reads these directly instead of computing (lineHeight/size)*100 itself.
-          lineHeightPct: Math.round(s.leadingRatio * 100 * 100) / 100,
-          letterSpacingPct: Math.round(s.trackingRatio * 100 * 100) / 100,
           ...(hasPara ? { paragraphSpacing: s.paragraphSpacing } : {}),
           textCase: s.textTransform || "none",
         };
@@ -179,8 +175,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           const singleLineHeight = s.singleLineHeight ?? s.size;
           const singleBindBase = { ...bindBase, ...(s.singleLineHeight != null ? { lineHeight: `${voice}/${step}/singleLineHeight` } : {}) };
           if (s.singleLineHeight == null) delete singleBindBase.lineHeight; // no live variable for Body — literal only
-          // singleLineHeight is ALWAYS exactly size (1.0 leading, 100%) — never the voice's own leadingRatio.
-          const singleLitBase = { ...litBase, lineHeight: singleLineHeight, lineHeightPct: 100 };
+          const singleLitBase = { ...litBase, lineHeight: singleLineHeight };
           const singleStepSlug = `${stepSlug}-single`;
           texts.push({
             name: coreLabel ? `${voice}/${singleStepSlug}/• ${coreLabel}` : `${voice}/${singleStepSlug}`,

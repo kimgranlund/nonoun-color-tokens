@@ -432,11 +432,11 @@ async function applyStylePlans(sp) {
       st.name = t.name;
       st.fontName = { family: useFamily, style: face };
       st.fontSize = lit.size;
-      // the EXACT ratio as a percent (lineHeightPct/letterSpacingPct) — NEVER (lit.lineHeight/lit.size)*100:
-      // that re-derivation from the already-rounded absolute px drifted a step's percent away from the
-      // voice's one configured ratio (round(size·leading)/size ≠ leading at most sizes).
-      if (Number.isFinite(lit.lineHeightPct)) st.lineHeight = { unit: "PERCENT", value: lit.lineHeightPct };
-      if (Number.isFinite(lit.letterSpacingPct)) st.letterSpacing = { unit: "PERCENT", value: lit.letterSpacingPct };
+      // PIXELS, not PERCENT — a Figma-bound percent FLOAT displays as a bare, unit-less number in Figma's
+      // own Properties panel (indistinguishable from a pixel value at a glance); an absolute pixel reads
+      // unambiguously there instead.
+      if (Number.isFinite(lit.lineHeight)) st.lineHeight = { unit: "PIXELS", value: lit.lineHeight };
+      if (Number.isFinite(lit.letterSpacing)) st.letterSpacing = { unit: "PIXELS", value: lit.letterSpacing };
       if (Number.isFinite(lit.paragraphSpacing)) st.paragraphSpacing = lit.paragraphSpacing;
       try { st.textCase = lit.textCase === "uppercase" ? "UPPER" : "ORIGINAL"; } catch (e) { /* older API */ }
       // per-field bindings — only where the target variable exists; an unsupported field falls back to
@@ -448,9 +448,9 @@ async function applyStylePlans(sp) {
         try { st.setBoundVariable(field, target); } catch (e) { /* field not bindable in this API — literal stands */ }
       };
       bindField("fontSize", typoVars);
-      // leading/tracking: the PERCENT literals above set the unit context; the bound FLOAT carries the
-      // same percent number. Verify rendering after a real apply — if Figma reads the bound value as px,
-      // unbind these two fields and fall back to the literals.
+      // leading/tracking: the PIXELS literals above set the unit context; the bound FLOAT carries the
+      // same pixel number (the Typography collection emits lineHeight/letterSpacing in pixels too — see
+      // typeTokensFigmaModes).
       bindField("lineHeight", typoVars);
       bindField("letterSpacing", typoVars);
       bindField("paragraphSpacing", typoVars);

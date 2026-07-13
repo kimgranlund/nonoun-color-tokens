@@ -461,7 +461,7 @@ if (applyStylePlans && applyFontPrimitives) {
     if (!core || !sib) FAIL("styles", "Display/md/• bold core or Display/md/medium sibling text style missing");
     if (core && (!core.fontName || core.fontName.style !== "Bold")) FAIL("styles", `Display core face = ${core && core.fontName && core.fontName.style}, want Bold (700 candidates)`);
     if (sib && (!sib.fontName || sib.fontName.style !== "Medium")) FAIL("styles", `Display sibling face = ${sib && sib.fontName && sib.fontName.style}, want Medium`);
-    if (core && (!core.lineHeight || core.lineHeight.unit !== "PERCENT")) FAIL("styles", "text style lineHeight is not PERCENT-united");
+    if (core && (!core.lineHeight || core.lineHeight.unit !== "PIXELS")) FAIL("styles", "text style lineHeight is not PIXELS-united");
     if (core && !core._bound.fontSize) FAIL("styles", "core fontSize not bound to the Typography variable");
     if (core && !core._bound.lineHeight) FAIL("styles", "core lineHeight not bound (percent FLOAT after unit set)");
     if (core && !core._bound.letterSpacing) FAIL("styles", "core letterSpacing not bound (percent FLOAT after unit set)");
@@ -492,19 +492,21 @@ if (applyStylePlans && applyFontPrimitives) {
       if (!namedCoreStyle || !namedCoreStyle._bound.fontStyle) FAIL("styles", "named-style-cut core text style must carry a bound fontStyle field");
     }
 
-    // a voice with ONE configured leading ratio must apply the SAME constant lineHeight percent at every
-    // step — found live via BZZR's real Figma Styles panel showing 111.8%/114.3% for a single 112.5%
-    // leading, because the literal fallback used to re-derive percent from the already-rounded absolute
-    // px (round(size·leading)/size ≠ leading at most sizes). Sub-heading's fixed sizes (28/34/40) don't
-    // all divide evenly by 1.125 — exactly the drift-prone shape.
+    // Figma's lineHeight/letterSpacing bind as ABSOLUTE PIXELS, not a % — a Figma-bound percent FLOAT
+    // displays as a bare, unit-less number in Figma's own Properties panel, indistinguishable from a
+    // pixel value at a glance; an absolute pixel reads unambiguously there instead (CSS/DTCG keep the
+    // ratio/em relative units, unaffected — see test/engine/type.mjs). Each step legitimately gets its
+    // OWN pixel value (unlike percent, a differing per-step pixel number is expected, not drift).
     {
       const driftScale = TYPE.typeScale({ treatment: "statement", voices: { "Sub-heading": { leading: 1.125, weights: [] } } });
       const driftPlans = stylePlans({ families, scale: driftScale });
       await applyFontPrimitives(primitivesApplyPlan(TYPE.typeTokensFigmaPrimitives(driftScale)));
       await applyStylePlans(driftPlans);
-      const shStyles = ["lg", "md", "sm"].map((step) => F.figma._styles.find((x) => x._kind === "TEXT" && x.name === `Sub-heading/${step}`));
-      if (shStyles.some((x) => !x)) FAIL("styles", "drift fixture: Sub-heading/{lg,md,sm} text style missing");
-      else if (!shStyles.every((x) => x.lineHeight && x.lineHeight.value === 112.5)) FAIL("styles", `drift fixture: Sub-heading lineHeight% must be a CONSTANT 112.5 at every step (got ${shStyles.map((x) => x.lineHeight && x.lineHeight.value)})`);
+      for (const step of ["LG", "MD", "SM"]) {
+        const st = F.figma._styles.find((x) => x._kind === "TEXT" && x.name === `Sub-heading/${step.toLowerCase()}`);
+        const expected = driftScale.categories["Sub-heading"][step].lineHeight;
+        if (!st || !st.lineHeight || st.lineHeight.unit !== "PIXELS" || st.lineHeight.value !== expected) FAIL("styles", `Sub-heading/${step} lineHeight must be PIXELS ${expected} (got ${st && st.lineHeight && `${st.lineHeight.unit} ${st.lineHeight.value}`})`);
+      }
     }
 
     // a family Figma does not have: the style is BUILT on a placeholder face (Inter), reported as

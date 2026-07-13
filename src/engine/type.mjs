@@ -427,23 +427,21 @@ export function dimUnit(px, unit) {
   return unit === "rem" || unit === "em" ? `${parseFloat((px / 16).toFixed(4))}${unit}` : `${px}px`;
 }
 
-// Leading (line-height) + tracking (letter-spacing) are ALWAYS relative in EVERY export — never px. A px
+// Leading (line-height) + tracking (letter-spacing) are ALWAYS relative in CSS/DTCG — never px. A px
 // leading breaks the moment the root size changes; a px tracking breaks the moment the font size changes.
-// So they ride as ratios, in each platform's native relative unit:
+// So they ride as ratios there, in each platform's native relative unit:
 //   relLine   — a UNITLESS factor (the CSS `line-height`/DTCG `lineHeight` idiom)
 //   relTrackEm— tracking as `em` (CSS `letter-spacing` / DTCG — relative to font size)
-//   relPct    — the same ratio as a Figma % (Figma line-height/letter-spacing are %-native, not unitless)
 // size, paragraphSpacing, paragraphIndent stay ABSOLUTE dims (dimUnit) — they are box metrics, not leading.
 // These take the STEP's exact leadingRatio/trackingRatio directly (constant per voice) — NEVER re-derive
 // from the rounded absolute lineHeight/letterSpacing px, which broke ratio-constancy across steps (see
-// buildCategory's own leadingRatio/trackingRatio comment). singleLineHeight is the one exception that
-// still divides px/size — it's always exactly 1.0 (singleLineHeight = size), so no rounding drift is
-// possible there.
+// buildCategory's own leadingRatio/trackingRatio comment). Figma is the ONE export that stays PIXEL —
+// see typeTokensFigmaModes — because a Figma-bound percent FLOAT displays as a bare number in Figma's own
+// Properties panel, indistinguishable from a pixel value at a glance; an absolute pixel there is legible
+// on its own, where a unitless ratio (or a raw "112.5" that's secretly a percent) is not.
 const relLine = (ratio) => round(ratio, 3);
 const relTrackEm = (ratio) => `${round(ratio, 4)}em`;
-const relPct = (ratio) => round(ratio * 100, 2);
 const relLinePx = (px, size) => (size > 0 ? round(px / size, 3) : 0);
-const relPctPx = (px, size) => (size > 0 ? round((px / size) * 100, 2) : 0);
 
 // `pfx` — the type-scale custom-property prefix (the `type` in `--type-*` and the `.type-*` class).
 // Default "type" (historical); a Material scheme sets "md-sys-typescale". Font families stay `--font-*`
@@ -559,9 +557,10 @@ export function typeTokensDTCG(scale, { unit = "px" } = {}) {
 // (`exportUI3`): `{ collections: { "Typography": { modes:[…], variables: { "<voice>/<step>/<prop>": {
 // type:"FLOAT", values:{ Base:…, <modeName>:… } } } } }`. So a Figma user imports ONE breakpoint-moded
 // collection instead of N separate per-width files. Every voice×step emits four FLOAT variables — size,
-// lineHeight, letterSpacing, weight (weight too, since Figma variables are numbers). size/weight are raw;
-// lineHeight + letterSpacing ride as a % of font size (relPct) — leading/tracking are ALWAYS relative,
-// never px, and % is Figma's native relative unit. `modes` = the SAME
+// lineHeight, letterSpacing, weight — all in PIXELS (a Figma-bound percent FLOAT displays as a bare,
+// unit-less number in Figma's own Properties panel — indistinguishable from a pixel value at a glance —
+// so a PIXEL absolute reads unambiguously there instead; CSS/DTCG keep the ratio/em relative units, where
+// that ambiguity doesn't exist). `modes` = the SAME
 // shape `_typeModeScales()` returns: [{ name, scale }] (minWidth, if present, is ignored — Figma modes are
 // named, not media-queried). IDENTITY: `modes = []` ⇒ a single base mode whose values equal the base.
 // `opts.baseName` (default "Base") NAMES the synthetic base layer (e.g. "Mobile" — the standard set);
@@ -594,16 +593,13 @@ export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
         for (const prop of TYPE_FIGMA_PROPS) {
           const key = `${cName}/${sName}/${prop}`;
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
-          // leading + tracking ride as a % of the voice's exact ratio (Figma's native relative unit) —
-          // NEVER re-derived from the rounded absolute px, which drifted per step; size/weight/para stay raw.
-          variables[key].values[mode] = prop === "lineHeight" ? relPct(s.leadingRatio) : prop === "letterSpacing" ? relPct(s.trackingRatio) : s[prop];
+          variables[key].values[mode] = s[prop];
         }
-        // singleLineHeight exists only on the BOX voices (Label · Body-mono · Label-mono · Kicker) — emit as a
-        // % of size too (always exactly 100 — singleLineHeight = size, no rounding drift possible here).
+        // singleLineHeight exists only on the BOX voices (Label · Body-mono · Label-mono · Kicker) — pixels too.
         if (s.singleLineHeight != null) {
           const key = `${cName}/${sName}/singleLineHeight`;
           if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
-          variables[key].values[mode] = relPctPx(s.singleLineHeight, s.size);
+          variables[key].values[mode] = s.singleLineHeight;
         }
       }
     }

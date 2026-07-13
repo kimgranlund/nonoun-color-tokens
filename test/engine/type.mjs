@@ -274,7 +274,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(JSON.stringify(idCol.modes) === JSON.stringify(["Base"]), "no modes ⇒ a single \"Base\" mode");
   ok(Object.values(idCol.variables).every((x) => x.type === "FLOAT" && Object.keys(x.values).join() === "Base"), "no modes ⇒ every variable has exactly one Base value");
   const dlg = base.categories.Display.LG;
-  ok(idCol.variables["Body/MD/size"].values.Base === base.categories.Body.MD.size && idCol.variables["Display/LG/letterSpacing"].values.Base === Math.round((dlg.letterSpacing / dlg.size) * 10000) / 100, "no-modes Base values equal the base scale (size raw px; letterSpacing as % of size — the relative-units rule)");
+  ok(idCol.variables["Body/MD/size"].values.Base === base.categories.Body.MD.size && idCol.variables["Display/LG/letterSpacing"].values.Base === dlg.letterSpacing, "no-modes Base values equal the base scale (size + letterSpacing both raw px — Figma's own relative-units rule)");
   // DISTINCT mode names: a breakpoint named "Base" (reserved) and duplicate names are disambiguated, so
   // Figma never sees modes:["Base","Base"] (which it rejects on import) or a silently-shadowed mode.
   const dup = T.typeTokensFigmaModes(base, [{ name: "Base", scale: mobile }, { name: "Wide", scale: base }, { name: "Wide", scale: mobile }]).collections.Typography;
@@ -308,7 +308,6 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const s = T.typeScale({ treatment: "product", bodyBase: 16 });
   const b = s.categories.Body.MD;
   const relLine = (ratio) => Math.round(ratio * 1000) / 1000; // unitless factor, 3dp (mirrors engine round(,3))
-  const relPct = (ratio) => Math.round(ratio * 100 * 100) / 100; // % of size, 2dp (mirrors engine round(,2))
   // CSS: -line is a UNITLESS factor (= the voice's exact leadingRatio), -tracking is `em`, -line-single
   // unitless — and NO px on either.
   const css = T.typeTokensCSS(s);
@@ -324,24 +323,26 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(typeof dt.letterSpacing === "string" && /em$/.test(dt.letterSpacing), "DTCG letterSpacing is an em string (relative)");
   ok(/px$/.test(dt.fontSize) && /px$/.test(dt.paragraphSpacing), "DTCG fontSize + paragraphSpacing stay px (absolute dims)");
   ok(typeof T.typeTokensDTCG(s).typography.Label.MD.$value.singleLineHeight === "number", "DTCG singleLineHeight is a unitless number too");
-  // Figma: leading + tracking ride as a % of the exact ratio (Figma's native relative unit); size/weight raw.
+  // Figma: leading + tracking ride as ABSOLUTE PIXELS (unlike CSS/DTCG) — a Figma-bound percent FLOAT
+  // displays as a bare, unit-less number in Figma's own Properties panel, indistinguishable from a pixel
+  // value at a glance; an absolute pixel reads unambiguously there instead. size/weight/singleLineHeight
+  // are raw px too (unchanged from before).
   const gv = T.typeTokensFigmaModes(s, []).collections.Typography.variables;
-  ok(gv["Body/MD/lineHeight"].values.Base === relPct(b.leadingRatio), "Figma lineHeight is % of the exact leadingRatio");
-  ok(gv["Body/MD/letterSpacing"].values.Base === relPct(b.trackingRatio), "Figma letterSpacing is % of the exact trackingRatio");
-  // REGRESSION (found live via BZZR's real Figma Styles panel): a voice with ONE configured leading ratio
-  // must show the SAME constant percent at every step — never drift because round(size·leading)/size ≠
-  // leading at most sizes. Sub-heading's fixed sizes (28/34/40) don't all divide evenly by 1.125, so this
-  // is exactly the shape that silently drifted before leadingRatio/trackingRatio existed.
+  ok(gv["Body/MD/lineHeight"].values.Base === b.lineHeight, "Figma lineHeight is the absolute pixel value, not a %");
+  ok(gv["Body/MD/letterSpacing"].values.Base === b.letterSpacing, "Figma letterSpacing is the absolute pixel value, not a %");
+  ok(gv["Label/MD/singleLineHeight"].values.Base === s.categories.Label.MD.singleLineHeight, "Figma singleLineHeight is the absolute pixel value too");
+  ok(gv["Body/MD/size"].values.Base === b.size && gv["Body/MD/weight"].values.Base === b.weight, "Figma size + weight stay raw (absolute)");
+  // CSS/DTCG still use the exact ratio (unaffected by Figma's pixel choice): a voice with ONE configured
+  // leading ratio must show the SAME constant number at every step — never drift, because
+  // round(size·leading)/size ≠ leading at most sizes. Sub-heading's fixed sizes (28/34/40) don't all
+  // divide evenly by 1.125 — exactly the shape that silently drifted before leadingRatio/trackingRatio
+  // existed (found live via BZZR's real Figma Styles panel).
   const drift = T.typeScale({ treatment: "statement", voices: { "Sub-heading": { leading: 1.125, tracking: "-5%" } } });
   const shCss = T.typeTokensCSS(drift);
   const shLines = ["lg", "md", "sm"].map((step) => (shCss.match(new RegExp(`--type-sub-heading-${step}-line: ([\\d.]+);`)) || [])[1]);
   ok(shLines.every((v) => v === "1.125"), `Sub-heading's CSS -line is a CONSTANT 1.125 at every step, not drifting per size (got ${shLines})`);
-  const shGv = T.typeTokensFigmaModes(drift, []).collections.Typography.variables;
-  ok(["LG", "MD", "SM"].every((step) => shGv[`Sub-heading/${step}/lineHeight`].values.Base === 112.5), "Sub-heading's Figma lineHeight % is a CONSTANT 112.5 at every step");
-  ok(["LG", "MD", "SM"].every((step) => shGv[`Sub-heading/${step}/letterSpacing`].values.Base === -5), 'Sub-heading\'s Figma letterSpacing % is a CONSTANT -5 (from the "-5%" percent-string tracking override), every step');
-  const relPctPx = (px, sz) => Math.round((px / sz) * 10000) / 100; // singleLineHeight is always exactly size — px/size stays valid (no rounding drift possible)
-  ok(gv["Label/MD/singleLineHeight"].values.Base === relPctPx(s.categories.Label.MD.singleLineHeight, s.categories.Label.MD.size), "Figma singleLineHeight is % of size");
-  ok(gv["Body/MD/size"].values.Base === b.size && gv["Body/MD/weight"].values.Base === b.weight, "Figma size + weight stay raw (absolute)");
+  const shTracking = ["lg", "md", "sm"].map((step) => (shCss.match(new RegExp(`--type-sub-heading-${step}-tracking: (-?[\\d.]+)em;`)) || [])[1]);
+  ok(shTracking.every((v) => v === "-0.05"), `Sub-heading's CSS -tracking is a CONSTANT -0.05em at every step (from the "-5%" percent-string override), got ${shTracking}`);
 }
 
 // ── Figma "Font Primitives" companion collection: deduped family primitives + per-voice aliases (5.4c) ──
