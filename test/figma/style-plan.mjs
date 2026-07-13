@@ -114,22 +114,25 @@ const plans = stylePlans({ families, scale });
   }
   ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(-single)?(\/(?:[a-z0-9 -]+|• [^/]+))?$/.test(t.name)), "every text style name is Voice/lowerstep[-single][/lower-kebab-slug OR templated-lowercase-name OR /• lowercase name]");
   // volume: every voice×step gets 1 core + its siblings.length (auto-populated by default, 0 only for
-  // an explicit opt-out) — plus a "{step}-single" mirror GROUP for every Body/Label style. Derived from
-  // the resolved scale itself (not hand-counted) so this doesn't rot as voice defaults change.
+  // an explicit opt-out) — plus a "{step}-single" mirror GROUP for every Body/Body-mono/Label/Label-mono
+  // style. Derived from the resolved scale itself (not hand-counted) so this doesn't rot as voice
+  // defaults change.
+  const SINGLE_VOICES = new Set(["Body", "Body-mono", "Label", "Label-mono"]);
   let expected = 0;
   for (const [v, steps] of Object.entries(scale.categories)) {
     const perStep = 1 + ((scale.weights && scale.weights[v]) || []).length;
     const n = perStep * Object.keys(steps).length;
     expected += n;
-    if (v === "Body" || v === "Label") expected += n; // the {step}-single mirror
+    if (SINGLE_VOICES.has(v)) expected += n; // the {step}-single mirror
   }
   ok(plans.texts.length === expected, `text style count ${plans.texts.length} != expected ${expected}`);
-  // every Body/Label style gets exactly one {step}-single sibling; no other voice does. A trailing
-  // "/single" SUFFIX used to carry this (made the plain leaf a PREFIX of its own single variant's path,
-  // which Figma's Styles panel folder-izes — the plain leaf and the implied folder then rendered as two
-  // rows sharing the same visible label) — the "{step}-single" SIBLING FOLDER fixes that at the root.
+  // every Body/Body-mono/Label/Label-mono style gets exactly one {step}-single sibling; no other voice
+  // does. A trailing "/single" SUFFIX used to carry this (made the plain leaf a PREFIX of its own single
+  // variant's path, which Figma's Styles panel folder-izes — the plain leaf and the implied folder then
+  // rendered as two rows sharing the same visible label) — the "{step}-single" SIBLING FOLDER fixes that
+  // at the root.
   const singles = plans.texts.filter((t) => /-single(\/|$)/.test(t.name));
-  ok(singles.every((t) => t.voice === "Body" || t.voice === "Label"), `only Body/Label carry a {step}-single variant (voices: ${[...new Set(singles.map((t) => t.voice))].join(",")})`);
+  ok(singles.every((t) => SINGLE_VOICES.has(t.voice)), `only Body/Body-mono/Label/Label-mono carry a {step}-single variant (voices: ${[...new Set(singles.map((t) => t.voice))].join(",")})`);
   ok(!plans.texts.some((t) => t.name.endsWith("/single") || t.name.includes("/single/")), "no text style name uses the old \"/single\" SUFFIX shape (it collided with the plain leaf as a Figma folder prefix)");
   const bodySingle = plans.texts.find((t) => t.name === "Body/md-single/• regular");
   ok(!!bodySingle && bodySingle.literal.lineHeight === bodySingle.literal.size && !bodySingle.bind.lineHeight, "Body's {step}-single style: literal lineHeight = size, UNBOUND (Body has no singleLineHeight variable — it's prose)");
@@ -137,6 +140,14 @@ const plans = stylePlans({ families, scale });
   const labelCoreName = weightNameFor(labelScale.categories.Label.MD.weight).name.toLowerCase();
   const labelSingle = stylePlans({ families, scale: labelScale }).texts.find((t) => t.name === `Label/md-single/• ${labelCoreName}`);
   ok(!!labelSingle && labelSingle.bind.lineHeight === "Label/MD/singleLineHeight", "Label's {step}-single style BINDS live to its real singleLineHeight variable (Label is a box voice)");
+  // Body-mono/Label-mono join Body/Label here (2026-07-13, at request) — both are BOX voices too (mono
+  // role defaults box:true in buildCategory), so unlike Body's prose fallback, they bind live.
+  const bodyMonoCoreName = weightNameFor(labelScale.categories["Body-mono"].MD.weight).name.toLowerCase();
+  const bodyMonoSingle = stylePlans({ families, scale: labelScale }).texts.find((t) => t.name === `Body-mono/md-single/• ${bodyMonoCoreName}`);
+  ok(!!bodyMonoSingle && bodyMonoSingle.bind.lineHeight === "Body-mono/MD/singleLineHeight", "Body-mono's {step}-single style BINDS live to its real singleLineHeight variable (box voice, unlike Body)");
+  const labelMonoCoreName = weightNameFor(labelScale.categories["Label-mono"].MD.weight).name.toLowerCase();
+  const labelMonoSingle = stylePlans({ families, scale: labelScale }).texts.find((t) => t.name === `Label-mono/md-single/• ${labelMonoCoreName}`);
+  ok(!!labelMonoSingle && labelMonoSingle.bind.lineHeight === "Label-mono/MD/singleLineHeight", "Label-mono's {step}-single style BINDS live to its real singleLineHeight variable");
 }
 
 // ── include gates + determinism + identity ──
