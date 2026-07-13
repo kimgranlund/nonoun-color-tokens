@@ -314,7 +314,7 @@ export function typeScale(config = {}) {
       if (list.length) weights[name] = list;
     } else {
       const core = categories[name] && categories[name].MD && categories[name].MD.weight;
-      const auto = siblingWeightDefaults(core).map((x) => ({ ...x, slug: kebab(x.name) }));
+      const auto = (BODY_CLASS_VOICES.has(name) ? bodyClassSiblingDefaults(core) : siblingWeightDefaults(core)).map((x) => ({ ...x, slug: kebab(x.name) }));
       if (auto.length) weights[name] = auto;
     }
   }
@@ -366,6 +366,25 @@ export function siblingWeightDefaults(core) {
     .map((w) => ({ name: WEIGHT_NAMES[w], weight: w }));
 }
 
+// BODY_CLASS_VOICES — the smaller, reading-adjacent voices (2026-07-13, at request): their auto-
+// populated siblings cap at 2, both HEAVIER than the core (never lighter — "Bolder"/"Boldest" only
+// mean something heavier than the base), and their Figma Styles-panel label uses the simpler
+// Regular/Bolder/Boldest vocabulary instead of the full Lighter/Light/Heavy/Heavier scale (see
+// relativeWeightLabel). The large, expressive voices (Display/Headline/Sub-heading/Title/Sub-title/
+// Kicker) are UNCHANGED — full 3-sibling siblingWeightDefaults, full 4-word label scale.
+export const BODY_CLASS_VOICES = new Set(["Lead", "Body", "Body-mono", "Label", "Label-mono", "Tiny", "Tiny-mono"]);
+
+// bodyClassSiblingDefaults(core) — the "Regular/Bolder/Boldest" progression for BODY_CLASS_VOICES:
+// always the 2 ladder stops immediately ABOVE the snapped core, never below (unlike
+// siblingWeightDefaults' bidirectional pick) — a core already at/near the ladder's top (900) simply
+// gets fewer (or zero) suggested siblings, same "edge core" reasoning.
+export function bodyClassSiblingDefaults(core) {
+  const c = Number(core);
+  if (!Number.isFinite(c)) return [];
+  const snap = WEIGHT_LADDER.reduce((a, b) => (Math.abs(b - c) < Math.abs(a - c) ? b : a));
+  return [snap + 100, snap + 200].filter((w) => w <= 900).map((w) => ({ name: WEIGHT_NAMES[w], weight: w }));
+}
+
 // weightNameFor(weight) — the SAME nearest-ladder-stop snap siblingWeightDefaults uses, exposed
 // standalone so a consumer can name the CORE weight itself (siblingWeightDefaults deliberately EXCLUDES
 // the core — it only suggests neighbors). Used to give the core an explicit, symmetric weight segment
@@ -378,22 +397,29 @@ export function weightNameFor(weight) {
   return { weight: snap, name: WEIGHT_NAMES[snap], slug: kebab(WEIGHT_NAMES[snap]) };
 }
 
-// RELATIVE_WEIGHT_LABELS / relativeWeightLabel — the normalized Figma Styles-panel vocabulary (2026-07-13,
-// at request): every voice's core + siblings gets ONE of these 4 words, by RANK among the resolved set,
-// regardless of what real font/weight sits underneath. A literal name (a custom face's own style string,
-// or a generic ladder name like "Semi-bold") reads illegibly once Figma truncates a long custom name in
-// its narrow panel (multiple siblings collapsing to the same visible "condensed …" prefix) — a relative
-// word is always short and always distinct. `rank` = the item's 0-indexed position in the ascending-
-// sorted, deduplicated set of ALL resolved weights for that voice (core + every sibling); `total` = that
-// set's size. Interpolates the rank evenly across the 4-word scale, so it degrades cleanly for any count
-// 1–4 (today's max — a core + up to 3 siblings): total 4 uses all 4 words in order; fewer total picks a
-// still-ordered, still-distinct subset (e.g. total 2 → the two extremes, "Lighter"/"Heavier"). total ≤ 1
-// (no siblings — nothing to disambiguate) ⇒ null, the existing bare-name path.
+// RELATIVE_WEIGHT_LABELS / BODY_WEIGHT_LABELS / relativeWeightLabel — the normalized Figma Styles-panel
+// vocabulary (2026-07-13, at request): every voice's core + siblings gets ONE word by RANK among the
+// resolved set, regardless of what real font/weight sits underneath. A literal name (a custom face's own
+// style string, or a generic ladder name like "Semi-bold") reads illegibly once Figma truncates a long
+// custom name in its narrow panel (multiple siblings collapsing to the same visible "condensed …"
+// prefix) — a relative word is always short and always distinct. `rank` = the item's 0-indexed position
+// in the ascending-sorted, deduplicated set of ALL resolved weights for that voice (core + every
+// sibling); `total` = that set's size; `words` = the vocabulary to interpolate across (default the
+// 4-word RELATIVE_WEIGHT_LABELS; BODY_CLASS_VOICES use the simpler 3-word BODY_WEIGHT_LABELS instead,
+// since they're capped at 3 total by bodyClassSiblingDefaults and don't need the full spread). Interpolates
+// the rank evenly across `words`, so it degrades cleanly for any total from 1 up to `words.length`: a
+// total matching `words.length` uses every word in order; fewer total picks a still-ordered, still-
+// distinct subset (e.g. 4 words at total 2 → the two extremes, "Lighter"/"Heavier"). A total EXCEEDING
+// `words.length` (an explicit override configuring more siblings than the compact vocabulary was sized
+// for) falls back to the full 4-word scale, so two different weights can never collide on the same
+// label. total ≤ 1 (no siblings — nothing to disambiguate) ⇒ null, the existing bare-name path.
 export const RELATIVE_WEIGHT_LABELS = ["Lighter", "Light", "Heavy", "Heavier"];
-export function relativeWeightLabel(rank, total) {
+export const BODY_WEIGHT_LABELS = ["Regular", "Bolder", "Boldest"];
+export function relativeWeightLabel(rank, total, words = RELATIVE_WEIGHT_LABELS) {
   if (!Number.isFinite(rank) || !Number.isFinite(total) || total <= 1) return null;
-  const idx = Math.round((rank / (total - 1)) * (RELATIVE_WEIGHT_LABELS.length - 1));
-  return RELATIVE_WEIGHT_LABELS[Math.max(0, Math.min(RELATIVE_WEIGHT_LABELS.length - 1, idx))];
+  const vocab = total > words.length ? RELATIVE_WEIGHT_LABELS : words;
+  const idx = Math.round((rank / (total - 1)) * (vocab.length - 1));
+  return vocab[Math.max(0, Math.min(vocab.length - 1, idx))];
 }
 
 // siblingStyleName — when a voice carries a custom Figma style name (a non-variable face, e.g.
