@@ -10,7 +10,11 @@ import { hydrate } from "../../src/ui/persist.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SPECDIR = join(HERE, "..", "..", "docs", "reference", "colors", "categories");
-const CATS = ["architecture", "cuisine", "film", "literature", "music", "nature", "travel"];
+// slug → expected preset count. The original 7 are uniformly "12 volumes × 4" (sourced/decorative
+// content, curated to a fixed gallery scale); "brands" is a small, real-identity set with no reason
+// to hit that same count — one volume of exactly the researched brands, not padded to 48.
+const CAT_COUNTS = { architecture: 48, cuisine: 48, film: 48, literature: 48, music: 48, nature: 48, travel: 48, brands: 7 };
+const CATS = Object.keys(CAT_COUNTS);
 const ROLES = ["display", "heading", "body", "ui", "mono"];
 // slot ROLE → the primary voice the mapper (gen-categories.design5ToTypeConfig) shapes with the slot's
 // tracking/leading/weight. Kept in lockstep with TYPE_VOICE_OF there — the fidelity gate below leans on it.
@@ -37,7 +41,7 @@ for (const slug of CATS) {
   const spec = JSON.parse(readFileSync(join(SPECDIR, `${slug}.json`), "utf8"));
   const specPals = spec.volumes.flatMap((v) => v.palettes); // volume/palette order == preset order
 
-  if (PRESETS.length !== 48) FAIL("count", `${slug} has ${PRESETS.length} presets, want 48`);
+  if (PRESETS.length !== CAT_COUNTS[slug]) FAIL("count", `${slug} has ${PRESETS.length} presets, want ${CAT_COUNTS[slug]}`);
   if (specPals.length !== PRESETS.length) FAIL("count", `${slug}: ${specPals.length} spec palettes vs ${PRESETS.length} presets`);
   totalPresets += PRESETS.length;
 
@@ -45,8 +49,11 @@ for (const slug of CATS) {
     const sd = specPals[i]?.type?.slots;
     // a spec palette is "designed" iff its type carries ≥1 font — exactly when the mapper yields a config
     // (gen-categories returns null otherwise). Gate on the IFF, not on "100% seeded", so a future
-    // un-designed palette doesn't redden this suite for a non-bug.
-    const specDesigned = !!(sd && ROLES.some((r) => typeof sd[r]?.font === "string" && sd[r].font.trim()));
+    // un-designed palette doesn't redden this suite for a non-bug. A spec can ALSO carry an already-
+    // resolved `type.fonts` directly (the "brands" category's real-doc pass-through, e.g. a config
+    // exported from the app itself, not the 5-slot design shape) — designed either way; the per-field
+    // "faithful" checks below are `.slots`-shaped and simply skip (guarded on `sd`) for this case.
+    const specDesigned = !!(sd && ROLES.some((r) => typeof sd[r]?.font === "string" && sd[r].font.trim())) || !!specPals[i]?.type?.fonts;
     const t = p.type;
     if (specDesigned && !t) { FAIL("hastype", `${slug}[${i}] spec is designed but preset dropped its type`); return; }
     if (!specDesigned && t) { FAIL("hastype", `${slug}[${i}] preset has type but the spec palette isn't designed`); return; }

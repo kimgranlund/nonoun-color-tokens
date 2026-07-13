@@ -76,7 +76,7 @@ try {
 
   const el = `document.querySelector("ultimate-tokens")`;
   ok(await evalJS(`!!${el} && !!${el}.querySelector(".gallery")`), "gallery boots");
-  ok(await evalJS(`${el}.querySelectorAll(".category-card").length === 7`), "hub renders 7 category cards");
+  ok(await evalJS(`${el}.querySelectorAll(".category-card").length === 8`), "hub renders 8 category cards");
 
   await evalJS(`${el}.openCategory("travel")`, true); await sleep(1200);
   ok(await evalJS(`${el}.category === "travel" && ${el}.querySelectorAll(".preset").length === 48`), "Travel category lazy-loads 48 palettes");

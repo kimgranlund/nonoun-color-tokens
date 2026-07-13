@@ -1,13 +1,15 @@
 // gen-categories.mjs — GENERATE the Palette Categories from docs/reference/colors/categories/*.json
 //
-// SUPERSEDES gen-travel-presets.mjs. Reads the 7 clean per-category JSON categories (architecture,
-// cuisine, film, literature, music, nature, travel) — each 12 volumes × 4 palettes — and emits:
+// SUPERSEDES gen-travel-presets.mjs. Reads every *.json under docs/reference/colors/categories/ — the
+// 7 sourced/decorative categories (architecture, cuisine, film, literature, music, nature, travel),
+// each 12 volumes × 4 palettes, PLUS "brands" (a smaller, real-identity set — see the `direct` palette
+// pass-through below) — and emits:
 //
 //   src/ui/categories/index.js     a SMALL, always-bundled index: one card per category
 //                               ({slug, category, eyebrow, tagline, count, strip}) + a lazy loader
 //                               (a static map of dynamic import()s → one code-split chunk per category).
 //   src/ui/categories/<slug>.js    one LAZY module per category: VOLUMES (per-volume headers) + PRESETS
-//                               (the 48 sets as read-only gallery presets the generator opens as copies).
+//                               (the read-only gallery presets the generator opens as copies).
 //
 // NAMING — per docs/reference/colors/color-model-function.md:
 //   sampled 6 colors → {tier}[-muted]: primary/primary-muted, secondary/secondary-muted, accent/accent-muted
@@ -208,8 +210,16 @@ function buildCategory(doc) {
     volumes[vol] = { title: tidyVolumeTitle(v.h1 || v.title), intro: clean((v.preface || []).join(" ")) };
     (v.palettes || []).forEach((p, pi) => {
       const hy = p.hierarchy || {};
+      // `p.palettes` (opt-in, currently only the "brands" category) is a DIRECT pass-through of a
+      // full palette array — every family verbatim, no swatch-hier derivation, no computed neutral,
+      // no fixed shared status four. For a real shipped product (Maison/Adia/BZZR/the Jazz kit) that
+      // preserves the ACTUAL authored Neutral + custom Info/Success/Warning/Danger instead of silently
+      // discarding them for the generic ones every sourced/decorative preset shares — those presets
+      // never set this field, so their output is byte-identical to before this was added.
+      const direct = Array.isArray(p.palettes) && p.palettes.length ? p.palettes : null;
       const dom = (p.swatches || []).find((s) => s.hier === "d");
-      if (pi === 0 && dom) strip.push(String(dom.hex).toUpperCase()); // one dominant per volume → the card strip
+      const stripHex = dom ? String(dom.hex).toUpperCase() : direct ? String(p.dominantHex || "").toUpperCase() : null;
+      if (pi === 0 && stripHex) strip.push(stripHex); // one dominant per volume → the card strip
       presets.push({
         // the tile/set name is the KICKER (a clean structured label, e.g. "59° N · January · Lake
         // Baikal corridor"); the long evocative `title` lives in story.title (Story tab + per-color line).
@@ -225,10 +235,14 @@ function buildCategory(doc) {
         ...DEFAULT_CONTROLS, ...VIVID_MIDS,
         // per-palette TYPOGRAPHY — opening this preset (openConfigAsSet → hydrate → clampType) sets the
         // doc's `type`, so the Fonts picker + scale + every export carry this palette's designed system.
-        // Absent when the spec palette has no `type` (falls back to the global default treatment).
-        ...(design5ToTypeConfig(p.type) ? { type: design5ToTypeConfig(p.type) } : {}),
-        // neutral first (derived from the character palettes' key colors), then the named families.
-        palettes: (() => { const pals = mapColors(p.swatches || []); return [deriveNeutralPalette(pals), ...pals]; })(),
+        // Absent when the spec palette has no `type` (falls back to the global default treatment). A
+        // spec can ALSO carry an already-resolved `type.fonts`/`.voices` directly (the "brands" pass-
+        // through shape — a real doc's own type config, not the 5-slot design shape) — pass it through
+        // verbatim rather than running it through the slot mapper, which wouldn't recognize it.
+        ...(p.type && p.type.fonts ? { type: p.type } : design5ToTypeConfig(p.type) ? { type: design5ToTypeConfig(p.type) } : {}),
+        // neutral first (derived from the character palettes' key colors), then the named families —
+        // unless `direct` supplies the full array itself (verbatim, in its own authored order).
+        palettes: direct || (() => { const pals = mapColors(p.swatches || []); return [deriveNeutralPalette(pals), ...pals]; })(),
       });
     });
   }

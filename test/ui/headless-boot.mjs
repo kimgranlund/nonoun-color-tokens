@@ -1013,8 +1013,10 @@ app.toGallery();
 
 // ── (hh) Palette Categories: hub category grid → a category's read-only presets → open an editable copy ──
 const { CATEGORY_INDEX: SI, loadCategory: LS } = await import("../../src/ui/categories/index.js");
-ok(Array.isArray(SI) && SI.length === 7, `(hh) 7 category categories ship in the bundled index (got ${SI && SI.length})`);
-ok(SI.every((c) => c.slug && c.category && c.count === 48 && Array.isArray(c.strip) && c.strip.length), "(hh) each category card has slug/name/count + a color strip");
+ok(Array.isArray(SI) && SI.length === 8, `(hh) 8 category categories ship in the bundled index (got ${SI && SI.length})`);
+// "brands" is a small, real-identity set (7) — every OTHER category is the uniform sourced/decorative
+// scale (48). Count still checked exactly, per category, not relaxed to "> 0".
+ok(SI.every((c) => c.slug && c.category && c.count === (c.slug === "brands" ? 7 : 48) && Array.isArray(c.strip) && c.strip.length), "(hh) each category card has slug/name/count + a color strip");
 const TPm = await LS("travel"); // one category lazily loaded
 const TP = TPm.PRESETS;
 ok(Array.isArray(TP) && TP.length === 48, `(hh) travel category lazily loads 48 presets (got ${TP && TP.length})`);
@@ -1034,11 +1036,20 @@ ok(TP.every((p) => p.lmax === 100 && p.lmin === 5 && p.damp === 70 && p.dampAmp 
 // retains the original palette exactly while the ramp re-derives an even scale from it.
 ok(TP.every((p) => p.palettes.slice(1, 7).every((q) => q.keyColors && q.keyColors.length === 1 && q.keyColors[0].role === "dominant" && Array.isArray(q.keyColors[0].oklch) && q.keyColors[0].oklch.length === 3)),
   "(hh) every sampled preset palette retains its source color as a dominant key color (OKLCH)");
-// every category lazily loads + holds 48 fully-formed presets (11 palettes each)
+// every sourced/decorative category lazily loads + holds 48 fully-formed presets (11 palettes each —
+// derived neutral + the {tier}-{rank} 6 + status four); "brands" is a small real-identity set (7
+// presets) whose four owned-product entries carry their OWN real family count (8: no "-muted"
+// siblings) instead of being forced into the 11-slot shape — see gen-categories.mjs's `direct` pass-
+// through.
 for (const c of SI) {
   const m = await LS(c.slug);
-  ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === 48 && m.PRESETS.every((p) => p.palettes.length === 11),
-    `(hh) category "${c.slug}" loads 48 presets × 11 palettes`);
+  if (c.slug === "brands") {
+    ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === 7 && m.PRESETS.every((p) => p.palettes.length >= 8),
+      `(hh) category "brands" loads 7 presets, each with its own real palette set (got ${m && m.PRESETS && m.PRESETS.length})`);
+  } else {
+    ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === 48 && m.PRESETS.every((p) => p.palettes.length === 11),
+      `(hh) category "${c.slug}" loads 48 presets × 11 palettes`);
+  }
 }
 // lift-anchoring (EVEN mode): a LIGHT dominant must open LIGHT, not the old mid-dark L*≈46 grey.
 // This is the "colors look really wrong" fix. Keyed on any preset whose primary source is light.
@@ -1049,7 +1060,7 @@ const _lightPrime = _pvHH(_hydHH({ ..._light, toneMode: "even" })).palettes[1].r
 ok(_lightPrime.tone > 72, `(hh) [even] lift anchors the prime to source lightness — a light dominant opens LIGHT (550 L*=${_lightPrime.tone.toFixed(0)})`);
 app.toGallery(); flushRaf();
 // the HUB shows a category card per category (not the presets directly)
-ok(app.querySelectorAll(".category-card").length === 7, `(hh) the gallery hub renders a category card per category (got ${app.querySelectorAll(".category-card").length})`);
+ok(app.querySelectorAll(".category-card").length === 8, `(hh) the gallery hub renders a category card per category (got ${app.querySelectorAll(".category-card").length})`);
 ok(app.querySelectorAll(".preset").length === 0, "(hh) preset tiles are NOT on the hub — they live inside a category");
 // descend into a category → its 48 read-only preset tiles render
 await app.openCategory("travel"); flushRaf();
@@ -1070,7 +1081,7 @@ app.search = tokenHH; app.refreshTiles();
 const filteredHH = app.querySelectorAll(".preset").length;
 ok(filteredHH >= 1 && filteredHH < 48, `(hh) the search box filters the category's shelf too (got ${filteredHH} for "${tokenHH}")`);
 app.search = ""; app.closeCategory(); flushRaf();
-ok(app.category === null && app.querySelectorAll(".category-card").length === 7, "(hh) closing a category returns to the hub");
+ok(app.category === null && app.querySelectorAll(".category-card").length === 8, "(hh) closing a category returns to the hub");
 
 // ── (jj) preset strip weighting (TKT-0003): a preset's strip WIDTH tracks its OWN authored
 // dominant/supporting/accent hierarchy (story.groups[].pct via colorRole), not a fixed template — so

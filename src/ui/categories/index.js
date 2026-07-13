@@ -3,6 +3,7 @@
 // code-splits each category's PRESETS/VOLUMES into its own chunk, loaded on demand when opened.
 export const CATEGORY_INDEX = [
   {"slug":"architecture","category":"Architecture","eyebrow":"Architecture Palette · Sourced from material & light","tagline":"Forty-eight buildings, read for their material, not their blueprint.","count":48,"strip":["#948F88","#958E87","#AEABA6","#7E5F49","#E3E2DF","#DFDEDC","#CBBCA6","#864D3B","#AA8967","#8E8D87","#CFC7B7","#683F32"]},
+  {"slug":"brands","category":"Brands","eyebrow":"Brand Palette · Sourced from real identities","tagline":"Seven real brands, read for their actual color — shipped products and researched public identities alike.","count":7,"strip":["#361DF1"]},
   {"slug":"cuisine","category":"Cuisine / Food","eyebrow":"Cuisine Palette · Sourced from ingredient & table","tagline":"Forty-eight dishes, read for their ingredients, not their menu photo.","count":48,"strip":["#DAD8D2","#CBA972","#4F2F22","#DB9A28","#B0C399","#567E51","#CCBC9D","#658E57","#C6A26D","#D8D5CC","#4C3125","#9F7852"]},
   {"slug":"film","category":"Film / Cinema","eyebrow":"Cinema Palette · Sourced from the frame","tagline":"Forty-eight films, read for their colour grade, not their poster.","count":48,"strip":["#9D9891","#E1B53C","#302721","#D5D9DA","#B5231E","#B39366","#273731","#71AA6B","#68766D","#E6A9AA","#C9AE7D","#27292F"]},
   {"slug":"literature","category":"Literature","eyebrow":"Literary Palette · Sourced from setting & page","tagline":"Forty-eight books, read for their colour, not their dust-jacket.","count":48,"strip":["#C49F60","#C6D0D6","#6F9E6A","#A8865B","#7A3F5F","#9E6042","#63676B","#6794C0","#C09B67","#68915A","#B0946E","#817A6F"]},
@@ -13,6 +14,7 @@ export const CATEGORY_INDEX = [
 
 const LOADERS = {
   "architecture": () => import("./architecture.js"),
+  "brands": () => import("./brands.js"),
   "cuisine": () => import("./cuisine.js"),
   "film": () => import("./film.js"),
   "literature": () => import("./literature.js"),
