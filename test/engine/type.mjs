@@ -409,8 +409,19 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // Figma primitives — FLOAT + STRING per sibling, core un-suffixed names unchanged
   const col = T.typeTokensFigmaPrimitives(sc).collections["Font Primitives"];
   ok(col.variables["weight/Display/bold"] && col.variables["weight/Display/bold"].type === "FLOAT" && col.variables["weight/Display/bold"].values.Value === 700, "primitives emit weight/<voice>/<slug> FLOAT per sibling");
-  ok(col.variables["weight-style/Display/bold"] && col.variables["weight-style/Display/bold"].values.Value === "Bold", "primitives emit weight-style/<voice>/<slug> STRING per sibling");
+  ok(col.variables["weight-style/Display/bold"] && col.variables["weight-style/Display/bold"].values.Value === "Bold", "primitives emit weight-style/<voice>/<slug> STRING per sibling (no custom styleName here ⇒ bare name, unaffected by templating)");
   ok(col.variables["weight/Display"], "the core un-suffixed weight primitive is unchanged");
+
+  // REGRESSION (found via BZZR's real Figma export): a sibling's weight-style/<voice>/<slug>
+  // primitive must go through the SAME custom-face templating the text-style planner uses
+  // (src/engine/type.mjs's siblingStyleName) — this shipped once with the planner fixed but this
+  // engine-level primitive still emitting the bare sibling name ("Bold" instead of "Condensed Bold
+  // Italic"), because the two had their own separate, independently-drifting implementations.
+  const bzzrDisplay = T.typeScale({ treatment: "statement", voices: { Display: { weight: 900, styleName: "Condensed Black Italic", weights: [{ name: "Extra-bold", weight: 800 }, { name: "Bold", weight: 700 }] } } });
+  const bzzrCol = T.typeTokensFigmaPrimitives(bzzrDisplay).collections["Font Primitives"];
+  ok(bzzrCol.variables["weight-style/Display"].values.Value === "Condensed Black Italic", "core weight-style keeps the full custom name");
+  ok(bzzrCol.variables["weight-style/Display/extra-bold"].values.Value === "Condensed Extra-bold Italic", `sibling weight-style primitive templates the custom name, not a bare "Extra-bold" (got ${bzzrCol.variables["weight-style/Display/extra-bold"].values.Value})`);
+  ok(bzzrCol.variables["weight-style/Display/bold"].values.Value === "Condensed Bold Italic", `sibling weight-style primitive templates the custom name, not a bare "Bold" (got ${bzzrCol.variables["weight-style/Display/bold"].values.Value})`);
 }
 
 // ── per-voice FONT overrides (TKT-0002): config.voices[v].font escapes a voice off its shared ROLE font

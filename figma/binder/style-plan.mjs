@@ -30,27 +30,15 @@
 // their core in list order. Same inputs ⇒ byte-identical plan (the executor's idempotency rides on it).
 
 import { semanticRoles } from "../../src/engine/semantic.js";
-import { weightNameFor, resolvedFontFor } from "../../src/engine/type.mjs";
+import { weightNameFor, resolvedFontFor, siblingStyleName } from "../../src/engine/type.mjs";
 
 // SINGLE_LINE_VOICES — voices that additionally get a `/single` text-style sibling (1.0 leading —
 // line-height = size) alongside their normal multi-line style, per step and per configured weight.
 const SINGLE_LINE_VOICES = new Set(["Body", "Label"]);
 
-// siblingStyleName — when a voice carries a custom Figma style name (a non-variable face, e.g.
-// BZZR's Display: "Condensed Black Italic"), a sibling's own literal.styleName must follow the SAME
-// naming convention, substituting just the weight word — "Condensed Bold Italic", not a bare
-// "Bold". This isn't cosmetic: `resolveFace` (figma/plugin/code.js) does an EXACT string match
-// against the family's real installed style list before falling back to a nearest-weight guess (one
-// that also prefers non-italic faces) — a bare "Bold" would miss "Condensed Bold Italic" entirely
-// and silently resolve to the wrong cut. Finds the core's own weight-name word (e.g. "Black") inside
-// the custom name and swaps it for the sibling's; if it can't find that word (a name that doesn't
-// literally contain the ladder word), falls back to the sibling's own bare name rather than guess.
-function siblingStyleName(coreStyleName, coreWeightName, siblingName) {
-  if (!coreStyleName || !coreWeightName) return siblingName;
-  const idx = coreStyleName.indexOf(coreWeightName.name);
-  if (idx < 0) return siblingName;
-  return coreStyleName.slice(0, idx) + siblingName + coreStyleName.slice(idx + coreWeightName.name.length);
-}
+// siblingStyleName lives in the engine (src/engine/type.mjs) — it's the ONE source of truth shared
+// with typeTokensFigmaPrimitives's own weight-style/<voice>/<slug> primitive, so the two can never
+// independently go stale again (exactly how this bug shipped once already).
 
 // styleGroupOf — the ratified paint-style sub-folder for a role key: the 7 scrim roles under scrims/,
 // the surface + container ladders under surfaces/, everything else flat under the family.

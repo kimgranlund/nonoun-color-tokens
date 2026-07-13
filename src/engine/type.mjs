@@ -355,6 +355,27 @@ export function weightNameFor(weight) {
   return { weight: snap, name: WEIGHT_NAMES[snap], slug: kebab(WEIGHT_NAMES[snap]) };
 }
 
+// siblingStyleName — when a voice carries a custom Figma style name (a non-variable face, e.g.
+// BZZR's Display: "Condensed Black Italic"), a sibling's own style name must follow the SAME naming
+// convention, substituting just the weight word — "Condensed Bold Italic", not a bare "Bold". This
+// isn't cosmetic: `resolveFace` (figma/plugin/code.js) does an EXACT string match against the
+// family's real installed style list before falling back to a nearest-weight guess (one that also
+// prefers non-italic faces) — a bare "Bold" would miss "Condensed Bold Italic" entirely and silently
+// resolve to the wrong cut. THE ONE SOURCE OF TRUTH for this templating — both the Figma text-style
+// planner (figma/binder/style-plan.mjs, the literal.styleName that drives font loading) and this
+// module's own typeTokensFigmaPrimitives (the standalone weight-style/<voice>/<slug> STRING
+// primitive) must call this, never re-derive it — the two independently going stale is exactly how
+// this bug shipped once already (primitives kept the bare name after the planner was fixed). Finds
+// the core's own weight-name word (e.g. "Black") inside the custom name and swaps it for the
+// sibling's; if it can't find that word (a name that doesn't literally contain the ladder word),
+// falls back to the sibling's own bare name rather than guess.
+export function siblingStyleName(coreStyleName, coreWeightName, siblingName) {
+  if (!coreStyleName || !coreWeightName) return siblingName;
+  const idx = coreStyleName.indexOf(coreWeightName.name);
+  if (idx < 0) return siblingName;
+  return coreStyleName.slice(0, idx) + siblingName + coreStyleName.slice(idx + coreWeightName.name.length);
+}
+
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
 const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
@@ -589,11 +610,17 @@ export function typeTokensFigmaPrimitives(scale) {
     if (sn) variables[`weight-style/${voice}`] = { type: "STRING", values: { Value: sn } };
     // SIBLING WEIGHTS — one FLOAT + one STRING primitive per named variant (`weight/Display/bold`,
     // `weight-style/Display/bold`); the core keeps the un-suffixed names above (backward compatible).
-    // These are the binding targets for the sibling text styles (`Display/xl/Bold`).
+    // These are the binding targets for the sibling text styles (`Display/xl/Bold`). The STRING
+    // value goes through the SAME siblingStyleName templating the text-style planner uses — a bare
+    // "Bold" here (instead of "Condensed Bold Italic") is a REAL font-loading bug, not cosmetic: this
+    // primitive is what a non-variable face's sibling text style binds `fontStyle` to.
     const sibs = scale.weights && scale.weights[voice];
-    if (sibs) for (const wv of sibs) {
-      variables[`weight/${voice}/${wv.slug}`] = { type: "FLOAT", values: { Value: wv.weight } };
-      variables[`weight-style/${voice}/${wv.slug}`] = { type: "STRING", values: { Value: wv.name } };
+    if (sibs) {
+      const coreWeightName = first && Number.isFinite(first.weight) ? weightNameFor(first.weight) : null;
+      for (const wv of sibs) {
+        variables[`weight/${voice}/${wv.slug}`] = { type: "FLOAT", values: { Value: wv.weight } };
+        variables[`weight-style/${voice}/${wv.slug}`] = { type: "STRING", values: { Value: siblingStyleName(sn, coreWeightName, wv.name) } };
+      }
     }
   }
   return {
