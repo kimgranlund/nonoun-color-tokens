@@ -249,6 +249,14 @@ Format: Context → Decision → Rationale → Consequences → Status.
   `voice-parity.mjs` **auto-derives** the voice list from the live engine — so parity holds without a
   hand-kept table; the spec/README/marketing "seven"→"eleven" is doc drift, serviced in the same change.
 - **Status.** DECIDED.
+- **Update (2026-07-13).** The voice SET/NAMES here were renamed and the size mechanism changed
+  (superseding this ADR's `STEPS_3`/`STEPS_5`/`STEPS_UI` shape, not its voice-count decision — still
+  eleven): Heading→Headline, UI→Label; Quote folded into Lead, Caption folded into a new Tiny voice,
+  Legal folded into Body; Title and Sub-title added. Every voice is now a uniform 3-step SM/MD/LG ramp
+  (was 5/3/8 steps by voice) at a FIXED, hand-authored size per step — shared identically across all 5
+  treatments — instead of a per-treatment `base × ratio^step` modular scale; `ratio` is retired as a
+  per-voice/per-treatment knob entirely. See `src/engine/type.mjs`'s header comment and
+  `docs/reference/typography/README.md` for the current shape.
 
 ---
 

@@ -1,12 +1,21 @@
 // type.mjs — the perceptual TYPOGRAPHY engine: the type analog of the color engine. A few parameters
-// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Seven role "voices" —
-// Display · Heading · Sub-heading · Kicker · Body · UI · Code — each a size ramp whose every step
-// carries size, line-height, letter-spacing, weight, and paragraph spacing, all DERIVED from the
-// treatment's params (no hand-authored magic numbers). (The DTCG shape follows the Figma-variable
-// export at docs/reference/typography/typography.tokens.json, a frozen snapshot kept for reference.)
+// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Eleven named "voices" — Display ·
+// Headline · Sub-heading · Title · Sub-title · Lead · Body · Code · Label · Kicker · Tiny — each a
+// 3-step SM/MD/LG ramp whose every step carries size, line-height, letter-spacing, weight, and
+// paragraph spacing. (The DTCG shape follows the Figma-variable export at
+// docs/reference/typography/typography.tokens.json, a frozen snapshot kept for reference.)
+//
+// 2026-07-13 — SIZE IS NOW A FIXED, HAND-AUTHORED TABLE, not a modular scale. Previously every voice
+// derived its sizes from base·ratio^n (a treatment's own base+ratio gave it a distinct scale feel).
+// Now each voice's SM/MD/LG are literal px values (SIZES below), shared identically across all 5
+// treatments — matching how Google's own Material 3 scale works (one fixed scale; theme varies
+// styling, not the numbers). Treatments now differ ONLY in font/weight/tracking/leading/case, never
+// size. `bodyBase` still scales the WHOLE fixed table proportionally (factor = bodyBase/15); the
+// per-cell `overrides` escape hatch (see buildCategory) is still how a user moves an individual cell
+// off the fixed default — untouched by this change.
 //
 // The system relationships (see docs/reference/typography/README.md):
-//   size          = base · ratio^n           (a modular scale; n = the step's distance from the base)
+//   size          = FIXED_SIZE(voice, step) × factor     (factor = bodyBase/15; see typeScale)
 //   lineHeight     = round(size · leading)     (per-role leading; single-line = size)
 //   letterSpacing = round(size · trackingEm)  (optical: negative tightens big display, positive loosens UI)
 //   weight        = the role's weight
@@ -15,108 +24,98 @@
 
 const round = (v, d = 0) => { const f = 10 ** d; return Math.round(v * f) / f; };
 
-// step ramps: [name, exponent] where exponent is the step's distance from the base (size = base·ratio^n).
-const STEPS_5 = [["XS", -2], ["SM", -1], ["MD", 0], ["LG", 1], ["XL", 2]];
-const STEPS_UI = [["3XS", -4], ["2XS", -3], ["XS", -2], ["SM", -1], ["MD", 0], ["LG", 1], ["XL", 2], ["2XL", 3]];
-// lean editorial ramp (SM·MD·LG) for the four editorial voices — Lead · Quote · Caption · Legal. These
-// voices realistically use one-or-two registers, so they get a 3-step ramp (MD = the voice's base), not
-// the full XS–XL. Uniform across the four so the token matrix + override UI stay regular.
-const STEPS_3 = [["SM", -1], ["MD", 0], ["LG", 1]];
+// FIXED SIZE TABLE — [SM, MD, LG] literal px, shared across all 5 treatments. Code aliases Body's own
+// triplet (mono role, same numbers); Kicker aliases Label's (mono role, same numbers) — both are the
+// SAME voice-scale, dressed in the mono font, not a distinct size register of their own.
+const SIZES = {
+  Display: [72, 96, 120],
+  Headline: [32, 40, 48],
+  "Sub-heading": [28, 34, 40],
+  Title: [24, 32, 40],
+  "Sub-title": [18, 24, 32],
+  Lead: [20, 24, 28],
+  Body: [14, 15, 16],
+  Label: [12, 13, 14],
+  Tiny: [10, 11, 12],
+};
+const RANKS = ["SM", "MD", "LG"];
+const stepsFor = (sizeKey) => RANKS.map((r, i) => [r, SIZES[sizeKey][i]]);
 
-// classic modular ratios (the "musical" scale), for reference + the UI's ratio picker.
-export const TYPE_RATIOS = [
-  { id: "minor-second", value: 1.067, label: "Minor second" },
-  { id: "major-second", value: 1.125, label: "Major second" },
-  { id: "minor-third", value: 1.2, label: "Minor third" },
-  { id: "major-third", value: 1.25, label: "Major third" },
-  { id: "perfect-fourth", value: 1.333, label: "Perfect fourth" },
-  { id: "aug-fourth", value: 1.414, label: "Augmented fourth" },
-  { id: "perfect-fifth", value: 1.5, label: "Perfect fifth" },
-  { id: "golden", value: 1.618, label: "Golden ratio" },
-];
+// A "treatment" seeds the CHARACTER params, exactly as the color "Color Categories" presets seed
+// palette params. Each category: { role, base, leading, weight, trackingEm, steps, transform, box }.
+// `base` = the voice's MD-step literal (kept for typeScale's bodyBase→factor math, since Body's base
+// must still equal 15 for `factor = bodyBase/15` to mean what it says). Fonts are swappable; the
+// WEIGHT/TRACKING/LEADING/CASE relationships are the product now, not the scale. Free families only.
+// `box` — the presentation FLOW, decoupled from the font role: box voices are CONTROL/label text (they
+// emit a single-line height and use label-height paragraph spacing); prose voices wrap (no single-line
+// height, reading paragraph spacing). It DEFAULTS from the role (ui/mono ⇒ box), overridable — Tiny
+// rides the ui FONT but is prose (box:false); Sub-title rides mono but is prose too (a small heading,
+// not a control label).
+const cat = (role, sizeKey, leading, weight, trackingEm, transform = "none", box = role === "ui" || role === "mono") => ({ role, base: SIZES[sizeKey][1], leading, weight, trackingEm, steps: stepsFor(sizeKey), transform, box });
 
-// A "treatment" seeds the params, exactly as the color "Color Categories" presets seed palette params.
-// Each category: { role, base, ratio, leading, weight, trackingEm, steps, transform, box }. Fonts are
-// swappable; the SCALE + tracking + weight + leading + case relationships are the product. Free families only.
-// `box` — the presentation FLOW, decoupled from the font role: box voices are CONTROL/label text (they emit
-// a single-line height and use label-height paragraph spacing); prose voices wrap (no single-line height,
-// reading paragraph spacing). It DEFAULTS from the role (ui/mono ⇒ box) so the 7 original voices are
-// unchanged, and is overridable — Caption/Legal ride the ui FONT but are prose (box:false), per the design.
-const cat = (role, base, ratio, leading, weight, trackingEm, steps = STEPS_5, transform = "none", box = role === "ui" || role === "mono") => ({ role, base, ratio, leading, weight, trackingEm, steps, transform, box });
-
-// make11 — the ELEVEN named type ROLES (each a FUNCTION, not a size register — the taxonomy in
-// docs/reference/typography): Display · Heading · Sub-heading · Kicker · Lead · Body · Quote · Caption ·
-// UI · Code · Legal. A role carries CHARACTER (weight, tracking, leading, case, font cut) that travels
-// with it across every LEVEL; the level (the step) is chosen by hierarchy depth and the size is DERIVED
-// from it (base × ratio^level), never picked to hit a number. Sub-heading is the secondary heading below
-// Heading; Kicker is the smallest overline / section label that sits ABOVE a heading. Shared STRUCTURE
-// across treatments; each treatment passes its fonts + a few character knobs. Kicker + Code ride the MONO
-// role.
-//
-// The FOUR editorial voices (ADR-013) add the reading roles the original seven lacked, each on the lean
-// SM·MD·LG ramp (STEPS_3): Lead (the standfirst — a larger body intro, body role); Quote (block/pull
-// quote — the HEADING role, so it inherits each treatment's display face: a serif pull-quote in the serif
-// treatments, a grotesque in Brutalist); Caption (figure/media caption) and Legal (fine-print) — both ride
-// the ui FONT but are PROSE (box:false → wrapping, reading leading ~1.5, not the box/control single-line
-// treatment). They ride EXISTING font roles (body/heading/ui), so no new font is introduced.
-//
-// NOTE (character vs name): Sub-heading was "Kicker"; Kicker was "Eyebrow" (a preserved-character rename).
-// The internal knob prefixes (`hc-`, `eye-`) still feed Sub-heading and Kicker respectively.
+// make11 — the ELEVEN named type VOICES (docs/reference/typography): Display · Headline · Sub-heading ·
+// Title · Sub-title · Lead · Body · Code · Label · Kicker · Tiny. A voice carries CHARACTER (weight,
+// tracking, leading, case, font cut) that travels with it across every step; the SIZE is now a fixed
+// literal per voice+step (SIZES above), never derived. Sub-heading is a bold, all-caps CONTEXT heading
+// (a section label like "LATEST STORIES" sitting above a list/grid — not a subordinate H2); Title is a
+// smaller Headline; Sub-title is a smaller sub-heading in an alternate (mono-by-default) typeface; Lead
+// is a larger body intro (a former "Quote" folds in here — both are large, single-emphasis body-
+// adjacent text); Code and Kicker ride the MONO role at Body's and Label's own sizes respectively
+// (former "Legal" folds into Body; former "Caption" folds into Tiny).
 //
 // CASE is a per-treatment decision, not a blanket rule. The Display role defaults to TITLE/SENTENCE case
-// (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. The two genuine
-// "caps roles" are Sub-heading and Kicker; those stay uppercase and track POSITIVE so small caps open up.
-// Display tracks NEGATIVE — big type tightens. LEADINGS are a system constant (the font.modes.json
-// design intent, extended for the editorial voices), uniform across treatments so the same ratio set holds
-// everywhere: display 0.8 (< 1 — large type sets tight), heading + sub-heading 1.125, prose (body) 1.5,
-// Lead 1.4, Quote 1.35, Caption + Legal 1.5, Kicker 1.4, UI 1.4, mono/code ~1.5; single-line control text
-// (the BOX voices UI · Code · Kicker) = 1.0. Treatments express voice through font, weight, tracking, and
-// scale — NOT leading, which is fixed to the intent (retune a per-voice `*Lead` knob only for a deliberate
-// character exception). The editorial voices keep a few knobs (weight/leading/tracking) for the same
-// per-treatment latitude Kicker/Code have — used sparingly (see the treatments below), fixed otherwise.
+// (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. The one
+// genuine "caps role" left is Sub-heading; it stays uppercase and tracks POSITIVE so small caps open up
+// (Kicker, now pegged to Label's smaller size, keeps the same uppercase/positive-tracking character).
+// Display tracks NEGATIVE — big type tightens. LEADINGS are a system constant, uniform across
+// treatments: display 0.8 (< 1 — large type sets tight), heading-family (Headline/Sub-heading/Title)
+// 1.125, prose (Body/Lead/Sub-title/Tiny) 1.4–1.5, single-line control text (Label/Kicker/Code) 1.0.
+// Treatments express voice through font, weight, tracking, and case — NOT leading, which is fixed to
+// the intent (retune a per-voice `*Lead` knob only for a deliberate character exception).
 function make11(o = {}) {
   return {
-    "Display": cat("display", o.dBase ?? 60, o.dRatio ?? 1.25, o.dLead ?? 0.8, o.dWeight ?? 700, o.dTrack ?? -0.02, STEPS_5, o.dTransform ?? "none"),
-    "Heading": cat("heading", 28, o.heRatio ?? 1.25, o.heLead ?? 1.125, o.heWeight ?? 700, o.heTrack ?? -0.005, STEPS_5, "none"),
-    "Sub-heading": cat("heading", 26, o.hcRatio ?? 1.2, o.hcLead ?? 1.125, o.hcWeight ?? 600, o.hcTrack ?? 0.1, STEPS_5, "uppercase"),
-    "Kicker": cat("mono", 13, 1.15, o.eyeLead ?? 1.4, o.eyeWeight ?? 600, o.eyeTrack ?? 0.16, STEPS_5, "uppercase"),
-    "Lead": cat("body", 20, 1.2, o.leadLead ?? 1.4, o.leadWeight ?? 400, o.leadTrack ?? -0.005, STEPS_3, "none"),
-    "Body": cat("body", o.bBase ?? 16, o.bRatio ?? 1.2, o.bLead ?? 1.5, o.bWeight ?? 440, 0, STEPS_5, "none"),
-    "Quote": cat("heading", 22, o.quoteRatio ?? 1.2, o.quoteLead ?? 1.35, o.quoteWeight ?? 450, o.quoteTrack ?? -0.005, STEPS_3, "none"),
-    "Caption": cat("ui", 13, 1.1, o.capLead ?? 1.5, o.capWeight ?? 440, 0, STEPS_3, "none", false), // ui FONT, prose flow
-    "UI": cat("ui", 14, 1.125, o.uiLead ?? 1.4, o.uiWeight ?? 480, o.uiTrack ?? 0.006, STEPS_UI, "none"),
-    "Code": cat("mono", 13, 1.125, 1.5, o.codeWeight ?? 460, o.codeTrack ?? 0, STEPS_UI, "none"),
-    "Legal": cat("ui", 11, 1.1, o.legalLead ?? 1.5, o.legalWeight ?? 440, 0, STEPS_3, "none", false), // ui FONT, prose flow
+    "Display": cat("display", "Display", o.dLead ?? 0.8, o.dWeight ?? 700, o.dTrack ?? -0.02, o.dTransform ?? "none"),
+    "Headline": cat("heading", "Headline", o.hLead ?? 1.125, o.hWeight ?? 700, o.hTrack ?? -0.005, "none"),
+    "Sub-heading": cat("heading", "Sub-heading", o.shLead ?? 1.125, o.shWeight ?? 600, o.shTrack ?? 0.1, "uppercase"),
+    "Title": cat("heading", "Title", o.tLead ?? 1.125, o.tWeight ?? 650, o.tTrack ?? -0.005, "none"),
+    "Sub-title": cat("mono", "Sub-title", o.stLead ?? 1.3, o.stWeight ?? 500, o.stTrack ?? 0.02, "none", false), // mono-by-default but PROSE (a small heading, not a control label)
+    "Lead": cat("body", "Lead", o.leadLead ?? 1.4, o.leadWeight ?? 400, o.leadTrack ?? -0.005, "none"),
+    "Body": cat("body", "Body", o.bLead ?? 1.5, o.bWeight ?? 440, 0, "none"),
+    "Code": cat("mono", "Body", o.codeLead ?? 1.5, o.codeWeight ?? 460, o.codeTrack ?? 0, "none"),
+    "Label": cat("ui", "Label", o.labelLead ?? 1.4, o.labelWeight ?? 480, o.labelTrack ?? 0.006, "none"),
+    "Kicker": cat("mono", "Label", o.kickLead ?? 1.4, o.kickWeight ?? 600, o.kickTrack ?? 0.16, "uppercase"),
+    "Tiny": cat("ui", "Tiny", o.tinyLead ?? 1.5, o.tinyWeight ?? 440, 0, "none", false), // ui FONT, prose flow (former Caption's job)
   };
 }
 
-// Each treatment expresses a distinct VOICE through case, weight contrast, tracking, leading, and scale —
-// not just a font swap. Per the directive + ui-compose-typography: Display is title/sentence case
-// everywhere except Brutalist (the one earned ALL-CAPS), with bespoke specimen copy living in the UI.
+// Each treatment expresses a distinct VOICE through case, weight contrast, and tracking — not scale
+// (fixed/shared, 2026-07-13) or a font swap alone. Per the directive + ui-compose-typography: Display
+// is title/sentence case everywhere except Brutalist (the one earned ALL-CAPS), with bespoke specimen
+// copy living in the UI.
 export const TYPE_TREATMENTS = [
   // Product — calm geometric sans, gentle hierarchy, title-case display. The everyday system voice.
   { id: "product", label: "Product / Lifestyle", note: "Neutral geometric sans, title-case display — screen-native, calm, versatile.",
     fonts: { display: "Inter Tight", heading: "Inter Tight", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
-    categories: make11({ dBase: 54, dRatio: 1.25, dWeight: 700, dTrack: -0.02, heWeight: 620, uiLead: 1.35, eyeTrack: 0.14 }) },
+    categories: make11({ dWeight: 700, dTrack: -0.02, hWeight: 620, labelLead: 1.35, kickTrack: 0.14 }) },
   // Luxury — high-contrast serif set LIGHT and large, airy prose, wide-tracked labels. Restraint, not shout.
   { id: "luxury", label: "Luxury / Premium", note: "High-contrast serif display set light and large, airy sans body, wide-tracked labels — restraint over shout.",
     fonts: { display: "Source Serif 4", heading: "Source Serif 4", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
-    categories: make11({ dBase: 76, dRatio: 1.25, dWeight: 400, dTrack: -0.005, heWeight: 500, heTrack: 0, hcRatio: 1.25, hcWeight: 500, hcTrack: 0.18, bBase: 17, bRatio: 1.25, bWeight: 400, uiTrack: 0.04, uiLead: 1.45, eyeWeight: 500, eyeTrack: 0.26, leadWeight: 300, quoteWeight: 400, quoteLead: 1.4 }) },
+    categories: make11({ dWeight: 400, dTrack: -0.005, hWeight: 500, hTrack: 0, shWeight: 500, shTrack: 0.18, bWeight: 400, labelTrack: 0.04, labelLead: 1.45, kickWeight: 500, kickTrack: 0.26, leadWeight: 300 }) },
   // Editorial — serif headlines in title case, tight sans subheads, sans body tuned for long-form reading.
   { id: "editorial", label: "Editorial / Magazine", note: "Serif headlines in title case, tight sans subheads, sans body for long-form reading, mono metadata.",
     fonts: { display: "Source Serif 4", heading: "Inter Tight", body: "Inter", ui: "JetBrains Mono", mono: "JetBrains Mono" },
-    categories: make11({ dBase: 60, dRatio: 1.25, dWeight: 650, dTrack: -0.015, heWeight: 750, heTrack: -0.01, bBase: 18, bRatio: 1.25, eyeTrack: 0.2, leadLead: 1.45, quoteLead: 1.3 }) },
+    categories: make11({ dWeight: 650, dTrack: -0.015, hWeight: 750, hTrack: -0.01, kickTrack: 0.2, leadLead: 1.45 }) },
   // Technical — mono-forward, tabular, dense, tight leading. Display reads as data, not a slogan.
   { id: "technical", label: "Technical / Data", note: "Mono-forward — tabular figures, dense, tight leading, restrained scale. Display reads as data, not slogan.",
     fonts: { display: "Inter", heading: "Inter", body: "Inter", ui: "JetBrains Mono", mono: "JetBrains Mono" },
-    categories: make11({ dBase: 42, dRatio: 1.2, dWeight: 650, dTrack: -0.01, heWeight: 600, heRatio: 1.2, hcRatio: 1.18, hcTrack: 0.08, bBase: 15, bRatio: 1.2, uiTrack: 0, uiLead: 1.35 }) },
+    categories: make11({ dWeight: 650, dTrack: -0.01, hWeight: 600, shTrack: 0.08, labelTrack: 0, labelLead: 1.35 }) },
   // Brutalist — one heavy grotesque, the earned ALL-CAPS display, tight tracking, dramatic size jumps.
   { id: "statement", label: "Brutalist / Statement", note: "One heavy grotesque, ALL-CAPS display, tight tracking, dramatic size jumps — the loud voice, used on purpose.",
     fonts: { display: "Inter Tight", heading: "Inter Tight", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
-    categories: make11({ dBase: 84, dRatio: 1.5, dWeight: 900, dTrack: -0.04, dTransform: "uppercase", heWeight: 800, heRatio: 1.4, heTrack: -0.02, hcRatio: 1.3, hcWeight: 700, hcTrack: 0.12, bRatio: 1.25, bWeight: 500, uiWeight: 550, uiTrack: 0.02, eyeWeight: 700, eyeTrack: 0.12, quoteWeight: 700, quoteTrack: -0.01, legalWeight: 500 }) },
+    categories: make11({ dWeight: 900, dTrack: -0.04, dTransform: "uppercase", hWeight: 800, hTrack: -0.02, shWeight: 700, shTrack: 0.12, bWeight: 500, labelWeight: 550, labelTrack: 0.02, kickWeight: 700, kickTrack: 0.12 }) },
 ];
 
-export const DEFAULT_TYPE = { treatment: "product", bodyBase: 16 };
+export const DEFAULT_TYPE = { treatment: "product", bodyBase: 15 };
 // The families bundled (woff2 in type-fonts.js) — the Fonts combobox menu. A user may also TYPE any custom
 // family per role (config.fonts in typeScale); it exports + renders if installed, else falls back to a generic.
 export const BUNDLED_FONTS = ["Inter", "Inter Tight", "Source Serif 4", "JetBrains Mono"];
@@ -159,49 +158,52 @@ const nextNice = (v) => { let n = v + 1; while (niceSize(n) <= v) n += 1; return
 // per-role READING paragraph factor (× the resolved size) for PROSE voices — sourced from the reference
 // Figma system: display/heading paragraphs breathe at ~0.7×, body prose at 0.75. BOX voices (control/label
 // text) don't consult this — they use a flat 1.0 (a label's "paragraph" is its own height). A prose voice
-// on a non-reading role (Caption/Legal ride the ui FONT but are prose) falls back to 0.75.
+// on a non-reading role (Tiny/Sub-title ride the ui/mono FONT but are prose) falls back to 0.75.
 const PARA_PROSE = { display: 0.7, heading: 0.7, body: 0.75 };
 
 function buildCategory(name, p, factor, overrides, vp, compress) {
-  // per-VOICE shaping overrides (vp): ratio · weight · leading · tracking(em) REPLACE the treatment's for the
+  // per-VOICE shaping overrides (vp): weight · leading · tracking(em) REPLACE the treatment's for the
   // WHOLE voice (the "select a voice, retune it" lever — like a per-palette Hue). Absent ⇒ the treatment
   // values, so a voice with no override is byte-identical (the identity gate). The per-cell size `overrides`
   // are a separate, finer layer that still moves an individual step's size.
-  const ratio = vp && Number.isFinite(vp.ratio) ? vp.ratio : p.ratio;
   const weight = vp && Number.isFinite(vp.weight) ? vp.weight : p.weight;
   const leading = vp && Number.isFinite(vp.leading) ? vp.leading : p.leading;
   const trackingEm = vp && Number.isFinite(vp.tracking) ? vp.tracking : p.trackingEm;
   const out = {};
   let prevSize = 0; // running max, for the monotonic bump (quantization can collide adjacent steps)
   for (const [step, n] of p.steps) {
-    // breakpoint compression (modeFactor) applies to the RAW modular size before rounding/quantization —
+    // `n` is now the voice's FIXED literal size at this step (SIZES table) — no longer an exponent.
+    // breakpoint compression (modeFactor) applies to the raw scaled size before rounding/quantization —
     // it IS a size change (line-height, tracking, paragraph rhythm all re-derive from the compressed size).
-    const rawModular = compress ? compress(p.base * factor * ratio ** n) : p.base * factor * ratio ** n;
-    const derived = Math.max(8, Math.round(rawModular)); // the modular-scale size — letterSpacing STAYS on this
+    const rawScaled = compress ? compress(n * factor) : n * factor;
+    const derived = Math.max(8, Math.round(rawScaled)); // the scaled fixed size — letterSpacing STAYS on this
     const ov = overrides && overrides[name + "|" + step];
     const overridden = typeof ov === "number" && Number.isFinite(ov) && ov > 0;
     // The DERIVED nice size drives the monotonic ramp (so a per-cell override never nudges its neighbours —
-    // the bump rides the underlying ladder, not the override). SIZE snaps the ROUNDED modular px to the ladder
-    // (smoother than snapping the raw float at .5 boundaries); an override is exact.
-    let nice = niceSize(derived);
+    // the bump rides the underlying ladder, not the override). SIZE snaps the ROUNDED scaled px to the ladder
+    // (smoother than snapping the raw float at .5 boundaries); an override is exact. UNSCALED (factor 1, no
+    // breakpoint compression) skips the snap entirely — `n` is already the hand-authored literal (SIZES),
+    // and niceSize's coarser-as-size-grows bucketing would otherwise re-round an already-nice number to a
+    // DIFFERENT nice number (120 → 128, 34 → 36) for no reason — only genuinely SCALED sizes need re-snapping.
+    let nice = factor === 1 && !compress ? derived : niceSize(derived);
     if (nice <= prevSize) nice = nextNice(prevSize);
     prevSize = nice;
     const size = overridden ? Math.round(ov) : nice;
     out[step] = {
       size,
       lineHeight: Math.round(size * leading), // line-height TRACKS the override (re-derives from the resolved size)
-      letterSpacing: round(derived * trackingEm, 2), // tracking STAYS on the modular-scale size (ratified "size lever; tracking/weight unchanged")
+      letterSpacing: round(derived * trackingEm, 2), // tracking STAYS on the scaled fixed size (ratified "size lever; tracking/weight unchanged")
       weight,
       textTransform: p.transform || "none",
       // paragraph rhythm tracks the resolved size, keyed on FLOW not just role: a BOX voice (control/label
-      // text — UI · Code · Kicker) uses 1.0×size (its "paragraph" is its own height); a PROSE voice breathes
-      // at its reading factor (display/heading ~0.7, body 0.75, and a ui-font prose voice — Caption/Legal —
-      // falls back to 0.75). Indent is a constant 0 (schema parity).
+      // text — Label · Kicker · Code) uses 1.0×size (its "paragraph" is its own height); a PROSE voice
+      // breathes at its reading factor (display/heading ~0.7, body 0.75, and a ui/mono-font prose voice —
+      // Tiny/Sub-title — falls back to 0.75). Indent is a constant 0 (schema parity).
       paragraphSpacing: Math.round(size * (p.box ? 1 : (PARA_PROSE[p.role] ?? 0.75))),
       paragraphIndent: 0,
       // single-line height (= size, leading 1.0) — the CONTROL-text intent, distinct from the
-      // multi-line lineHeight above. Emitted only for the BOX voices (UI · Code · Kicker), where text
-      // sits in a box and the box owns the rhythm — NOT for the ui-FONT prose voices (Caption · Legal).
+      // multi-line lineHeight above. Emitted only for the BOX voices (Label · Kicker · Code), where text
+      // sits in a box and the box owns the rhythm — NOT for the prose voices (Tiny · Sub-title).
       ...(p.box ? { singleLineHeight: size } : {}),
     };
   }
@@ -209,14 +211,14 @@ function buildCategory(name, p, factor, overrides, vp, compress) {
 }
 
 // typeScale — the resolved scale for a config { treatment, bodyBase, modeFactor?, overrides? }. `bodyBase`
-// (the Body base size) uniformly scales every category so the whole system grows/shrinks together while
-// keeping its ratios. `overrides` (optional) is a flat per-cell size-override map (see buildCategory);
-// ABSENT ⇒ identity.
+// (the Body base size) uniformly scales the WHOLE fixed size table so the system grows/shrinks together
+// (factor = bodyBase/15 — Body's MD literal). `overrides` (optional) is a flat per-cell size-override map
+// (see buildCategory); ABSENT ⇒ identity.
 // `modeFactor` (optional, default 1) — the HIERARCHY-AWARE breakpoint compression (Kim's ratified law,
 // 2026-07-10): body-class text is frozen across breakpoints while display-class type compresses. The
 // factor names the compression at the TOP of the ramp (Tablet 5/6 · Mobile 2/3 canonical — Display 90 →
 // 75 → 60); each step's own factor interpolates in LOG-size space from ×1.0 at bodyBase to ×modeFactor at
-// the base ramp's largest size, so Body/Label/UI move ±0px, headings compress partially, Display fully.
+// the ramp's largest fixed size, so Body/Label/Kicker move ±0px, headings compress partially, Display fully.
 // modeFactor = 1 (or absent) ⇒ byte-identical scale (the identity gate).
 export function typeScale(config = {}) {
   const t = TYPE_TREATMENTS.find((x) => x.id === config.treatment) || TYPE_TREATMENTS[0];
@@ -228,10 +230,10 @@ export function typeScale(config = {}) {
   const mf = Number.isFinite(mfRaw) && mfRaw > 0 && mfRaw !== 1 ? mfRaw : 1;
   let compress = null;
   if (mf !== 1) {
-    // the base ramp's largest raw size (uncompressed, treatment ratios) anchors the curve's top end; a
-    // per-voice ratio override that exceeds it clamps to the full factor (t ≤ 1), never over-compresses.
+    // the fixed table's largest literal size anchors the curve's top end (always Display/LG today, but
+    // computed generically so a future re-authoring of SIZES never has to touch this).
     let sMax = bodyBase;
-    for (const p of Object.values(t.categories)) for (const [, n] of p.steps) sMax = Math.max(sMax, p.base * factor * p.ratio ** n);
+    for (const p of Object.values(t.categories)) for (const [, n] of p.steps) sMax = Math.max(sMax, n * factor);
     const logSpan = Math.log(Math.max(sMax, bodyBase * 1.01) / bodyBase);
     compress = (S) => {
       if (S <= bodyBase) return S; // body size and below: frozen

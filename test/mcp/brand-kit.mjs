@@ -51,7 +51,7 @@ ok(!geomOnly.palettes && !geomOnly.type && geomOnly.geometry, "brandKit({geometr
   const baseDoc = defaultDocument();
   const ovDoc = {
     ...baseDoc,
-    type: { ...baseDoc.type, tokenOverrides: { "Body|MD|base": 99, "UI|MD|base": 33 } },
+    type: { ...baseDoc.type, tokenOverrides: { "Body|MD|base": 99, "Label|MD|base": 33 } },
     geometry: { ...baseDoc.geometry, tokenOverrides: { "MD|base": 50 } },
   };
   const ovKit = brandKit(ovDoc);
@@ -60,8 +60,8 @@ ok(!geomOnly.palettes && !geomOnly.type && geomOnly.geometry, "brandKit({geometr
   ok(ovKit.type.categories.Body.MD.size !== plainKit.type.categories.Body.MD.size, "the type override actually moves kit.type off the un-overridden kit");
   ok(ovKit.geometry.sizes.MD.height === 50, `a BASE geom override reaches kit.geometry (got ${ovKit.geometry.sizes.MD.height}, want 50)`);
   ok(ovKit.geometry.sizes.MD.height !== plainKit.geometry.sizes.MD.height, "the geom override actually moves kit.geometry off the un-overridden kit");
-  // the COMPOSED per-step `font` carries the type override too (the geom MD font = the overridden UI MD size)
-  ok(ovKit.geometry.sizes.MD.font === 33, `the composed geom font carries the BASE type UI override (got ${ovKit.geometry.sizes.MD.font}, want 33)`);
+  // the COMPOSED per-step `font` carries the type override too (the geom MD font = the overridden Label MD size)
+  ok(ovKit.geometry.sizes.MD.font === 33, `the composed geom font carries the BASE type Label override (got ${ovKit.geometry.sizes.MD.font}, want 33)`);
   // a NON-base ("|md")-keyed override must NOT touch the BASE kit (the base slice is mode-local)
   const nonBaseDoc = { ...baseDoc, type: { ...baseDoc.type, tokenOverrides: { "Body|MD|md": 99 } } };
   ok(brandKit(nonBaseDoc).type.categories.Body.MD.size === plainKit.type.categories.Body.MD.size, "a non-base (|md) override does NOT leak into the BASE kit");
@@ -103,8 +103,9 @@ try {
   ok(ty && ty.categories && ty.categories.Body, "get_type → the typography scale (Body voice present)");
   const geo = await callTool("get_geometry", {});
   ok(geo && geo.sizes && geo.sizes.MD && geo.sizes.MD.padding === (geo.sizes.MD.height - geo.sizes.MD.icon) / 2, "get_geometry → the dimensional scale (the centering law holds on the served MD size)");
-  // composition end-to-end: the served geometry's per-step `font` is the served type UI size (one source of truth)
-  ok(geo.typed === true && geo.sizes.MD.font === ty.categories.UI.MD.size, `get_geometry font is composed from the type UI scale (${geo.sizes.MD.font} = ${ty.categories.UI.MD.size})`);
+  // composition end-to-end: the served geometry's per-step `font` is the served type Label size (renamed
+  // from "UI" 2026-07-13 — one source of truth)
+  ok(geo.typed === true && geo.sizes.MD.font === ty.categories.Label.MD.size, `get_geometry font is composed from the type Label scale (${geo.sizes.MD.font} = ${ty.categories.Label.MD.size})`);
 
   const resUris = (await rpc("resources/list")).result.resources.map((r) => r.uri);
   ok(resUris.includes("brand://type") && resUris.includes("brand://geometry"), `resources/list has brand://type + brand://geometry (${resUris})`);

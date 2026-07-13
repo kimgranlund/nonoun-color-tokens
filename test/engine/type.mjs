@@ -5,106 +5,136 @@ import * as T from "../../src/engine/type.mjs";
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
 
-// ── treatments: 5 presets, each with the ELEVEN named voices (7 original + 4 editorial, ADR-013) ──
-const GROUPS = ["Display", "Heading", "Sub-heading", "Kicker", "Lead", "Body", "Quote", "Caption", "UI", "Code", "Legal"];
+// ── treatments: 5 presets, each with the ELEVEN named voices (2026-07-13 taxonomy) ──
+const GROUPS = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Code", "Label", "Kicker", "Tiny"];
 ok(T.TYPE_TREATMENTS.length === 5, `5 treatments (got ${T.TYPE_TREATMENTS.length})`);
-ok(T.TYPE_TREATMENTS.every((t) => t.fonts && GROUPS.every((c) => t.categories[c])), "every treatment has the 11 voices (Display · Heading · Sub-heading · Kicker · Lead · Body · Quote · Caption · UI · Code · Legal) + fonts");
+ok(T.TYPE_TREATMENTS.every((t) => t.fonts && GROUPS.every((c) => t.categories[c])), "every treatment has the 11 voices (Display · Headline · Sub-heading · Title · Sub-title · Lead · Body · Code · Label · Kicker · Tiny) + fonts");
 ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((t) => t.id === "luxury") && T.TYPE_TREATMENTS.some((t) => t.id === "editorial"), "has product/luxury/editorial");
 
-// ── the taxonomy: role mapping (Kicker + Code ride MONO) + the UPPERCASE caps voices ──
+// ── every voice is now a FIXED, uniform 3-step SM/MD/LG ramp (2026-07-13 — was 5/3/8 steps by voice) ──
 {
   const s = T.typeScale({ treatment: "product", bodyBase: 16 });
-  ok(s.roleOf["Kicker"] === "mono" && s.roleOf["Code"] === "mono", "Kicker + Code map to the mono font role");
-  ok(s.roleOf["Display"] === "display" && s.roleOf["Heading"] === "heading" && s.roleOf["Body"] === "body" && s.roleOf["UI"] === "ui", "Display/Heading/Body/UI map to their roles");
+  const c = s.categories;
+  ok(Object.keys(c).length === 11, `11 voices total (got ${Object.keys(c).length})`);
+  for (const v of GROUPS) ok(Object.keys(c[v]).join() === "SM,MD,LG", `${v} rides the uniform 3-step ramp SM·MD·LG (got ${Object.keys(c[v])})`);
+}
+
+// ── the taxonomy: role mapping (Sub-title/Code/Kicker ride MONO) + the UPPERCASE caps voices ──
+{
+  const s = T.typeScale({ treatment: "product", bodyBase: 16 });
+  ok(s.roleOf["Code"] === "mono" && s.roleOf["Kicker"] === "mono" && s.roleOf["Sub-title"] === "mono", "Code/Kicker/Sub-title map to the mono font role");
+  ok(s.roleOf["Display"] === "display" && s.roleOf["Headline"] === "heading" && s.roleOf["Sub-heading"] === "heading" && s.roleOf["Title"] === "heading", "Display/Headline/Sub-heading/Title map to their roles");
+  ok(s.roleOf["Body"] === "body" && s.roleOf["Lead"] === "body" && s.roleOf["Label"] === "ui" && s.roleOf["Tiny"] === "ui", "Body/Lead/Label/Tiny map to their roles");
   // CASE is per-treatment now: Sub-heading + Kicker are the standing UPPERCASE "caps voices"; Display is
   // title/sentence case by default (only Brutalist opts Display into caps — checked below).
   ok(s.categories["Sub-heading"].MD.textTransform === "uppercase" && s.categories["Kicker"].MD.textTransform === "uppercase", "Sub-heading + Kicker are the UPPERCASE caps voices");
-  ok(s.categories["Display"].MD.textTransform === "none" && s.categories["Heading"].MD.textTransform === "none" && s.categories["Body"].MD.textTransform === "none", "Display + Heading + Body are title/sentence case by default (Display no longer forced ALL-CAPS)");
+  ok(s.categories["Display"].MD.textTransform === "none" && s.categories["Headline"].MD.textTransform === "none" && s.categories["Body"].MD.textTransform === "none", "Display + Headline + Body are title/sentence case by default (Display no longer forced ALL-CAPS)");
   // only the Brutalist/Statement treatment earns the ALL-CAPS display
   const st = T.typeScale({ treatment: "statement" });
   ok(st.categories["Display"].MD.textTransform === "uppercase", "Brutalist/Statement is the one treatment whose Display is ALL-CAPS");
   ok(T.TYPE_TREATMENTS.filter((t) => t.categories["Display"].transform === "uppercase").length === 1, "exactly ONE treatment (Brutalist) sets an uppercase Display");
   // Sub-heading/Kicker caps track POSITIVE (open up); Display caps track NEGATIVE (tighten)
-  ok(s.categories["Sub-heading"].XL.letterSpacing > 0 && s.categories["Kicker"].XL.letterSpacing > 0, "caps headings track positive (open)");
-  ok(s.categories["Display"].XL.letterSpacing < 0, "Display caps track negative (tighten)");
-  // Code mirrors the UI ramp (8 steps, 3XS..2XL)
-  ok(["3XS", "2XS", "XS", "SM", "MD", "LG", "XL", "2XL"].every((k) => s.categories.Code[k]), "Code has the 8-step UI ramp 3XS..2XL");
+  ok(s.categories["Sub-heading"].LG.letterSpacing > 0 && s.categories["Kicker"].LG.letterSpacing > 0, "caps headings track positive (open)");
+  ok(s.categories["Display"].LG.letterSpacing < 0, "Display caps track negative (tighten)");
 }
 
-// ── the FOUR editorial voices (ADR-013): 11-voice count, roles, the lean SM·MD·LG ramp, box/prose decoupling ──
+// ── the FIXED SIZE TABLE (2026-07-13): literal per-voice px, shared across ALL 5 treatments; Code
+// aliases Body's own triplet, Kicker aliases Label's — same numbers, mono font only ──
 {
-  const s = T.typeScale({ treatment: "product", bodyBase: 16 });
-  const c = s.categories;
-  ok(Object.keys(c).length === 11, `11 voices total (got ${Object.keys(c).length})`);
-  ok(s.roleOf.Lead === "body" && s.roleOf.Quote === "heading" && s.roleOf.Caption === "ui" && s.roleOf.Legal === "ui", "editorial roles: Lead→body · Quote→heading (display cut) · Caption/Legal→ui font");
-  for (const v of ["Lead", "Quote", "Caption", "Legal"]) ok(Object.keys(c[v]).join() === "SM,MD,LG", `${v} rides the lean 3-step ramp SM·MD·LG (got ${Object.keys(c[v])})`);
-  // the box/prose DECOUPLING is the load-bearing decision: Caption + Legal ride the ui FONT but are PROSE —
-  // reading leading (~1.5) + reading paragraph spacing (0.75×) + NO single-line height — unlike the ui voice.
-  ok(!("singleLineHeight" in c.Caption.MD) && !("singleLineHeight" in c.Legal.MD), "Caption/Legal ride the ui role but do NOT emit a single-line height (box:false — prose flow)");
-  ok(c.Caption.MD.lineHeight === Math.round(c.Caption.MD.size * 1.5) && c.Legal.MD.lineHeight === Math.round(c.Legal.MD.size * 1.5), "Caption/Legal use prose leading 1.5 (not the ui box leading 1.4)");
-  ok(c.Caption.MD.paragraphSpacing === Math.round(c.Caption.MD.size * 0.75), `Caption paragraphSpacing = prose 0.75×size (not the ui box 1.0×) — got ${c.Caption.MD.paragraphSpacing} for size ${c.Caption.MD.size}`);
-  // Quote rides the heading role → inherits each treatment's display face (a serif pull-quote in serif treatments)
-  const ed = T.typeScale({ treatment: "editorial" });
-  ok(ed.fonts[ed.roleOf.Quote] === ed.fonts.heading, "Quote uses the heading/display font, so a serif treatment yields a serif pull-quote");
-  ok(c.Lead.MD.size === 20 && c.Quote.MD.size === 22 && c.Caption.MD.size === 13 && c.Legal.MD.size === 11, `editorial MD base sizes (Lead 20 · Quote 22 · Caption 13 · Legal 11) — got ${[c.Lead.MD.size, c.Quote.MD.size, c.Caption.MD.size, c.Legal.MD.size]}`);
+  const s = T.typeScale({ treatment: "product", bodyBase: 15 }).categories;
+  const sizes = (v) => ["SM", "MD", "LG"].map((k) => s[v][k].size);
+  ok(sizes("Display").join() === "72,96,120", `Display fixed sizes 72/96/120 (got ${sizes("Display")})`);
+  ok(sizes("Headline").join() === "32,40,48", `Headline fixed sizes 32/40/48 (got ${sizes("Headline")})`);
+  ok(sizes("Sub-heading").join() === "28,34,40", `Sub-heading fixed sizes 28/34/40 (got ${sizes("Sub-heading")})`);
+  ok(sizes("Title").join() === "24,32,40", `Title fixed sizes 24/32/40 (got ${sizes("Title")})`);
+  ok(sizes("Sub-title").join() === "18,24,32", `Sub-title fixed sizes 18/24/32 (got ${sizes("Sub-title")})`);
+  ok(sizes("Lead").join() === "20,24,28", `Lead fixed sizes 20/24/28 (got ${sizes("Lead")})`);
+  ok(sizes("Body").join() === "14,15,16", `Body fixed sizes 14/15/16 (got ${sizes("Body")})`);
+  ok(sizes("Label").join() === "12,13,14", `Label fixed sizes 12/13/14 — a step below Body (got ${sizes("Label")})`);
+  ok(sizes("Tiny").join() === "10,11,12", `Tiny fixed sizes 10/11/12 (got ${sizes("Tiny")})`);
+  // Code aliases Body's triplet; Kicker aliases Label's — SAME numbers, mono font only.
+  ok(sizes("Code").join() === sizes("Body").join(), "Code's sizes alias Body's own triplet exactly");
+  ok(sizes("Kicker").join() === sizes("Label").join(), "Kicker's sizes alias Label's own triplet exactly");
+  // this table is IDENTICAL across all 5 treatments (confirmed decision: treatments differ only in
+  // font/weight/tracking/leading/case, never size).
+  for (const t of ["luxury", "editorial", "technical", "statement"]) {
+    const sc = T.typeScale({ treatment: t, bodyBase: 15 }).categories;
+    ok(sizes("Display").join() === ["SM", "MD", "LG"].map((k) => sc.Display[k].size).join(), `${t}'s Display sizes match product's (shared fixed table)`);
+    ok(sizes("Body").join() === ["SM", "MD", "LG"].map((k) => sc.Body[k].size).join(), `${t}'s Body sizes match product's (shared fixed table)`);
+  }
 }
 
-// ── the modular scale: size = base · ratio^n, monotonic, MD = base ──
+// ── box/prose decoupling: Label/Kicker/Code are BOX (control text); Tiny/Sub-title ride ui/mono FONTS
+// but are PROSE (box:false) — the same decoupling the old Caption/Legal voices demonstrated ──
+{
+  const s = T.typeScale({ treatment: "product", bodyBase: 16 }).categories;
+  ok(!("singleLineHeight" in s.Tiny.MD) && !("singleLineHeight" in s["Sub-title"].MD), "Tiny/Sub-title ride ui/mono roles but do NOT emit a single-line height (box:false — prose flow)");
+  ok(s.Tiny.MD.lineHeight === Math.round(s.Tiny.MD.size * 1.5), "Tiny uses prose leading 1.5 (not the ui box leading 1.4)");
+  ok(s.Tiny.MD.paragraphSpacing === Math.round(s.Tiny.MD.size * 0.75), `Tiny paragraphSpacing = prose 0.75×size (not the ui box 1.0×) — got ${s.Tiny.MD.paragraphSpacing} for size ${s.Tiny.MD.size}`);
+  ok(s.Label.MD.paragraphSpacing === s.Label.MD.size && s.Code.MD.paragraphSpacing === s.Code.MD.size && s.Kicker.MD.paragraphSpacing === s.Kicker.MD.size, "the BOX voices (Label/Code/Kicker) paragraphSpacing = 1.0×size");
+  ok(s.Label.MD.singleLineHeight === s.Label.MD.size && s.Code.SM.singleLineHeight === s.Code.SM.size && s.Kicker.MD.singleLineHeight === s.Kicker.MD.size, "singleLineHeight = size on the BOX voices Label/Code/Kicker");
+  ok(GROUPS.filter((v) => !["Label", "Code", "Kicker"].includes(v)).every((v) => !("singleLineHeight" in s[v].MD)), "singleLineHeight is ABSENT on every PROSE voice — incl. Tiny/Sub-title, which ride ui/mono roles but are prose (box:false)");
+  // Title/Sub-heading ride the heading role → inherit each treatment's display face (e.g. serif in Editorial)
+  const ed = T.typeScale({ treatment: "editorial" });
+  ok(ed.fonts[ed.roleOf.Title] === ed.fonts.heading, "Title uses the heading font role");
+}
+
+// ── size = FIXED_SIZE(voice, step) × factor (factor = bodyBase/16); MD = Body's own base ──
 {
   const s = T.typeScale({ treatment: "product", bodyBase: 16 });
   const body = s.categories.Body;
   ok(body.MD.size === 16, `Body MD = bodyBase 16 (got ${body.MD.size})`);
-  const sizes = ["XS", "SM", "MD", "LG", "XL"].map((k) => body[k].size);
-  ok(sizes.every((v, i) => i === 0 || v > sizes[i - 1]), `Body sizes strictly increase XS→XL (${sizes})`);
-  // ratio check: LG/MD ≈ the treatment ratio (1.2 for product Body) within rounding
-  ok(Math.abs(body.LG.size / body.MD.size - 1.2) < 0.08, `Body LG/MD ≈ 1.2 (got ${(body.LG.size / body.MD.size).toFixed(3)})`);
+  const sizes = ["SM", "MD", "LG"].map((k) => body[k].size);
+  ok(sizes.every((v, i) => i === 0 || v > sizes[i - 1]), `Body sizes strictly increase SM→LG (${sizes})`);
   // line-height = size × leading (Body prose leading 1.5 — the font.modes.json design intent, uniform across treatments)
   ok(body.MD.lineHeight === Math.round(16 * 1.5), `Body MD line-height = size×1.5 (got ${body.MD.lineHeight})`);
   // Display leading is TIGHT (< 1 — large type sets sub-single); the design-intent retune. Every Display step.
   ok(Object.values(s.categories.Display).every((c) => c.lineHeight < c.size), `Display line-height < size on every step (leading < 1)`);
-  // Heading + Body land on the intent ratios (1.125 · 1.5)
-  ok(s.categories.Heading.MD.lineHeight === Math.round(s.categories.Heading.MD.size * 1.125), `Heading MD line-height = size×1.125`);
-  // UI has 8 steps incl. 3XS..2XL
-  ok(["3XS", "2XS", "XS", "SM", "MD", "LG", "XL", "2XL"].every((k) => s.categories.UI[k]), "UI has the 8-step ramp 3XS..2XL");
+  // Headline + Body land on the intent ratios (1.125 · 1.5)
+  ok(s.categories.Headline.MD.lineHeight === Math.round(s.categories.Headline.MD.size * 1.125), `Headline MD line-height = size×1.125`);
 }
 
-// ── the "nice number" ladder: every emitted size is a familiar value, at every base/breakpoint ──
+// ── the "nice number" quantizer only engages when the fixed table is actually SCALED (factor≠1) or
+// breakpoint-compressed — an UNSCALED literal (factor 1, no compression) passes through EXACTLY, never
+// re-snapped to a different "nice" number (the 2026-07-13 fix: 120 must stay 120, not round to 128) ──
 {
+  const disp = T.typeScale({ treatment: "product", bodyBase: 15 }).categories.Display;
+  ok(["SM", "MD", "LG"].map((k) => disp[k].size).join(",") === "72,96,120", `unscaled Display is the EXACT literal 72,96,120, not quantizer-rounded (got ${["SM", "MD", "LG"].map((k) => disp[k].size)})`);
+  const subhead = T.typeScale({ treatment: "product", bodyBase: 15 }).categories["Sub-heading"];
+  ok(["SM", "MD", "LG"].map((k) => subhead[k].size).join(",") === "28,34,40", `unscaled Sub-heading is the EXACT literal 28,34,40 (got ${["SM", "MD", "LG"].map((k) => subhead[k].size)})`);
   // a value is ON the ladder iff it equals its own band-step snap (step 1 ≤16, 2 ≤24, 4 ≤48, 8 ≤96, 16 else)
   const step = (v) => (v <= 16 ? 1 : v <= 24 ? 2 : v <= 48 ? 4 : v <= 96 ? 8 : 16);
   const onLadder = (v) => v === Math.round(v / step(v)) * step(v);
   for (const t of ["product", "luxury", "editorial", "technical", "statement"]) {
-    for (const base of [13, 16, 20]) {
+    for (const base of [13, 20]) { // SCALED cases (13/20 ≠ 15) — the quantizer must engage here
       const sc = T.typeScale({ treatment: t, bodyBase: base });
       for (const [voice, steps] of Object.entries(sc.categories)) {
         const sizes = Object.values(steps).map((x) => x.size);
-        ok(sizes.every(onLadder), `${t} @${base} ${voice}: every size is on the ladder (${sizes})`);
+        ok(sizes.every(onLadder), `${t} @${base} ${voice}: every SCALED size is on the ladder (${sizes})`);
         ok(sizes.every((v, i) => i === 0 || v > sizes[i - 1]), `${t} @${base} ${voice}: strictly increases (${sizes})`);
       }
     }
   }
-  // a concrete example (product Display) reads as familiar numbers, not arbitrary modular outputs
-  const disp = T.typeScale({ treatment: "product", bodyBase: 16 }).categories.Display;
-  ok(["XS", "SM", "MD", "LG", "XL"].map((k) => disp[k].size).join(",") === "36,44,56,72,88", `product Display snaps to 36,44,56,72,88 (got ${["XS", "SM", "MD", "LG", "XL"].map((k) => disp[k].size)})`);
 }
 
-// ── optical tracking: Display tightens (negative), UI loosens (positive) in the product treatment ──
+// ── optical tracking: Display tightens (negative), Label loosens (positive) in the product treatment ──
 {
   const s = T.typeScale({ treatment: "product" });
-  ok(s.categories.Display.XL.letterSpacing < 0, `Display XL tracking negative (got ${s.categories.Display.XL.letterSpacing})`);
-  ok(s.categories.UI.XS.letterSpacing > 0, `UI XS tracking positive (got ${s.categories.UI.XS.letterSpacing})`);
-  // tracking scales with size (Display XL more negative than Display XS)
-  ok(s.categories.Display.XL.letterSpacing < s.categories.Display.XS.letterSpacing, "Display tracking scales with size (XL tighter than XS)");
+  ok(s.categories.Display.LG.letterSpacing < 0, `Display LG tracking negative (got ${s.categories.Display.LG.letterSpacing})`);
+  ok(s.categories.Label.SM.letterSpacing > 0, `Label SM tracking positive (got ${s.categories.Label.SM.letterSpacing})`);
+  // tracking scales with size (Display LG more negative than Display SM)
+  ok(s.categories.Display.LG.letterSpacing < s.categories.Display.SM.letterSpacing, "Display tracking scales with size (LG tighter than SM)");
   // Display weight is heavy
-  ok(s.categories.Display.XL.weight >= 700, `Display weight heavy (got ${s.categories.Display.XL.weight})`);
+  ok(s.categories.Display.LG.weight >= 700, `Display weight heavy (got ${s.categories.Display.LG.weight})`);
 }
 
-// ── bodyBase scales the whole system uniformly (ratios preserved) ──
+// ── bodyBase scales the whole FIXED table uniformly (factor = bodyBase/15) ──
 {
-  const a = T.typeScale({ treatment: "product", bodyBase: 16 });
+  const a = T.typeScale({ treatment: "product", bodyBase: 15 });
   const b = T.typeScale({ treatment: "product", bodyBase: 20 });
-  ok(b.categories.Body.MD.size === 20, `bodyBase 20 → Body MD 20 (got ${b.categories.Body.MD.size})`);
-  ok(b.categories.Display.XL.size > a.categories.Display.XL.size, "a larger bodyBase scales Display up too");
+  ok(a.categories.Body.MD.size === 15, `bodyBase 15 (identity) → Body MD 15, unscaled (got ${a.categories.Body.MD.size})`);
+  ok(b.categories.Body.MD.size > a.categories.Body.MD.size, `a larger bodyBase scales Body up too (got ${b.categories.Body.MD.size})`);
+  ok(b.categories.Display.LG.size > a.categories.Display.LG.size, "a larger bodyBase scales Display up too");
 }
 
 // ── unknown treatment falls back to the first ──
@@ -119,16 +149,15 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(Array.isArray(T.BUNDLED_FONTS) && T.BUNDLED_FONTS.includes("Inter"), "BUNDLED_FONTS lists the bundled families");
 }
 
-// ── per-voice shaping: config.voices overrides a voice's weight/leading/ratio/tracking for the WHOLE voice;
-// other voices untouched; absent / empty ⇒ byte-identical (the identity gate) ──
+// ── per-voice shaping: config.voices overrides a voice's weight/leading/tracking for the WHOLE voice;
+// other voices untouched; absent / empty ⇒ byte-identical (the identity gate). `ratio` is RETIRED
+// (2026-07-13 — size is a fixed table now, nothing left to re-scale per voice) ──
 {
   const baseV = T.typeScale({ treatment: "product" });
   const ovV = T.typeScale({ treatment: "product", voices: { Body: { weight: 600, leading: 1.8 } } });
   ok(ovV.categories.Body.MD.weight === 600, "typeScale: a per-voice weight override applies to every step of that voice");
   ok(ovV.categories.Body.MD.lineHeight === Math.round(ovV.categories.Body.MD.size * 1.8), "typeScale: a per-voice leading override re-derives line-height");
   ok(ovV.categories.Display.MD.weight === baseV.categories.Display.MD.weight, "typeScale: a voice override doesn't touch OTHER voices");
-  const ovR = T.typeScale({ treatment: "product", voices: { Display: { ratio: 1.5 } } });
-  ok(ovR.categories.Display.XL.size !== baseV.categories.Display.XL.size, "typeScale: a per-voice ratio override re-scales that voice");
   ok(JSON.stringify(T.typeScale({ treatment: "product", voices: {} }).categories) === JSON.stringify(baseV.categories), "typeScale: an empty voices map is identity (byte-identical to the un-tuned scale)");
 }
 
@@ -136,7 +165,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
 {
   const css = T.typeTokensCSS(T.typeScale({ treatment: "product" }));
   ok(css.includes("--font-display:") && css.includes("--type-body-md-size:"), "CSS has font + size custom props");
-  ok(/\.type-display-xl\s*\{[^}]*font-size: var\(--type-display-xl-size\)/.test(css), "CSS emits a .type-display-xl utility class");
+  ok(/\.type-display-lg\s*\{[^}]*font-size: var\(--type-display-lg-size\)/.test(css), "CSS emits a .type-display-lg utility class");
   // font family names MUST be QUOTED — a name with a digit ("Source Serif 4") is invalid unquoted in
   // strict parsers (Safari drops the whole declaration → fallback). luxury uses Source Serif 4.
   const lux = T.typeTokensCSS(T.typeScale({ treatment: "luxury" }));
@@ -196,18 +225,18 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(ov.categories.Body.MD.lineHeight === Math.round(40 * bodyP.leading), `line-height re-derives from the override (got ${ov.categories.Body.MD.lineHeight}, want ${Math.round(40 * bodyP.leading)})`);
   ok(ov.categories.Body.MD.weight === baseline.categories.Body.MD.weight && ov.categories.Body.MD.letterSpacing === baseline.categories.Body.MD.letterSpacing, "tracking + weight are UNCHANGED by a size override (the ratified rule)");
   // only the targeted cell changes — every other step is identical to the baseline.
-  ok(ov.categories.Body.LG.size === baseline.categories.Body.LG.size && ov.categories.Display.XL.size === baseline.categories.Display.XL.size, "an override touches only its (voice|step) cell, no others");
+  ok(ov.categories.Body.LG.size === baseline.categories.Body.LG.size && ov.categories.Display.LG.size === baseline.categories.Display.LG.size, "an override touches only its (voice|step) cell, no others");
   // a non-positive / non-numeric override is ignored (no effect) — the cell stays derived.
-  ok(JSON.stringify(T.typeScale({ treatment: "product", bodyBase: 16, overrides: { "Body|MD": 0, "Body|LG": -5, "Display|XL": NaN } })) === JSON.stringify(baseline), "non-positive / NaN overrides are ignored (no effect)");
+  ok(JSON.stringify(T.typeScale({ treatment: "product", bodyBase: 16, overrides: { "Body|MD": 0, "Body|LG": -5, "Display|LG": NaN } })) === JSON.stringify(baseline), "non-positive / NaN overrides are ignored (no effect)");
   // NON-ZERO-TRACKING pin (Body|MD has trackingEm 0 → 0===0 masks the bug). Display tracks NEGATIVE, so
-  // overriding a Display step's SIZE must NOT move tracking (it stays on the modular-scale size) or weight —
-  // only size changes and line-height re-derives. This pins the "size lever; tracking/weight stay" rule.
+  // overriding a Display step's SIZE must NOT move tracking (it stays on the underlying fixed size) or
+  // weight — only size changes and line-height re-derives. This pins the "size lever; tracking/weight stay" rule.
   const displayP = T.TYPE_TREATMENTS.find((x) => x.id === "product").categories.Display; // leading 0.8 (< 1), trackingEm -0.02 (non-zero)
   const ovD = T.typeScale({ treatment: "product", bodyBase: 16, overrides: { "Display|MD": 88 } });
   ok(displayP.trackingEm !== 0, `Display tracking is non-zero (got ${displayP.trackingEm}) — the assertion below is meaningful`);
   ok(ovD.categories.Display.MD.size === 88, `Display override sets the size (got ${ovD.categories.Display.MD.size}, want 88)`);
   ok(ovD.categories.Display.MD.size !== baseline.categories.Display.MD.size, "the Display override actually moves the size off baseline");
-  ok(ovD.categories.Display.MD.letterSpacing === baseline.categories.Display.MD.letterSpacing, `Display tracking is UNCHANGED by a size override (got ${ovD.categories.Display.MD.letterSpacing}, baseline ${baseline.categories.Display.MD.letterSpacing}) — tracking stays on the modular-scale size`);
+  ok(ovD.categories.Display.MD.letterSpacing === baseline.categories.Display.MD.letterSpacing, `Display tracking is UNCHANGED by a size override (got ${ovD.categories.Display.MD.letterSpacing}, baseline ${baseline.categories.Display.MD.letterSpacing}) — tracking stays on the fixed size`);
   ok(ovD.categories.Display.MD.weight === baseline.categories.Display.MD.weight, "Display weight is UNCHANGED by a size override");
   ok(ovD.categories.Display.MD.lineHeight === Math.round(88 * displayP.leading), `Display line-height re-derives from the override (got ${ovD.categories.Display.MD.lineHeight}, want ${Math.round(88 * displayP.leading)})`);
 }
@@ -241,8 +270,8 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const idCol = idn.collections.Typography;
   ok(JSON.stringify(idCol.modes) === JSON.stringify(["Base"]), "no modes ⇒ a single \"Base\" mode");
   ok(Object.values(idCol.variables).every((x) => x.type === "FLOAT" && Object.keys(x.values).join() === "Base"), "no modes ⇒ every variable has exactly one Base value");
-  const dxl = base.categories.Display.XL;
-  ok(idCol.variables["Body/MD/size"].values.Base === base.categories.Body.MD.size && idCol.variables["Display/XL/letterSpacing"].values.Base === Math.round((dxl.letterSpacing / dxl.size) * 10000) / 100, "no-modes Base values equal the base scale (size raw px; letterSpacing as % of size — the relative-units rule)");
+  const dlg = base.categories.Display.LG;
+  ok(idCol.variables["Body/MD/size"].values.Base === base.categories.Body.MD.size && idCol.variables["Display/LG/letterSpacing"].values.Base === Math.round((dlg.letterSpacing / dlg.size) * 10000) / 100, "no-modes Base values equal the base scale (size raw px; letterSpacing as % of size — the relative-units rule)");
   // DISTINCT mode names: a breakpoint named "Base" (reserved) and duplicate names are disambiguated, so
   // Figma never sees modes:["Base","Base"] (which it rejects on import) or a silently-shadowed mode.
   const dup = T.typeTokensFigmaModes(base, [{ name: "Base", scale: mobile }, { name: "Wide", scale: base }, { name: "Wide", scale: mobile }]).collections.Typography;
@@ -256,19 +285,19 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const s = T.typeScale({ treatment: "product", bodyBase: 16 }).categories;
   const near = (a, b) => Math.abs(a - b) <= 0.5;
   ok(near(s.Display.MD.paragraphSpacing, Math.round(s.Display.MD.size * 0.7)), `Display paragraphSpacing = 0.7×size (got ${s.Display.MD.paragraphSpacing} for size ${s.Display.MD.size})`);
-  ok(near(s["Heading"].MD.paragraphSpacing, Math.round(s["Heading"].MD.size * 0.7)), "Heading paragraphSpacing = 0.7×size");
+  ok(near(s.Headline.MD.paragraphSpacing, Math.round(s.Headline.MD.size * 0.7)), "Headline paragraphSpacing = 0.7×size");
   ok(near(s.Body.MD.paragraphSpacing, Math.round(s.Body.MD.size * 0.75)), `Body (prose) paragraphSpacing = 0.75×size (got ${s.Body.MD.paragraphSpacing})`);
-  ok(s.UI.MD.paragraphSpacing === s.UI.MD.size && s.Code.MD.paragraphSpacing === s.Code.MD.size, "the BOX voices (UI/Code) paragraphSpacing = 1.0×size");
-  // singleLineHeight: control-text intent — present IFF a voice is a BOX voice (UI/Code/Kicker), equal to size.
-  ok(s.UI.MD.singleLineHeight === s.UI.MD.size && s.Code.SM.singleLineHeight === s.Code.SM.size && s["Kicker"].MD.singleLineHeight === s["Kicker"].MD.size, "singleLineHeight = size on the BOX voices UI/Code/Kicker");
-  ok(["Display", "Heading", "Sub-heading", "Lead", "Body", "Quote", "Caption", "Legal"].every((v) => !("singleLineHeight" in s[v].MD)), "singleLineHeight is ABSENT on every PROSE voice — incl. Caption/Legal, which ride the ui role but are prose (box:false)");
+  ok(s.Label.MD.paragraphSpacing === s.Label.MD.size && s.Code.MD.paragraphSpacing === s.Code.MD.size, "the BOX voices (Label/Code) paragraphSpacing = 1.0×size");
+  // singleLineHeight: control-text intent — present IFF a voice is a BOX voice (Label/Code/Kicker), equal to size.
+  ok(s.Label.MD.singleLineHeight === s.Label.MD.size && s.Code.SM.singleLineHeight === s.Code.SM.size && s.Kicker.MD.singleLineHeight === s.Kicker.MD.size, "singleLineHeight = size on the BOX voices Label/Code/Kicker");
+  ok(["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Tiny"].every((v) => !("singleLineHeight" in s[v].MD)), "singleLineHeight is ABSENT on every PROSE voice — incl. Tiny/Sub-title, which ride ui/mono roles but are prose (box:false)");
   // the emitters carry both: CSS -para (+ -line-single where present), DTCG composite, Figma-modes vars.
   const css = T.typeTokensCSS(T.typeScale({ treatment: "product" }));
-  ok(css.includes("-para:") && css.includes("--type-ui-md-line-single:") && !css.includes("--type-display-md-line-single") && !css.includes("--type-caption-md-line-single"), "CSS emits -para everywhere and -line-single only on the BOX voices (absent on Caption, though it rides ui)");
+  ok(css.includes("-para:") && css.includes("--type-label-md-line-single:") && !css.includes("--type-display-md-line-single") && !css.includes("--type-tiny-md-line-single"), "CSS emits -para everywhere and -line-single only on the BOX voices (absent on Tiny, though it rides ui)");
   const dt = T.typeTokensDTCG(T.typeScale({ treatment: "product" })).typography;
-  ok(dt.UI.MD.$value.singleLineHeight && !dt.Display.MD.$value.singleLineHeight && /px$/.test(dt.Display.MD.$value.paragraphSpacing), "DTCG composite carries paragraphSpacing (px) + singleLineHeight on ui/mono");
+  ok(dt.Label.MD.$value.singleLineHeight && !dt.Display.MD.$value.singleLineHeight && /px$/.test(dt.Display.MD.$value.paragraphSpacing), "DTCG composite carries paragraphSpacing (px) + singleLineHeight on ui/mono box voices");
   const fv = T.typeTokensFigmaModes(T.typeScale({ treatment: "product" }), []).collections.Typography.variables;
-  ok(fv["Display/MD/paragraphSpacing"] && fv["UI/MD/singleLineHeight"] && !fv["Display/MD/singleLineHeight"], "Figma modes carry paragraphSpacing (all) + singleLineHeight (ui/mono only)");
+  ok(fv["Display/MD/paragraphSpacing"] && fv["Label/MD/singleLineHeight"] && !fv["Display/MD/singleLineHeight"], "Figma modes carry paragraphSpacing (all) + singleLineHeight (ui/mono box voices only)");
 }
 
 // ── leading + tracking are ALWAYS relative — never px — in every emitter (the units rule; overhaul P1) ──
@@ -281,7 +310,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const css = T.typeTokensCSS(s);
   ok(css.includes(`--type-body-md-line: ${relLine(b.lineHeight, b.size)};`), `CSS -line is a unitless factor line÷size (= ${relLine(b.lineHeight, b.size)})`);
   ok(/--type-body-md-tracking: -?\d+(?:\.\d+)?em;/.test(css), "CSS -tracking is em (relative to font size)");
-  ok(/--type-ui-md-line-single: \d+(?:\.\d+)?;/.test(css), "CSS -line-single is a unitless factor");
+  ok(/--type-label-md-line-single: \d+(?:\.\d+)?;/.test(css), "CSS -line-single is a unitless factor");
   ok(!/-line: -?\d+(?:\.\d+)?px/.test(css) && !/-tracking: -?\d+(?:\.\d+)?px/.test(css) && !/-line-single: -?\d+(?:\.\d+)?px/.test(css), "NO px leading or tracking anywhere in the CSS export");
   // the SIZE / paragraph dims are still absolute px (only leading/tracking go relative).
   ok(/--type-body-md-size: \d+px;/.test(css) && /--type-body-md-para: \d+px;/.test(css), "size + paragraph spacing stay absolute px (box metrics, not leading)");
@@ -290,12 +319,12 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(typeof dt.lineHeight === "number" && dt.lineHeight === relLine(b.lineHeight, b.size), "DTCG lineHeight is a unitless number (= line ÷ size)");
   ok(typeof dt.letterSpacing === "string" && /em$/.test(dt.letterSpacing), "DTCG letterSpacing is an em string (relative)");
   ok(/px$/.test(dt.fontSize) && /px$/.test(dt.paragraphSpacing), "DTCG fontSize + paragraphSpacing stay px (absolute dims)");
-  ok(typeof T.typeTokensDTCG(s).typography.UI.MD.$value.singleLineHeight === "number", "DTCG singleLineHeight is a unitless number too");
+  ok(typeof T.typeTokensDTCG(s).typography.Label.MD.$value.singleLineHeight === "number", "DTCG singleLineHeight is a unitless number too");
   // Figma: leading + tracking ride as a % of font size (Figma's native relative unit); size/weight raw.
   const gv = T.typeTokensFigmaModes(s, []).collections.Typography.variables;
   ok(gv["Body/MD/lineHeight"].values.Base === relPct(b.lineHeight, b.size), "Figma lineHeight is % of size");
   ok(gv["Body/MD/letterSpacing"].values.Base === relPct(b.letterSpacing, b.size), "Figma letterSpacing is % of size");
-  ok(gv["UI/MD/singleLineHeight"].values.Base === relPct(s.categories.UI.MD.singleLineHeight, s.categories.UI.MD.size), "Figma singleLineHeight is % of size");
+  ok(gv["Label/MD/singleLineHeight"].values.Base === relPct(s.categories.Label.MD.singleLineHeight, s.categories.Label.MD.size), "Figma singleLineHeight is % of size");
   ok(gv["Body/MD/size"].values.Base === b.size && gv["Body/MD/weight"].values.Base === b.weight, "Figma size + weight stay raw (absolute)");
 }
 
@@ -313,14 +342,14 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(voices.every((v) => col.variables[`font/${v}`] && col.variables[`font/${v}`].type === "ALIAS"), "every voice emits a font/<voice> ALIAS");
   ok(voices.every((v) => col.variables[`weight/${v}`] && col.variables[`weight/${v}`].type === "FLOAT" && Number.isFinite(col.variables[`weight/${v}`].values.Value)), "every voice emits a weight/<voice> FLOAT primitive");
   ok(voices.every((v) => col.variables[col.variables[`font/${v}`].target]), "every alias target resolves to a primitive in the same collection");
-  ok(col.variables["font/Heading"].target === "family/display", "Heading aliases the deduped Inter Tight primitive (family/display)");
+  ok(col.variables["font/Headline"].target === "family/display", "Headline aliases the deduped Inter Tight primitive (family/display)");
   ok(col.variables["font/Kicker"].target === col.variables["font/Code"].target, "Kicker and Code alias the SAME mono primitive (roleOf → mono)");
   ok(col.variables["weight/Display"].values.Value === base.categories.Display.MD.weight, "weight/Display carries the voice's uniform weight");
   // weight STYLE NAMES (slice 4): config.voices[v].styleName → scale.styleNames → weight-style/<voice>
   // STRING primitives; absent names ⇒ no styleNames key and no weight-style vars (the identity gate).
   ok(!("styleNames" in base) && !Object.keys(col.variables).some((k) => k.startsWith("weight-style/")), "no styleName config ⇒ no styleNames on the scale, no weight-style vars");
-  const named = T.typeScale({ treatment: "product", voices: { Display: { styleName: "Condensed Black Italic" }, "Kicker": { styleName: "  Medium  " }, Body: { styleName: "" } } });
-  ok(named.styleNames && named.styleNames.Display === "Condensed Black Italic" && named.styleNames["Kicker"] === "Medium" && !("Body" in named.styleNames), "styleNames collect trimmed non-empty names only");
+  const named = T.typeScale({ treatment: "product", voices: { Display: { styleName: "Condensed Black Italic" }, Kicker: { styleName: "  Medium  " }, Body: { styleName: "" } } });
+  ok(named.styleNames && named.styleNames.Display === "Condensed Black Italic" && named.styleNames.Kicker === "Medium" && !("Body" in named.styleNames), "styleNames collect trimmed non-empty names only");
   const nCol = T.typeTokensFigmaPrimitives(named).collections["Font Primitives"];
   ok(nCol.variables["weight-style/Display"] && nCol.variables["weight-style/Display"].type === "STRING" && nCol.variables["weight-style/Display"].values.Value === "Condensed Black Italic", "the primitives collection emits weight-style/<voice> STRING vars");
   ok(!nCol.variables["weight-style/Body"] && nCol.variables["weight/Body"], "an unnamed voice keeps its numeric weight primitive but gets no style var");
@@ -375,7 +404,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
 }
 
 // ── per-voice FONT overrides (TKT-0002): config.voices[v].font escapes a voice off its shared ROLE font
-// (e.g. Sub-heading no longer forced to share Heading's family); resolvedFontFor is the ONE resolution
+// (e.g. Sub-heading no longer forced to share Headline's family); resolvedFontFor is the ONE resolution
 // point; absent ⇒ no voiceFonts key + BYTE-IDENTICAL CSS/DTCG/Figma-primitives (the identity gate) ──
 {
   const baseline = T.typeScale({ treatment: "product" });
@@ -399,29 +428,29 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // resolvedFontFor: an un-overridden voice resolves to its role's shared default.
   ok(T.resolvedFontFor(baseline, "Sub-heading") === baseline.fonts[baseline.roleOf["Sub-heading"]], "resolvedFontFor: no override ⇒ the role's shared default");
 
-  // ── the override itself: Sub-heading gets its OWN font, distinct from Heading (its shared role today) ──
+  // ── the override itself: Sub-heading gets its OWN font, distinct from Headline (its shared role today) ──
   const ov = T.typeScale({ treatment: "product", voices: { "Sub-heading": { font: "  Fraunces  " } } });
   ok(ov.voiceFonts && ov.voiceFonts["Sub-heading"] === "Fraunces", "voiceFonts collects a trimmed non-empty per-voice font");
   ok(T.resolvedFontFor(ov, "Sub-heading") === "Fraunces", "resolvedFontFor: an override resolves to the voice's own font");
-  ok(T.resolvedFontFor(ov, "Heading") === ov.fonts[ov.roleOf.Heading], "resolvedFontFor: an UN-overridden voice sharing the same role (Heading) is untouched");
+  ok(T.resolvedFontFor(ov, "Headline") === ov.fonts[ov.roleOf.Headline], "resolvedFontFor: an UN-overridden voice sharing the same role (Headline) is untouched");
   ok(ov.fonts.heading === baseline.fonts.heading, "the shared ROLE font itself is untouched by a per-voice override (config.fonts is a separate channel)");
 
-  // CSS: a --font-voice-sub-heading prop carries the override; Heading's own --font-voice-heading
+  // CSS: a --font-voice-sub-heading prop carries the override; Headline's own --font-voice-headline
   // still carries the shared role default (TKT-0006: every voice's utility class now binds to its
   // OWN --font-voice-* prop, overridden or not — one point of truth per voice).
   const cssOv = T.typeTokensCSS(ov);
   ok(cssOv.includes("--font-voice-sub-heading: 'Fraunces';"), "CSS emits a quoted --font-voice-* prop for the overridden voice (same Safari digit-name trap as --font-*)");
-  ok(cssOv.includes(`--font-voice-heading: '${ov.fonts.heading}';`), "an un-overridden voice sharing the same role (Heading) still gets its own --font-voice-* prop, at the role's value");
+  ok(cssOv.includes(`--font-voice-headline: '${ov.fonts.heading}';`), "an un-overridden voice sharing the same role (Headline) still gets its own --font-voice-* prop, at the role's value");
   ok(/\.type-sub-heading-md\s*\{[^}]*font-family: var\(--font-voice-sub-heading\)/.test(cssOv), "the overridden voice's utility classes reference its OWN --font-voice-* prop");
-  ok(/\.type-heading-md\s*\{[^}]*font-family: var\(--font-voice-heading\)/.test(cssOv), "an un-overridden voice's utility classes ALSO reference its own --font-voice-* prop now (TKT-0006), not --font-{role} directly");
+  ok(/\.type-headline-md\s*\{[^}]*font-family: var\(--font-voice-headline\)/.test(cssOv), "an un-overridden voice's utility classes ALSO reference its own --font-voice-* prop now (TKT-0006), not --font-{role} directly");
 
   // DTCG: the composite fontFamily for the overridden voice carries its own family; the top-level
-  // fontFamily group is voice-keyed (TKT-0006) — BOTH Sub-heading and Heading get their own entry.
+  // fontFamily group is voice-keyed (TKT-0006) — BOTH Sub-heading and Headline get their own entry.
   const dtOv = T.typeTokensDTCG(ov);
   ok(dtOv.typography["Sub-heading"].MD.$value.fontFamily === "Fraunces", "DTCG composite fontFamily resolves the per-voice override");
-  ok(dtOv.typography.Heading.MD.$value.fontFamily === ov.fonts.heading, "DTCG composite fontFamily for an un-overridden voice still reads its role's family");
+  ok(dtOv.typography.Headline.MD.$value.fontFamily === ov.fonts.heading, "DTCG composite fontFamily for an un-overridden voice still reads its role's family");
   ok(dtOv.fontFamily["Sub-heading"].$value === "Fraunces", "the top-level fontFamily group carries the overridden voice's own family");
-  ok(dtOv.fontFamily.Heading.$value === ov.fonts.heading, "the top-level fontFamily group ALSO carries the un-overridden voice, at the role's value");
+  ok(dtOv.fontFamily.Headline.$value === ov.fonts.heading, "the top-level fontFamily group ALSO carries the un-overridden voice, at the role's value");
 
   // Figma primitives: a genuinely distinct override family mints its OWN family/voice/<voice> primitive,
   // aliased by font/<voice>; two voices overridden to the SAME custom family share ONE primitive (dedupe by
@@ -430,12 +459,12 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const colOv = T.typeTokensFigmaPrimitives(ov).collections["Font Primitives"];
   ok(colOv.variables["family/voice/sub-heading"] && colOv.variables["family/voice/sub-heading"].type === "STRING" && colOv.variables["family/voice/sub-heading"].values.Value === "Fraunces", "a distinct override family mints its own family/voice/<voice> primitive");
   ok(colOv.variables["font/Sub-heading"].target === "family/voice/sub-heading", "font/Sub-heading aliases the new voice-specific primitive");
-  ok(colOv.variables["font/Heading"].target === "family/display", "font/Heading is UNCHANGED — still aliases the shared role primitive (Inter Tight, product treatment)");
+  ok(colOv.variables["font/Headline"].target === "family/display", "font/Headline is UNCHANGED — still aliases the shared role primitive (Inter Tight, product treatment)");
 
-  const twoSame = T.typeScale({ treatment: "product", voices: { "Sub-heading": { font: "Fraunces" }, "Quote": { font: "Fraunces" } } });
+  const twoSame = T.typeScale({ treatment: "product", voices: { "Sub-heading": { font: "Fraunces" }, Title: { font: "Fraunces" } } });
   const colTwo = T.typeTokensFigmaPrimitives(twoSame).collections["Font Primitives"];
-  ok(colTwo.variables["font/Sub-heading"].target === colTwo.variables["font/Quote"].target, "two voices overridden to the SAME custom family share ONE primitive (dedupe by value)");
-  ok(!colTwo.variables["family/voice/quote"], "the second voice with the same override family does NOT mint a redundant duplicate primitive");
+  ok(colTwo.variables["font/Sub-heading"].target === colTwo.variables["font/Title"].target, "two voices overridden to the SAME custom family share ONE primitive (dedupe by value)");
+  ok(!colTwo.variables["family/voice/title"], "the second voice with the same override family does NOT mint a redundant duplicate primitive");
 
   // an override that happens to equal an EXISTING role's family aliases that primitive — no duplicate.
   const eqRole = T.typeScale({ treatment: "product", voices: { "Sub-heading": { font: baseline.fonts.body } } }); // body="Inter", distinct from heading's "Inter Tight"
@@ -454,5 +483,5 @@ ok(T.genericFor("Space Mono") === "monospace" && T.genericFor("Space Grotesk") =
 ok(T.genericFor("Some Unknown Face") === "sans-serif" && T.genericFor("") === "sans-serif" && T.genericFor(undefined) === "sans-serif", "genericFor: unknown/empty → sans-serif default");
 
 if (fails.length) { console.error(`type FAIL (${fails.length}):\n  ` + fails.join("\n  ")); process.exit(1); }
-console.log("type PASS — modular scale, optical tracking, treatments, CSS + DTCG + Figma-modes emit");
+console.log("type PASS — fixed size table, optical tracking, treatments, CSS + DTCG + Figma-modes emit");
 process.exit(0);

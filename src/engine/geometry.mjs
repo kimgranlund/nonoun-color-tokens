@@ -91,10 +91,14 @@ function buildSize(rawHeight, density, fontOverride) {
 // height) uniformly scales the whole ramp; the treatment seeds density + the radius ladder + spacing.
 //
 // COMPOSITION with typography: pass `opts.typeScale` (a resolved `typeScale(...)`) and each size's text
-// `font` comes from the type scale's UI voice at the MATCHING step (XS→UI XS … 2XL→UI 2XL) instead of the
-// standalone power law — so the box (geometry) and the text in it (typography) share one source of truth.
-// `caret = font` and `gap = font/2` follow; the FRAME (height/icon/pad/radius) is untouched, so the
-// centering law still holds. `typed` reports whether the fonts came from the type scale.
+// `font` comes from the type scale's Label voice (renamed from "UI" 2026-07-13) at the MATCHING step —
+// SM/MD/LG only, since every type voice is now a fixed 3-step ramp (was XS..2XL, 6 of geometry's 8 steps
+// matched) — instead of the standalone power law, so the box (geometry) and the text in it (typography)
+// share one source of truth where a step exists. Geometry's XS and the expressive band (LG·XL·2XL) have
+// no Label counterpart anymore, so THOSE fall back to the standalone power law (buildSize's null-check —
+// an intentional, pre-existing fallback, not new). `caret = font` and `gap = font/2` follow; the FRAME
+// (height/icon/pad/radius) is untouched, so the centering law still holds. `typed` reports whether the
+// fonts came from the type scale.
 // `opts.overrides` (optional) — a flat per-size HEIGHT override map keyed "<sizeName>", already mode-selected
 // by the caller. When a positive number exists for a size, it REPLACES the scaled rawHeight fed to buildSize,
 // so icon/font/pad/radius/caret/gap ALL re-derive via the laws (and the type-composition `fontOverride` still
@@ -112,7 +116,7 @@ export function geomScale(config = {}, opts = {}) {
   const factor = baseHeight / CANON_MD;
   const c = Number(config.rampContrast);
   const rampContrast = Number.isFinite(c) ? Math.max(0, Math.min(1, c)) : 1;
-  const uiSteps = opts.typeScale && opts.typeScale.categories && opts.typeScale.categories.UI;
+  const uiSteps = opts.typeScale && opts.typeScale.categories && opts.typeScale.categories.Label;
   const overrides = opts.overrides && typeof opts.overrides === "object" ? opts.overrides : null;
   const sizes = {};
   let expr = 0; // 0 for the compact band, then 1·2·3 across LG·XL·2XL (the expressive band)

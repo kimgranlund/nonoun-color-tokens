@@ -81,10 +81,11 @@ const plans = stylePlans({ families, scale });
   const bodySib = plans.texts.find((t) => t.name === "Body/md/semi-bold");
   ok(!!bodySib && bodySib.literal.weight === 600, "Body sibling present with its weight, kebab-named");
   // a voice with NO configured siblings (only Display + Body have `weights` in this fixture) stays bare.
-  const bareCore = plans.texts.find((t) => t.voice === "Heading" && t.step === "MD");
-  ok(!!bareCore && bareCore.name === "Heading/md", "a voice with no siblings keeps the bare Voice/step name");
+  const bareCore = plans.texts.find((t) => t.voice === "Headline" && t.step === "MD");
+  ok(!!bareCore && bareCore.name === "Headline/md", "a voice with no siblings keeps the bare Voice/step name");
   ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(\/[a-z0-9-]+)?$/.test(t.name)), "every text style name is Voice/lowerstep[/lower-kebab-slug]");
-  // volume: 53 steps × (1 core + siblings on 2 voices) — renaming the core doesn't change the COUNT.
+  // volume: 33 steps (11 voices × 3, since the 2026-07-13 fixed-size rewrite) × (1 core + siblings on 2
+  // voices) — renaming the core doesn't change the COUNT.
   const stepCount = Object.values(scale.categories).reduce((a, s) => a + Object.keys(s).length, 0);
   const expected = stepCount + (scale.weights.Display.length * Object.keys(scale.categories.Display).length) + (scale.weights.Body.length * Object.keys(scale.categories.Body).length);
   ok(plans.texts.length === expected, `text style count ${plans.texts.length} != expected ${expected}`);
@@ -109,10 +110,10 @@ const plans = stylePlans({ families, scale });
   const subMd = ovPlans.texts.find((t) => t.voice === "Sub-heading" && t.step === "MD");
   ok(!!subMd && subMd.literal.family === "Custom Voice Font", `an overridden voice's literal fallback family resolves its OWN font (got ${subMd && subMd.literal.family})`);
   ok(subMd.bind.fontFamily === "font/Sub-heading", "the BINDING target is unchanged — already per-voice (font/<voice>)");
-  // an un-overridden voice sharing the SAME role (Heading rides `heading`, like Sub-heading) still gets the
+  // an un-overridden voice sharing the SAME role (Headline rides `heading`, like Sub-heading) still gets the
   // role's shared family — the override doesn't leak to its role-mates.
-  const headMd = ovPlans.texts.find((t) => t.voice === "Heading" && t.step === "MD");
-  ok(!!headMd && headMd.literal.family === ovScale.fonts[ovScale.roleOf.Heading], "an un-overridden voice sharing the same role still gets the role's shared family, untouched");
+  const headMd = ovPlans.texts.find((t) => t.voice === "Headline" && t.step === "MD");
+  ok(!!headMd && headMd.literal.family === ovScale.fonts[ovScale.roleOf.Headline], "an un-overridden voice sharing the same role still gets the role's shared family, untouched");
   // no override anywhere ⇒ literal.family matches the role's family exactly as before (identity).
   const bareSubMd = plans.texts.find((t) => t.voice === "Sub-heading" && t.step === "MD");
   ok(bareSubMd.literal.family === scale.fonts[scale.roleOf["Sub-heading"]], "no override ⇒ literal.family is the role's shared family (unchanged behavior)");

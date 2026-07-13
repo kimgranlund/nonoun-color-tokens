@@ -1,0 +1,382 @@
+{
+  "curve": "logistic",
+  "tension": 0,
+  "lmin": 5,
+  "lmax": 100,
+  "damp": 70,
+  "dampCurve": 1.5,
+  "dampAmp": 55,
+  "dampBias": 0,
+  "hueSpace": "oklch",
+  "relChroma": false,
+  "chromaFloor": 40,
+  "toneMode": "perceptual",
+  "vibrancy": 0,
+  "onColorMode": "fixed",
+  "accentRef": "mode",
+  "theme": "auto",
+  "selected": 1,
+  "roleOverrides": {},
+  "type": {
+    "treatment": "editorial",
+    "bodyBase": 16,
+    "fonts": {
+      "display": "Trade Gothic Bold Condensed No. 20",
+      "heading": "News Gothic",
+      "body": "New Caledonia",
+      "ui": "Helvetica Neue",
+      "mono": "Courier Prime"
+    },
+    "voices": {
+      "Display": {
+        "weight": 700,
+        "tracking": 0,
+        "leading": 0.98,
+        "weights": [
+          {
+            "name": "Semi-bold",
+            "weight": 600
+          },
+          {
+            "name": "Medium",
+            "weight": 500
+          }
+        ]
+      },
+      "Heading": {
+        "weight": 600,
+        "tracking": 0.04,
+        "leading": 1.15,
+        "weights": [
+          {
+            "name": "Medium",
+            "weight": 500
+          },
+          {
+            "name": "Regular",
+            "weight": 400
+          }
+        ]
+      },
+      "Kicker": {
+        "weight": 520,
+        "tracking": 0.16,
+        "leading": 1.45,
+        "weights": [
+          {
+            "name": "Semi-bold",
+            "weight": 600
+          },
+          {
+            "name": "Bold",
+            "weight": 700
+          }
+        ]
+      },
+      "Body": {
+        "weight": 400,
+        "tracking": 0,
+        "leading": 1.6,
+        "weights": [
+          {
+            "name": "Medium",
+            "weight": 500
+          },
+          {
+            "name": "Semi-bold",
+            "weight": 600
+          }
+        ]
+      },
+      "UI": {
+        "weight": 460,
+        "tracking": 0.01,
+        "leading": 1.55,
+        "weights": [
+          {
+            "name": "Semi-bold",
+            "weight": 600
+          },
+          {
+            "name": "Bold",
+            "weight": 700
+          }
+        ]
+      }
+    }
+  },
+  "geometry": {
+    "treatment": "comfortable",
+    "baseHeight": 28
+  },
+  "palettes": [
+    {
+      "name": "neutral",
+      "hue": 94,
+      "chroma": 6,
+      "skew": 0,
+      "lift": 0,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.66,
+            0.018,
+            93.66434069804376
+          ]
+        }
+      ]
+    },
+    {
+      "name": "primary",
+      "hue": 256,
+      "chroma": 34,
+      "skew": 0,
+      "lift": -17,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.382,
+            0.082,
+            256
+          ]
+        }
+      ],
+      "colorName": "Midnight blue, deep",
+      "description": "The cool modal mood.",
+      "colorRole": "dominant"
+    },
+    {
+      "name": "primary-muted",
+      "hue": 210,
+      "chroma": 25,
+      "skew": 0,
+      "lift": -13,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.412,
+            0.052,
+            210
+          ]
+        }
+      ],
+      "colorName": "Teal shadow",
+      "description": "The cool club shadow.",
+      "colorRole": "supporting"
+    },
+    {
+      "name": "secondary",
+      "hue": 80,
+      "chroma": 30,
+      "skew": 0,
+      "lift": 17,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.682,
+            0.092,
+            80
+          ]
+        }
+      ],
+      "colorName": "Brass, gold",
+      "description": "The horn under the light.",
+      "colorRole": "supporting"
+    },
+    {
+      "name": "secondary-muted",
+      "hue": 230,
+      "chroma": 7,
+      "skew": 0,
+      "lift": 8,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.602,
+            0.01,
+            230
+          ]
+        }
+      ],
+      "colorName": "Smoke, grey",
+      "description": "The hazy air.",
+      "colorRole": "supporting"
+    },
+    {
+      "name": "accent",
+      "hue": 76,
+      "chroma": 26,
+      "skew": 0,
+      "lift": 20,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.702,
+            0.082,
+            76
+          ]
+        }
+      ],
+      "colorName": "Spotlight, warm amber",
+      "description": "The single warm light.",
+      "colorRole": "accent"
+    },
+    {
+      "name": "accent-muted",
+      "hue": 56,
+      "chroma": 18,
+      "skew": 0,
+      "lift": -10,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.452,
+            0.052,
+            56
+          ]
+        }
+      ],
+      "colorName": "Bass wood, brown",
+      "description": "The double-bass body.",
+      "colorRole": "accent"
+    },
+    {
+      "name": "info",
+      "hue": 255,
+      "chroma": 49,
+      "skew": 0,
+      "lift": 1,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.54,
+            0.13,
+            255
+          ]
+        }
+      ]
+    },
+    {
+      "name": "success",
+      "hue": 152,
+      "chroma": 42,
+      "skew": 0,
+      "lift": 1,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.56,
+            0.115,
+            152
+          ]
+        }
+      ]
+    },
+    {
+      "name": "warning",
+      "hue": 73,
+      "chroma": 46,
+      "skew": 0,
+      "lift": 4,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.62,
+            0.118,
+            73
+          ]
+        }
+      ]
+    },
+    {
+      "name": "danger",
+      "hue": 27,
+      "chroma": 76,
+      "skew": 0,
+      "lift": -6,
+      "hueShift": 0,
+      "hueSameDir": false,
+      "on": true,
+      "keyColors": [
+        {
+          "role": "dominant",
+          "oklch": [
+            0.52,
+            0.176,
+            27
+          ]
+        }
+      ]
+    }
+  ],
+  "vol": "I",
+  "story": {
+    "title": "A modal-jazz mood of deep blue, midnight teal, brass, and smoke",
+    "kicker": "Modal jazz · the cool-blue session",
+    "narrative": "Color from the modal session: midnight blue, teal shadow, brass gold, smoke grey, and a warm spotlight.",
+    "refuses": "Faded sepia. Modal jazz is deep blue and teal warmed by brass — a cool-blue mood, not a brown nostalgia.",
+    "groups": [
+      {
+        "hier": "d",
+        "pct": 50,
+        "note": "Midnight blue leads the modal mood."
+      },
+      {
+        "hier": "s",
+        "pct": 40,
+        "note": "Teal shadow, brass gold, and smoke grey."
+      },
+      {
+        "hier": "a",
+        "pct": 10,
+        "note": "Amber spot and bass wood as small reads."
+      }
+    ]
+  },
+  "name": "Modal jazz · the cool-blue session",
+  "export": {
+    "colorPrefix": "md-sys-color",
+    "typePrefix": "md-sys-typescale",
+    "geomPrefix": "md-sys"
+  }
+}

@@ -120,9 +120,10 @@ if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "cl
   if (!deepEq(Rf.type.fonts, { body: "Custom Sans", ui: "My Mono" })) FAIL("type-fonts", `type.fonts did not round-trip / didn't drop junk: ${JSON.stringify(Rf.type.fonts)}`);
   const Rf0 = U.hydrate(U.serialize({ ...inDomainState(), type: { treatment: "product", bodyBase: 16 } }));
   if ("fonts" in Rf0.type) FAIL("type-fonts", "an absent fonts override must NOT materialize a fonts key (round-trip identity)");
-  // per-voice shaping overrides round-trip; unknown voices drop; out-of-range fields clamp.
+  // per-voice shaping overrides round-trip; unknown voices drop; out-of-range fields clamp. `ratio` is
+  // RETIRED (2026-07-13 — size is now a fixed table, not base×ratio^n) and no longer a recognized field.
   const Rv = U.hydrate(U.serialize({ ...inDomainState(), type: { treatment: "product", bodyBase: 16, voices: { Body: { weight: 600, leading: 1.8, ratio: 1.3, tracking: 0.01 }, Bogus: { weight: 500 }, Display: { weight: 99999 } } } }));
-  if (!deepEq(Rv.type.voices.Body, { weight: 600, leading: 1.8, ratio: 1.3, tracking: 0.01 })) FAIL("type-voices", `type.voices.Body did not round-trip: ${JSON.stringify(Rv.type.voices.Body)}`);
+  if (!deepEq(Rv.type.voices.Body, { weight: 600, leading: 1.8, tracking: 0.01 })) FAIL("type-voices", `type.voices.Body did not round-trip (and 'ratio' should be silently dropped, not a recognized field): ${JSON.stringify(Rv.type.voices.Body)}`);
   if ("Bogus" in Rv.type.voices) FAIL("type-voices", "an unknown voice name must drop");
   if (Rv.type.voices.Display.weight !== 1000) FAIL("type-voices", `weight 99999 should clamp to 1000, got ${Rv.type.voices.Display.weight}`);
   // SIBLING WEIGHTS round-trip: valid entries survive (name trimmed/capped, weight clamped); invalid drop;
@@ -182,9 +183,9 @@ if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "cl
 {
   const seed = inDomainState();
   const R = U.hydrate(U.serialize({ ...seed, type: { treatment: "product", bodyBase: 16,
-    voices: { Display: { weight: 900, styleName: "  Condensed Black Italic  " }, Body: { styleName: "" }, UI: { styleName: 42 } } } }));
+    voices: { Display: { weight: 900, styleName: "  Condensed Black Italic  " }, Body: { styleName: "" }, Label: { styleName: 42 } } } }));
   if (R.type.voices.Display.styleName !== "Condensed Black Italic") FAIL("voice-style", `styleName must round-trip trimmed (got ${JSON.stringify(R.type.voices.Display.styleName)})`);
-  if (R.type.voices.Body || (R.type.voices.UI && R.type.voices.UI.styleName)) FAIL("voice-style", "empty/non-string styleName must drop (and an emptied voice with it)");
+  if (R.type.voices.Body || (R.type.voices.Label && R.type.voices.Label.styleName)) FAIL("voice-style", "empty/non-string styleName must drop (and an emptied voice with it)");
   const long = U.hydrate(U.serialize({ ...seed, type: { treatment: "product", bodyBase: 16, voices: { Display: { styleName: "x".repeat(200) } } } }));
   if (long.type.voices.Display.styleName.length !== 60) FAIL("voice-style", "styleName caps at 60 chars");
 }

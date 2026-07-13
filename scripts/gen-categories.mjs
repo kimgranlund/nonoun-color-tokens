@@ -169,7 +169,9 @@ const VIVID_MIDS = { damp: 70, dampCurve: 1.5, dampAmp: 55, dampBias: 0 };
 // Each font ROLE covers all its voices (fonts are per-role), so 5 families dress all 11 voices; the design's
 // per-slot tracking/leading/weight shape the ROLE's PRIMARY voice (secondary editorial voices keep the base
 // treatment's character). mono→Kicker (the slot's tracking IS the wide-kicker value; Code stays neutral).
-const TYPE_VOICE_OF = { display: "Display", heading: "Heading", body: "Body", ui: "UI", mono: "Kicker" };
+// 2026-07-13: Heading's primary voice renamed Headline; ui's primary voice renamed Label (taxonomy rename,
+// same mapping shape).
+const TYPE_VOICE_OF = { display: "Display", heading: "Headline", body: "Body", ui: "Label", mono: "Kicker" };
 const TYPE_BASES = ["product", "luxury", "editorial", "technical", "statement"];
 // pct — the STRICT %-string parser for the preset schema's leading/tracking (Kim's 2026-07-10 unit
 // transition: `leading: "96%"` = 0.96 × size; `tracking: "-2%"` = -0.02em). Strings only — a bare

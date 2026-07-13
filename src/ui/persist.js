@@ -344,7 +344,7 @@ const TYPE_TREATMENTS = ["product", "luxury", "editorial", "technical", "stateme
 function clampType(t) {
   t = (t && typeof t === "object") ? t : {};
   const treatment = TYPE_TREATMENTS.includes(t.treatment) ? t.treatment : "product";
-  const clampBody = (v) => { const n = Number(v); return Math.max(10, Math.min(32, Number.isFinite(n) ? Math.round(n) : 16)); };
+  const clampBody = (v) => { const n = Number(v); return Math.max(10, Math.min(32, Number.isFinite(n) ? Math.round(n) : 15)); };
   const bodyBase = clampBody(t.bodyBase);
   const out = { treatment, bodyBase };
   // tokenOverrides (Phase 3) — per-cell size overrides. OPTIONAL: only attach when non-empty so a config
@@ -358,12 +358,14 @@ function clampType(t) {
     for (const r of ["display", "heading", "body", "ui", "mono"]) if (typeof t.fonts[r] === "string" && t.fonts[r].trim()) fonts[r] = t.fonts[r].trim();
     if (Object.keys(fonts).length) out.fonts = fonts;
   }
-  // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading, ratio } } for the 11 known
+  // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading } } for the 11 known
   // voices; each field clamped to a sane range, kept only when finite, attached only when non-empty. This
   // allowlist MUST track make11's voices — a voice missing here has its per-voice overrides SILENTLY DROPPED
-  // on hydrate (the four editorial voices Lead/Quote/Caption/Legal were added in lockstep with the engine).
+  // on hydrate. 2026-07-13 — voice set + `ratio` retired: Heading→Headline, UI→Label, Quote folded into
+  // Lead, Caption folded into Tiny, Legal folded into Body; Title/Sub-title/Tiny added. `ratio` no longer
+  // means anything (size is now a fixed table, not base×ratio^n — see type.mjs).
   if (t.voices && typeof t.voices === "object") {
-    const VOICES = ["Display", "Heading", "Sub-heading", "Kicker", "Lead", "Body", "Quote", "Caption", "UI", "Code", "Legal"];
+    const VOICES = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Code", "Label", "Kicker", "Tiny"];
     const num = (x, lo, hi, round) => { const n = Number(x); if (!Number.isFinite(n)) return undefined; const c = Math.max(lo, Math.min(hi, n)); return round ? Math.round(c) : c; };
     const voices = {};
     for (const name of VOICES) {
@@ -373,7 +375,6 @@ function clampType(t) {
       const w = num(v.weight, 100, 1000, true); if (w !== undefined) o.weight = w;
       const tr = num(v.tracking, -0.5, 1, false); if (tr !== undefined) o.tracking = tr;
       const le = num(v.leading, 0.8, 3, false); if (le !== undefined) o.leading = le;
-      const ra = num(v.ratio, 1, 2, false); if (ra !== undefined) o.ratio = ra;
       // styleName — the Figma weight-style string for non-variable families; trimmed, capped, non-empty only.
       if (typeof v.styleName === "string" && v.styleName.trim()) o.styleName = v.styleName.trim().slice(0, 60);
       // font — the per-voice FONT override (TKT-0002): a voice's own family, overriding its shared role

@@ -1,0 +1,810 @@
+{
+  "fontFamily": {
+    "display": {
+      "$type": "fontFamily",
+      "$value": "Trade Gothic Bold Condensed No. 20"
+    },
+    "heading": {
+      "$type": "fontFamily",
+      "$value": "News Gothic"
+    },
+    "body": {
+      "$type": "fontFamily",
+      "$value": "New Caledonia"
+    },
+    "ui": {
+      "$type": "fontFamily",
+      "$value": "Helvetica Neue"
+    },
+    "mono": {
+      "$type": "fontFamily",
+      "$value": "Courier Prime"
+    }
+  },
+  "typography": {
+    "Display": {
+      "XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Trade Gothic Bold Condensed No. 20",
+          "fontSize": "36px",
+          "lineHeight": 0.972,
+          "letterSpacing": "0em",
+          "fontWeight": 700,
+          "textCase": "none",
+          "paragraphSpacing": "25px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Trade Gothic Bold Condensed No. 20",
+          "fontSize": "44px",
+          "lineHeight": 0.977,
+          "letterSpacing": "0em",
+          "fontWeight": 700,
+          "textCase": "none",
+          "paragraphSpacing": "31px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Trade Gothic Bold Condensed No. 20",
+          "fontSize": "56px",
+          "lineHeight": 0.982,
+          "letterSpacing": "0em",
+          "fontWeight": 700,
+          "textCase": "none",
+          "paragraphSpacing": "39px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Trade Gothic Bold Condensed No. 20",
+          "fontSize": "64px",
+          "lineHeight": 0.984,
+          "letterSpacing": "0em",
+          "fontWeight": 700,
+          "textCase": "none",
+          "paragraphSpacing": "45px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "XL": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Trade Gothic Bold Condensed No. 20",
+          "fontSize": "80px",
+          "lineHeight": 0.975,
+          "letterSpacing": "0em",
+          "fontWeight": 700,
+          "textCase": "none",
+          "paragraphSpacing": "56px",
+          "paragraphIndent": "0px"
+        }
+      }
+    },
+    "Heading": {
+      "XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "16px",
+          "lineHeight": 1.125,
+          "letterSpacing": "0.04em",
+          "fontWeight": 600,
+          "textCase": "none",
+          "paragraphSpacing": "11px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "20px",
+          "lineHeight": 1.15,
+          "letterSpacing": "0.04em",
+          "fontWeight": 600,
+          "textCase": "none",
+          "paragraphSpacing": "14px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "24px",
+          "lineHeight": 1.167,
+          "letterSpacing": "0.0417em",
+          "fontWeight": 600,
+          "textCase": "none",
+          "paragraphSpacing": "17px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "32px",
+          "lineHeight": 1.156,
+          "letterSpacing": "0.0388em",
+          "fontWeight": 600,
+          "textCase": "none",
+          "paragraphSpacing": "22px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "XL": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "40px",
+          "lineHeight": 1.15,
+          "letterSpacing": "0.039em",
+          "fontWeight": 600,
+          "textCase": "none",
+          "paragraphSpacing": "28px",
+          "paragraphIndent": "0px"
+        }
+      }
+    },
+    "Sub-heading": {
+      "XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "16px",
+          "lineHeight": 1.125,
+          "letterSpacing": "0.1em",
+          "fontWeight": 600,
+          "textCase": "uppercase",
+          "paragraphSpacing": "11px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "20px",
+          "lineHeight": 1.15,
+          "letterSpacing": "0.095em",
+          "fontWeight": 600,
+          "textCase": "uppercase",
+          "paragraphSpacing": "14px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "24px",
+          "lineHeight": 1.125,
+          "letterSpacing": "0.0958em",
+          "fontWeight": 600,
+          "textCase": "uppercase",
+          "paragraphSpacing": "17px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "28px",
+          "lineHeight": 1.143,
+          "letterSpacing": "0.1em",
+          "fontWeight": 600,
+          "textCase": "uppercase",
+          "paragraphSpacing": "20px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "XL": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "32px",
+          "lineHeight": 1.125,
+          "letterSpacing": "0.1031em",
+          "fontWeight": 600,
+          "textCase": "uppercase",
+          "paragraphSpacing": "22px",
+          "paragraphIndent": "0px"
+        }
+      }
+    },
+    "Kicker": {
+      "XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "9px",
+          "lineHeight": 1.444,
+          "letterSpacing": "0.16em",
+          "fontWeight": 520,
+          "textCase": "uppercase",
+          "paragraphSpacing": "9px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "10px",
+          "lineHeight": 1.5,
+          "letterSpacing": "0.16em",
+          "fontWeight": 520,
+          "textCase": "uppercase",
+          "paragraphSpacing": "10px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "12px",
+          "lineHeight": 1.417,
+          "letterSpacing": "0.16em",
+          "fontWeight": 520,
+          "textCase": "uppercase",
+          "paragraphSpacing": "12px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "13px",
+          "lineHeight": 1.462,
+          "letterSpacing": "0.16em",
+          "fontWeight": 520,
+          "textCase": "uppercase",
+          "paragraphSpacing": "13px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "XL": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "15px",
+          "lineHeight": 1.467,
+          "letterSpacing": "0.16em",
+          "fontWeight": 520,
+          "textCase": "uppercase",
+          "paragraphSpacing": "15px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      }
+    },
+    "Lead": {
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "New Caledonia",
+          "fontSize": "15px",
+          "lineHeight": 1.467,
+          "letterSpacing": "-0.0047em",
+          "fontWeight": 400,
+          "textCase": "none",
+          "paragraphSpacing": "11px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "New Caledonia",
+          "fontSize": "18px",
+          "lineHeight": 1.444,
+          "letterSpacing": "-0.005em",
+          "fontWeight": 400,
+          "textCase": "none",
+          "paragraphSpacing": "14px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "New Caledonia",
+          "fontSize": "22px",
+          "lineHeight": 1.455,
+          "letterSpacing": "-0.0045em",
+          "fontWeight": 400,
+          "textCase": "none",
+          "paragraphSpacing": "17px",
+          "paragraphIndent": "0px"
+        }
+      }
+    },
+    "Body": {
+      "XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "New Caledonia",
+          "fontSize": "10px",
+          "lineHeight": 1.6,
+          "letterSpacing": "0em",
+          "fontWeight": 400,
+          "textCase": "none",
+          "paragraphSpacing": "8px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "New Caledonia",
+          "fontSize": "13px",
+          "lineHeight": 1.615,
+          "letterSpacing": "0em",
+          "fontWeight": 400,
+          "textCase": "none",
+          "paragraphSpacing": "10px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "New Caledonia",
+          "fontSize": "16px",
+          "lineHeight": 1.625,
+          "letterSpacing": "0em",
+          "fontWeight": 400,
+          "textCase": "none",
+          "paragraphSpacing": "12px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "New Caledonia",
+          "fontSize": "20px",
+          "lineHeight": 1.6,
+          "letterSpacing": "0em",
+          "fontWeight": 400,
+          "textCase": "none",
+          "paragraphSpacing": "15px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "XL": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "New Caledonia",
+          "fontSize": "24px",
+          "lineHeight": 1.583,
+          "letterSpacing": "0em",
+          "fontWeight": 400,
+          "textCase": "none",
+          "paragraphSpacing": "18px",
+          "paragraphIndent": "0px"
+        }
+      }
+    },
+    "Quote": {
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "16px",
+          "lineHeight": 1.313,
+          "letterSpacing": "-0.005em",
+          "fontWeight": 450,
+          "textCase": "none",
+          "paragraphSpacing": "11px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "20px",
+          "lineHeight": 1.3,
+          "letterSpacing": "-0.005em",
+          "fontWeight": 450,
+          "textCase": "none",
+          "paragraphSpacing": "14px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "News Gothic",
+          "fontSize": "24px",
+          "lineHeight": 1.292,
+          "letterSpacing": "-0.0046em",
+          "fontWeight": 450,
+          "textCase": "none",
+          "paragraphSpacing": "17px",
+          "paragraphIndent": "0px"
+        }
+      }
+    },
+    "Caption": {
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "11px",
+          "lineHeight": 1.545,
+          "letterSpacing": "0em",
+          "fontWeight": 440,
+          "textCase": "none",
+          "paragraphSpacing": "8px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "12px",
+          "lineHeight": 1.5,
+          "letterSpacing": "0em",
+          "fontWeight": 440,
+          "textCase": "none",
+          "paragraphSpacing": "9px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "13px",
+          "lineHeight": 1.538,
+          "letterSpacing": "0em",
+          "fontWeight": 440,
+          "textCase": "none",
+          "paragraphSpacing": "10px",
+          "paragraphIndent": "0px"
+        }
+      }
+    },
+    "UI": {
+      "3XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "8px",
+          "lineHeight": 1.5,
+          "letterSpacing": "0.01em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "8px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "2XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "9px",
+          "lineHeight": 1.556,
+          "letterSpacing": "0.01em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "9px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "10px",
+          "lineHeight": 1.6,
+          "letterSpacing": "0.01em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "10px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "11px",
+          "lineHeight": 1.545,
+          "letterSpacing": "0.01em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "11px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "12px",
+          "lineHeight": 1.583,
+          "letterSpacing": "0.01em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "12px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "14px",
+          "lineHeight": 1.571,
+          "letterSpacing": "0.01em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "14px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "XL": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "16px",
+          "lineHeight": 1.563,
+          "letterSpacing": "0.01em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "16px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "2XL": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "18px",
+          "lineHeight": 1.556,
+          "letterSpacing": "0.01em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "18px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      }
+    },
+    "Code": {
+      "3XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "8px",
+          "lineHeight": 1.5,
+          "letterSpacing": "0em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "8px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "2XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "9px",
+          "lineHeight": 1.556,
+          "letterSpacing": "0em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "9px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "XS": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "10px",
+          "lineHeight": 1.5,
+          "letterSpacing": "0em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "10px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "11px",
+          "lineHeight": 1.545,
+          "letterSpacing": "0em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "11px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "12px",
+          "lineHeight": 1.5,
+          "letterSpacing": "0em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "12px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "13px",
+          "lineHeight": 1.538,
+          "letterSpacing": "0em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "13px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "XL": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "15px",
+          "lineHeight": 1.533,
+          "letterSpacing": "0em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "15px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      },
+      "2XL": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Courier Prime",
+          "fontSize": "16px",
+          "lineHeight": 1.5,
+          "letterSpacing": "0em",
+          "fontWeight": 460,
+          "textCase": "none",
+          "paragraphSpacing": "16px",
+          "paragraphIndent": "0px",
+          "singleLineHeight": 1
+        }
+      }
+    },
+    "Legal": {
+      "SM": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "9px",
+          "lineHeight": 1.556,
+          "letterSpacing": "0em",
+          "fontWeight": 440,
+          "textCase": "none",
+          "paragraphSpacing": "7px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "MD": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "10px",
+          "lineHeight": 1.5,
+          "letterSpacing": "0em",
+          "fontWeight": 440,
+          "textCase": "none",
+          "paragraphSpacing": "8px",
+          "paragraphIndent": "0px"
+        }
+      },
+      "LG": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "Helvetica Neue",
+          "fontSize": "11px",
+          "lineHeight": 1.545,
+          "letterSpacing": "0em",
+          "fontWeight": 440,
+          "textCase": "none",
+          "paragraphSpacing": "8px",
+          "paragraphIndent": "0px"
+        }
+      }
+    }
+  },
+  "weights": {
+    "Display": {
+      "Semi-bold": {
+        "$type": "fontWeight",
+        "$value": 600
+      },
+      "Medium": {
+        "$type": "fontWeight",
+        "$value": 500
+      }
+    },
+    "Heading": {
+      "Medium": {
+        "$type": "fontWeight",
+        "$value": 500
+      },
+      "Regular": {
+        "$type": "fontWeight",
+        "$value": 400
+      }
+    },
+    "Kicker": {
+      "Semi-bold": {
+        "$type": "fontWeight",
+        "$value": 600
+      },
+      "Bold": {
+        "$type": "fontWeight",
+        "$value": 700
+      }
+    },
+    "Body": {
+      "Medium": {
+        "$type": "fontWeight",
+        "$value": 500
+      },
+      "Semi-bold": {
+        "$type": "fontWeight",
+        "$value": 600
+      }
+    },
+    "UI": {
+      "Semi-bold": {
+        "$type": "fontWeight",
+        "$value": 600
+      },
+      "Bold": {
+        "$type": "fontWeight",
+        "$value": 700
+      }
+    }
+  }
+}

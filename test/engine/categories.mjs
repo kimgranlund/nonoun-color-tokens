@@ -18,10 +18,10 @@ const CATS = Object.keys(CAT_COUNTS);
 const ROLES = ["display", "heading", "body", "ui", "mono"];
 // slot ROLE → the primary voice the mapper (gen-categories.design5ToTypeConfig) shapes with the slot's
 // tracking/leading/weight. Kept in lockstep with TYPE_VOICE_OF there — the fidelity gate below leans on it.
-const VOICE_OF = { display: "Display", heading: "Heading", body: "Body", ui: "UI", mono: "Kicker" };
+const VOICE_OF = { display: "Display", heading: "Headline", body: "Body", ui: "Label", mono: "Kicker" };
 // the make11 / clampType voice allowlist — a voice NOT here is SILENTLY DROPPED by clampType on hydrate,
 // so the mapper emitting an off-list name (e.g. "Mono") would lose that voice with no error. Keep in lockstep.
-const VOICES = ["Display", "Heading", "Sub-heading", "Kicker", "Lead", "Body", "Quote", "Caption", "UI", "Code", "Legal"];
+const VOICES = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Code", "Label", "Kicker", "Tiny"];
 
 const fails = [];
 const FAIL = (g, m) => { if (!fails.some((f) => f.startsWith(g + ":"))) fails.push(`${g}: ${m}`); };

@@ -1,11 +1,11 @@
 # Typography tokens — reference shape
 
-`typography.tokens.json` is the **target output shape** for the typography feature: the type
-analog of the color engine — a few parameters → a systematic, harmonious type scale → exported as
-[DTCG](https://tr.designtokens.org/) tokens (and, in the plugin, Figma text styles). It's a real
-Figma-exported token set, kept here as the canonical example. The engine that generates it ships in
-`src/engine/type.mjs`. Font-role names are
-generic (no brand/foundry specifics).
+`typography.tokens.json` is a **frozen historical snapshot** of the target output shape (a real
+Figma-exported token set, kept here as an example of the DTCG shape) — it predates the 2026-07-13
+voice-taxonomy and fixed-size-table rewrite below and is not kept in lockstep with the engine; read
+`src/engine/type.mjs` for the current, live source of truth. The type analog of the color engine — a
+few parameters → a systematic type scale → exported as [DTCG](https://tr.designtokens.org/) tokens
+(and, in the plugin, Figma text styles). Font-role names are generic (no brand/foundry specifics).
 
 ## Structure
 
@@ -18,57 +18,67 @@ generic (no brand/foundry specifics).
 
 ### `Font Specs` — the eleven named voices
 
-The engine implements this as **eleven voices** (ADR-013 — the original seven plus four **editorial**
-voices: Lead · Quote · Caption · Legal): each is a size ramp, each step carrying `Size · Line Height ·
-Letter Spacing · Weight · Case · Paragraph Spacing · Indent`.
+The engine implements this as **eleven voices**: Display · Headline · Sub-heading · Title ·
+Sub-title · Lead · Body · Code · Label · Kicker · Tiny. Each is a size ramp, each step carrying
+`Size · Line Height · Letter Spacing · Weight · Case · Paragraph Spacing · Indent`.
 
-| Voice | Steps | Font role | Case | Letter-spacing character |
-|---|---|---|---|---|
-| **Display** | `XS … XL` (5) | display | sentence/title (UPPERCASE only in Brutalist) | negative, tightens with size |
-| **Heading** | `XS … XL` (5) | heading | sentence | ~0 |
-| **Sub-heading** | `XS … XL` (5) | heading | **UPPERCASE** | wide positive (caps open up) |
-| **Kicker** | `XS … XL` (5) | **mono** | **UPPERCASE** | very wide positive |
-| **Lead** | `SM · MD · LG` (3) | body | sentence | slight negative |
-| **Body** | `XS … XL` (5) | body | sentence | 0 |
-| **Quote** | `SM · MD · LG` (3) | **heading** (display cut) | sentence | slight negative |
-| **Caption** | `SM · MD · LG` (3) | **ui font, prose** | sentence | 0 |
-| **UI** | `3XS … 2XL` (8) | ui | sentence | small positive (optical) |
-| **Code** | `3XS … 2XL` (8) | **mono** | sentence | 0 |
-| **Legal** | `SM · MD · LG` (3) | **ui font, prose** | sentence | 0 |
+**2026-07-13 — size is now a FIXED, hand-authored table**, not a modular scale: every voice is a
+uniform 3-step **SM · MD · LG** ramp, with literal px values shared identically across all 5
+treatments (previously each voice derived from its own `base × ratio^step`, with step counts varying
+5/3/8 by voice). Treatments now differ only in font/weight/tracking/leading/case, never size.
 
-53 steps in all. Each treatment supplies the font palette + a few character knobs (a shared `make11()`
-factory); the engine generates every step's size (modular scale), leading, optical tracking, weight, and
-case. Kicker + Code use the mono role; **Quote** rides the heading role so it inherits each treatment's
-display face (a serif pull-quote in the serif treatments); **Caption + Legal** ride the ui FONT but are
-**prose** (the `box:false` flow — reading leading, no single-line height). Sub-heading + Kicker are the
-uppercase caps voices (Display is uppercase only in the Brutalist treatment).
+| Voice | Font role | Case | Letter-spacing character |
+|---|---|---|---|
+| **Display** | display | sentence/title (UPPERCASE only in Brutalist) | negative, tightens with size |
+| **Headline** | heading | sentence | ~0 |
+| **Sub-heading** | heading | **UPPERCASE** | wide positive (caps open up) |
+| **Title** | heading | sentence | slight negative |
+| **Sub-title** | **mono, prose** | sentence | slight positive |
+| **Lead** | body | sentence | slight negative |
+| **Body** | body | sentence | 0 |
+| **Code** | **mono** (pegged to Body's sizes) | sentence | 0 |
+| **Label** | ui | sentence | small positive (optical) |
+| **Kicker** | **mono** (pegged to Label's sizes) | **UPPERCASE** | very wide positive |
+| **Tiny** | **ui, prose** | sentence | 0 |
+
+33 steps in all (11 voices × 3). Each treatment supplies the font palette + a few character knobs (a
+shared `make11()` factory); the FIXED SIZES table gives every step's size; the engine still derives
+leading, optical tracking, weight, and case per treatment. Code and Kicker use the mono role, aliasing
+Body's and Label's own size triplets respectively (same numbers, mono font only) — they are not a
+distinct size register. Sub-title also rides the mono role but is prose (`box:false`), not a control
+label. Sub-heading + Kicker are the uppercase caps voices (Display is uppercase only in the Brutalist
+treatment).
 
 ## The system relationships (what the generator derives)
 
-Mirroring color (`{hue, chroma, distribution}` → even tonal ramp), type derives from
-`{ base size, modular ratio per category, leading per category, weight ramp, optical tracking
-coefficient, font roles }`:
+Unlike color (`{hue, chroma, distribution}` → an even tonal ramp derived from a formula), type SIZE is
+now a fixed literal table (`SIZES` in `src/engine/type.mjs`); the rest still derives from
+`{ leading per category, weight ramp, optical tracking coefficient, font roles }`:
 
-- **Size** = a **modular scale** `base × ratio^step`, then snapped to a nice-number ladder. The ratio is
-  per-role/per-treatment: `1.125` (UI · Code) through `1.2–1.25` (most voices) up to `1.5` (the Brutalist
-  display) — not one global ratio.
-- **Letter Spacing** = `f(size)` — negative to *tighten* large display, positive to *loosen* small UI text (optical).
+- **Size** = a **fixed literal per voice+step** (e.g. Display SM/MD/LG = 72/96/120), identical across
+  every treatment. `bodyBase` (default 15 — Body/Label's own fixed MD literal) still scales the WHOLE
+  table proportionally (`factor = bodyBase/15`) — a larger/smaller `bodyBase` grows/shrinks every voice
+  together, snapping back onto a nice-number ladder when the factor isn't 1. Ratio (`base × ratio^step`)
+  is **retired** — it no longer means anything to override per voice.
+- **Letter Spacing** = `f(size)` — negative to *tighten* large display, positive to *loosen* small label text (optical).
 - **Multi-line Height** = `size × leading`, where **leading is a per-role constant** (the
   `font.modes.json` design intent). The reading/display voices are held *uniform across all treatments* —
-  treatments express voice through font, weight, tracking, and scale, not leading:
+  treatments express voice through font, weight, tracking, and case, not leading:
   - **display — 0.8** (large type sets *tight*, leading < 1)
-  - **heading · sub-heading — 1.125**
-  - **body — 1.5** · **Lead — 1.4** · **Quote — 1.35** · **Caption · Legal — 1.5** (the editorial voices)
-  - **Kicker — 1.4** · **code — ~1.5**
-  - **UI — ~1.4** (the one voice that keeps a small per-treatment lever, `1.35–1.45`)
+  - **headline · sub-heading · title — 1.125**
+  - **body — 1.5** · **lead — 1.4** · **sub-title — 1.3** · **tiny — 1.5**
+  - **kicker — 1.4** · **code — ~1.5**
+  - **label — ~1.4** (the one voice that keeps a small per-treatment lever, `1.35–1.45`)
 - **Single-line Height** = `size × 1.0` — the control-text height, emitted on the **box** voices only
-  (**UI · Code · Kicker**). Keyed on a per-voice `box` flag, not the role — so Caption/Legal, which ride the
-  ui FONT but are prose (`box:false`), do NOT get a single-line height (ADR-013).
-- **Weight** ramps by role — Display `700` (`900` Brutalist), Heading `620–800`, Sub-heading · Kicker `~600`,
-  Lead `400` (`300` Luxury), Body `440`, Quote `450`, Caption · Legal `440`, UI `480`, Code `460`.
+  (**Label · Code · Kicker**). Keyed on a per-voice `box` flag, not the role — so Tiny/Sub-title, which
+  ride the ui/mono FONT but are prose (`box:false`), do NOT get a single-line height.
+- **Weight** ramps by role — Display `700` (`900` Brutalist), Headline `620–800`, Sub-heading · Kicker
+  `~500–700`, Title `650`, Sub-title `500`, Lead `400` (`300` Luxury), Body `440`, Code `460`, Label
+  `480`, Tiny `440`.
 
 A set of **treatments** (Product/Lifestyle, Luxury, Editorial, Technical/Data, Brutalist) seed these
-params, exactly as the color "Color Categories" presets seed palette params.
+character params, exactly as the color "Color Categories" presets seed palette params — but no longer
+seed size at all.
 
 ## Sibling weights — adjacent emphasis variants
 
@@ -87,7 +97,7 @@ custom prop, a DTCG `weights.{voice}.{Name}` `fontWeight` token, a `weight/{voic
 Primitives variable, and — the reason this exists — a **sibling Figma text style** per variant
 (`Voice/step/Name`, e.g. `Body/md/Semi-bold`, alongside the bare `Voice/step` core; see
 `figma/binder/style-plan.mjs`). Every Color Categories preset (336 palettes × the 5 designed roles —
-Display/Heading/Body/UI/Kicker) ships its siblings pre-populated at generation time
+Display/Headline/Body/Label/Kicker) ships its siblings pre-populated at generation time
 (`scripts/gen-categories.mjs#design5ToTypeConfig`), computed from that slot's own designed weight — so
 opening any curated palette already exports emphasis-ready text styles, not just a single core weight.
 

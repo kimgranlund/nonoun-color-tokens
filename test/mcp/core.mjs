@@ -49,7 +49,7 @@ ok(typeof callTool("get_semantic", { scheme: "dark" })["primary/surface"] === "s
 const ty = callTool("get_type", {});
 const geo = callTool("get_geometry", {});
 ok(ty.categories && ty.categories.Body && geo.sizes && geo.sizes.MD.padding === (geo.sizes.MD.height - geo.sizes.MD.icon) / 2, "get_type + get_geometry serve the scales (the centering law holds)");
-ok(geo.sizes.MD.font === ty.categories.UI.MD.size, "the served geometry font is composed from the served type UI scale (one source of truth)");
+ok(geo.sizes.MD.font === ty.categories.Label.MD.size, "the served geometry font is composed from the served type Label scale (renamed from \"UI\" 2026-07-13 — one source of truth)");
 
 // resources/read + prompts/get
 ok((req("resources/read", { uri: "brand://guide" }).result.contents[0].text || "").length > 50, "resources/read brand://guide → the usage guide");

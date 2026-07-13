@@ -432,78 +432,81 @@ const SCHEME_NEXT = { system: "light", light: "dark", dark: "system" };
 
 // Per-treatment specimen copy — each treatment carries BESPOKE placeholder text aligned to its concept
 // (lifestyle app · luxury maison · long-form journalism · ops dashboard · gig poster), so the type
-// previews read like the world they're for instead of one shared sports demo. `para` is the Body-XL
-// long-form filler. Sub-heading/Kicker render uppercase via the engine's textTransform; strings stay
-// title-case here (except Brutalist's already-shouting UI line).
+// previews read like the world they're for instead of one shared sports demo. `para` is the Body-LG
+// long-form filler (2026-07-13: every voice is now a fixed 3-step SM/MD/LG ramp, LG is Body's largest
+// step, replacing the old Body-XL). Sub-heading/Kicker render uppercase via the engine's textTransform;
+// strings stay title-case here (except Brutalist's already-shouting label line). Voice taxonomy renamed
+// 2026-07-13: Heading→Headline, UI→Label; Quote folded into Lead, Legal folded into Body, Caption's copy
+// moved to the new Tiny voice; Title/Sub-title are new.
 const TYPE_SPECIMENS = {
   product: {
     "Display": "Make today count",
-    "Heading": "Your week, at a glance",
+    "Headline": "Your week, at a glance",
     "Sub-heading": "This Morning",
-    "Kicker": "Daily Brief",
+    "Title": "This week's habits",
+    "Sub-title": "Updated 2m ago",
     "Body": "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go.",
     "Lead": "The small stuff has a way of piling up. Here's a calmer place to set it down and start the day with a clear head.",
-    "Quote": "Plan less. Finish more.",
-    "Caption": "Your streak keeps itself — no daily check-in required.",
-    "UI": "Today · 4 of 6 done · 2 left",
+    "Label": "Today · 4 of 6 done · 2 left",
     "Code": "GET /v1/habits/today → 200",
-    "Legal": "Free plan includes two brand kits. Upgrade or cancel anytime.",
+    "Kicker": "Daily Brief",
+    "Tiny": "Your streak keeps itself — no daily check-in required.",
     para: "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go — your streak keeps itself, so you can stay present for the part that actually counts.",
   },
   luxury: {
     "Display": "The Maison Collection",
-    "Heading": "An invitation to slow down",
+    "Headline": "An invitation to slow down",
     "Sub-heading": "The Atelier",
-    "Kicker": "Private Reserve",
+    "Title": "Autumn Selections",
+    "Sub-title": "Est. 1998",
     "Body": "Crafted in limited number, each piece is finished by hand in our atelier and made to be kept for a lifetime.",
     "Lead": "A collection made in limited number, for those who measure luxury in decades rather than seasons.",
-    "Quote": "Kept for a lifetime, then passed to someone you love.",
-    "Caption": "Finished entirely by hand in the atelier, Florence.",
-    "UI": "Reserve · Suite 9 · 2 nights",
+    "Label": "Reserve · Suite 9 · 2 nights",
     "Code": "RES · 2026-09-14 · SUITE-09",
-    "Legal": "Each piece is numbered and accompanied by a certificate of authenticity.",
+    "Kicker": "Private Reserve",
+    "Tiny": "Finished entirely by hand in the atelier, Florence.",
     para: "Crafted in limited number and finished entirely by hand, every piece leaves our atelier with the quiet confidence of something built to outlast its season — and to be passed, one day, to someone you love.",
   },
   editorial: {
     "Display": "The long road back",
-    "Heading": "Notes from a vanishing coastline",
+    "Headline": "Notes from a vanishing coastline",
     "Sub-heading": "Field Report",
-    "Kicker": "Dispatch",
+    "Title": "The vanishing coastline",
+    "Sub-title": "Vol. 12 · No. 47",
     "Body": "For thirty years she walked these shores at dawn. What she saw — and what she could no longer find — became the story.",
     "Lead": "For thirty years she walked the shore at dawn — until the birds she counted began, quietly, to disappear.",
-    "Quote": "What she slowly stopped finding became the story.",
-    "Caption": "Above: the north cove at first light, September.",
-    "UI": "Issue 47 · 12 min read · Share",
+    "Label": "Issue 47 · 12 min read · Share",
     "Code": "By J. Okonkwo · Oct 2026",
-    "Legal": "First published in Issue 47. Reproduction by permission only.",
+    "Kicker": "Dispatch",
+    "Tiny": "Above: the north cove at first light, September.",
     para: "For thirty years she walked these shores at dawn, counting the birds the way her mother had taught her. What she saw over those decades, and what she slowly stopped finding, is the story we set out to tell.",
   },
   technical: {
     "Display": "99.98% uptime",
-    "Heading": "Cluster health overview",
+    "Headline": "Cluster health overview",
     "Sub-heading": "Live Metrics",
-    "Kicker": "System Status",
+    "Title": "Region-by-region breakdown",
+    "Sub-title": "us-east-1 · v2.4.1",
     "Body": "All regions reporting nominal. Latency held under 80ms across the last 24 hours of production traffic.",
     "Lead": "Every region reporting nominal — a look at the last 24 hours of production traffic, node by node.",
-    "Quote": "Zero dropped requests. Eleven nodes released overnight.",
-    "Caption": "Fig. 3 — p99 latency, rolling 24-hour window.",
-    "UI": "p99 78ms · 1.2k rps · 0 err",
+    "Label": "p99 78ms · 1.2k rps · 0 err",
     "Code": "$ kubectl get pods -n prod",
-    "Legal": "Metrics sampled at 10s resolution. SLA credits apply below 99.9% uptime.",
+    "Kicker": "System Status",
+    "Tiny": "Fig. 3 — p99 latency, rolling 24-hour window.",
     para: "All regions are reporting nominal: latency held under 80ms across the last 24 hours, the error budget is untouched for the quarter, and the autoscaler released eleven nodes overnight without a single dropped request.",
   },
   statement: {
     "Display": "After Hours",
-    "Heading": "Three nights only",
+    "Headline": "Three nights only",
     "Sub-heading": "Main Stage",
-    "Kicker": "Doors 9PM",
+    "Title": "Main stage lineup",
+    "Sub-title": "18+ · GA + VIP",
     "Body": "No openers. No encore. One set, start to finish, loud enough to feel in your chest.",
     "Lead": "One set, start to finish, three nights only — loud enough to feel in your chest and gone before the city wakes.",
-    "Quote": "No openers. No encore. No second chances.",
-    "Caption": "Warehouse 9, DTLA — doors at nine.",
-    "UI": "SOLD OUT · WAITLIST OPEN",
+    "Label": "SOLD OUT · WAITLIST OPEN",
     "Code": "FRI 02 · WAREHOUSE 9 · DTLA",
-    "Legal": "18+. No refunds. Lineup subject to change without notice.",
+    "Kicker": "Doors 9PM",
+    "Tiny": "Warehouse 9, DTLA — doors at nine.",
     para: "No openers, no encore, no second chances: one set from start to finish, three nights only, loud enough to feel in your chest and gone before the city wakes up. Doors at nine — don't be the one telling it secondhand.",
   },
 };
@@ -1931,7 +1934,7 @@ class HctApp extends HTMLElement {
   typeAnalysisCards(view) {
     const scale = this._activeTypeScale();
     const card = (label, body) => h("div", { class: "an-card" }, h("div", { class: "an-label" }, label), body);
-    const SHORT = { "Display": "Disp", "Heading": "Head", "Sub-heading": "Sub", "Kicker": "Kick", "Lead": "Lead", "Body": "Body", "Quote": "Quote", "Caption": "Capt", "UI": "UI", "Code": "Code", "Legal": "Legal" };
+    const SHORT = { "Display": "Disp", "Headline": "Head", "Sub-heading": "Sub", "Title": "Title", "Sub-title": "Subt", "Lead": "Lead", "Body": "Body", "Code": "Code", "Label": "Label", "Kicker": "Kick", "Tiny": "Tiny" };
     const series = Object.keys(scale.categories)
       .map((c) => ({ cat: c, short: SHORT[c] || c, steps: Object.entries(scale.categories[c] || {}).map(([name, s]) => ({ name, ...s })) }))
       .filter((x) => x.steps.length);
@@ -1962,7 +1965,7 @@ class HctApp extends HTMLElement {
         <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
         <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
         <text x="2" y="14">px</text>
-        <text x="${W - 40}" y="${H - pad + 18}">XS→XL</text>
+        <text x="${W - 40}" y="${H - pad + 18}">SM→LG</text>
         ${paths}
       </svg>`;
     return h("div", {}, h("div", { class: "an-svg", html: svg }), this.legend(series.map((g, gi) => ({ mark: "ty s" + gi, label: g.short || g.cat }))));
@@ -2017,7 +2020,7 @@ class HctApp extends HTMLElement {
         <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
         <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
         <text x="2" y="14">×</text>
-        <text x="${W - 40}" y="${H - pad + 18}">XS→XL</text>
+        <text x="${W - 40}" y="${H - pad + 18}">SM→LG</text>
         ${paths}
       </svg>`;
     return h("div", {}, h("div", { class: "an-svg", html: svg }), this.legend(series.map((g, gi) => ({ mark: "ty s" + gi, label: g.short || g.cat }))));
@@ -3091,7 +3094,7 @@ class HctApp extends HTMLElement {
     const { baseName: bn, baseLast } = this._typeBaseOpts();
     // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
     if (this.typeMode !== "base" && this.typeMode !== "compare" && !modes.some((m) => m.id === this.typeMode)) this.typeMode = "base";
-    const baseItem = { id: "base", label: bn, title: `${bn} type scale · ${t.bodyBase ?? 16}px` };
+    const baseItem = { id: "base", label: bn, title: `${bn} type scale · ${t.bodyBase ?? 15}px` };
     const modeItems = modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: m.factor ? `${m.name || "Mode"} · display ×${Math.round(m.factor * 100)}% (body frozen)` : `${m.name || "Mode"} · ${m.bodyBase}px body` }));
     const items = [
       ...(baseLast ? [...modeItems, baseItem] : [baseItem, ...modeItems]),
@@ -3132,7 +3135,7 @@ class HctApp extends HTMLElement {
     this.commit((d) => {
       d.type = { ...(d.type || DEFAULT_TYPE) };
       const modes = d.type.modes ? [...d.type.modes] : [];
-      modes.push({ id, name: "Mode " + (modes.length + 1), bodyBase: d.type.bodyBase ?? 16 });
+      modes.push({ id, name: "Mode " + (modes.length + 1), bodyBase: d.type.bodyBase ?? 15 });
       d.type.modes = modes;
     });
   }
@@ -3454,7 +3457,8 @@ class HctApp extends HTMLElement {
   }
 
   // renderTypeTokensTable — the EDITABLE Typography token MATRIX (Phase 3). Rows = type steps GROUPED by
-  // voice (Display · the Headings · Body · UI · Code) with a group-header row; the first (sticky) column is
+  // voice (Display · Headline/Sub-heading/Title · Body/Lead · Label/Code/Kicker · Sub-title/Tiny) with a
+  // group-header row; the first (sticky) column is
   // the token NAME (--type-{voice}-{step}). Columns = Base + each breakpoint mode (≥{minWidth}px). Each value
   // cell is a SIZE number input (the lever): editing it writes doc.type.tokenOverrides[<voice>|<step>|<mode>]
   // and the line/weight/tracking re-derive beneath; an overridden cell gets `.ov` + a ↺ reset. The override
@@ -3828,11 +3832,11 @@ class HctApp extends HTMLElement {
     return stack;
   }
 
-  // renderTypographyScene — the canvas "Typography" view: the FULL specimen (all 53 steps — the seven
-  // originals at 5/5/5/5/5/8/8 plus the four editorial voices Lead/Quote/Caption/Legal at 3 each), grouped
-  // by voice, each step a live line in the treatment's real face at its size/lineHeight/letterSpacing/weight
-  // + a compact metrics readout. Lives in the same pannable .canvas-scene as the ramps; paints in the canvas preview scheme
-  // (var(--ink*) flips with the area's color-scheme) and the treatment's fonts (ensureTypeFonts).
+  // renderTypographyScene — the canvas "Typography" view: the FULL specimen (all 33 steps — 11 named
+  // voices × 3 steps each, SM/MD/LG, since the 2026-07-13 fixed-size-table rewrite), grouped by voice,
+  // each step a live line in the treatment's real face at its size/lineHeight/letterSpacing/weight + a
+  // compact metrics readout. Lives in the same pannable .canvas-scene as the ramps; paints in the canvas
+  // preview scheme (var(--ink*) flips with the area's color-scheme) and the treatment's fonts (ensureTypeFonts).
   renderTypographyScene(view) {
     ensureTypeFonts();
     const cfg = this._activeType();
@@ -3852,7 +3856,7 @@ class HctApp extends HTMLElement {
       const faceStyle =
         `font-family:'${fam}', ${generic};font-size:${s.size}px;line-height:${s.lineHeight}px;` +
         `letter-spacing:${s.letterSpacing}px;font-weight:${s.weight};${tt}`;
-      const isPara = cat === "Body" && step === "XL";
+      const isPara = cat === "Body" && step === "LG"; // Body's largest step (2026-07-13: every voice is now a 3-step SM/MD/LG ramp, no more XL)
       return h(
         "div",
         { class: "type-spec-line" },
@@ -4450,7 +4454,8 @@ class HctApp extends HTMLElement {
                   this.slider("Weight", val("weight", p.weight), 100, 900, 10, (v) => String(v), (v) => this._setTypeVoice(cName, "weight", v)),
                   this.slider("Tracking", val("tracking", p.trackingEm), -0.05, 0.3, 0.001, (v) => (v >= 0 ? "+" : "") + fmt(v, 3) + "em", (v) => this._setTypeVoice(cName, "tracking", v)),
                   this.slider("Leading", val("leading", p.leading), 0.9, 2, 0.01, (v) => fmt(v, 2), (v) => this._setTypeVoice(cName, "leading", v)),
-                  this.slider("Ratio", val("ratio", p.ratio), 1, 1.7, 0.005, (v) => fmt(v, 3), (v) => this._setTypeVoice(cName, "ratio", v)),
+                  // no Ratio control — size is a fixed table since 2026-07-13, not base×ratio^n; a
+                  // per-cell override (Global tab) is now the lever for moving an individual step's size.
                   // the per-voice font override (TKT-0002) is set on the Fonts tab (all 11 voices live
                   // there, one editing surface) — this panel shows the resolved family read-only, in the
                   // collapsed row's tyi-voice-font span, so it's not duplicated/editable in two places.
@@ -4503,7 +4508,6 @@ class HctApp extends HTMLElement {
               : h(
                   "dl",
                   { class: "tyi-voice-stats" },
-                  h("div", {}, h("dt", {}, "Ratio"), h("dd", {}, fmt(val("ratio", p.ratio), 3))),
                   h("div", {}, h("dt", {}, "Leading"), h("dd", {}, fmt(val("leading", p.leading), 2))),
                   h("div", {}, h("dt", {}, "Weight"), h("dd", {}, String(val("weight", p.weight)))),
                   h("div", {}, h("dt", {}, "Tracking"), h("dd", {}, (val("tracking", p.trackingEm) > 0 ? "+" : "") + fmt(val("tracking", p.trackingEm), 3) + "em")),
@@ -4679,7 +4683,7 @@ class HctApp extends HTMLElement {
       const treatment = TYPE_TREATMENTS.find((x) => x.id === t.treatment) || TYPE_TREATMENTS[0];
       const pCat = treatment.categories[voice];
       if (!pCat) return;
-      const defaults = { weight: pCat.weight, tracking: pCat.trackingEm, leading: pCat.leading, ratio: pCat.ratio };
+      const defaults = { weight: pCat.weight, tracking: pCat.trackingEm, leading: pCat.leading };
       const num = param === "weight" ? Math.round(value) : value;
       const voices = { ...(t.voices || {}) };
       const v = { ...(voices[voice] || {}) };
@@ -4793,12 +4797,12 @@ class HctApp extends HTMLElement {
     const pick = (role) => (role ? (dark ? role.darkHex : role.lightHex) : "transparent");
     const main = roles.find((r) => r.suffix === "");
     const onMain = roles.find((r) => r.suffix === "-on-" + sl);
-    const hStep = scale.categories["Heading"].MD, bStep = scale.categories.Body.MD;
+    const hStep = scale.categories["Headline"].MD, bStep = scale.categories.Body.MD;
     const fam = (cat) => { const role = scale.roleOf[cat]; const fm = resolvedFontFor(scale, cat) || "Inter"; return `'${fm}', ${genericFor(fm, role)}`; };
     return h(
       "div",
       { class: "example-card tyi-example", style: "background:" + pick(byKey.surface) },
-      h("div", { class: "tyi-ex-head", style: `color:${pick(byKey.onSurface)};font-family:${fam("Heading")};font-size:${hStep.size}px;line-height:${hStep.lineHeight}px;letter-spacing:${hStep.letterSpacing}px;font-weight:${hStep.weight}` }, TYPE_SAMPLE("Heading", scale.treatment)),
+      h("div", { class: "tyi-ex-head", style: `color:${pick(byKey.onSurface)};font-family:${fam("Headline")};font-size:${hStep.size}px;line-height:${hStep.lineHeight}px;letter-spacing:${hStep.letterSpacing}px;font-weight:${hStep.weight}` }, TYPE_SAMPLE("Headline", scale.treatment)),
       h("p", { class: "tyi-ex-body", style: `color:${pick(byKey.onSurfaceVariant)};font-family:${fam("Body")};font-size:${bStep.size}px;line-height:${bStep.lineHeight}px;letter-spacing:${bStep.letterSpacing}px;font-weight:${bStep.weight}` }, TYPE_SAMPLE("Body", scale.treatment)),
       h("button", { class: "ex-btn", tabindex: "-1", style: "background:" + pick(main) + ";color:" + pick(onMain) }, "Read more"),
     );

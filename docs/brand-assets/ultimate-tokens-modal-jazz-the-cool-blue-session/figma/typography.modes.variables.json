@@ -1,0 +1,2302 @@
+{
+  "$schema": "figma-ui3-variables.float.schema.v1",
+  "collections": {
+    "Typography": {
+      "modes": [
+        "Desktop",
+        "Tablet",
+        "Mobile"
+      ],
+      "variables": {
+        "Display/XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 36,
+            "Tablet": 32,
+            "Mobile": 28
+          }
+        },
+        "Display/XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 97.22,
+            "Tablet": 96.88,
+            "Mobile": 96.43
+          }
+        },
+        "Display/XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Display/XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 700,
+            "Tablet": 700,
+            "Mobile": 700
+          }
+        },
+        "Display/XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 25,
+            "Tablet": 22,
+            "Mobile": 20
+          }
+        },
+        "Display/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 44,
+            "Tablet": 40,
+            "Mobile": 36
+          }
+        },
+        "Display/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 97.73,
+            "Tablet": 97.5,
+            "Mobile": 97.22
+          }
+        },
+        "Display/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Display/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 700,
+            "Tablet": 700,
+            "Mobile": 700
+          }
+        },
+        "Display/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 31,
+            "Tablet": 28,
+            "Mobile": 25
+          }
+        },
+        "Display/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 56,
+            "Tablet": 48,
+            "Mobile": 40
+          }
+        },
+        "Display/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 98.21,
+            "Tablet": 97.92,
+            "Mobile": 97.5
+          }
+        },
+        "Display/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Display/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 700,
+            "Tablet": 700,
+            "Mobile": 700
+          }
+        },
+        "Display/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 39,
+            "Tablet": 34,
+            "Mobile": 28
+          }
+        },
+        "Display/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 64,
+            "Tablet": 56,
+            "Mobile": 48
+          }
+        },
+        "Display/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 98.44,
+            "Tablet": 98.21,
+            "Mobile": 97.92
+          }
+        },
+        "Display/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Display/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 700,
+            "Tablet": 700,
+            "Mobile": 700
+          }
+        },
+        "Display/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 45,
+            "Tablet": 39,
+            "Mobile": 34
+          }
+        },
+        "Display/XL/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 80,
+            "Tablet": 72,
+            "Mobile": 56
+          }
+        },
+        "Display/XL/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 97.5,
+            "Tablet": 98.61,
+            "Mobile": 98.21
+          }
+        },
+        "Display/XL/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Display/XL/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 700,
+            "Tablet": 700,
+            "Mobile": 700
+          }
+        },
+        "Display/XL/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 56,
+            "Tablet": 50,
+            "Mobile": 39
+          }
+        },
+        "Heading/XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Heading/XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 112.5,
+            "Tablet": 112.5,
+            "Mobile": 112.5
+          }
+        },
+        "Heading/XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 4,
+            "Tablet": 4,
+            "Mobile": 4
+          }
+        },
+        "Heading/XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 600,
+            "Tablet": 600,
+            "Mobile": 600
+          }
+        },
+        "Heading/XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 11,
+            "Tablet": 11,
+            "Mobile": 11
+          }
+        },
+        "Heading/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 20,
+            "Tablet": 20,
+            "Mobile": 20
+          }
+        },
+        "Heading/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 115,
+            "Tablet": 115,
+            "Mobile": 115
+          }
+        },
+        "Heading/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 4,
+            "Tablet": 3.8,
+            "Mobile": 3.8
+          }
+        },
+        "Heading/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 600,
+            "Tablet": 600,
+            "Mobile": 600
+          }
+        },
+        "Heading/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 14,
+            "Tablet": 14,
+            "Mobile": 14
+          }
+        },
+        "Heading/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 24,
+            "Tablet": 24,
+            "Mobile": 24
+          }
+        },
+        "Heading/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 116.67,
+            "Tablet": 116.67,
+            "Mobile": 116.67
+          }
+        },
+        "Heading/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 4.17,
+            "Tablet": 4,
+            "Mobile": 3.83
+          }
+        },
+        "Heading/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 600,
+            "Tablet": 600,
+            "Mobile": 600
+          }
+        },
+        "Heading/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 17,
+            "Tablet": 17,
+            "Mobile": 17
+          }
+        },
+        "Heading/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 32,
+            "Tablet": 28,
+            "Mobile": 28
+          }
+        },
+        "Heading/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 115.63,
+            "Tablet": 114.29,
+            "Mobile": 114.29
+          }
+        },
+        "Heading/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 3.88,
+            "Tablet": 4.14,
+            "Mobile": 3.86
+          }
+        },
+        "Heading/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 600,
+            "Tablet": 600,
+            "Mobile": 600
+          }
+        },
+        "Heading/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 22,
+            "Tablet": 20,
+            "Mobile": 20
+          }
+        },
+        "Heading/XL/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 40,
+            "Tablet": 36,
+            "Mobile": 32
+          }
+        },
+        "Heading/XL/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 115,
+            "Tablet": 113.89,
+            "Mobile": 115.63
+          }
+        },
+        "Heading/XL/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 3.9,
+            "Tablet": 3.89,
+            "Mobile": 4
+          }
+        },
+        "Heading/XL/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 600,
+            "Tablet": 600,
+            "Mobile": 600
+          }
+        },
+        "Heading/XL/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 28,
+            "Tablet": 25,
+            "Mobile": 22
+          }
+        },
+        "Sub-heading/XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Sub-heading/XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 112.5,
+            "Tablet": 112.5,
+            "Mobile": 112.5
+          }
+        },
+        "Sub-heading/XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "Sub-heading/XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 600,
+            "Tablet": 600,
+            "Mobile": 600
+          }
+        },
+        "Sub-heading/XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 11,
+            "Tablet": 11,
+            "Mobile": 11
+          }
+        },
+        "Sub-heading/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 20,
+            "Tablet": 20,
+            "Mobile": 20
+          }
+        },
+        "Sub-heading/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 115,
+            "Tablet": 115,
+            "Mobile": 115
+          }
+        },
+        "Sub-heading/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 9.5,
+            "Tablet": 9.5,
+            "Mobile": 9.5
+          }
+        },
+        "Sub-heading/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 600,
+            "Tablet": 600,
+            "Mobile": 600
+          }
+        },
+        "Sub-heading/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 14,
+            "Tablet": 14,
+            "Mobile": 14
+          }
+        },
+        "Sub-heading/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 24,
+            "Tablet": 22,
+            "Mobile": 22
+          }
+        },
+        "Sub-heading/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 112.5,
+            "Tablet": 113.64,
+            "Mobile": 113.64
+          }
+        },
+        "Sub-heading/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 9.58,
+            "Tablet": 10,
+            "Mobile": 9.55
+          }
+        },
+        "Sub-heading/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 600,
+            "Tablet": 600,
+            "Mobile": 600
+          }
+        },
+        "Sub-heading/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 17,
+            "Tablet": 15,
+            "Mobile": 15
+          }
+        },
+        "Sub-heading/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 28,
+            "Tablet": 28,
+            "Mobile": 24
+          }
+        },
+        "Sub-heading/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 114.29,
+            "Tablet": 114.29,
+            "Mobile": 112.5
+          }
+        },
+        "Sub-heading/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 9.29,
+            "Mobile": 10.42
+          }
+        },
+        "Sub-heading/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 600,
+            "Tablet": 600,
+            "Mobile": 600
+          }
+        },
+        "Sub-heading/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 20,
+            "Tablet": 20,
+            "Mobile": 17
+          }
+        },
+        "Sub-heading/XL/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 32,
+            "Tablet": 32,
+            "Mobile": 28
+          }
+        },
+        "Sub-heading/XL/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 112.5,
+            "Tablet": 112.5,
+            "Mobile": 114.29
+          }
+        },
+        "Sub-heading/XL/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10.31,
+            "Tablet": 9.69,
+            "Mobile": 10
+          }
+        },
+        "Sub-heading/XL/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 600,
+            "Tablet": 600,
+            "Mobile": 600
+          }
+        },
+        "Sub-heading/XL/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 22,
+            "Tablet": 22,
+            "Mobile": 20
+          }
+        },
+        "Kicker/XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 9,
+            "Tablet": 9,
+            "Mobile": 9
+          }
+        },
+        "Kicker/XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 144.44,
+            "Tablet": 144.44,
+            "Mobile": 144.44
+          }
+        },
+        "Kicker/XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Kicker/XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 520,
+            "Tablet": 520,
+            "Mobile": 520
+          }
+        },
+        "Kicker/XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 9,
+            "Tablet": 9,
+            "Mobile": 9
+          }
+        },
+        "Kicker/XS/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Kicker/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "Kicker/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 150,
+            "Tablet": 150,
+            "Mobile": 150
+          }
+        },
+        "Kicker/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Kicker/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 520,
+            "Tablet": 520,
+            "Mobile": 520
+          }
+        },
+        "Kicker/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "Kicker/SM/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Kicker/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 12,
+            "Tablet": 12,
+            "Mobile": 12
+          }
+        },
+        "Kicker/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 141.67,
+            "Tablet": 141.67,
+            "Mobile": 141.67
+          }
+        },
+        "Kicker/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Kicker/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 520,
+            "Tablet": 520,
+            "Mobile": 520
+          }
+        },
+        "Kicker/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 12,
+            "Tablet": 12,
+            "Mobile": 12
+          }
+        },
+        "Kicker/MD/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Kicker/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 13,
+            "Tablet": 13,
+            "Mobile": 13
+          }
+        },
+        "Kicker/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 146.15,
+            "Tablet": 146.15,
+            "Mobile": 146.15
+          }
+        },
+        "Kicker/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Kicker/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 520,
+            "Tablet": 520,
+            "Mobile": 520
+          }
+        },
+        "Kicker/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 13,
+            "Tablet": 13,
+            "Mobile": 13
+          }
+        },
+        "Kicker/LG/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Kicker/XL/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 15,
+            "Tablet": 15,
+            "Mobile": 15
+          }
+        },
+        "Kicker/XL/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 146.67,
+            "Tablet": 146.67,
+            "Mobile": 146.67
+          }
+        },
+        "Kicker/XL/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Kicker/XL/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 520,
+            "Tablet": 520,
+            "Mobile": 520
+          }
+        },
+        "Kicker/XL/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 15,
+            "Tablet": 15,
+            "Mobile": 15
+          }
+        },
+        "Kicker/XL/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Lead/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 15,
+            "Tablet": 15,
+            "Mobile": 15
+          }
+        },
+        "Lead/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 146.67,
+            "Tablet": 146.67,
+            "Mobile": 146.67
+          }
+        },
+        "Lead/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": -0.47,
+            "Tablet": -0.47,
+            "Mobile": -0.47
+          }
+        },
+        "Lead/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 400,
+            "Tablet": 400,
+            "Mobile": 400
+          }
+        },
+        "Lead/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 11,
+            "Tablet": 11,
+            "Mobile": 11
+          }
+        },
+        "Lead/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 18,
+            "Tablet": 18,
+            "Mobile": 18
+          }
+        },
+        "Lead/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 144.44,
+            "Tablet": 144.44,
+            "Mobile": 144.44
+          }
+        },
+        "Lead/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": -0.5,
+            "Tablet": -0.5,
+            "Mobile": -0.44
+          }
+        },
+        "Lead/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 400,
+            "Tablet": 400,
+            "Mobile": 400
+          }
+        },
+        "Lead/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 14,
+            "Tablet": 14,
+            "Mobile": 14
+          }
+        },
+        "Lead/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 22,
+            "Tablet": 22,
+            "Mobile": 20
+          }
+        },
+        "Lead/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 145.45,
+            "Tablet": 145.45,
+            "Mobile": 145
+          }
+        },
+        "Lead/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": -0.45,
+            "Tablet": -0.45,
+            "Mobile": -0.5
+          }
+        },
+        "Lead/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 400,
+            "Tablet": 400,
+            "Mobile": 400
+          }
+        },
+        "Lead/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 17,
+            "Tablet": 17,
+            "Mobile": 15
+          }
+        },
+        "Body/XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "Body/XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 160,
+            "Tablet": 160,
+            "Mobile": 160
+          }
+        },
+        "Body/XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Body/XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 400,
+            "Tablet": 400,
+            "Mobile": 400
+          }
+        },
+        "Body/XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 8,
+            "Tablet": 8,
+            "Mobile": 8
+          }
+        },
+        "Body/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 13,
+            "Tablet": 13,
+            "Mobile": 13
+          }
+        },
+        "Body/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 161.54,
+            "Tablet": 161.54,
+            "Mobile": 161.54
+          }
+        },
+        "Body/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Body/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 400,
+            "Tablet": 400,
+            "Mobile": 400
+          }
+        },
+        "Body/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "Body/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Body/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 162.5,
+            "Tablet": 162.5,
+            "Mobile": 162.5
+          }
+        },
+        "Body/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Body/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 400,
+            "Tablet": 400,
+            "Mobile": 400
+          }
+        },
+        "Body/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 12,
+            "Tablet": 12,
+            "Mobile": 12
+          }
+        },
+        "Body/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 20,
+            "Tablet": 20,
+            "Mobile": 20
+          }
+        },
+        "Body/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 160,
+            "Tablet": 160,
+            "Mobile": 160
+          }
+        },
+        "Body/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Body/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 400,
+            "Tablet": 400,
+            "Mobile": 400
+          }
+        },
+        "Body/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 15,
+            "Tablet": 15,
+            "Mobile": 15
+          }
+        },
+        "Body/XL/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 24,
+            "Tablet": 24,
+            "Mobile": 24
+          }
+        },
+        "Body/XL/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 158.33,
+            "Tablet": 158.33,
+            "Mobile": 158.33
+          }
+        },
+        "Body/XL/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Body/XL/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 400,
+            "Tablet": 400,
+            "Mobile": 400
+          }
+        },
+        "Body/XL/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 18,
+            "Tablet": 18,
+            "Mobile": 18
+          }
+        },
+        "Quote/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Quote/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 131.25,
+            "Tablet": 131.25,
+            "Mobile": 131.25
+          }
+        },
+        "Quote/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": -0.5,
+            "Tablet": -0.5,
+            "Mobile": -0.5
+          }
+        },
+        "Quote/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 450,
+            "Tablet": 450,
+            "Mobile": 450
+          }
+        },
+        "Quote/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 11,
+            "Tablet": 11,
+            "Mobile": 11
+          }
+        },
+        "Quote/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 20,
+            "Tablet": 20,
+            "Mobile": 20
+          }
+        },
+        "Quote/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 130,
+            "Tablet": 130,
+            "Mobile": 130
+          }
+        },
+        "Quote/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": -0.5,
+            "Tablet": -0.45,
+            "Mobile": -0.45
+          }
+        },
+        "Quote/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 450,
+            "Tablet": 450,
+            "Mobile": 450
+          }
+        },
+        "Quote/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 14,
+            "Tablet": 14,
+            "Mobile": 14
+          }
+        },
+        "Quote/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 24,
+            "Tablet": 24,
+            "Mobile": 22
+          }
+        },
+        "Quote/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 129.17,
+            "Tablet": 129.17,
+            "Mobile": 131.82
+          }
+        },
+        "Quote/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": -0.46,
+            "Tablet": -0.46,
+            "Mobile": -0.5
+          }
+        },
+        "Quote/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 450,
+            "Tablet": 450,
+            "Mobile": 450
+          }
+        },
+        "Quote/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 17,
+            "Tablet": 17,
+            "Mobile": 15
+          }
+        },
+        "Caption/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 11,
+            "Tablet": 11,
+            "Mobile": 11
+          }
+        },
+        "Caption/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 154.55,
+            "Tablet": 154.55,
+            "Mobile": 154.55
+          }
+        },
+        "Caption/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Caption/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 440,
+            "Tablet": 440,
+            "Mobile": 440
+          }
+        },
+        "Caption/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 8,
+            "Tablet": 8,
+            "Mobile": 8
+          }
+        },
+        "Caption/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 12,
+            "Tablet": 12,
+            "Mobile": 12
+          }
+        },
+        "Caption/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 150,
+            "Tablet": 150,
+            "Mobile": 150
+          }
+        },
+        "Caption/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Caption/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 440,
+            "Tablet": 440,
+            "Mobile": 440
+          }
+        },
+        "Caption/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 9,
+            "Tablet": 9,
+            "Mobile": 9
+          }
+        },
+        "Caption/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 13,
+            "Tablet": 13,
+            "Mobile": 13
+          }
+        },
+        "Caption/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 153.85,
+            "Tablet": 153.85,
+            "Mobile": 153.85
+          }
+        },
+        "Caption/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Caption/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 440,
+            "Tablet": 440,
+            "Mobile": 440
+          }
+        },
+        "Caption/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "UI/3XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 8,
+            "Tablet": 8,
+            "Mobile": 8
+          }
+        },
+        "UI/3XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 150,
+            "Tablet": 150,
+            "Mobile": 150
+          }
+        },
+        "UI/3XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 1,
+            "Tablet": 1,
+            "Mobile": 1
+          }
+        },
+        "UI/3XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "UI/3XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 8,
+            "Tablet": 8,
+            "Mobile": 8
+          }
+        },
+        "UI/3XS/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "UI/2XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 9,
+            "Tablet": 9,
+            "Mobile": 9
+          }
+        },
+        "UI/2XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 155.56,
+            "Tablet": 155.56,
+            "Mobile": 155.56
+          }
+        },
+        "UI/2XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 1,
+            "Tablet": 1,
+            "Mobile": 1
+          }
+        },
+        "UI/2XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "UI/2XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 9,
+            "Tablet": 9,
+            "Mobile": 9
+          }
+        },
+        "UI/2XS/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "UI/XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "UI/XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 160,
+            "Tablet": 160,
+            "Mobile": 160
+          }
+        },
+        "UI/XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 1,
+            "Tablet": 1,
+            "Mobile": 1
+          }
+        },
+        "UI/XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "UI/XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "UI/XS/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "UI/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 11,
+            "Tablet": 11,
+            "Mobile": 11
+          }
+        },
+        "UI/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 154.55,
+            "Tablet": 154.55,
+            "Mobile": 154.55
+          }
+        },
+        "UI/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 1,
+            "Tablet": 1,
+            "Mobile": 1
+          }
+        },
+        "UI/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "UI/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 11,
+            "Tablet": 11,
+            "Mobile": 11
+          }
+        },
+        "UI/SM/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "UI/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 12,
+            "Tablet": 12,
+            "Mobile": 12
+          }
+        },
+        "UI/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 158.33,
+            "Tablet": 158.33,
+            "Mobile": 158.33
+          }
+        },
+        "UI/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 1,
+            "Tablet": 1,
+            "Mobile": 1
+          }
+        },
+        "UI/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "UI/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 12,
+            "Tablet": 12,
+            "Mobile": 12
+          }
+        },
+        "UI/MD/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "UI/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 14,
+            "Tablet": 14,
+            "Mobile": 14
+          }
+        },
+        "UI/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 157.14,
+            "Tablet": 157.14,
+            "Mobile": 157.14
+          }
+        },
+        "UI/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 1,
+            "Tablet": 1,
+            "Mobile": 1
+          }
+        },
+        "UI/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "UI/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 14,
+            "Tablet": 14,
+            "Mobile": 14
+          }
+        },
+        "UI/LG/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "UI/XL/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "UI/XL/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 156.25,
+            "Tablet": 156.25,
+            "Mobile": 156.25
+          }
+        },
+        "UI/XL/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 1,
+            "Tablet": 1,
+            "Mobile": 1
+          }
+        },
+        "UI/XL/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "UI/XL/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "UI/XL/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "UI/2XL/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 18,
+            "Tablet": 18,
+            "Mobile": 18
+          }
+        },
+        "UI/2XL/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 155.56,
+            "Tablet": 155.56,
+            "Mobile": 155.56
+          }
+        },
+        "UI/2XL/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 1,
+            "Tablet": 1,
+            "Mobile": 0.94
+          }
+        },
+        "UI/2XL/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "UI/2XL/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 18,
+            "Tablet": 18,
+            "Mobile": 18
+          }
+        },
+        "UI/2XL/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Code/3XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 8,
+            "Tablet": 8,
+            "Mobile": 8
+          }
+        },
+        "Code/3XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 150,
+            "Tablet": 150,
+            "Mobile": 150
+          }
+        },
+        "Code/3XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Code/3XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "Code/3XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 8,
+            "Tablet": 8,
+            "Mobile": 8
+          }
+        },
+        "Code/3XS/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Code/2XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 9,
+            "Tablet": 9,
+            "Mobile": 9
+          }
+        },
+        "Code/2XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 155.56,
+            "Tablet": 155.56,
+            "Mobile": 155.56
+          }
+        },
+        "Code/2XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Code/2XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "Code/2XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 9,
+            "Tablet": 9,
+            "Mobile": 9
+          }
+        },
+        "Code/2XS/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Code/XS/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "Code/XS/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 150,
+            "Tablet": 150,
+            "Mobile": 150
+          }
+        },
+        "Code/XS/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Code/XS/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "Code/XS/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "Code/XS/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Code/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 11,
+            "Tablet": 11,
+            "Mobile": 11
+          }
+        },
+        "Code/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 154.55,
+            "Tablet": 154.55,
+            "Mobile": 154.55
+          }
+        },
+        "Code/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Code/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "Code/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 11,
+            "Tablet": 11,
+            "Mobile": 11
+          }
+        },
+        "Code/SM/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Code/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 12,
+            "Tablet": 12,
+            "Mobile": 12
+          }
+        },
+        "Code/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 150,
+            "Tablet": 150,
+            "Mobile": 150
+          }
+        },
+        "Code/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Code/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "Code/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 12,
+            "Tablet": 12,
+            "Mobile": 12
+          }
+        },
+        "Code/MD/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Code/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 13,
+            "Tablet": 13,
+            "Mobile": 13
+          }
+        },
+        "Code/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 153.85,
+            "Tablet": 153.85,
+            "Mobile": 153.85
+          }
+        },
+        "Code/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Code/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "Code/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 13,
+            "Tablet": 13,
+            "Mobile": 13
+          }
+        },
+        "Code/LG/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Code/XL/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 15,
+            "Tablet": 15,
+            "Mobile": 15
+          }
+        },
+        "Code/XL/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 153.33,
+            "Tablet": 153.33,
+            "Mobile": 153.33
+          }
+        },
+        "Code/XL/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Code/XL/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "Code/XL/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 15,
+            "Tablet": 15,
+            "Mobile": 15
+          }
+        },
+        "Code/XL/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Code/2XL/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Code/2XL/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 150,
+            "Tablet": 150,
+            "Mobile": 150
+          }
+        },
+        "Code/2XL/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Code/2XL/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 460,
+            "Tablet": 460,
+            "Mobile": 460
+          }
+        },
+        "Code/2XL/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 16,
+            "Tablet": 16,
+            "Mobile": 16
+          }
+        },
+        "Code/2XL/singleLineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 100,
+            "Tablet": 100,
+            "Mobile": 100
+          }
+        },
+        "Legal/SM/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 9,
+            "Tablet": 9,
+            "Mobile": 9
+          }
+        },
+        "Legal/SM/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 155.56,
+            "Tablet": 155.56,
+            "Mobile": 155.56
+          }
+        },
+        "Legal/SM/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Legal/SM/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 440,
+            "Tablet": 440,
+            "Mobile": 440
+          }
+        },
+        "Legal/SM/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 7,
+            "Tablet": 7,
+            "Mobile": 7
+          }
+        },
+        "Legal/MD/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 10,
+            "Tablet": 10,
+            "Mobile": 10
+          }
+        },
+        "Legal/MD/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 150,
+            "Tablet": 150,
+            "Mobile": 150
+          }
+        },
+        "Legal/MD/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Legal/MD/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 440,
+            "Tablet": 440,
+            "Mobile": 440
+          }
+        },
+        "Legal/MD/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 8,
+            "Tablet": 8,
+            "Mobile": 8
+          }
+        },
+        "Legal/LG/size": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 11,
+            "Tablet": 11,
+            "Mobile": 11
+          }
+        },
+        "Legal/LG/lineHeight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 154.55,
+            "Tablet": 154.55,
+            "Mobile": 154.55
+          }
+        },
+        "Legal/LG/letterSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 0,
+            "Tablet": 0,
+            "Mobile": 0
+          }
+        },
+        "Legal/LG/weight": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 440,
+            "Tablet": 440,
+            "Mobile": 440
+          }
+        },
+        "Legal/LG/paragraphSpacing": {
+          "type": "FLOAT",
+          "values": {
+            "Desktop": 8,
+            "Tablet": 8,
+            "Mobile": 8
+          }
+        }
+      }
+    }
+  }
+}
