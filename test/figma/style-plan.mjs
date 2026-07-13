@@ -76,12 +76,12 @@ const plans = stylePlans({ families, scale });
   // be a strictly less specific name than the actual configured face cut), lowercased for the
   // DISPLAY name (the literal.styleName used for real font loading keeps its real casing).
   const coreNamed = plans.texts.find((t) => t.name === "Display/md/• bold condensed");
-  ok(!!coreNamed && coreNamed.literal.styleName === "Bold Condensed" && coreNamed.bind.fontStyle === "weight-style/Display/bold" && coreNamed.bind.fontWeight === "weight/Display/bold", "core style (WITH siblings + a custom style name): Voice/step/• {lowercase custom style name}, literal.styleName keeps real casing, weight-style/weight binding NESTED under the core's own weight-name slug (same group as its siblings)");
+  ok(!!coreNamed && coreNamed.literal.styleName === "Bold Condensed" && coreNamed.bind.fontStyle === "weight-style/Display/bold" && coreNamed.bind.fontWeight === undefined, "core style (WITH siblings + a custom style name): Voice/step/• {lowercase custom style name}, literal.styleName keeps real casing, ONLY fontStyle binds (nested under the core's own weight-name slug) — fontWeight stays unbound so real Figma's closest-valid-weight snap can never override the named cut");
   // a sibling's DISPLAY name follows the SAME custom-face naming convention as the core (lowercase,
   // full templated name) — not a bare generic slug — so the Styles panel never drops the
   // "condensed" adjective that only lived in the literal before this fix.
   const sib = plans.texts.find((t) => t.name === "Display/md/medium condensed");
-  ok(!!sib && sib.literal.weight === 500 && sib.bind.fontStyle === "weight-style/Display/medium" && sib.bind.fontWeight === "weight/Display/medium", "sibling style: Voice/step/{templated lowercase name} with per-sibling bindings still keyed on the plain slug — no dot prefix, only the core gets one");
+  ok(!!sib && sib.literal.weight === 500 && sib.bind.fontStyle === "weight-style/Display/medium" && sib.bind.fontWeight === undefined, "sibling style: Voice/step/{templated lowercase name} with fontStyle keyed on the plain slug — fontWeight stays unbound (same reasoning as the core) — no dot prefix, only the core gets one");
   // a sibling's literal.styleName must follow the SAME custom-face naming convention as the core, not
   // a bare generic name — resolveFace (figma/plugin/code.js) exact-matches styleName against the
   // family's real installed style list, so "Medium" alone would miss "Medium Condensed" entirely and

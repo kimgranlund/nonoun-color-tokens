@@ -469,6 +469,29 @@ if (applyStylePlans && applyFontPrimitives) {
     if (core && !core._bound.fontWeight) FAIL("styles", "core fontWeight not bound to weight/<voice>");
     if (sib && !sib._bound.fontWeight) FAIL("styles", "sibling fontWeight not bound to weight/<voice>/<slug>");
 
+    // a voice WITH a custom styleName (a named cut like "Condensed Black Italic", not derivable from a
+    // bare weight number) must bind fontStyle ONLY, never fontWeight alongside it — real Figma resolves
+    // a bound fontWeight to "the closest valid weight for the font" independently of fontStyle, which
+    // silently overrode the named cut back to the nearest plain face (found live via BZZR's Display core
+    // not rendering its bound "Condensed Black Italic" style at all — this mock's own setBoundVariable
+    // is too permissive to catch that on its own, so the plan itself must never emit both).
+    {
+      const namedScale = TYPE.typeScale({ treatment: "statement", voices: { Display: { weight: 900, styleName: "Condensed Black Italic", weights: [{ name: "Bold", weight: 700 }] } } });
+      const namedPlans = stylePlans({ families, scale: namedScale });
+      const namedCore = namedPlans.texts.find((t) => t.voice === "Display" && t.name.startsWith("Display/lg/•"));
+      const namedSib = namedPlans.texts.find((t) => t.voice === "Display" && t.name === "Display/lg/condensed bold italic");
+      if (!namedCore || !namedSib) FAIL("styles", "named-style-cut fixture: Display core or sibling plan entry missing");
+      if (namedCore && (namedCore.bind.fontWeight || !namedCore.bind.fontStyle)) FAIL("styles", `named-style-cut core must bind fontStyle only (got fontStyle=${namedCore.bind.fontStyle}, fontWeight=${namedCore.bind.fontWeight})`);
+      if (namedSib && (namedSib.bind.fontWeight || !namedSib.bind.fontStyle)) FAIL("styles", `named-style-cut sibling must bind fontStyle only (got fontStyle=${namedSib.bind.fontStyle}, fontWeight=${namedSib.bind.fontWeight})`);
+
+      const namedPr = await applyFontPrimitives(primitivesApplyPlan(TYPE.typeTokensFigmaPrimitives(namedScale)));
+      if (!namedPr || !namedPr.variables) FAIL("styles", "named-style-cut fixture: applyFontPrimitives created nothing");
+      const namedSr = await applyStylePlans(namedPlans);
+      const namedCoreStyle = F.figma._styles.find((x) => x._kind === "TEXT" && x.name === namedCore.name);
+      if (!namedCoreStyle || namedCoreStyle._bound.fontWeight) FAIL("styles", "named-style-cut core text style must not carry a bound fontWeight field");
+      if (!namedCoreStyle || !namedCoreStyle._bound.fontStyle) FAIL("styles", "named-style-cut core text style must carry a bound fontStyle field");
+    }
+
     // a family Figma does not have: the style is BUILT on a placeholder face (Inter), reported as
     // SUBSTITUTED (not skipped), and its fontFamily stays BOUND to the true-family variable — so the
     // style self-heals once the font is installed. The ghost rides the FULL plan (a partial plan

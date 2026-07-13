@@ -24,8 +24,15 @@
 //              bind:    { fontSize, lineHeight, letterSpacing,   // → Typography collection keys
 //                         paragraphSpacing?,                     //   (prose voices only)
 //                         fontFamily,                            // → Font Primitives font/<voice> (STRING alias)
-//                         fontStyle? },                          // → weight-style/<voice>/<slug> — ALWAYS
-//                                                                //   nested (coreWeightKey), core included
+//                         fontStyle? | fontWeight? },            // → weight-style/<voice>/<slug> OR
+//                                                                //   weight/<voice>/<slug> — MUTUALLY
+//                                                                //   EXCLUSIVE, never both: real Figma
+//                                                                //   resolves a bound fontWeight to "the
+//                                                                //   closest valid weight for the font",
+//                                                                //   silently overriding a bound fontStyle's
+//                                                                //   named cut back to the nearest plain
+//                                                                //   face. A custom styleName wins (fontStyle
+//                                                                //   only); otherwise fontWeight binds alone.
 //              literal: { family, styleName?, weight, size, lineHeight, letterSpacing,
 //                         paragraphSpacing?, textCase } }]       // resolved values: loadFontAsync + per-field
 //                                                                // fallback when a binding target is absent
@@ -113,10 +120,15 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         const coreWeightName = weightNameFor(s.weight);
         const coreLabel = sibs.length ? (coreStyleName || coreWeightName.name).toLowerCase() : null;
         const coreKey = coreWeightKey(voice, coreWeightName, sibs);
+        // fontWeight and fontStyle are NEVER both bound: real Figma resolves a bound fontWeight to
+        // "the closest valid weight for the font" independently of fontStyle, which silently overrides
+        // a custom named cut ("Condensed Black Italic") back to whatever plain face is nearest by
+        // weight number alone — found live via BZZR's Display core not rendering its bound style. A
+        // custom styleName is strictly more specific than a numeric weight, so it alone drives the bind.
         texts.push({
           name: coreLabel ? `${voice}/${stepSlug}/• ${coreLabel}` : `${voice}/${stepSlug}`,
           voice, step,
-          bind: { ...bindBase, fontWeight: `weight/${coreKey}`, ...(coreStyleName ? { fontStyle: `weight-style/${coreKey}` } : {}) },
+          bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${coreKey}` } : { fontWeight: `weight/${coreKey}` }) },
           literal: { ...litBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
         });
         // the SIBLING weight variants. The DISPLAY name mirrors whatever the core shows: a plain
@@ -132,7 +144,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           texts.push({
             name: `${voice}/${stepSlug}/${wvLabel}`,
             voice, step,
-            bind: { ...bindBase, fontStyle: `weight-style/${voice}/${wv.slug}`, fontWeight: `weight/${voice}/${wv.slug}` },
+            bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${voice}/${wv.slug}` } : { fontWeight: `weight/${voice}/${wv.slug}` }) },
             literal: { ...litBase, styleName: wvStyleName, weight: wv.weight },
           });
         }
@@ -150,7 +162,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           texts.push({
             name: (coreLabel ? `${voice}/${stepSlug}/• ${coreLabel}` : `${voice}/${stepSlug}`) + "/single",
             voice, step,
-            bind: { ...singleBindBase, fontWeight: `weight/${coreKey}`, ...(coreStyleName ? { fontStyle: `weight-style/${coreKey}` } : {}) },
+            bind: { ...singleBindBase, ...(coreStyleName ? { fontStyle: `weight-style/${coreKey}` } : { fontWeight: `weight/${coreKey}` }) },
             literal: { ...singleLitBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
           });
           for (const wv of sibs) {
@@ -159,7 +171,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
             texts.push({
               name: `${voice}/${stepSlug}/${wvLabel}/single`,
               voice, step,
-              bind: { ...singleBindBase, fontStyle: `weight-style/${voice}/${wv.slug}`, fontWeight: `weight/${voice}/${wv.slug}` },
+              bind: { ...singleBindBase, ...(coreStyleName ? { fontStyle: `weight-style/${voice}/${wv.slug}` } : { fontWeight: `weight/${voice}/${wv.slug}` }) },
               literal: { ...singleLitBase, styleName: wvStyleName, weight: wv.weight },
             });
           }
