@@ -329,12 +329,12 @@
                 "styleName": "Regular",
                 "weights": [
                   {
-                    "name": "Light",
-                    "weight": 300
-                  },
-                  {
                     "name": "Medium",
                     "weight": 500
+                  },
+                  {
+                    "name": "Bold",
+                    "weight": 700
                   }
                 ]
               },
@@ -345,12 +345,12 @@
                 "styleName": "Regular",
                 "weights": [
                   {
-                    "name": "Light",
-                    "weight": 300
-                  },
-                  {
                     "name": "Medium",
                     "weight": 500
+                  },
+                  {
+                    "name": "Bold",
+                    "weight": 700
                   }
                 ]
               },
@@ -381,60 +381,60 @@
               "Body-mono": {
                 "weights": [
                   {
-                    "name": "Regular",
-                    "weight": 400
+                    "name": "Bold",
+                    "weight": 700
                   },
                   {
-                    "name": "Light",
-                    "weight": 300
+                    "name": "Black",
+                    "weight": 900
                   }
                 ]
               },
               "Label": {
                 "weights": [
                   {
-                    "name": "Regular",
-                    "weight": 400
+                    "name": "Bold",
+                    "weight": 700
                   },
                   {
-                    "name": "Light",
-                    "weight": 300
+                    "name": "Black",
+                    "weight": 900
                   }
                 ]
               },
               "Label-mono": {
                 "weights": [
                   {
-                    "name": "Regular",
-                    "weight": 400
+                    "name": "Bold",
+                    "weight": 700
                   },
                   {
-                    "name": "Light",
-                    "weight": 300
+                    "name": "Black",
+                    "weight": 900
                   }
                 ]
               },
               "Tiny": {
                 "weights": [
                   {
-                    "name": "Light",
-                    "weight": 300
-                  },
-                  {
                     "name": "Medium",
                     "weight": 500
+                  },
+                  {
+                    "name": "Bold",
+                    "weight": 700
                   }
                 ]
               },
               "Tiny-mono": {
                 "weights": [
                   {
-                    "name": "Light",
-                    "weight": 300
-                  },
-                  {
                     "name": "Medium",
                     "weight": 500
+                  },
+                  {
+                    "name": "Bold",
+                    "weight": 700
                   }
                 ]
               }
@@ -616,12 +616,12 @@
                 "leading": 1.55,
                 "weights": [
                   {
-                    "name": "Regular",
-                    "weight": 400
+                    "name": "Bold",
+                    "weight": 700
                   },
                   {
-                    "name": "Light",
-                    "weight": 300
+                    "name": "Heavy",
+                    "weight": 800
                   }
                 ]
               },
