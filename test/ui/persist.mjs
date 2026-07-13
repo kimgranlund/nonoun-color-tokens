@@ -127,10 +127,16 @@ if (!deepEq(hyd2.palettes[0].chroma, base.palettes[0].chroma)) FAIL("clamp", "cl
   if ("Bogus" in Rv.type.voices) FAIL("type-voices", "an unknown voice name must drop");
   if (Rv.type.voices.Display.weight !== 1000) FAIL("type-voices", `weight 99999 should clamp to 1000, got ${Rv.type.voices.Display.weight}`);
   // SIBLING WEIGHTS round-trip: valid entries survive (name trimmed/capped, weight clamped); invalid drop;
-  // an empty/absent list never materializes a weights key (the hydrate identity gate).
+  // an ABSENT list never materializes a weights key (the hydrate identity gate) — but an EXPLICIT empty
+  // array `weights: []` DOES materialize (as `[]`), since it's a deliberate opt-out (typeScale treats
+  // undefined vs [] differently: undefined auto-populates via siblingWeightDefaults, [] stays bare) —
+  // dropping it here would silently un-opt-out a voice on the very next hydrate (found live via a
+  // real-font preset's Display voice, whose only real weight left no real sibling to offer).
   const Rw = U.hydrate(U.serialize({ ...inDomainState(), type: { treatment: "product", bodyBase: 16, voices: { Display: { weights: [{ name: "Bold", weight: 700 }, { name: "  Medium ", weight: 99999 }, { name: "", weight: 500 }, { weight: 400 }] }, Body: { weights: [] } } } }));
   if (!deepEq(Rw.type.voices.Display.weights, [{ name: "Bold", weight: 700 }, { name: "Medium", weight: 1000 }])) FAIL("type-voices", `sibling weights did not round-trip: ${JSON.stringify(Rw.type.voices.Display.weights)}`);
-  if (Rw.type.voices.Body && "weights" in Rw.type.voices.Body) FAIL("type-voices", "an empty weights list must NOT materialize a weights key");
+  if (!Rw.type.voices.Body || !Array.isArray(Rw.type.voices.Body.weights) || Rw.type.voices.Body.weights.length !== 0) FAIL("type-voices", `an EXPLICIT empty weights list must round-trip as [] (an opt-out), not drop (got ${JSON.stringify(Rw.type.voices.Body && Rw.type.voices.Body.weights)})`);
+  const Rw0 = U.hydrate(U.serialize({ ...inDomainState(), type: { treatment: "product", bodyBase: 16, voices: { Body: { weight: 600 } } } }));
+  if ("weights" in Rw0.type.voices.Body) FAIL("type-voices", "a voice with NO weights key at all must still round-trip with no weights key (absent stays absent, only [] is the opt-out)");
   if ("voices" in Rf0.type) FAIL("type-voices", "an absent voices override must NOT materialize a voices key (round-trip identity)");
 
   // ── icons: the icon-system facet. Identity-gated (default system+variant ⇒ absent); unknown id drops;

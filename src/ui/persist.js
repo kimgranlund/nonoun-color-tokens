@@ -387,7 +387,12 @@ function clampType(t) {
       if (typeof v.font === "string" && v.font.trim()) o.font = v.font.trim().slice(0, 60);
       // weights — SIBLING weight variants [{name, weight}] around the voice's core (the styles feature).
       // Capped at 8 per voice; each entry needs a finite clamped weight AND a non-empty name (name capped
-      // at 40 chars). Kept only when non-empty, so a config without siblings round-trips identically.
+      // at 40 chars). ALWAYS set when the input WAS an array (even if it filters down to empty) — an
+      // explicit `weights: []` is a deliberate OPT-OUT (typeScale/buildCategory treats it differently
+      // from an ABSENT weights key: absent auto-populates via siblingWeightDefaults, [] stays bare, no
+      // siblings at all) — dropping the key here on an empty result silently reverted an opt-out back to
+      // auto-populate on the very next hydrate (found live: a real-font preset with only one available
+      // weight for a voice, correctly opted out with `weights: []`, un-opted-out itself on reload).
       if (Array.isArray(v.weights)) {
         const list = [];
         for (const e of v.weights.slice(0, 8)) {
@@ -396,7 +401,7 @@ function clampType(t) {
           const nm = typeof e.name === "string" ? e.name.trim().slice(0, 40) : "";
           if (w !== undefined && nm) list.push({ name: nm, weight: w });
         }
-        if (list.length) o.weights = list;
+        o.weights = list;
       }
       if (Object.keys(o).length) voices[name] = o;
     }
