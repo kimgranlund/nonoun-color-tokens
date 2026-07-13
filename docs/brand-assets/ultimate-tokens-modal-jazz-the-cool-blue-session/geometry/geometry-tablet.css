@@ -1,0 +1,11 @@
+/* Tablet — 992–1279px */
+@media (min-width: 992px) and (max-width: 1279px) {
+  :root {
+    --md-sys-size-xs-height: 18px; --md-sys-size-xs-icon: 14px; --md-sys-size-xs-caret: 10px; --md-sys-size-xs-font: 10px; --md-sys-size-xs-gap: 5px; --md-sys-size-xs-pad: 2px; --md-sys-size-xs-pad-edge: 9px; --md-sys-size-xs-radius: 9px; --md-sys-size-xs-min: 18px;
+    --md-sys-size-sm-height: 22px; --md-sys-size-sm-icon: 14px; --md-sys-size-sm-caret: 11px; --md-sys-size-sm-font: 11px; --md-sys-size-sm-gap: 6px; --md-sys-size-sm-pad: 4px; --md-sys-size-sm-pad-edge: 11px; --md-sys-size-sm-radius: 11px; --md-sys-size-sm-min: 22px;
+    --md-sys-size-md-height: 26px; --md-sys-size-md-icon: 16px; --md-sys-size-md-caret: 12px; --md-sys-size-md-font: 12px; --md-sys-size-md-gap: 6px; --md-sys-size-md-pad: 5px; --md-sys-size-md-pad-edge: 13px; --md-sys-size-md-radius: 13px; --md-sys-size-md-min: 26px;
+    --md-sys-size-lg-height: 34px; --md-sys-size-lg-icon: 20px; --md-sys-size-lg-caret: 14px; --md-sys-size-lg-font: 14px; --md-sys-size-lg-gap: 7px; --md-sys-size-lg-pad: 7px; --md-sys-size-lg-pad-edge: 17px; --md-sys-size-lg-radius: 17px; --md-sys-size-lg-min: 34px;
+    --md-sys-size-xl-height: 44px; --md-sys-size-xl-icon: 22px; --md-sys-size-xl-caret: 16px; --md-sys-size-xl-font: 16px; --md-sys-size-xl-gap: 8px; --md-sys-size-xl-pad: 11px; --md-sys-size-xl-pad-edge: 22px; --md-sys-size-xl-radius: 22px; --md-sys-size-xl-min: 44px;
+    --md-sys-size-2xl-height: 60px; --md-sys-size-2xl-icon: 26px; --md-sys-size-2xl-caret: 18px; --md-sys-size-2xl-font: 18px; --md-sys-size-2xl-gap: 9px; --md-sys-size-2xl-pad: 17px; --md-sys-size-2xl-pad-edge: 30px; --md-sys-size-2xl-radius: 30px; --md-sys-size-2xl-min: 60px;
+  }
+}
