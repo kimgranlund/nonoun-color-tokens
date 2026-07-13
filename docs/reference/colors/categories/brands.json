@@ -279,7 +279,7 @@
                 "styleName": "Medium",
                 "weights": [{ "name": "Semi-bold", "weight": 600 }, { "name": "Bold", "weight": 700 }]
               },
-              "Label": {
+              "Sub-heading": {
                 "weight": 700,
                 "tracking": 0.286,
                 "leading": 1.125,
