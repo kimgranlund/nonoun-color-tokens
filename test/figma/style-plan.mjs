@@ -97,7 +97,7 @@ const plans = stylePlans({ families, scale });
   ok(!!bodySib && bodySib.literal.weight === 600, "Body sibling present with its weight, kebab-named");
   // AUTO-POPULATE (2026-07-13): a voice with NO explicit weights config (Headline, here) still gets 3
   // siblings from siblingWeightDefaults on its own resolved core weight — dot-prefixed core included.
-  const headlineSibs = plans.texts.filter((t) => t.voice === "Headline" && t.step === "MD" && !t.name.endsWith("/single"));
+  const headlineSibs = plans.texts.filter((t) => t.voice === "Headline" && t.step === "MD" && t.name.split("/")[1] === "md");
   ok(headlineSibs.length === 4, `an un-configured voice (Headline) still auto-populates 1 core + 3 siblings (got ${headlineSibs.length})`);
   ok(headlineSibs.some((t) => t.name.includes("• ")), "the auto-populated core is ALSO dot-prefixed, same as an explicitly-configured one");
   // the ONE remaining bare path: a voice that explicitly opts OUT via weights:[] (Kicker, here).
@@ -112,27 +112,31 @@ const plans = stylePlans({ families, scale });
     const fallbackSib = noTemplatePlans.texts.find((t) => t.voice === "Headline" && t.step === "MD" && t.name.endsWith("/medium"));
     ok(!!fallbackSib && fallbackSib.literal.styleName === "Medium", `no matchable weight word in the custom name ⇒ sibling falls back to its own bare name (got ${fallbackSib && fallbackSib.literal.styleName})`);
   }
-  ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(\/(?:[a-z0-9 -]+|• [^/]+))?(\/single)?$/.test(t.name)), "every text style name is Voice/lowerstep[/lower-kebab-slug OR templated-lowercase-name OR /• lowercase name][/single]");
+  ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(-single)?(\/(?:[a-z0-9 -]+|• [^/]+))?$/.test(t.name)), "every text style name is Voice/lowerstep[-single][/lower-kebab-slug OR templated-lowercase-name OR /• lowercase name]");
   // volume: every voice×step gets 1 core + its siblings.length (auto-populated by default, 0 only for
-  // an explicit opt-out) — plus a `/single` mirror of every Body/Label style. Derived from the
-  // resolved scale itself (not hand-counted) so this doesn't rot as voice defaults change.
+  // an explicit opt-out) — plus a "{step}-single" mirror GROUP for every Body/Label style. Derived from
+  // the resolved scale itself (not hand-counted) so this doesn't rot as voice defaults change.
   let expected = 0;
   for (const [v, steps] of Object.entries(scale.categories)) {
     const perStep = 1 + ((scale.weights && scale.weights[v]) || []).length;
     const n = perStep * Object.keys(steps).length;
     expected += n;
-    if (v === "Body" || v === "Label") expected += n; // the /single mirror
+    if (v === "Body" || v === "Label") expected += n; // the {step}-single mirror
   }
   ok(plans.texts.length === expected, `text style count ${plans.texts.length} != expected ${expected}`);
-  // every Body/Label style gets exactly one /single sibling; no other voice does.
-  const singles = plans.texts.filter((t) => t.name.endsWith("/single"));
-  ok(singles.every((t) => t.voice === "Body" || t.voice === "Label"), `only Body/Label carry a /single variant (voices: ${[...new Set(singles.map((t) => t.voice))].join(",")})`);
-  const bodySingle = plans.texts.find((t) => t.name === "Body/md/• regular/single");
-  ok(!!bodySingle && bodySingle.literal.lineHeight === bodySingle.literal.size && !bodySingle.bind.lineHeight, "Body's /single style: literal lineHeight = size, UNBOUND (Body has no singleLineHeight variable — it's prose)");
+  // every Body/Label style gets exactly one {step}-single sibling; no other voice does. A trailing
+  // "/single" SUFFIX used to carry this (made the plain leaf a PREFIX of its own single variant's path,
+  // which Figma's Styles panel folder-izes — the plain leaf and the implied folder then rendered as two
+  // rows sharing the same visible label) — the "{step}-single" SIBLING FOLDER fixes that at the root.
+  const singles = plans.texts.filter((t) => /-single(\/|$)/.test(t.name));
+  ok(singles.every((t) => t.voice === "Body" || t.voice === "Label"), `only Body/Label carry a {step}-single variant (voices: ${[...new Set(singles.map((t) => t.voice))].join(",")})`);
+  ok(!plans.texts.some((t) => t.name.endsWith("/single") || t.name.includes("/single/")), "no text style name uses the old \"/single\" SUFFIX shape (it collided with the plain leaf as a Figma folder prefix)");
+  const bodySingle = plans.texts.find((t) => t.name === "Body/md-single/• regular");
+  ok(!!bodySingle && bodySingle.literal.lineHeight === bodySingle.literal.size && !bodySingle.bind.lineHeight, "Body's {step}-single style: literal lineHeight = size, UNBOUND (Body has no singleLineHeight variable — it's prose)");
   const labelScale = typeScale({ treatment: "product" });
   const labelCoreName = weightNameFor(labelScale.categories.Label.MD.weight).name.toLowerCase();
-  const labelSingle = stylePlans({ families, scale: labelScale }).texts.find((t) => t.name === `Label/md/• ${labelCoreName}/single`);
-  ok(!!labelSingle && labelSingle.bind.lineHeight === "Label/MD/singleLineHeight", "Label's /single style BINDS live to its real singleLineHeight variable (Label is a box voice)");
+  const labelSingle = stylePlans({ families, scale: labelScale }).texts.find((t) => t.name === `Label/md-single/• ${labelCoreName}`);
+  ok(!!labelSingle && labelSingle.bind.lineHeight === "Label/MD/singleLineHeight", "Label's {step}-single style BINDS live to its real singleLineHeight variable (Label is a box voice)");
 }
 
 // ── include gates + determinism + identity ──
