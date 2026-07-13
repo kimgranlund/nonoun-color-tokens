@@ -44,6 +44,10 @@ const BRIDGE = `
     // optimistic "Applying…" toast can't know when, so code.js signals back → a real "Applied N…" / error toast.
     if(m.type==="apply-done"){ var d=app(); if(d&&typeof d.onApplyDone==="function") d.onApplyDone(m); }
     if(m.type==="apply-error"){ var f=app(); if(f&&typeof f.onApplyError==="function") f.onApplyError(); }
+    // legacy-style sweep: code.js scanned for real styles that look like ours but aren't in the current
+    // plan (sweep-scanned), or finished deleting the ones the user confirmed (sweep-done).
+    if(m.type==="sweep-scanned"){ var g=app(); if(g&&typeof g.receiveSweepScan==="function") g.receiveSweepScan(m); }
+    if(m.type==="sweep-done"){ var h=app(); if(h&&typeof h.onSweepDone==="function") h.onSweepDone(m); }
   });
 })();
 </script>`;

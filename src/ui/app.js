@@ -573,6 +573,9 @@ class HctApp extends HTMLElement {
     this.inFigma = false; // set true by the Figma bridge (gen-ui.mjs) on figma-init → reveals "Add Variables → Figma"
     this._figmaFonts = null;          // Set of family names Figma can use (asked once, inFigma only)
     this._figmaFontsRequested = false;
+    this.sweepResults = null;   // { texts:[{id,name}], paints:[{id,name}] } | null = not scanned yet
+    this.sweepSelected = new Set(); // ids the user has checked for deletion
+    this.sweepBusy = false;     // true while a scan or delete round-trip is in flight (Figma-only)
     this._faceCache = new Map();      // family → does it actually RENDER here (web probe, cleared on font change)
     this.liveVars = null; // { "{n}/{key}": hex } read from the file (read-only drift reference); null = not read
     this.liveVarsFound = false; // whether the file has a raw-colors collection (gates the gallery import row)
@@ -6052,6 +6055,69 @@ class HctApp extends HTMLElement {
     this.toast("Couldn't apply to Figma — please try again.");
   }
 
+  // ── legacy-style sweep (Settings › Cleanup, Figma-only) — find real Figma styles that look like ours
+  // (their top "/" segment matches a namespace we still use) but aren't anything the CURRENT plan would
+  // produce: leftovers from an older naming generation that predate this plugin's own per-style registry,
+  // so no ordinary apply/prune can ever reach them. Scan-then-confirm: nothing is ever deleted without the
+  // user checking it first (sweepCandidates in code.js is itself read-only; only sweep-delete mutates,
+  // and only the exact ids sent).
+  _sweepNames() {
+    // the SAME resolution applyToFigma uses for its own plan — so "current" here means exactly what the
+    // next real apply would produce, never a stale or hypothetical shape.
+    const sys = this.exportSystems || {};
+    const scale = sys.type !== false ? this._typeScaleFor("base") : null;
+    let families = [];
+    if (sys.color !== false) {
+      const bundle = this.figmaBundle();
+      if (bundle && bundle["Light_tokens.json"]) {
+        const enabled = (this.doc.palettes || []).filter((p) => p && p.on !== false);
+        families = Object.keys(bundle["Light_tokens.json"]).filter((k) => k[0] !== "$")
+          .map((n, i) => ({ n, name: (enabled[i] && enabled[i].name) || n }));
+      }
+    }
+    const plans = stylePlans({ families, scale, include: { color: sys.color !== false, type: sys.type !== false } });
+    return { textNames: plans.texts.map((t) => t.name), paintNames: plans.paints.map((p) => p.name) };
+  }
+  scanForLegacyStyles() {
+    if (!this.inFigma || this.sweepBusy) return;
+    try {
+      const { textNames, paintNames } = this._sweepNames();
+      this.sweepBusy = true; this.render();
+      parent.postMessage({ pluginMessage: { type: "sweep-scan", textNames, paintNames } }, "*");
+    } catch { this.sweepBusy = false; this.toast("Couldn't scan — please try again."); }
+  }
+  receiveSweepScan(m) {
+    this.sweepResults = { texts: (m && m.texts) || [], paints: (m && m.paints) || [] };
+    this.sweepSelected = new Set();
+    this.sweepBusy = false;
+    this.render();
+  }
+  toggleSweepSelect(id) {
+    const s = new Set(this.sweepSelected);
+    if (s.has(id)) s.delete(id); else s.add(id);
+    this.sweepSelected = s;
+    this.render();
+  }
+  toggleSweepSelectAll() {
+    const all = this.sweepResults ? [...this.sweepResults.texts, ...this.sweepResults.paints].map((x) => x.id) : [];
+    this.sweepSelected = this.sweepSelected.size === all.length ? new Set() : new Set(all);
+    this.render();
+  }
+  deleteSelectedSweep() {
+    if (!this.inFigma || this.sweepBusy || !this.sweepSelected.size) return;
+    this.sweepBusy = true; this.render();
+    try { parent.postMessage({ pluginMessage: { type: "sweep-delete", ids: [...this.sweepSelected] } }, "*"); }
+    catch { this.sweepBusy = false; this.toast("Couldn't delete — please try again."); }
+  }
+  onSweepDone(m) {
+    const n = (m && Number(m.removed)) || 0;
+    this.sweepBusy = false;
+    this.sweepResults = null;
+    this.sweepSelected = new Set();
+    this.toast(n ? `Removed ${n} legacy style${n === 1 ? "" : "s"}` : "Nothing removed");
+    this.render();
+  }
+
   // _figmaFloatPlans — the Type + Geometry breakpoint-moded collections (typeTokensFigmaModes /
   // geomTokensFigmaModes over the override-aware base + per-breakpoint mode scales), turned into the
   // pure apply PLANS code.js executes (figma/binder/mode-apply-plan.mjs). Only the systems toggled ON in
@@ -6168,6 +6234,8 @@ class HctApp extends HTMLElement {
     return [
       { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }, { id: "icons", label: "Icons" }, { id: "export", label: "Export" }] },
       { group: "App", items: [{ id: "appearance", label: "Appearance" }] },
+      // Figma-only: a real Figma file, not this generator's own state, is what a sweep inspects.
+      ...(this.inFigma ? [{ group: "Figma", items: [{ id: "cleanup", label: "Cleanup" }] }] : []),
       { group: "Account", items: [{ id: "account", label: "Account" }] },
       { group: "About", items: [{ id: "about", label: "About" }] },
     ];
@@ -6339,6 +6407,7 @@ class HctApp extends HTMLElement {
         ])],
       };
     }
+    if (sec === "cleanup") return this._cleanupPanel();
     if (sec === "account") return this._accountPanel();
     if (sec === "about") {
       return {
@@ -6405,6 +6474,45 @@ class HctApp extends HTMLElement {
       if (v) fc[key] = v; else delete fc[key];
       if (Object.keys(fc).length) d.figmaCollections = fc; else delete d.figmaCollections;
     });
+  }
+
+  // _cleanupPanel — Settings › Figma › Cleanup: scan this file for real styles that look like ours but
+  // don't match anything the CURRENT apply plan would produce (leftovers from an older naming generation
+  // that predate this plugin's own registry, so a normal apply can never find or prune them), then let
+  // the user pick exactly which ones to remove. Confirm-before-delete throughout: a scan never mutates
+  // anything, and delete only ever touches the ids explicitly checked.
+  _cleanupPanel() {
+    const r = this.sweepResults;
+    const busy = this.sweepBusy;
+    const body = [];
+    body.push(h("div", { class: "settings-row" },
+      h("div", { class: "settings-row-text" }, h("b", {}, "Scan for legacy styles"),
+        h("small", {}, "Looks for real Figma styles whose name starts with a voice/palette this kit still uses, but that no current apply would ever produce — usually leftovers from an older naming convention. Nothing is deleted by scanning.")),
+      btn(busy && !r ? "Scanning…" : "Scan this file", { variant: "primary", cls: "cleanup-scan", disabled: busy, onclick: () => this.scanForLegacyStyles() })));
+    if (r) {
+      const items = [...r.texts.map((x) => ({ ...x, kind: "Text style" })), ...r.paints.map((x) => ({ ...x, kind: "Paint style" }))];
+      if (!items.length) {
+        body.push(h("p", { class: "settings-note" }, "No legacy styles found — this file is clean."));
+      } else {
+        const allChecked = this.sweepSelected.size === items.length;
+        body.push(h("div", { class: "cleanup-list-head" },
+          h("small", {}, `${items.length} candidate${items.length === 1 ? "" : "s"} found`),
+          h("button", { type: "button", class: "linklike", onclick: () => this.toggleSweepSelectAll() }, allChecked ? "Deselect all" : "Select all")));
+        body.push(h("ul", { class: "cleanup-list", role: "list" }, ...items.map((it) =>
+          h("li", { class: "cleanup-item" },
+            h("label", { class: "cleanup-item-label" },
+              h("input", { type: "checkbox", checked: this.sweepSelected.has(it.id) ? "" : undefined, onchange: () => this.toggleSweepSelect(it.id) }),
+              h("code", {}, it.name), h("small", {}, it.kind))))));
+        body.push(btn(busy ? "Removing…" : `Delete ${this.sweepSelected.size} selected`, {
+          cls: "cleanup-delete", disabled: busy || !this.sweepSelected.size,
+          onclick: () => this.deleteSelectedSweep(),
+        }));
+      }
+    }
+    return {
+      title: "Cleanup", desc: "Find and remove real Figma styles left over from an older naming convention — nothing is ever removed without your confirmation.",
+      body: [this._settingsGroup(null, body)],
+    };
   }
 
   // _accountPanel — the Settings « Account » home (item 7, Layer 3): the effective plan (Free/Pro badge),

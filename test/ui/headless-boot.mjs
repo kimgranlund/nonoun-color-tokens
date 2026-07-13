@@ -2121,6 +2121,32 @@ ok(!app.querySelector(".account-license-input") && !app.querySelector(".account-
 app.inFigma = false; app.render(); flushRaf();
 app.closeSettings(); flushRaf();
 
+// ── (cleanup) Settings › Figma › Cleanup — Figma-only nav item; scan-then-confirm sweep for legacy styles ─
+app.inFigma = false; app.render(); flushRaf();
+ok(!app._settingsNav().some((g) => g.group === "Figma"), "(cleanup) the Figma nav group is absent outside Figma");
+const realParentCU = globalThis.parent;
+let postedCU = null;
+globalThis.parent = { postMessage: (m) => { postedCU = m; } };
+app.inFigma = true; app.openSettings(); app.settingsSection = "cleanup"; app.render(); flushRaf();
+ok(app._settingsNav().some((g) => g.group === "Figma" && g.items.some((i) => i.id === "cleanup")), "(cleanup) the Figma nav group + Cleanup item appear once inFigma");
+ok(!!app.querySelector(".cleanup-scan"), "(cleanup) the scan button renders");
+app.scanForLegacyStyles();
+ok(postedCU && postedCU.pluginMessage && postedCU.pluginMessage.type === "sweep-scan" && Array.isArray(postedCU.pluginMessage.textNames) && Array.isArray(postedCU.pluginMessage.paintNames), "(cleanup) scanning posts {type:'sweep-scan', textNames, paintNames} — never deletes anything itself");
+ok(app.sweepBusy === true, "(cleanup) scanning sets sweepBusy while the round-trip is in flight");
+app.receiveSweepScan({ texts: [{ id: "s1", name: "Body/lg/regular" }], paints: [] });
+flushRaf();
+ok(app.sweepBusy === false && app.sweepResults && app.sweepResults.texts.length === 1, "(cleanup) receiveSweepScan stores the candidates and clears sweepBusy");
+ok(!!app.querySelector(".cleanup-delete"), "(cleanup) a delete button renders once results exist");
+const cuCheckbox = app.querySelector(".cleanup-item-label").children.find((c) => c.tagName === "INPUT");
+cuCheckbox.dispatch("change", {});
+ok(app.sweepSelected.has("s1"), "(cleanup) checking an item selects its id");
+app.deleteSelectedSweep();
+ok(postedCU.pluginMessage.type === "sweep-delete" && postedCU.pluginMessage.ids[0] === "s1", "(cleanup) deleting posts {type:'sweep-delete', ids} for ONLY the checked candidates");
+app.onSweepDone({ removed: 1 });
+ok(app.sweepResults === null && app.sweepSelected.size === 0, "(cleanup) onSweepDone clears the results — a re-scan starts fresh");
+globalThis.parent = realParentCU;
+app.inFigma = false; app.closeSettings(); flushRaf();
+
 // ── (std) the STANDARD breakpoint sets (Typography + Geometry) — the DESKTOP-ANCHORED law ─────────────
 // Clear any modes accumulated above, then materialize each standard set and pin its shape: the DESIGNED
 // scale IS Desktop (the base, first, Figma's default mode — baseName "Desktop", untouched by the commit);

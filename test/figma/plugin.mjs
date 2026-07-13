@@ -128,14 +128,15 @@ function mockFigma() {
 }
 
 // ── END-TO-END contract: figmaBundle() -> applyBundle() on the mock ──────────────
-let applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, setCollectionNames, resolveFace;
+let applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, setCollectionNames, resolveFace, sweepCandidates;
 const F = mockFigma();
 try {
-  const load = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, setCollectionNames, resolveFace };");
+  const load = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, setCollectionNames, resolveFace, sweepCandidates };");
   const loaded = load(F.figma, "<html>", undefined); // closes over the MOCK figma
   applyBundle = loaded.applyBundle; applyFloatPlans = loaded.applyFloatPlans;
   applyFontPrimitives = loaded.applyFontPrimitives; applyStylePlans = loaded.applyStylePlans;
   setCollectionNames = loaded.setCollectionNames; resolveFace = loaded.resolveFace;
+  sweepCandidates = loaded.sweepCandidates;
 } catch (e) { FAIL("parse", "code.js failed to load: " + e.message); }
 
 if (applyBundle) {
@@ -415,8 +416,53 @@ if (resolveFace) {
   if (!styles.includes(noMatch)) FAIL("resolveface", `the nearest-weight fallback must return a REAL style from the list (got ${noMatch})`);
 }
 
+// ── sweepCandidates: find real styles that LOOK like ours (top "/" segment matches a namespace the
+// current plan still uses) but aren't anything the current plan would produce — leftovers from an older
+// naming generation that predate this plugin's own registry, so no ordinary apply/prune can reach them.
+// Pure + read-only: never touches a user's own unrelated style (a different namespace entirely). ──
+if (sweepCandidates) {
+  const knownTexts = ["Body/lg/• regular", "Body/lg/medium", "Headline/lg/• black"];
+  const knownPaints = ["Primary/onPrimary"];
+  const localTexts = [
+    { id: "t1", name: "Body/lg/• regular" },          // current — not a candidate
+    { id: "t2", name: "Body/lg/regular" },             // legacy (no dot-prefix) — candidate
+    { id: "t3", name: "Body/lg/regular-single" },      // legacy (old hyphen-suffix era) — candidate
+    { id: "t4", name: "MyOwnCustomStyle/heading" },    // a namespace we don't use at all — NEVER a candidate
+  ];
+  const localPaints = [
+    { id: "p1", name: "Primary/onPrimary" },           // current — not a candidate
+    { id: "p2", name: "Primary/onPrimaryOld" },         // legacy — candidate
+  ];
+  const cand = sweepCandidates(knownTexts, knownPaints, localTexts, localPaints);
+  const candTextIds = cand.texts.map((x) => x.id).sort();
+  if (candTextIds.join(",") !== "t2,t3") FAIL("sweep", `sweepCandidates must flag exactly the legacy Body/lg text styles, not the current one or the unrelated namespace (got ${candTextIds.join(",")})`);
+  if (cand.paints.map((x) => x.id).join(",") !== "p2") FAIL("sweep", `sweepCandidates must flag exactly the legacy paint style (got ${cand.paints.map((x) => x.id).join(",")})`);
+  if (cand.texts.some((x) => x.id === "t4") || cand.paints.some((x) => x.name.startsWith("MyOwnCustomStyle"))) FAIL("sweep", "a namespace this plan never uses at all must NEVER be flagged — only prefixes we currently own");
+
+  // end-to-end via the real message handlers: sweep-scan never mutates; sweep-delete removes ONLY the
+  // confirmed ids and reports how many.
+  const F6 = mockFigma();
+  new Function("figma", "__html__", "module", code)(F6.figma, "<html>", undefined);
+  const legacyStyle = F6.figma.createTextStyle(); legacyStyle.name = "Body/lg/regular";
+  const currentStyle = F6.figma.createTextStyle(); currentStyle.name = "Body/lg/• regular";
+  const foreignStyle = F6.figma.createTextStyle(); foreignStyle.name = "MyOwnCustomStyle/heading";
+  await F6.figma.ui._h({ type: "sweep-scan", textNames: ["Body/lg/• regular"], paintNames: [] });
+  const scanMsg = F6.figma.ui._posted.find((m) => m && m.type === "sweep-scanned");
+  if (!scanMsg) FAIL("sweep", "sweep-scan posted no {sweep-scanned} message");
+  else {
+    if (!scanMsg.texts.some((x) => x.id === legacyStyle.id)) FAIL("sweep", "sweep-scanned must include the legacy style");
+    if (scanMsg.texts.some((x) => x.id === currentStyle.id)) FAIL("sweep", "sweep-scanned must NOT include a style the current plan already names");
+    if (scanMsg.texts.some((x) => x.id === foreignStyle.id)) FAIL("sweep", "sweep-scanned must NEVER include a style outside any namespace the plan uses");
+  }
+  await F6.figma.ui._h({ type: "sweep-delete", ids: [legacyStyle.id] });
+  const doneMsg = F6.figma.ui._posted.find((m) => m && m.type === "sweep-done");
+  if (!doneMsg || doneMsg.removed !== 1) FAIL("sweep", `sweep-delete must report removing exactly 1 (got ${doneMsg && doneMsg.removed})`);
+  if (F6.figma._styles.some((s) => s.id === legacyStyle.id)) FAIL("sweep", "sweep-delete must actually remove the confirmed style");
+  if (!F6.figma._styles.some((s) => s.id === currentStyle.id) || !F6.figma._styles.some((s) => s.id === foreignStyle.id)) FAIL("sweep", "sweep-delete must touch ONLY the confirmed ids — nothing else");
+}
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "applysys", "applydone", "config", "read", "fonts", "resolveface"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "applysys", "applydone", "config", "read", "fonts", "resolveface", "sweep"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
