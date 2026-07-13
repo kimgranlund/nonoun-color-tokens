@@ -15,12 +15,16 @@
 //              varName: "primary/onPrimary" }]                   // → Color Modes variable, ratified grouping:
 //                                                                //   scrim* → scrims/ · surface*|container* → surfaces/
 //   texts:  [{ name: "Display/lg" (voice explicitly opted OUT of siblings via weights:[] — bare) |
-//                     "Display/lg/• condensed black italic" (core, siblings exist — dot-prefixed,
-//                     lowercase; prefers a custom Figma style name over the generic weight name) |
-//                     "Display/lg/condensed extra-bold italic" (sibling, lowercase — the SAME
-//                     templated name as the core when one's configured, else a bare weight slug)
-//                     (TKT-0001 — symmetric core+sibling naming, 2026-07-13's dot-prefix + templating) |
-//                     "Label/lg/• medium-single" (Body/Body-mono/Label/Label-mono only — a "-single"
+//                     "Display/lg/• heavier" (core, siblings exist — dot-prefixed, lowercase; the
+//                     NORMALIZED relative label — see relativeWeightLabel — never the literal custom
+//                     style name or ladder name: a long custom face name ("Condensed Black Italic")
+//                     truncates illegibly in Figma's narrow Styles panel, with multiple siblings
+//                     collapsing to the same visible "condensed …" prefix; a short relative word never
+//                     does, and reads consistently regardless of what real font/weight sits underneath) |
+//                     "Display/lg/heavy" (sibling, lowercase — the SAME relative-label vocabulary, by
+//                     its own rank among the voice's resolved weights) (2026-07-13 — normalized
+//                     Lighter/Light/Heavy/Heavier labels, superseding TKT-0001's literal-name templating) |
+//                     "Label/lg/• light-single" (Body/Body-mono/Label/Label-mono only — a "-single"
 //                     SUFFIX on the leaf itself, flat inside the SAME step folder as the multi-line
 //                     styles, never a NEW "/"-segment: a trailing "/single" segment made the plain leaf a
 //                     PATH PREFIX of its own single variant, and Figma's Styles panel folder-izes any name
@@ -49,7 +53,7 @@
 // their core in list order. Same inputs ⇒ byte-identical plan (the executor's idempotency rides on it).
 
 import { semanticRoles } from "../../src/engine/semantic.js";
-import { weightNameFor, resolvedFontFor, siblingStyleName, coreWeightKey } from "../../src/engine/type.mjs";
+import { weightNameFor, resolvedFontFor, siblingStyleName, coreWeightKey, relativeWeightLabel } from "../../src/engine/type.mjs";
 
 // SINGLE_LINE_VOICES — voices that additionally get a "-single"-suffixed text-style sibling (1.0
 // leading — line-height = size), flat alongside their normal multi-line style in the SAME step folder,
@@ -92,6 +96,15 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
       const family = resolvedFontFor(scale, voice) || "";
       const coreStyleName = (scale.styleNames && scale.styleNames[voice]) || null;
       const sibs = (scale.weights && scale.weights[voice]) || [];
+      // relative Figma-label RANKS for this voice — computed ONCE (weight is constant across LG/MD/SM),
+      // over the ascending-sorted, deduplicated set of every resolved weight (core + each sibling). See
+      // relativeWeightLabel (src/engine/type.mjs) for why: a literal name (a custom face's own style
+      // string, or a generic ladder name) reads illegibly once Figma truncates a long one in its narrow
+      // Styles panel; a short relative word never does, and stays consistent regardless of what real
+      // font/weight sits underneath.
+      const coreWeightForRank = (steps.MD || steps.LG || steps.SM).weight;
+      const rankedWeights = [...new Set([coreWeightForRank, ...sibs.map((wv) => wv.weight)])].sort((a, b) => a - b);
+      const labelFor = (weight) => relativeWeightLabel(rankedWeights.indexOf(weight), rankedWeights.length);
       // text styles list LARGEST → smallest (LG, MD, SM) in the Figma Styles panel — the reverse of the
       // engine's own SM/MD/LG insertion order (steps is a plain {SM,MD,LG} object; Figma preserves the
       // plan's own order rather than re-sorting, so this array IS the panel order).
@@ -122,18 +135,20 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         };
         // the CORE style — `Voice/step` when the voice/step has NO configured siblings (nothing to
         // disambiguate — a voice explicitly opted out via `weights:[]`); `Voice/step/• name` when it
-        // DOES (TKT-0001 — every voice by default, since 2026-07-13's auto-populated siblings). The
-        // `• ` (dot) prefix marks the default pick among its named siblings — not a plain weight-slug
-        // segment, so it can never collide with a sibling's own name. Lowercase throughout (matching
-        // the siblings' own lowercase-kebab convention, e.g. `bold`) — the label itself prefers the
-        // voice's own custom Figma style name (`coreStyleName` — e.g. BZZR's "Condensed Black Italic")
-        // over the generic ladder-snap name ("Black"): a non-variable face's real cut is strictly more
-        // specific and must never be flattened down to the ladder's generic vocabulary. Computed
-        // UNCONDITIONALLY (not gated by sibs.length like coreLabel below) because the BIND TARGET
-        // (coreWeightKey) always nests the same way, even for a voice with zero siblings — one lone
-        // primitive in its own "Voice" folder, not confusing the way a split group would be.
+        // DOES (every voice by default, since 2026-07-13's auto-populated siblings). The `• ` (dot)
+        // prefix marks the default pick among its named siblings — not a plain label segment, so it can
+        // never collide with a sibling's own name. `name` is the NORMALIZED relative label (Lighter/
+        // Light/Heavy/Heavier, lowercased) by the core's own rank among `rankedWeights` — never the
+        // literal custom style name or ladder name (2026-07-13, superseding TKT-0001's literal-name
+        // templating): a long custom face name ("Condensed Black Italic") truncates illegibly in Figma's
+        // narrow Styles panel, multiple siblings collapsing to the same visible "condensed …" prefix.
+        // Computed UNCONDITIONALLY (not gated by sibs.length like coreLabel below) because the BIND
+        // TARGET (coreWeightKey) always nests the same way, even for a voice with zero siblings — one
+        // lone primitive in its own "Voice" folder, not confusing the way a split group would be.
         const coreWeightName = weightNameFor(s.weight);
-        const coreLabel = sibs.length ? (coreStyleName || coreWeightName.name).toLowerCase() : null;
+        // labelFor is null only when rankedWeights collapsed to 1 distinct weight (a misconfigured
+        // sibling weight identical to the core's) — fall back to the ladder name rather than throw.
+        const coreLabel = sibs.length ? (labelFor(coreWeightForRank) || coreWeightName.name).toLowerCase() : null;
         const coreKey = coreWeightKey(voice, coreWeightName, sibs);
         // fontWeight and fontStyle are NEVER both bound: real Figma resolves a bound fontWeight to
         // "the closest valid weight for the font" independently of fontStyle, which silently overrides
@@ -146,16 +161,16 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${coreKey}` } : { fontWeight: `weight/${coreKey}` }) },
           literal: { ...litBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
         });
-        // the SIBLING weight variants. The DISPLAY name mirrors whatever the core shows: a plain
-        // lowercase-kebab weight slug (`bold`) for the common no-custom-name case, or — when the voice
-        // has a custom style name — the SAME full templated name the literal uses (lowercase, space-
-        // separated, e.g. `condensed bold italic`), so the visible Styles panel never drops the
-        // "condensed"/"italic" adjectives that only lived in the literal before. The BINDING target
-        // keys (`weight-style/<voice>/<slug>`, `weight/<voice>/<slug>`) stay on the plain kebab slug
-        // regardless — internal primitive naming, not the user-facing style name.
+        // the SIBLING weight variants. The DISPLAY name is the SAME normalized relative-label
+        // vocabulary as the core, by this sibling's own rank among `rankedWeights` — never the literal
+        // templated face name or a bare weight slug (2026-07-13). The literal `styleName` (used for
+        // actual font loading, via siblingStyleName) is UNCHANGED — only the visible Styles-panel label
+        // moves to the relative word. The BINDING target keys (`weight-style/<voice>/<slug>`,
+        // `weight/<voice>/<slug>`) stay on the plain kebab slug regardless — internal primitive naming,
+        // not the user-facing style name.
         for (const wv of sibs) {
           const wvStyleName = siblingStyleName(coreStyleName, coreWeightName, wv.name);
-          const wvLabel = coreStyleName ? wvStyleName.toLowerCase() : wv.slug;
+          const wvLabel = (labelFor(wv.weight) || wv.name).toLowerCase();
           texts.push({
             name: `${voice}/${stepSlug}/${wvLabel}`,
             voice, step,
@@ -191,7 +206,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           });
           for (const wv of sibs) {
             const wvStyleName = siblingStyleName(coreStyleName, coreWeightName, wv.name);
-            const wvLabel = coreStyleName ? wvStyleName.toLowerCase() : wv.slug;
+            const wvLabel = (labelFor(wv.weight) || wv.name).toLowerCase();
             texts.push({
               name: `${voice}/${stepSlug}/${wvLabel}-single`,
               voice, step,

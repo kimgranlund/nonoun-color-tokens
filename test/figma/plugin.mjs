@@ -79,7 +79,7 @@ function mockFigma() {
     createPaintStyle() { const st = { _kind: "PAINT", id: "s" + id++, name: "", paints: [], remove: function () { const i = figma._styles.indexOf(this); if (i >= 0) figma._styles.splice(i, 1); } }; this._styles.push(st); return st; },
     createTextStyle() {
       const st = { _kind: "TEXT", id: "s" + id++, name: "", fontName: null, fontSize: 0, lineHeight: null, letterSpacing: null, paragraphSpacing: 0, textCase: "ORIGINAL", _bound: {},
-        setBoundVariable: function (field, v) { this._bound[field] = v.id; },
+        setBoundVariable: function (field, v) { if (v == null) delete this._bound[field]; else this._bound[field] = v.id; },
         remove: function () { const i = figma._styles.indexOf(this); if (i >= 0) figma._styles.splice(i, 1); } };
       this._styles.push(st); return st;
     },
@@ -535,12 +535,12 @@ if (applyStylePlans && applyFontPrimitives) {
 
     const textStyles = F.figma._styles.filter((x) => x._kind === "TEXT");
     if (sr.texts !== plans.texts.length || textStyles.length !== plans.texts.length) FAIL("styles", `text styles ${textStyles.length}/${sr.texts}, expected ${plans.texts.length}`);
-    // Display's core weight (the product treatment's 700) snaps to "Bold"; WITH a sibling configured,
-    // the core carries a dot-prefixed `• Bold` segment too (symmetric naming, TKT-0001) — the sibling
-    // itself stays lowercase-kebab, "Medium" → "medium".
-    const core = textStyles.find((x) => x.name === "Display/md/• bold");
-    const sib = textStyles.find((x) => x.name === "Display/md/medium");
-    if (!core || !sib) FAIL("styles", "Display/md/• bold core or Display/md/medium sibling text style missing");
+    // Display's core weight (the product treatment's 700) + its 1 sibling (Medium/500) — 2 distinct
+    // weights; the core (700, heavier of the two) gets the NORMALIZED relative label "heavier"
+    // (2026-07-13 — supersedes the literal ladder-name "bold"); the sibling (500) ranks "lighter".
+    const core = textStyles.find((x) => x.name === "Display/md/• heavier");
+    const sib = textStyles.find((x) => x.name === "Display/md/lighter");
+    if (!core || !sib) FAIL("styles", "Display/md/• heavier core or Display/md/lighter sibling text style missing");
     if (core && (!core.fontName || core.fontName.style !== "Bold")) FAIL("styles", `Display core face = ${core && core.fontName && core.fontName.style}, want Bold (700 candidates)`);
     if (sib && (!sib.fontName || sib.fontName.style !== "Medium")) FAIL("styles", `Display sibling face = ${sib && sib.fontName && sib.fontName.style}, want Medium`);
     if (core && (!core.lineHeight || core.lineHeight.unit !== "PIXELS")) FAIL("styles", "text style lineHeight is not PIXELS-united");
@@ -561,7 +561,9 @@ if (applyStylePlans && applyFontPrimitives) {
       const namedScale = TYPE.typeScale({ treatment: "statement", voices: { Display: { weight: 900, styleName: "Condensed Black Italic", weights: [{ name: "Bold", weight: 700 }] } } });
       const namedPlans = stylePlans({ families, scale: namedScale });
       const namedCore = namedPlans.texts.find((t) => t.voice === "Display" && t.name.startsWith("Display/lg/•"));
-      const namedSib = namedPlans.texts.find((t) => t.voice === "Display" && t.name === "Display/lg/condensed bold italic");
+      // core (900) + 1 sibling (Bold/700) — the sibling ranks "lighter" of the 2; the literal styleName
+      // still carries the full templated cut ("Condensed Bold Italic"), only the LABEL is relative now.
+      const namedSib = namedPlans.texts.find((t) => t.voice === "Display" && t.name === "Display/lg/lighter");
       if (!namedCore || !namedSib) FAIL("styles", "named-style-cut fixture: Display core or sibling plan entry missing");
       if (namedCore && (namedCore.bind.fontWeight || !namedCore.bind.fontStyle)) FAIL("styles", `named-style-cut core must bind fontStyle only (got fontStyle=${namedCore.bind.fontStyle}, fontWeight=${namedCore.bind.fontWeight})`);
       if (namedSib && (namedSib.bind.fontWeight || !namedSib.bind.fontStyle)) FAIL("styles", `named-style-cut sibling must bind fontStyle only (got fontStyle=${namedSib.bind.fontStyle}, fontWeight=${namedSib.bind.fontWeight})`);
@@ -572,6 +574,35 @@ if (applyStylePlans && applyFontPrimitives) {
       const namedCoreStyle = F.figma._styles.find((x) => x._kind === "TEXT" && x.name === namedCore.name);
       if (!namedCoreStyle || namedCoreStyle._bound.fontWeight) FAIL("styles", "named-style-cut core text style must not carry a bound fontWeight field");
       if (!namedCoreStyle || !namedCoreStyle._bound.fontStyle) FAIL("styles", "named-style-cut core text style must carry a bound fontStyle field");
+    }
+
+    // STALE fontWeight/fontStyle binding clears across a re-apply — an EXPLICIT, isolated repro (found
+    // live via a naming coincidence between two OTHER fixtures in this file: relative labels are RANKS,
+    // not literal weight/style names, so the SAME Figma style name can legitimately carry a
+    // fontWeight-bound style in one apply and a fontStyle-bound one in the next, e.g. a voice gaining a
+    // custom styleName later while its rank-based label happens to stay the same). bindField only ever
+    // ADDS a binding, never clears one the CURRENT plan omits — so a style reused by name must have its
+    // NOW-unused half of the pair explicitly unbound, or Figma's own "closest valid weight" snap on the
+    // stale fontWeight could silently override a freshly-bound fontStyle's precise named cut.
+    {
+      const F7 = mockFigma();
+      const loaded7 = new Function("figma", "__html__", "module", code + "\nreturn { applyFontPrimitives, applyStylePlans };")(F7.figma, "<html>", undefined);
+      const genericScale = TYPE.typeScale({ treatment: "product", voices: { Kicker: { weight: 700, weights: [{ name: "Medium", weight: 500 }] } } });
+      const genericPlans = stylePlans({ families: [], scale: genericScale });
+      await loaded7.applyFontPrimitives(primitivesApplyPlan(TYPE.typeTokensFigmaPrimitives(genericScale)));
+      await loaded7.applyStylePlans(genericPlans);
+      const reusedName = genericPlans.texts.find((t) => t.voice === "Kicker" && t.name.startsWith("Kicker/lg/•")).name;
+      const afterGeneric = F7.figma._styles.find((x) => x._kind === "TEXT" && x.name === reusedName);
+      if (!afterGeneric || !afterGeneric._bound.fontWeight) FAIL("styles", "stale-bind repro setup: the generic (no styleName) core must bind fontWeight first");
+      // SAME Figma style name, SAME rank shape, but NOW with a custom styleName — fontStyle binds
+      // instead. Re-applying under the reused name must not leave the OLD fontWeight bind behind.
+      const namedScale2 = TYPE.typeScale({ treatment: "product", voices: { Kicker: { weight: 700, styleName: "Custom Bold Cut", weights: [{ name: "Medium", weight: 500 }] } } });
+      const namedPlans2 = stylePlans({ families: [], scale: namedScale2 });
+      await loaded7.applyFontPrimitives(primitivesApplyPlan(TYPE.typeTokensFigmaPrimitives(namedScale2)));
+      await loaded7.applyStylePlans(namedPlans2);
+      const afterNamed = F7.figma._styles.find((x) => x._kind === "TEXT" && x.name === reusedName);
+      if (!afterNamed || afterNamed._bound.fontWeight) FAIL("styles", "a stale fontWeight bind from an earlier apply survived once the SAME-named style switched to fontStyle binding");
+      if (!afterNamed || !afterNamed._bound.fontStyle) FAIL("styles", "the reused style must carry the NEW fontStyle bind");
     }
 
     // Figma's lineHeight/letterSpacing bind as ABSOLUTE PIXELS, not a % — a Figma-bound percent FLOAT
@@ -632,10 +663,10 @@ if (applyStylePlans && applyFontPrimitives) {
     // way left to get a bare, undisambiguated core).
     const reduced = stylePlans({ families, scale: TYPE.typeScale({ treatment: "product", bodyBase: 16, voices: { Display: { weights: [] } } }) });
     const sr2 = await applyStylePlans(reduced);
-    if (F.figma._styles.some((x) => x.name === "Display/md/medium")) FAIL("styles", "prune did not remove the dropped sibling style");
-    // the core RENAMES too when its siblings disappear (Display/md/• bold → bare Display/md, nothing
+    if (F.figma._styles.some((x) => x.name === "Display/md/lighter")) FAIL("styles", "prune did not remove the dropped sibling style");
+    // the core RENAMES too when its siblings disappear (Display/md/• heavier → bare Display/md, nothing
     // left to disambiguate) — the old suffixed name must prune, and the bare name must exist fresh.
-    if (F.figma._styles.some((x) => x.name === "Display/md/• bold")) FAIL("styles", "prune did not remove the core's old suffixed name after its siblings were dropped");
+    if (F.figma._styles.some((x) => x.name === "Display/md/• heavier")) FAIL("styles", "prune did not remove the core's old suffixed name after its siblings were dropped");
     if (!F.figma._styles.some((x) => x.name === "Display/md")) FAIL("styles", "the core did not revert to its bare name once siblings were dropped");
     if (!F.figma._styles.some((x) => x.name === "My Own/keep-me")) FAIL("styles", "prune touched a USER style (provenance violated)");
     if (!sr2.pruned) FAIL("styles", "prune count not reported");

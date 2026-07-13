@@ -510,6 +510,16 @@ async function applyStylePlans(sp) {
       bindField("fontFamily", primVars);
       bindField("fontStyle", primVars);
       bindField("fontWeight", primVars);
+      // fontStyle/fontWeight are MUTUALLY EXCLUSIVE per plan (see style-plan.mjs) — but a REUSED style
+      // object (found by name across re-applies) can carry a STALE bind from an earlier apply where the
+      // OTHER field of the pair was the one in play (e.g. a voice gains a custom styleName later, while
+      // its Figma style name coincidentally stays the same — names are relative ranks now, not literal
+      // weight names, so this collision is real, not hypothetical). bindField only ever ADDS a binding,
+      // never clears one the current plan omits, so explicitly unbind whichever of the pair the CURRENT
+      // plan does not carry — or Figma's own "closest valid weight" snap on a stale fontWeight binding
+      // could still silently override a freshly-bound fontStyle's precise named cut.
+      if (!bind.fontStyle) { try { st.setBoundVariable("fontStyle", null); } catch (e) { /* nothing was bound, or unsupported */ } }
+      if (!bind.fontWeight) { try { st.setBoundVariable("fontWeight", null); } catch (e) { /* nothing was bound, or unsupported */ } }
       current[t.name] = st.id; out.texts++;
     }
     for (const name of Object.keys(reg.texts)) {

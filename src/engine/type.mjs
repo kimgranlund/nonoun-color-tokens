@@ -378,6 +378,24 @@ export function weightNameFor(weight) {
   return { weight: snap, name: WEIGHT_NAMES[snap], slug: kebab(WEIGHT_NAMES[snap]) };
 }
 
+// RELATIVE_WEIGHT_LABELS / relativeWeightLabel — the normalized Figma Styles-panel vocabulary (2026-07-13,
+// at request): every voice's core + siblings gets ONE of these 4 words, by RANK among the resolved set,
+// regardless of what real font/weight sits underneath. A literal name (a custom face's own style string,
+// or a generic ladder name like "Semi-bold") reads illegibly once Figma truncates a long custom name in
+// its narrow panel (multiple siblings collapsing to the same visible "condensed …" prefix) — a relative
+// word is always short and always distinct. `rank` = the item's 0-indexed position in the ascending-
+// sorted, deduplicated set of ALL resolved weights for that voice (core + every sibling); `total` = that
+// set's size. Interpolates the rank evenly across the 4-word scale, so it degrades cleanly for any count
+// 1–4 (today's max — a core + up to 3 siblings): total 4 uses all 4 words in order; fewer total picks a
+// still-ordered, still-distinct subset (e.g. total 2 → the two extremes, "Lighter"/"Heavier"). total ≤ 1
+// (no siblings — nothing to disambiguate) ⇒ null, the existing bare-name path.
+export const RELATIVE_WEIGHT_LABELS = ["Lighter", "Light", "Heavy", "Heavier"];
+export function relativeWeightLabel(rank, total) {
+  if (!Number.isFinite(rank) || !Number.isFinite(total) || total <= 1) return null;
+  const idx = Math.round((rank / (total - 1)) * (RELATIVE_WEIGHT_LABELS.length - 1));
+  return RELATIVE_WEIGHT_LABELS[Math.max(0, Math.min(RELATIVE_WEIGHT_LABELS.length - 1, idx))];
+}
+
 // siblingStyleName — when a voice carries a custom Figma style name (a non-variable face, e.g.
 // BZZR's Display: "Condensed Black Italic"), a sibling's own style name must follow the SAME naming
 // convention, substituting just the weight word — "Condensed Bold Italic", not a bare "Bold". This
