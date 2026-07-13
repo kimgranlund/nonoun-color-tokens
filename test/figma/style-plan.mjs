@@ -78,6 +78,12 @@ const plans = stylePlans({ families, scale });
   ok(!!coreNamed && coreNamed.literal.styleName === "Bold Condensed" && coreNamed.bind.fontStyle === "weight-style/Display" && coreNamed.bind.fontWeight === "weight/Display", "core style (WITH siblings + a custom style name): Voice/step/• {custom style name}, styleName + weight-style/weight binding still on the UN-suffixed primitive");
   const sib = plans.texts.find((t) => t.name === "Display/md/medium");
   ok(!!sib && sib.literal.weight === 500 && sib.bind.fontStyle === "weight-style/Display/medium" && sib.bind.fontWeight === "weight/Display/medium", "sibling style: Voice/step/{slug} (lowercase-kebab via wv.slug) with per-sibling bindings — no dot prefix, only the core gets one");
+  // a sibling's literal.styleName must follow the SAME custom-face naming convention as the core, not
+  // a bare generic name — resolveFace (figma/plugin/code.js) exact-matches styleName against the
+  // family's real installed style list, so "Medium" alone would miss "Medium Condensed" entirely and
+  // silently fall back to a nearest-weight guess. Core here is "Bold Condensed" (weight 700 → "Bold");
+  // the sibling (Medium, 500) must read "Medium Condensed", substituting just the weight word.
+  ok(sib && sib.literal.styleName === "Medium Condensed", `sibling styleName follows the core's custom naming convention, not a bare generic name (got ${sib && sib.literal.styleName})`);
   // Body's core weight (440, unstyled — makeVoices's default) snaps to "Regular"; Body also has 1
   // EXPLICITLY configured sibling, so its core is dot-prefixed too.
   const bodyCore = plans.texts.find((t) => t.name === "Body/md/• Regular");
@@ -92,6 +98,15 @@ const plans = stylePlans({ families, scale });
   // the ONE remaining bare path: a voice that explicitly opts OUT via weights:[] (Kicker, here).
   const bareCore = plans.texts.find((t) => t.voice === "Kicker" && t.step === "MD");
   ok(!!bareCore && bareCore.name === "Kicker/md", "a voice that explicitly opts OUT (weights:[]) keeps the bare Voice/step name — the only way to still get one");
+  // fallback: a custom style name that DOESN'T literally contain the core's own weight-name word
+  // (e.g. a face named after a brand, not a weight) can't be safely templated — a sibling falls back
+  // to its own bare name rather than risk a wrong substitution.
+  {
+    const noTemplateScale = typeScale({ treatment: "product", voices: { Headline: { styleName: "Brand Grotesk", weights: [{ name: "Medium", weight: 500 }] } } });
+    const noTemplatePlans = stylePlans({ families, scale: noTemplateScale });
+    const fallbackSib = noTemplatePlans.texts.find((t) => t.voice === "Headline" && t.step === "MD" && t.name.endsWith("/medium"));
+    ok(!!fallbackSib && fallbackSib.literal.styleName === "Medium", `no matchable weight word in the custom name ⇒ sibling falls back to its own bare name (got ${fallbackSib && fallbackSib.literal.styleName})`);
+  }
   ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(\/(?:[a-z0-9-]+|• [^/]+))?(\/single)?$/.test(t.name)), "every text style name is Voice/lowerstep[/lower-kebab-slug OR /• custom-or-Title-Case name][/single]");
   // volume: every voice×step gets 1 core + its siblings.length (auto-populated by default, 0 only for
   // an explicit opt-out) — plus a `/single` mirror of every Body/Label style. Derived from the
