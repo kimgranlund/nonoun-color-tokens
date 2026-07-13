@@ -128,14 +128,14 @@ function mockFigma() {
 }
 
 // ── END-TO-END contract: figmaBundle() -> applyBundle() on the mock ──────────────
-let applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, setCollectionNames;
+let applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, setCollectionNames, resolveFace;
 const F = mockFigma();
 try {
-  const load = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, setCollectionNames };");
+  const load = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyFloatPlans, applyFontPrimitives, applyStylePlans, setCollectionNames, resolveFace };");
   const loaded = load(F.figma, "<html>", undefined); // closes over the MOCK figma
   applyBundle = loaded.applyBundle; applyFloatPlans = loaded.applyFloatPlans;
   applyFontPrimitives = loaded.applyFontPrimitives; applyStylePlans = loaded.applyStylePlans;
-  setCollectionNames = loaded.setCollectionNames;
+  setCollectionNames = loaded.setCollectionNames; resolveFace = loaded.resolveFace;
 } catch (e) { FAIL("parse", "code.js failed to load: " + e.message); }
 
 if (applyBundle) {
@@ -396,8 +396,27 @@ if (applyFloatPlans) {
   if (!F4.figma.ui._posted.some((m) => m && m.type === "apply-error")) FAIL("applydone", "a FAILED apply posted no {apply-error} message to the UI");
 }
 
+// ── resolveFace: separator/case-insensitive fuzzy match — a REAL font's style catalog doesn't agree
+// on hyphen vs. space for compound weight names (this kit's own WEIGHT_NAMES: "Extra-bold",
+// "Semi-bold"), and an exact-string-only match silently missed the real face, falling back to the
+// nearest-weight guess (which doesn't even preserve italic) — found live via BZZR's real GT America
+// styles ("Condensed Extra Bold Italic", space, vs. the templated "Condensed Extra-bold Italic",
+// hyphen) resolving to plain "Bold". ──
+if (resolveFace) {
+  const styles = ["Regular", "Condensed Bold Italic", "Condensed Extra Bold Italic", "Condensed Black Italic"];
+  const exact = resolveFace(styles, { styleName: "Condensed Bold Italic", weight: 700 });
+  if (exact !== "Condensed Bold Italic") FAIL("resolveface", `an exact match still wins outright (got ${exact})`);
+  const fuzzy = resolveFace(styles, { styleName: "Condensed Extra-bold Italic", weight: 800 });
+  if (fuzzy !== "Condensed Extra Bold Italic") FAIL("resolveface", `hyphen vs. space must fuzzy-match to the real face (got ${fuzzy}, want "Condensed Extra Bold Italic")`);
+  const caseInsensitive = resolveFace(styles, { styleName: "condensed extra-bold italic", weight: 800 });
+  if (caseInsensitive !== "Condensed Extra Bold Italic") FAIL("resolveface", `the fuzzy match must be case-insensitive too (got ${caseInsensitive})`);
+  const noMatch = resolveFace(styles, { styleName: "Totally Unrelated Name", weight: 800 });
+  if (noMatch === "Totally Unrelated Name") FAIL("resolveface", "a genuinely absent style name must still fall back to the nearest-weight guess, not itself");
+  if (!styles.includes(noMatch)) FAIL("resolveface", `the nearest-weight fallback must return a REAL style from the list (got ${noMatch})`);
+}
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "applysys", "applydone", "config", "read", "fonts"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "applysys", "applydone", "config", "read", "fonts", "resolveface"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
