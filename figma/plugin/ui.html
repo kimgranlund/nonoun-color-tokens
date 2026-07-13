@@ -7709,7 +7709,11 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
       const family = resolvedFontFor(scale, voice) || "";
       const coreStyleName = (scale.styleNames && scale.styleNames[voice]) || null;
       const sibs = (scale.weights && scale.weights[voice]) || [];
-      for (const [step, s] of Object.entries(steps)) {
+      // text styles list LARGEST → smallest (LG, MD, SM) in the Figma Styles panel — the reverse of the
+      // engine's own SM/MD/LG insertion order (steps is a plain {SM,MD,LG} object; Figma preserves the
+      // plan's own order rather than re-sorting, so this array IS the panel order).
+      for (const step of ["LG", "MD", "SM"]) {
+        const s = steps[step];
         if (!s || !Number.isFinite(s.size)) continue;
         const stepSlug = String(step).toLowerCase();
         // paragraphSpacing rides only where the engine emits it (prose voices); a 0 is still a value.
