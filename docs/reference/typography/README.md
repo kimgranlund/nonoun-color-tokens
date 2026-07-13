@@ -60,10 +60,14 @@ now a fixed literal table (`SIZES` in `src/engine/type.mjs`); the rest still der
 `{ leading per category, weight ramp, optical tracking coefficient, font roles }`:
 
 - **Size** = a **fixed literal per voice+step** (e.g. Display SM/MD/LG = 72/96/120), identical across
-  every treatment. `bodyBase` (default 15 — Body/Label's own fixed MD literal) still scales the WHOLE
-  table proportionally (`factor = bodyBase/15`) — a larger/smaller `bodyBase` grows/shrinks every voice
+  every treatment. `bodyBase` (default 16 — Body's own fixed MD literal) still scales the WHOLE
+  table proportionally (`factor = bodyBase/16`) — a larger/smaller `bodyBase` grows/shrinks every voice
   together, snapping back onto a nice-number ladder when the factor isn't 1. Ratio (`base × ratio^step`)
-  is **retired** — it no longer means anything to override per voice.
+  is **retired** — it no longer means anything to override per voice. Body's own SM/MD/LG = 14/16/18;
+  at the responsive **Mobile** breakpoint tier specifically (the canonical ×2/3 compression factor),
+  Body carries a targeted per-cell nudge down to 14/15/16 (its own pre-2026-07-13 sizes) — the general
+  hierarchy-aware law freezes Body/Label at Desktop↔Tablet by design, but can't produce this small step
+  on its own, so it's a deliberate, explicit exception, not a change to the general compression curve.
 - **Letter Spacing** = `f(size)` — negative to *tighten* large display, positive to *loosen* small label text (optical).
 - **Multi-line Height** = `size × leading`, where **leading is a per-role constant** (the
   `font.modes.json` design intent). The reading/display voices are held *uniform across all treatments* —

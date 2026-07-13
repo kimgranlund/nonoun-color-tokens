@@ -3107,7 +3107,7 @@ class HctApp extends HTMLElement {
     const { baseName: bn, baseLast } = this._typeBaseOpts();
     // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
     if (this.typeMode !== "base" && this.typeMode !== "compare" && !modes.some((m) => m.id === this.typeMode)) this.typeMode = "base";
-    const baseItem = { id: "base", label: bn, title: `${bn} type scale · ${t.bodyBase ?? 15}px` };
+    const baseItem = { id: "base", label: bn, title: `${bn} type scale · ${t.bodyBase ?? DEFAULT_TYPE.bodyBase}px` };
     const modeItems = modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: m.factor ? `${m.name || "Mode"} · display ×${Math.round(m.factor * 100)}% (body frozen)` : `${m.name || "Mode"} · ${m.bodyBase}px body` }));
     const items = [
       ...(baseLast ? [...modeItems, baseItem] : [baseItem, ...modeItems]),
@@ -3148,7 +3148,7 @@ class HctApp extends HTMLElement {
     this.commit((d) => {
       d.type = { ...(d.type || DEFAULT_TYPE) };
       const modes = d.type.modes ? [...d.type.modes] : [];
-      modes.push({ id, name: "Mode " + (modes.length + 1), bodyBase: d.type.bodyBase ?? 15 });
+      modes.push({ id, name: "Mode " + (modes.length + 1), bodyBase: d.type.bodyBase ?? DEFAULT_TYPE.bodyBase });
       d.type.modes = modes;
     });
   }
@@ -3352,6 +3352,17 @@ class HctApp extends HTMLElement {
   //   doc.geometry.tokenOverrides = { "<size>|<modeKey>": <heightPx> }
   // modeKey = "base" or a breakpoint mode's id; "|" never appears in a voice/step/size name. ──
 
+  // _bodyMobileNudge(modeFactor) — Body's own small step down at the canonical Mobile compression tier
+  // (modeFactor 2/3), 2026-07-13, at request. The general hierarchy-aware law freezes anything
+  // at-or-below bodyBase (by design — "body-class text doesn't move"), so it can't produce this on its
+  // own; a targeted per-cell override (the EXISTING size-override mechanism) lands Body's Mobile SM/MD/LG
+  // on its own pre-2026-07-13 sizes. Keyed on the FACTOR itself (not a mode's name/id), so it applies
+  // consistently whether the Mobile tier is the synthesized (no-modes) shape or the materialized Standard
+  // set (addStandardTypeModes) — both use this exact factor for their "Mobile" rung. The SINGLE source for
+  // both call sites (_typeScaleFor / _typeModeScales), so they can never independently drift.
+  _bodyMobileNudge(modeFactor) {
+    return Math.abs((modeFactor || 1) - 2 / 3) < 1e-9 ? { "Body|SM": 14, "Body|MD": 15, "Body|LG": 16 } : null;
+  }
   // _typeOverridesFor(modeKey) — the flat { "<voice>|<step>": size } slice for one mode (the suffix stripped).
   _typeOverridesFor(modeKey) {
     const all = (this.doc.type && this.doc.type.tokenOverrides) || null;
@@ -3372,7 +3383,8 @@ class HctApp extends HTMLElement {
   _typeScaleFor(modeKey) {
     const t = this.doc.type || DEFAULT_TYPE;
     const base = modeKey === "base" ? t : (() => { const m = (t.modes || []).find((x) => x.id === modeKey); return m ? { ...t, bodyBase: m.bodyBase ?? t.bodyBase, modeFactor: m.factor ?? 1 } : t; })();
-    return typeScale({ ...base, overrides: this._typeOverridesFor(modeKey) });
+    const overrides = { ...this._bodyMobileNudge(base.modeFactor), ...this._typeOverridesFor(modeKey) };
+    return typeScale({ ...base, overrides });
   }
   // _geomOverridesFor(modeKey) — the flat { "<size>": height } slice for one mode (the suffix stripped).
   _geomOverridesFor(modeKey) {
@@ -6704,12 +6716,20 @@ class HctApp extends HTMLElement {
   // doc carries configured modes they resolve override-aware (via _typeScaleFor, incl. factor modes);
   // when it carries NONE the pair is synthesized — so every export/apply carries Desktop · Tablet ·
   // Mobile with zero setup. Configuring your own modes (＋) takes full manual control.
+  //
+  // Body's own Mobile-only nudge (2026-07-13, at request): the general modeFactor curve freezes anything
+  // at-or-below bodyBase and barely compresses what's just above it (by design — "body-class text doesn't
+  // move"), so it can't produce Body's small step down at just the smallest breakpoint on its own. A
+  // targeted per-cell override (reusing the EXISTING size-override mechanism, not a change to the general
+  // law) lands Body's Mobile SM/MD/LG on its own pre-2026-07-13 sizes — Tablet still uses the general
+  // curve untouched (frozen, same as Desktop).
   _typeModeScales() {
     const t = this.doc.type || DEFAULT_TYPE;
     if ((t.modes || []).length) return t.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._typeScaleFor(m.id) }));
+    const mobileOverrides = { ...(t.overrides || {}), ...this._bodyMobileNudge(2 / 3) };
     return [
       { name: "Tablet", minWidth: 992, scale: typeScale({ ...t, modeFactor: 5 / 6 }) },
-      { name: "Mobile", minWidth: 476, scale: typeScale({ ...t, modeFactor: 2 / 3 }) },
+      { name: "Mobile", minWidth: 476, scale: typeScale({ ...t, modeFactor: 2 / 3, overrides: mobileOverrides }) },
     ];
   }
   _geomModeScales() {

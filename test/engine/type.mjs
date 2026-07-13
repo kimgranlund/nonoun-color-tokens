@@ -42,7 +42,7 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
 // ── the FIXED SIZE TABLE (2026-07-13): literal per-voice px, shared across ALL 5 treatments; Body-mono
 // aliases Body's own triplet, Label-mono + Kicker alias Label's, Tiny-mono aliases Tiny's — same numbers, mono font only ──
 {
-  const s = T.typeScale({ treatment: "product", bodyBase: 15 }).categories;
+  const s = T.typeScale({ treatment: "product", bodyBase: 16 }).categories;
   const sizes = (v) => ["SM", "MD", "LG"].map((k) => s[v][k].size);
   ok(sizes("Display").join() === "72,96,120", `Display fixed sizes 72/96/120 (got ${sizes("Display")})`);
   ok(sizes("Headline").join() === "32,40,48", `Headline fixed sizes 32/40/48 (got ${sizes("Headline")})`);
@@ -50,8 +50,8 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
   ok(sizes("Title").join() === "24,32,40", `Title fixed sizes 24/32/40 (got ${sizes("Title")})`);
   ok(sizes("Sub-title").join() === "18,24,32", `Sub-title fixed sizes 18/24/32 (got ${sizes("Sub-title")})`);
   ok(sizes("Lead").join() === "20,24,28", `Lead fixed sizes 20/24/28 (got ${sizes("Lead")})`);
-  ok(sizes("Body").join() === "14,15,16", `Body fixed sizes 14/15/16 (got ${sizes("Body")})`);
-  ok(sizes("Label").join() === "12,13,14", `Label fixed sizes 12/13/14 — a step below Body (got ${sizes("Label")})`);
+  ok(sizes("Body").join() === "14,16,18", `Body fixed sizes 14/16/18 (got ${sizes("Body")})`);
+  ok(sizes("Label").join() === "12,13,14", `Label fixed sizes 12/13/14 (got ${sizes("Label")})`);
   ok(sizes("Tiny").join() === "9,10,11", `Tiny fixed sizes 9/10/11 (got ${sizes("Tiny")})`);
   // Body-mono aliases Body's triplet; Label-mono + Kicker alias Label's; Tiny-mono aliases Tiny's — SAME numbers, mono font only.
   ok(sizes("Body-mono").join() === sizes("Body").join(), "Body-mono's sizes alias Body's own triplet exactly");
@@ -61,7 +61,7 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
   // this table is IDENTICAL across all 5 treatments (confirmed decision: treatments differ only in
   // font/weight/tracking/leading/case, never size).
   for (const t of ["luxury", "editorial", "technical", "statement"]) {
-    const sc = T.typeScale({ treatment: t, bodyBase: 15 }).categories;
+    const sc = T.typeScale({ treatment: t, bodyBase: 16 }).categories;
     ok(sizes("Display").join() === ["SM", "MD", "LG"].map((k) => sc.Display[k].size).join(), `${t}'s Display sizes match product's (shared fixed table)`);
     ok(sizes("Body").join() === ["SM", "MD", "LG"].map((k) => sc.Body[k].size).join(), `${t}'s Body sizes match product's (shared fixed table)`);
   }
@@ -101,9 +101,9 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
 // breakpoint-compressed — an UNSCALED literal (factor 1, no compression) passes through EXACTLY, never
 // re-snapped to a different "nice" number (the 2026-07-13 fix: 120 must stay 120, not round to 128) ──
 {
-  const disp = T.typeScale({ treatment: "product", bodyBase: 15 }).categories.Display;
+  const disp = T.typeScale({ treatment: "product", bodyBase: 16 }).categories.Display;
   ok(["SM", "MD", "LG"].map((k) => disp[k].size).join(",") === "72,96,120", `unscaled Display is the EXACT literal 72,96,120, not quantizer-rounded (got ${["SM", "MD", "LG"].map((k) => disp[k].size)})`);
-  const subhead = T.typeScale({ treatment: "product", bodyBase: 15 }).categories["Sub-heading"];
+  const subhead = T.typeScale({ treatment: "product", bodyBase: 16 }).categories["Sub-heading"];
   ok(["SM", "MD", "LG"].map((k) => subhead[k].size).join(",") === "28,34,40", `unscaled Sub-heading is the EXACT literal 28,34,40 (got ${["SM", "MD", "LG"].map((k) => subhead[k].size)})`);
   // a value is ON the ladder iff it equals its own band-step snap (step 1 ≤16, 2 ≤24, 4 ≤48, 8 ≤96, 16 else)
   const step = (v) => (v <= 16 ? 1 : v <= 24 ? 2 : v <= 48 ? 4 : v <= 96 ? 8 : 16);
@@ -131,11 +131,11 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
   ok(s.categories.Display.LG.weight >= 700, `Display weight heavy (got ${s.categories.Display.LG.weight})`);
 }
 
-// ── bodyBase scales the whole FIXED table uniformly (factor = bodyBase/15) ──
+// ── bodyBase scales the whole FIXED table uniformly (factor = bodyBase/16) ──
 {
-  const a = T.typeScale({ treatment: "product", bodyBase: 15 });
+  const a = T.typeScale({ treatment: "product", bodyBase: 16 });
   const b = T.typeScale({ treatment: "product", bodyBase: 20 });
-  ok(a.categories.Body.MD.size === 15, `bodyBase 15 (identity) → Body MD 15, unscaled (got ${a.categories.Body.MD.size})`);
+  ok(a.categories.Body.MD.size === 16, `bodyBase 16 (identity) → Body MD 16, unscaled (got ${a.categories.Body.MD.size})`);
   ok(b.categories.Body.MD.size > a.categories.Body.MD.size, `a larger bodyBase scales Body up too (got ${b.categories.Body.MD.size})`);
   ok(b.categories.Display.LG.size > a.categories.Display.LG.size, "a larger bodyBase scales Display up too");
 }

@@ -2154,6 +2154,15 @@ app.inFigma = false; app.closeSettings(); flushRaf();
 // compressed ×5/6 / ×2/3), geometry via heights −2/−4.
 app.commit((d) => { if (d.type) { d.type = { ...d.type }; delete d.type.modes; delete d.type.baseName; } if (d.geometry) { d.geometry = { ...d.geometry }; delete d.geometry.modes; delete d.geometry.baseName; } }); flushRaf();
 const stdBB = (app.doc.type && app.doc.type.bodyBase) ?? 16;
+// Body's targeted Mobile-only nudge (2026-07-13, at request), checked on the SYNTHESIZED (no-modes)
+// path first, before addStandardTypeModes materializes real modes below — Desktop/Tablet both 18/16/14
+// (LG/MD/SM), Mobile steps down to 16/15/14.
+{
+  const bodyLGMDSM = (s) => ["LG", "MD", "SM"].map((k) => s.categories.Body[k].size).join("/");
+  const synthMS = app._typeModeScales();
+  ok(bodyLGMDSM(app._typeScaleFor("base")) === "18/16/14", `(std) the synthesized Desktop (base) scale: Body LG/MD/SM (got ${bodyLGMDSM(app._typeScaleFor("base"))})`);
+  ok(JSON.stringify(synthMS.map((m) => bodyLGMDSM(m.scale))) === JSON.stringify(["18/16/14", "16/15/14"]), `(std) the synthesized (no-modes) Tablet/Mobile pair: Body LG/MD/SM (got ${JSON.stringify(synthMS.map((m) => bodyLGMDSM(m.scale)))})`);
+}
 app.addStandardTypeModes(); flushRaf();
 {
   const ms = (app.doc.type.modes || []);
@@ -2165,11 +2174,15 @@ app.addStandardTypeModes(); flushRaf();
   ok(opts.baseName === "Desktop" && opts.baseLast === false, "(std) _typeBaseOpts derives Desktop-first (the designed scale IS Figma's default mode)");
   const cols = app._typeTokenColumns();
   ok(JSON.stringify(cols.map((c) => c.name)) === JSON.stringify(["Desktop", "Tablet", "Mobile"]), `(std) the type token matrix reads Desktop · Tablet · Mobile (got ${JSON.stringify(cols.map((c) => c.name))})`);
-  // the ratified law itself: Body/MD frozen across every column; the Display top strictly compresses.
+  // the ratified law itself: Body/MD frozen Desktop→Tablet (the general law); Display top strictly compresses.
   const bodyAt = cols.map((c) => c.scale.categories.Body.MD.size);
-  ok(bodyAt.every((s) => s === bodyAt[0]), `(std) Body/MD is FROZEN across Desktop·Tablet·Mobile (${bodyAt.join("·")})`);
+  ok(bodyAt[0] === bodyAt[1], `(std) Body/MD is FROZEN Desktop→Tablet (${bodyAt.join("·")})`);
   const dispTop = cols.map((c) => { const st = Object.values(c.scale.categories.Display); return st[st.length - 1].size; });
   ok(dispTop[0] > dispTop[1] && dispTop[1] > dispTop[2], `(std) the Display top strictly compresses Desktop→Tablet→Mobile (${dispTop.join("→")})`);
+  // the SAME Mobile nudge via the MATERIALIZED Standard set (addStandardTypeModes → _typeScaleFor per
+  // mode) — must match the synthesized (no-modes) check above exactly, so the two paths can never drift.
+  const bodyLGMDSM = (s) => ["LG", "MD", "SM"].map((k) => s.categories.Body[k].size).join("/");
+  ok(bodyLGMDSM(cols[0].scale) === "18/16/14" && bodyLGMDSM(cols[1].scale) === "18/16/14" && bodyLGMDSM(cols[2].scale) === "16/15/14", `(std) Body LG/MD/SM: Desktop ${bodyLGMDSM(cols[0].scale)}, Tablet ${bodyLGMDSM(cols[1].scale)}, Mobile ${bodyLGMDSM(cols[2].scale)} (want 18/16/14, 18/16/14, 16/15/14)`);
 }
 const stdBH = (app.doc.geometry && app.doc.geometry.baseHeight) ?? 28;
 app.addStandardGeomModes(); flushRaf();

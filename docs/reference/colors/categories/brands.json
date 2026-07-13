@@ -249,7 +249,7 @@
           "dominantHex": "#1F1DF9",
           "type": {
             "treatment": "statement",
-            "bodyBase": 15,
+            "bodyBase": 16,
             "fonts": {
               "display": "GT America",
               "heading": "GT America",
@@ -420,7 +420,7 @@
           "dominantHex": "#23436E",
           "type": {
             "treatment": "editorial",
-            "bodyBase": 15,
+            "bodyBase": 16,
             "fonts": {
               "display": "Trade Gothic Bold Condensed No. 20",
               "heading": "News Gothic",

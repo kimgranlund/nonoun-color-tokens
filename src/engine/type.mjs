@@ -10,12 +10,12 @@
 // Now each voice's SM/MD/LG are literal px values (SIZES below), shared identically across all 5
 // treatments — matching how Google's own Material 3 scale works (one fixed scale; theme varies
 // styling, not the numbers). Treatments now differ ONLY in font/weight/tracking/leading/case, never
-// size. `bodyBase` still scales the WHOLE fixed table proportionally (factor = bodyBase/15); the
+// size. `bodyBase` still scales the WHOLE fixed table proportionally (factor = bodyBase/16); the
 // per-cell `overrides` escape hatch (see buildCategory) is still how a user moves an individual cell
 // off the fixed default — untouched by this change.
 //
 // The system relationships (see docs/reference/typography/README.md):
-//   size          = FIXED_SIZE(voice, step) × factor     (factor = bodyBase/15; see typeScale)
+//   size          = FIXED_SIZE(voice, step) × factor     (factor = bodyBase/16; see typeScale)
 //   lineHeight     = round(size · leading)     (per-role leading; single-line = size)
 //   letterSpacing = round(size · trackingEm)  (optical: negative tightens big display, positive loosens UI)
 //   weight        = the role's weight
@@ -35,7 +35,7 @@ const SIZES = {
   Title: [24, 32, 40],
   "Sub-title": [18, 24, 32],
   Lead: [20, 24, 28],
-  Body: [14, 15, 16],
+  Body: [14, 16, 18],
   Label: [12, 13, 14],
   Tiny: [9, 10, 11],
 };
@@ -45,7 +45,8 @@ const stepsFor = (sizeKey) => RANKS.map((r, i) => [r, SIZES[sizeKey][i]]);
 // A "treatment" seeds the CHARACTER params, exactly as the color "Color Categories" presets seed
 // palette params. Each category: { role, base, leading, weight, trackingEm, steps, transform, box }.
 // `base` = the voice's MD-step literal (kept for typeScale's bodyBase→factor math, since Body's base
-// must still equal 15 for `factor = bodyBase/15` to mean what it says). Fonts are swappable; the
+// must still equal SIZES.Body[1] — 16 — for `factor = bodyBase/16` to mean what it says, and
+// DEFAULT_TYPE.bodyBase must track it too). Fonts are swappable; the
 // WEIGHT/TRACKING/LEADING/CASE relationships are the product now, not the scale. Free families only.
 // `box` — the presentation FLOW, decoupled from the font role: box voices are CONTROL/label text (they
 // emit a single-line height and use label-height paragraph spacing); prose voices wrap (no single-line
@@ -122,7 +123,7 @@ export const TYPE_TREATMENTS = [
     categories: makeVoices({ dWeight: 900, dTrack: -0.04, dTransform: "uppercase", hWeight: 800, hTrack: -0.02, shWeight: 700, shTrack: 0.12, bWeight: 500, labelWeight: 550, labelTrack: 0.02, kickWeight: 700, kickTrack: 0.12 }) },
 ];
 
-export const DEFAULT_TYPE = { treatment: "product", bodyBase: 15 };
+export const DEFAULT_TYPE = { treatment: "product", bodyBase: 16 }; // matches Body's own fixed MD literal (SIZES.Body[1]) — the factor=1 anchor
 // The families bundled (woff2 in type-fonts.js) — the Fonts combobox menu. A user may also TYPE any custom
 // family per role (config.fonts in typeScale); it exports + renders if installed, else falls back to a generic.
 export const BUNDLED_FONTS = ["Inter", "Inter Tight", "Source Serif 4", "JetBrains Mono"];
@@ -241,7 +242,7 @@ function buildCategory(name, p, factor, overrides, vp, compress) {
 
 // typeScale — the resolved scale for a config { treatment, bodyBase, modeFactor?, overrides? }. `bodyBase`
 // (the Body base size) uniformly scales the WHOLE fixed size table so the system grows/shrinks together
-// (factor = bodyBase/15 — Body's MD literal). `overrides` (optional) is a flat per-cell size-override map
+// (factor = bodyBase/16 — Body's MD literal). `overrides` (optional) is a flat per-cell size-override map
 // (see buildCategory); ABSENT ⇒ identity.
 // `modeFactor` (optional, default 1) — the HIERARCHY-AWARE breakpoint compression (Kim's ratified law,
 // 2026-07-10): body-class text is frozen across breakpoints while display-class type compresses. The
