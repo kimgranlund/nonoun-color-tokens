@@ -52,8 +52,9 @@ import { weightNameFor, resolvedFontFor, siblingStyleName, coreWeightKey } from 
 
 // SINGLE_LINE_VOICES — voices that additionally get a "{step}-single" text-style sibling FOLDER
 // (1.0 leading — line-height = size) alongside their normal "{step}" multi-line group, per step and
-// per configured weight.
-const SINGLE_LINE_VOICES = new Set(["Body", "Label"]);
+// per configured weight. Body-mono/Label-mono join their non-mono siblings here (both already carry
+// singleLineHeight as engine DATA — they're BOX voices too, see buildCategory's `box` default).
+const SINGLE_LINE_VOICES = new Set(["Body", "Body-mono", "Label", "Label-mono"]);
 
 // siblingStyleName lives in the engine (src/engine/type.mjs) — it's the ONE source of truth shared
 // with typeTokensFigmaPrimitives's own weight-style/<voice>/<slug> primitive, so the two can never
