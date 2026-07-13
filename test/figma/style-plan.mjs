@@ -90,11 +90,13 @@ const plans = stylePlans({ families, scale });
   // back to a nearest-weight guess. Only the DISPLAY LABEL (the relative word) changed; the literal is
   // exactly as templated before.
   ok(!!sib500 && sib500.literal.styleName === "Medium Condensed", `sibling styleName still follows the core's custom naming convention (the literal, not the label) — got ${sib500 && sib500.literal.styleName}`);
-  // Body's core (unstyled, weight 440) + its 1 EXPLICIT sibling (Semi-bold/600) — 2 distinct weights,
-  // core (440, the lighter of the two) ranks "lighter"; the sibling (600) ranks "heavier".
-  const bodyCore = plans.texts.find((t) => t.name === "Body/md/• lighter");
+  // Body's core (unstyled, weight 440) + its 1 EXPLICIT sibling (Semi-bold/600) — 2 distinct weights.
+  // Body is a BODY_CLASS_VOICE (2026-07-13, at request): its vocabulary is Regular/Bolder/Boldest, not
+  // Lighter/Light/Heavy/Heavier — core (440, lighter of the two) ranks "regular"; the sibling (600)
+  // ranks "boldest" (2 total ⇒ the two extremes of the 3-word scale, skipping "Bolder").
+  const bodyCore = plans.texts.find((t) => t.name === "Body/md/• regular");
   ok(!!bodyCore, "Body core (WITH a sibling) also carries its own dot-prefixed relative label, lowercase");
-  const bodySib = plans.texts.find((t) => t.name === "Body/md/heavier");
+  const bodySib = plans.texts.find((t) => t.name === "Body/md/boldest");
   ok(!!bodySib && bodySib.literal.weight === 600, "Body sibling present with its weight, relative-labeled");
   // AUTO-POPULATE (2026-07-13): a voice with NO explicit weights config (Headline, here) still gets 3
   // siblings from siblingWeightDefaults on its own resolved core weight — dot-prefixed core included.
@@ -140,27 +142,35 @@ const plans = stylePlans({ families, scale });
   const singles = plans.texts.filter((t) => /-single$/.test(t.name));
   ok(singles.every((t) => SINGLE_VOICES.has(t.voice)), `only Body/Body-mono/Label/Label-mono carry a -single variant (voices: ${[...new Set(singles.map((t) => t.voice))].join(",")})`);
   ok(!plans.texts.some((t) => t.name.endsWith("/single") || t.name.includes("/single/") || /-single\//.test(t.name)), "no text style name uses the old \"/single\" segment or \"{step}-single\" folder shape (both collided/hid siblings away)");
-  // Body's core (in THIS fixture, with 1 explicit sibling) ranks "lighter" (see above) — its -single
-  // mirror carries the SAME relative label.
-  const bodySingle = plans.texts.find((t) => t.name === "Body/md/• lighter-single");
+  // Body is a BODY_CLASS_VOICE (2026-07-13, at request): its label vocabulary is the simpler
+  // Regular/Bolder/Boldest, not Lighter/Light/Heavy/Heavier. In THIS fixture (core + 1 explicit
+  // sibling, 2 total) the core (lighter of the 2) ranks "regular" — its -single mirror matches.
+  const bodySingle = plans.texts.find((t) => t.name === "Body/md/• regular-single");
   ok(!!bodySingle && bodySingle.literal.lineHeight === bodySingle.literal.size && !bodySingle.bind.lineHeight, "Body's -single style: literal lineHeight = size, UNBOUND (Body has no singleLineHeight variable — it's prose)");
-  // a FRESH, fully-default scale (every voice auto-populates its own 3 siblings) — Label/Body-mono/
-  // Label-mono/Body's cores all rank 2nd-of-4 among their own auto-populated set here → "light".
+  // a FRESH, fully-default scale — Label/Body-mono/Label-mono/Body all auto-populate via
+  // bodyClassSiblingDefaults now (2 siblings, BOTH heavier — capped for BODY_CLASS_VOICES), so each
+  // core is the LIGHTEST of its own 3-total set → "regular", matching the Regular/Bolder/Boldest scale.
   const labelScale = typeScale({ treatment: "product" });
   const labelPlans = stylePlans({ families, scale: labelScale });
-  const labelSingle = labelPlans.texts.find((t) => t.name === "Label/md/• light-single");
+  const labelSingle = labelPlans.texts.find((t) => t.name === "Label/md/• regular-single");
   ok(!!labelSingle && labelSingle.bind.lineHeight === "Label/MD/singleLineHeight", "Label's -single style BINDS live to its real singleLineHeight variable (Label is a box voice)");
   // Body-mono/Label-mono join Body/Label here (2026-07-13, at request) — both are BOX voices too (mono
   // role defaults box:true in buildCategory), so unlike Body's prose fallback, they bind live.
-  const bodyMonoSingle = labelPlans.texts.find((t) => t.name === "Body-mono/md/• light-single");
+  const bodyMonoSingle = labelPlans.texts.find((t) => t.name === "Body-mono/md/• regular-single");
   ok(!!bodyMonoSingle && bodyMonoSingle.bind.lineHeight === "Body-mono/MD/singleLineHeight", "Body-mono's -single style BINDS live to its real singleLineHeight variable (box voice, unlike Body)");
-  const labelMonoSingle = labelPlans.texts.find((t) => t.name === "Label-mono/md/• light-single");
+  const labelMonoSingle = labelPlans.texts.find((t) => t.name === "Label-mono/md/• regular-single");
   ok(!!labelMonoSingle && labelMonoSingle.bind.lineHeight === "Label-mono/MD/singleLineHeight", "Label-mono's -single style BINDS live to its real singleLineHeight variable");
   // sibling weights get the SAME -single suffix, flat next to their own multi-line style (the exact ask:
   // every configured sibling gets its own "-single" variant, not just the core). Body's sibling (600,
-  // heavier of the 2) ranks "heavier" in THIS fixture.
-  const bodyHeavierSingle = plans.texts.find((t) => t.voice === "Body" && t.step === "MD" && t.name === "Body/md/heavier-single");
-  ok(!!bodyHeavierSingle, "Body's sibling weight carries its own -single variant, not just the core");
+  // the heavier of the 2 in THIS fixture) ranks "boldest".
+  const bodyBoldestSingle = plans.texts.find((t) => t.voice === "Body" && t.step === "MD" && t.name === "Body/md/boldest-single");
+  ok(!!bodyBoldestSingle, "Body's sibling weight carries its own -single variant, not just the core");
+  // BODY_CLASS_VOICES auto-populate ONLY 2 siblings (never 3) — both heavier than the core, never
+  // lighter, matching the Regular/Bolder/Boldest progression's one-directional meaning.
+  const labelBolder = labelPlans.texts.find((t) => t.name === "Label/md/bolder");
+  const labelBoldest = labelPlans.texts.find((t) => t.name === "Label/md/boldest");
+  ok(!!labelBolder && !!labelBoldest && labelBolder.literal.weight > labelScale.categories.Label.MD.weight && labelBoldest.literal.weight > labelBolder.literal.weight, `Label auto-populates exactly 2 siblings, BOTH heavier than the core (core ${labelScale.categories.Label.MD.weight}, got ${labelBolder && labelBolder.literal.weight}/${labelBoldest && labelBoldest.literal.weight})`);
+  ok(!labelPlans.texts.some((t) => t.voice === "Label" && t.step === "MD" && /^Label\/md\/(lighter|light|heavy|heavier)(-single)?$/.test(t.name)), "Label (a BODY_CLASS_VOICE) never uses the Lighter/Light/Heavy/Heavier vocabulary");
 }
 
 // ── include gates + determinism + identity ──

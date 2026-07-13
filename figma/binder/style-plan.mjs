@@ -53,7 +53,7 @@
 // their core in list order. Same inputs ⇒ byte-identical plan (the executor's idempotency rides on it).
 
 import { semanticRoles } from "../../src/engine/semantic.js";
-import { weightNameFor, resolvedFontFor, siblingStyleName, coreWeightKey, relativeWeightLabel } from "../../src/engine/type.mjs";
+import { weightNameFor, resolvedFontFor, siblingStyleName, coreWeightKey, relativeWeightLabel, BODY_CLASS_VOICES, BODY_WEIGHT_LABELS } from "../../src/engine/type.mjs";
 
 // SINGLE_LINE_VOICES — voices that additionally get a "-single"-suffixed text-style sibling (1.0
 // leading — line-height = size), flat alongside their normal multi-line style in the SAME step folder,
@@ -104,7 +104,13 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
       // font/weight sits underneath.
       const coreWeightForRank = (steps.MD || steps.LG || steps.SM).weight;
       const rankedWeights = [...new Set([coreWeightForRank, ...sibs.map((wv) => wv.weight)])].sort((a, b) => a - b);
-      const labelFor = (weight) => relativeWeightLabel(rankedWeights.indexOf(weight), rankedWeights.length);
+      // BODY_CLASS_VOICES (Lead/Body*/Label*/Tiny*) use the simpler Regular/Bolder/Boldest vocabulary
+      // instead of the full Lighter/Light/Heavy/Heavier scale (2026-07-13, at request) — they're capped
+      // at 3 total (core + 2, both heavier) by bodyClassSiblingDefaults, so the 3-word list always maps
+      // 1:1 with no collision risk; relativeWeightLabel falls back to the 4-word scale automatically if
+      // an explicit override ever configures more than 3 total for one of these voices anyway.
+      const labelWords = BODY_CLASS_VOICES.has(voice) ? BODY_WEIGHT_LABELS : undefined;
+      const labelFor = (weight) => relativeWeightLabel(rankedWeights.indexOf(weight), rankedWeights.length, labelWords);
       // text styles list LARGEST → smallest (LG, MD, SM) in the Figma Styles panel — the reverse of the
       // engine's own SM/MD/LG insertion order (steps is a plain {SM,MD,LG} object; Figma preserves the
       // plan's own order rather than re-sorting, so this array IS the panel order).

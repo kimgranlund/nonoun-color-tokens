@@ -403,7 +403,12 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // resolved core weight, with NO config at all — replacing the old opt-in identity gate.
   const base = T.typeScale({ treatment: "product" });
   ok(base.weights && Object.keys(base.weights).length === 13, `every voice auto-populates weights with zero config (got ${base.weights && Object.keys(base.weights).length})`);
-  ok(w(base.weights.Body) === w(T.siblingWeightDefaults(base.categories.Body.MD.weight)), "a voice's auto weights derive from its own RESOLVED core weight (post per-voice override)");
+  ok(w(base.weights.Display) === w(T.siblingWeightDefaults(base.categories.Display.MD.weight)), "a non-BODY_CLASS voice's auto weights derive from siblingWeightDefaults on its own RESOLVED core weight (post per-voice override)");
+  // BODY_CLASS_VOICES (Lead/Body*/Label*/Tiny*, 2026-07-13 at request) auto-populate from
+  // bodyClassSiblingDefaults instead — capped at 2 siblings, BOTH heavier than the core (never lighter).
+  ok(w(base.weights.Body) === w(T.bodyClassSiblingDefaults(base.categories.Body.MD.weight)), "a BODY_CLASS_VOICE's auto weights derive from bodyClassSiblingDefaults, not siblingWeightDefaults");
+  ok(base.weights.Body.length === 2 && base.weights.Body.every((wv) => wv.weight > base.categories.Body.MD.weight), `Body auto-populates exactly 2 siblings, BOTH heavier than its core (got ${JSON.stringify(base.weights.Body)})`);
+  ok(T.BODY_CLASS_VOICES.has("Body") && T.BODY_CLASS_VOICES.has("Body-mono") && T.BODY_CLASS_VOICES.has("Label") && T.BODY_CLASS_VOICES.has("Label-mono") && T.BODY_CLASS_VOICES.has("Lead") && T.BODY_CLASS_VOICES.has("Tiny") && T.BODY_CLASS_VOICES.has("Tiny-mono") && !T.BODY_CLASS_VOICES.has("Display") && !T.BODY_CLASS_VOICES.has("Headline") && !T.BODY_CLASS_VOICES.has("Sub-heading") && !T.BODY_CLASS_VOICES.has("Title") && !T.BODY_CLASS_VOICES.has("Sub-title") && !T.BODY_CLASS_VOICES.has("Kicker"), "BODY_CLASS_VOICES is exactly the 7 named voices — Sub-title/Kicker stay on the full Lighter/Light/Heavy/Heavier scale");
   // explicit weights:[] (or an array with no valid entries) is the one remaining opt-OUT lever.
   const withEmpty = T.typeScale({ treatment: "product", voices: { Display: { weights: [] }, Body: { weights: [{ name: "", weight: 700 }, { name: "Bad", weight: 0 }] } } });
   ok(!("Display" in withEmpty.weights) && !("Body" in withEmpty.weights), "explicit [] (or all-invalid entries) opts a voice OUT of weights entirely");
@@ -414,6 +419,14 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const sc = T.typeScale({ treatment: "product", voices: { Display: { weights: [{ name: "Bold", weight: 700 }, { name: "Semi-bold", weight: 600 }, { name: "bold ", weight: 650 }, { name: "Medium", weight: "500" }] }, Body: { weights: [{ name: "Light", weight: 300 }] } } });
   ok(sc.weights && sc.weights.Display && sc.weights.Display.length === 3, "weights channel: valid entries kept, duplicate slug collapsed (bold vs Bold)");
   ok(sc.weights.Display[0].slug === "bold" && sc.weights.Display[1].slug === "semi-bold" && sc.weights.Display[2].weight === 500, "weights channel: kebab slugs + numeric coercion");
+
+  // relativeWeightLabel — default 4-word scale, a custom `words` vocabulary (BODY_WEIGHT_LABELS), and
+  // the collision-safety fallback when `total` exceeds the custom vocabulary's own length.
+  ok(T.relativeWeightLabel(0, 4) === "Lighter" && T.relativeWeightLabel(1, 4) === "Light" && T.relativeWeightLabel(2, 4) === "Heavy" && T.relativeWeightLabel(3, 4) === "Heavier", "relativeWeightLabel: default 4-word scale maps every rank 1:1 at total=4");
+  ok(T.relativeWeightLabel(0, 2) === "Lighter" && T.relativeWeightLabel(1, 2) === "Heavier", "relativeWeightLabel: total=2 picks the two extremes of the default scale");
+  ok(T.relativeWeightLabel(0, 3, T.BODY_WEIGHT_LABELS) === "Regular" && T.relativeWeightLabel(1, 3, T.BODY_WEIGHT_LABELS) === "Bolder" && T.relativeWeightLabel(2, 3, T.BODY_WEIGHT_LABELS) === "Boldest", "relativeWeightLabel: a custom 3-word vocabulary (BODY_WEIGHT_LABELS) maps 1:1 at total=3");
+  ok(T.relativeWeightLabel(0, 5, T.BODY_WEIGHT_LABELS) === "Lighter", "relativeWeightLabel: total EXCEEDING the custom vocabulary's length falls back to the full 4-word scale (never collides)");
+  ok(T.relativeWeightLabel(0, 1) === null && T.relativeWeightLabel(NaN, 4) === null, "relativeWeightLabel: total ≤ 1 or non-finite rank ⇒ null (nothing to disambiguate)");
 
   // CSS — per-voice custom props, never per-step duplication
   const css = T.typeTokensCSS(sc);
