@@ -7763,10 +7763,14 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
         // DOES (TKT-0001 — every voice by default, since 2026-07-13's auto-populated siblings). The
         // `• ` (dot) prefix + Title-Case name visually marks the default pick among its named siblings
         // (which stay lowercase-kebab, e.g. `bold`) — not a plain weight-slug segment, so it can never
-        // collide with a sibling's own name.
+        // collide with a sibling's own name. The label itself prefers the voice's own custom Figma
+        // style name (`coreStyleName` — e.g. BZZR's "Condensed Black Italic") over the generic
+        // ladder-snap name ("Black") — a non-variable face's real cut is strictly more specific and
+        // must never be flattened down to the ladder's generic vocabulary.
         const coreWeightName = sibs.length ? weightNameFor(s.weight) : null;
+        const coreLabel = coreWeightName ? (coreStyleName || coreWeightName.name) : null;
         texts.push({
-          name: coreWeightName ? `${voice}/${stepSlug}/• ${coreWeightName.name}` : `${voice}/${stepSlug}`,
+          name: coreLabel ? `${voice}/${stepSlug}/• ${coreLabel}` : `${voice}/${stepSlug}`,
           voice, step,
           bind: { ...bindBase, fontWeight: `weight/${voice}`, ...(coreStyleName ? { fontStyle: `weight-style/${voice}` } : {}) },
           literal: { ...litBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
@@ -7793,7 +7797,7 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
           if (s.singleLineHeight == null) delete singleBindBase.lineHeight; // no live variable for Body — literal only
           const singleLitBase = { ...litBase, lineHeight: singleLineHeight };
           texts.push({
-            name: (coreWeightName ? `${voice}/${stepSlug}/• ${coreWeightName.name}` : `${voice}/${stepSlug}`) + "/single",
+            name: (coreLabel ? `${voice}/${stepSlug}/• ${coreLabel}` : `${voice}/${stepSlug}`) + "/single",
             voice, step,
             bind: { ...singleBindBase, fontWeight: `weight/${voice}`, ...(coreStyleName ? { fontStyle: `weight-style/${voice}` } : {}) },
             literal: { ...singleLitBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },

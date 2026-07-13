@@ -70,11 +70,12 @@ const plans = stylePlans({ families, scale });
 {
   const core = plans.texts.find((t) => t.voice === "Display" && t.step === "MD" && !t.literal.styleName);
   ok(!core, "the Display core carries its styleName (set in this fixture)");
-  // Display's core weight (the product treatment's dWeight, 700) snaps to "Bold" — the core carries a
-  // `• {Name}` segment (dot-prefixed, Title Case) because Display has siblings — symmetric with them,
-  // never bare, and never colliding with a sibling's own lowercase-kebab name.
-  const coreNamed = plans.texts.find((t) => t.name === "Display/md/• Bold");
-  ok(!!coreNamed && coreNamed.literal.styleName === "Bold Condensed" && coreNamed.bind.fontStyle === "weight-style/Display" && coreNamed.bind.fontWeight === "weight/Display", "core style (WITH siblings): Voice/step/• {Name}, styleName + weight-style/weight binding still on the UN-suffixed primitive");
+  // Display's core weight (the product treatment's dWeight, 700) snaps to "Bold", but this fixture
+  // ALSO configures a custom Figma style name ("Bold Condensed") — the core's dot-prefixed label
+  // prefers that specific name over the generic ladder snap (never lose resolution — "Bold" would
+  // be a strictly less specific name than the actual configured face cut).
+  const coreNamed = plans.texts.find((t) => t.name === "Display/md/• Bold Condensed");
+  ok(!!coreNamed && coreNamed.literal.styleName === "Bold Condensed" && coreNamed.bind.fontStyle === "weight-style/Display" && coreNamed.bind.fontWeight === "weight/Display", "core style (WITH siblings + a custom style name): Voice/step/• {custom style name}, styleName + weight-style/weight binding still on the UN-suffixed primitive");
   const sib = plans.texts.find((t) => t.name === "Display/md/medium");
   ok(!!sib && sib.literal.weight === 500 && sib.bind.fontStyle === "weight-style/Display/medium" && sib.bind.fontWeight === "weight/Display/medium", "sibling style: Voice/step/{slug} (lowercase-kebab via wv.slug) with per-sibling bindings — no dot prefix, only the core gets one");
   // Body's core weight (440, unstyled — makeVoices's default) snaps to "Regular"; Body also has 1
@@ -91,7 +92,7 @@ const plans = stylePlans({ families, scale });
   // the ONE remaining bare path: a voice that explicitly opts OUT via weights:[] (Kicker, here).
   const bareCore = plans.texts.find((t) => t.voice === "Kicker" && t.step === "MD");
   ok(!!bareCore && bareCore.name === "Kicker/md", "a voice that explicitly opts OUT (weights:[]) keeps the bare Voice/step name — the only way to still get one");
-  ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(\/(?:[a-z0-9-]+|• [A-Za-z-]+))?(\/single)?$/.test(t.name)), "every text style name is Voice/lowerstep[/lower-kebab-slug OR /• Title-Case][/single]");
+  ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(\/(?:[a-z0-9-]+|• [^/]+))?(\/single)?$/.test(t.name)), "every text style name is Voice/lowerstep[/lower-kebab-slug OR /• custom-or-Title-Case name][/single]");
   // volume: every voice×step gets 1 core + its siblings.length (auto-populated by default, 0 only for
   // an explicit opt-out) — plus a `/single` mirror of every Body/Label style. Derived from the
   // resolved scale itself (not hand-counted) so this doesn't rot as voice defaults change.
