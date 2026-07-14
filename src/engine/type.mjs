@@ -86,10 +86,16 @@ function makeVoices(o = {}) {
     "Title": cat("heading", "Title", o.tLead ?? 1.125, o.tWeight ?? 650, o.tTrack ?? -0.005, "none"),
     "Sub-title": cat("mono", "Sub-title", o.stLead ?? 1.3, o.stWeight ?? 500, o.stTrack ?? 0.02, "none", false), // mono-by-default but PROSE (a small heading, not a control label)
     "Lead": cat("body", "Lead", o.leadLead ?? 1.4, o.leadWeight ?? 400, o.leadTrack ?? -0.005, "none"),
+    // Body*/Label* core weights stay ≤450 so they SNAP to Regular (2026-07-14, at request): the
+    // body-class ladder is a fixed face mapping — regular=Regular(400) · bolder=Medium(500) ·
+    // boldest=Semi-bold(600) — and a 460/480 core snapped to the Medium face, so the style LABELED
+    // "regular •" silently rendered Medium. 440 keeps the slight optical bump without crossing the
+    // 450 snap boundary. (Lead/Tiny were already ≤450; Lead's weight stays a free treatment lever —
+    // luxury deliberately sets it Light.)
     "Body": cat("body", "Body", o.bLead ?? 1.5, o.bWeight ?? 440, 0, "none"),
-    "Body-mono": cat("mono", "Body", o.bodyMonoLead ?? 1.5, o.bodyMonoWeight ?? 460, o.bodyMonoTrack ?? 0, "none"),
-    "Label": cat("ui", "Label", o.labelLead ?? 1.4, o.labelWeight ?? 480, o.labelTrack ?? 0.006, "none"),
-    "Label-mono": cat("mono", "Label", o.labelMonoLead ?? 1.4, o.labelMonoWeight ?? 480, o.labelMonoTrack ?? 0, "none"),
+    "Body-mono": cat("mono", "Body", o.bodyMonoLead ?? 1.5, o.bodyMonoWeight ?? 440, o.bodyMonoTrack ?? 0, "none"),
+    "Label": cat("ui", "Label", o.labelLead ?? 1.4, o.labelWeight ?? 440, o.labelTrack ?? 0.006, "none"),
+    "Label-mono": cat("mono", "Label", o.labelMonoLead ?? 1.4, o.labelMonoWeight ?? 440, o.labelMonoTrack ?? 0, "none"),
     "Kicker": cat("mono", "Label", o.kickLead ?? 1.4, o.kickWeight ?? 600, o.kickTrack ?? 0.16, "uppercase"),
     "Tiny": cat("ui", "Tiny", o.tinyLead ?? 1.5, o.tinyWeight ?? 440, 0, "none", false), // ui FONT, prose flow (former Caption's job)
     "Tiny-mono": cat("mono", "Tiny", o.tinyMonoLead ?? 1.5, o.tinyMonoWeight ?? 440, 0, "none", false), // mono FONT, still prose (mirrors Tiny)
@@ -120,7 +126,10 @@ export const TYPE_TREATMENTS = [
   // Brutalist — one heavy grotesque, the earned ALL-CAPS display, tight tracking, dramatic size jumps.
   { id: "statement", label: "Brutalist / Statement", note: "One heavy grotesque, ALL-CAPS display, tight tracking, dramatic size jumps — the loud voice, used on purpose.",
     fonts: { display: "Inter Tight", heading: "Inter Tight", body: "Inter", ui: "Inter", mono: "JetBrains Mono" },
-    categories: makeVoices({ dWeight: 900, dTrack: -0.04, dTransform: "uppercase", hWeight: 800, hTrack: -0.02, shWeight: 700, shTrack: 0.12, bWeight: 500, labelWeight: 550, labelTrack: 0.02, kickWeight: 700, kickTrack: 0.12 }) },
+    // bWeight/labelWeight capped at 440 (2026-07-14 — were 500/550): body-class cores must snap to
+    // Regular so the "regular •" style renders the Regular face; the brutalist heft lives in the
+    // display/heading/kicker weights, which keep their full character.
+    categories: makeVoices({ dWeight: 900, dTrack: -0.04, dTransform: "uppercase", hWeight: 800, hTrack: -0.02, shWeight: 700, shTrack: 0.12, bWeight: 440, labelWeight: 440, labelTrack: 0.02, kickWeight: 700, kickTrack: 0.12 }) },
 ];
 
 export const DEFAULT_TYPE = { treatment: "product", bodyBase: 16 }; // matches Body's own fixed MD literal (SIZES.Body[1]) — the factor=1 anchor

@@ -37,7 +37,7 @@ import { cam16FromRgb, lstarFromRgb } from "../src/engine/hct.js";
 import { toneAt, DEFAULT_CONTROLS } from "../src/engine/tonal.js";
 import { deriveNeutral } from "../src/engine/derive.mjs";
 import { seedFromKeyColor } from "../src/ui/model.mjs";
-import { siblingWeightDefaults } from "../src/engine/type.mjs";
+import { siblingWeightDefaults, bodyClassSiblingDefaults, BODY_CLASS_VOICES } from "../src/engine/type.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SRCDIR = resolve(here, "../docs/reference/colors/categories");
@@ -199,11 +199,18 @@ function design5ToTypeConfig(t) {
     const ld = pct(s.leading); //                                 clampType range [0.8, 3]
     if (Number.isFinite(ld)) v.leading = ld;
     if (Number.isFinite(s.weight)) v.weight = s.weight; //        clampType range [100, 1000]
-    // ADJACENT WEIGHT SIBLINGS — every designed voice ships the two ladder-adjacent weight variants
-    // around its own core (see siblingWeightDefaults), so the preset's exported text styles (Figma
-    // `Voice/step/Name`, CSS/DTCG weight tokens) carry emphasis options out of the box, not just the
-    // single core weight. Rides the SAME core weight this slot already resolved above.
-    if (Number.isFinite(v.weight)) { const sibs = siblingWeightDefaults(v.weight); if (sibs.length) v.weights = sibs; }
+    // ADJACENT WEIGHT SIBLINGS — every designed voice ships weight variants around its own core, so
+    // the preset's exported text styles (Figma `Voice/step/Name`, CSS/DTCG weight tokens) carry
+    // emphasis options out of the box, not just the single core weight. The ladder FUNCTION follows
+    // the voice's class, mirroring typeScale's own auto-populate split (2026-07-14): a BODY_CLASS
+    // voice (here: body→Body, ui→Label) bakes bodyClassSiblingDefaults (2 stops, both heavier —
+    // the Regular/Bolder/Boldest progression); every other voice bakes siblingWeightDefaults (3
+    // bidirectional stops). Rides the SAME core weight this slot already resolved above.
+    if (Number.isFinite(v.weight)) {
+      const ladderFn = BODY_CLASS_VOICES.has(TYPE_VOICE_OF[role]) ? bodyClassSiblingDefaults : siblingWeightDefaults;
+      const sibs = ladderFn(v.weight);
+      if (sibs.length) v.weights = sibs;
+    }
     if (Object.keys(v).length) voices[TYPE_VOICE_OF[role]] = v;
   }
   if (Object.keys(fonts).length) out.fonts = fonts;

@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { typeScale, DEFAULT_TYPE, siblingWeightDefaults } from "../../src/engine/type.mjs";
+import { typeScale, DEFAULT_TYPE, siblingWeightDefaults, bodyClassSiblingDefaults, BODY_CLASS_VOICES } from "../../src/engine/type.mjs";
 import { hydrate } from "../../src/ui/persist.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -84,10 +84,12 @@ for (const slug of CATS) {
       if (Number.isFinite(pct(s.tracking)) && vv.tracking !== pct(s.tracking)) FAIL("faithful", `${slug}[${i}] ${r} tracking: preset ${vv.tracking} != spec ${s.tracking}`);
       if (Number.isFinite(pct(s.leading)) && vv.leading !== pct(s.leading)) FAIL("faithful", `${slug}[${i}] ${r} leading: preset ${vv.leading} != spec ${s.leading}`);
       if (Number.isFinite(s.weight) && vv.weight !== s.weight) FAIL("faithful", `${slug}[${i}] ${r} weight: preset ${vv.weight} != spec ${s.weight}`);
-      // ADJACENT WEIGHT SIBLINGS — every designed slot's voice carries the ladder-adjacent variants
-      // around ITS OWN weight (not a stale/copied set), so exported text styles get emphasis options.
+      // ADJACENT WEIGHT SIBLINGS — every designed slot's voice carries the ladder variants around
+      // ITS OWN weight (not a stale/copied set), so exported text styles get emphasis options. The
+      // ladder FUNCTION follows the voice's class, mirroring the mapper + typeScale's auto-populate
+      // split (2026-07-14): body-class voices (body→Body, ui→Label) derive bodyClassSiblingDefaults.
       if (Number.isFinite(s.weight)) {
-        const want = siblingWeightDefaults(s.weight);
+        const want = (BODY_CLASS_VOICES.has(VOICE_OF[r]) ? bodyClassSiblingDefaults : siblingWeightDefaults)(s.weight);
         if (!eq(vv.weights || [], want)) FAIL("faithful", `${slug}[${i}] ${r} weights: preset ${JSON.stringify(vv.weights)} != derived ${JSON.stringify(want)}`);
       }
     }

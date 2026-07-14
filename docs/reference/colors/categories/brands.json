@@ -381,36 +381,36 @@
               "Body-mono": {
                 "weights": [
                   {
-                    "name": "Bold",
-                    "weight": 700
+                    "name": "Medium",
+                    "weight": 500
                   },
                   {
-                    "name": "Black",
-                    "weight": 900
+                    "name": "Bold",
+                    "weight": 700
                   }
                 ]
               },
               "Label": {
                 "weights": [
                   {
-                    "name": "Bold",
-                    "weight": 700
+                    "name": "Medium",
+                    "weight": 500
                   },
                   {
-                    "name": "Black",
-                    "weight": 900
+                    "name": "Bold",
+                    "weight": 700
                   }
                 ]
               },
               "Label-mono": {
                 "weights": [
                   {
-                    "name": "Bold",
-                    "weight": 700
+                    "name": "Medium",
+                    "weight": 500
                   },
                   {
-                    "name": "Black",
-                    "weight": 900
+                    "name": "Bold",
+                    "weight": 700
                   }
                 ]
               },
@@ -611,17 +611,17 @@
                 ]
               },
               "Label": {
-                "weight": 460,
+                "weight": 440,
                 "tracking": 0.01,
                 "leading": 1.55,
                 "weights": [
                   {
-                    "name": "Bold",
-                    "weight": 700
+                    "name": "Medium",
+                    "weight": 500
                   },
                   {
-                    "name": "Heavy",
-                    "weight": 800
+                    "name": "Bold",
+                    "weight": 700
                   }
                 ]
               },
