@@ -76,7 +76,7 @@ const plans = stylePlans({ families, scale });
   ok(!core, "the Display core carries its styleName (set in this fixture)");
   // Display's siblings (siblingWeightDefaults(700) around a custom-named 700 core): 500/600/700/800 —
   // 4 distinct weights, rank 0..3 map 1:1 onto Lighter/Light/Heavy/Heavier. Core (700) ranks 3rd → "heavy".
-  const coreNamed = plans.texts.find((t) => t.name === "Display/md/• heavy");
+  const coreNamed = plans.texts.find((t) => t.name === "Display/md/heavy •");
   ok(!!coreNamed && coreNamed.literal.styleName === "Bold Condensed" && coreNamed.bind.fontStyle === "weight-style/Display/bold" && coreNamed.bind.fontWeight === undefined, "core style (WITH siblings + a custom style name): Voice/step/• {relative label, by rank}, literal.styleName keeps the real templated name + casing, ONLY fontStyle binds (nested under the core's own weight-name slug) — fontWeight stays unbound so real Figma's closest-valid-weight snap can never override the named cut");
   // siblings: 800 ranks heaviest (4th) → "heavier"; 600 ranks 2nd → "light"; 500 ranks lightest → "lighter".
   const sib800 = plans.texts.find((t) => t.name === "Display/md/heavier");
@@ -94,7 +94,7 @@ const plans = stylePlans({ families, scale });
   // Body is a BODY_CLASS_VOICE (2026-07-13, at request): its vocabulary is Regular/Bolder/Boldest, not
   // Lighter/Light/Heavy/Heavier — core (440, lighter of the two) ranks "regular"; the sibling (600)
   // ranks "boldest" (2 total ⇒ the two extremes of the 3-word scale, skipping "Bolder").
-  const bodyCore = plans.texts.find((t) => t.name === "Body/md/• regular");
+  const bodyCore = plans.texts.find((t) => t.name === "Body/md/regular •");
   ok(!!bodyCore, "Body core (WITH a sibling) also carries its own dot-prefixed relative label, lowercase");
   const bodySib = plans.texts.find((t) => t.name === "Body/md/boldest");
   ok(!!bodySib && bodySib.literal.weight === 600, "Body sibling present with its weight, relative-labeled");
@@ -102,7 +102,7 @@ const plans = stylePlans({ families, scale });
   // siblings from siblingWeightDefaults on its own resolved core weight — dot-prefixed core included.
   const headlineSibs = plans.texts.filter((t) => t.voice === "Headline" && t.step === "MD" && t.name.split("/")[1] === "md");
   ok(headlineSibs.length === 4, `an un-configured voice (Headline) still auto-populates 1 core + 3 siblings (got ${headlineSibs.length})`);
-  ok(headlineSibs.some((t) => t.name.includes("• ")), "the auto-populated core is ALSO dot-prefixed, same as an explicitly-configured one");
+  ok(headlineSibs.some((t) => t.name.includes(" •")), "the auto-populated core is ALSO dot-prefixed, same as an explicitly-configured one");
   // the ONE remaining bare path: a voice that explicitly opts OUT via weights:[] (Kicker, here).
   const bareCore = plans.texts.find((t) => t.voice === "Kicker" && t.step === "MD");
   ok(!!bareCore && bareCore.name === "Kicker/md", "a voice that explicitly opts OUT (weights:[]) keeps the bare Voice/step name — the only way to still get one");
@@ -117,7 +117,7 @@ const plans = stylePlans({ families, scale });
     const fallbackSib = noTemplatePlans.texts.find((t) => t.name === "Headline/md/lighter");
     ok(!!fallbackSib && fallbackSib.literal.styleName === "Medium", `no matchable weight word in the custom name ⇒ literal.styleName still falls back to the sibling's own bare name, but the LABEL resolves by rank regardless (got ${fallbackSib && fallbackSib.literal.styleName})`);
   }
-  ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(\/(?:[a-z0-9 -]+|• [^/]+))?(-single)?$/.test(t.name)), "every text style name is Voice/lowerstep[/lower-kebab-slug OR relative-label OR /• relative-label][-single suffix on the leaf]");
+  ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(\/[a-z0-9 -]+)?(-single)?( •)?$/.test(t.name)), "every text style name is Voice/lowerstep[/lower-kebab-slug OR relative-label OR /• relative-label][-single suffix on the leaf]");
   // volume: every voice×step gets 1 core + its siblings.length (auto-populated by default, 0 only for
   // an explicit opt-out) — plus a "-single"-suffixed mirror of every Body/Body-mono/Label/Label-mono
   // style. Derived from the resolved scale itself (not hand-counted) so this doesn't rot as voice
@@ -145,20 +145,20 @@ const plans = stylePlans({ families, scale });
   // Body is a BODY_CLASS_VOICE (2026-07-13, at request): its label vocabulary is the simpler
   // Regular/Bolder/Boldest, not Lighter/Light/Heavy/Heavier. In THIS fixture (core + 1 explicit
   // sibling, 2 total) the core (lighter of the 2) ranks "regular" — its -single mirror matches.
-  const bodySingle = plans.texts.find((t) => t.name === "Body/md/• regular-single");
+  const bodySingle = plans.texts.find((t) => t.name === "Body/md/regular-single •");
   ok(!!bodySingle && bodySingle.literal.lineHeight === bodySingle.literal.size && !bodySingle.bind.lineHeight, "Body's -single style: literal lineHeight = size, UNBOUND (Body has no singleLineHeight variable — it's prose)");
   // a FRESH, fully-default scale — Label/Body-mono/Label-mono/Body all auto-populate via
   // bodyClassSiblingDefaults now (2 siblings, BOTH heavier — capped for BODY_CLASS_VOICES), so each
   // core is the LIGHTEST of its own 3-total set → "regular", matching the Regular/Bolder/Boldest scale.
   const labelScale = typeScale({ treatment: "product" });
   const labelPlans = stylePlans({ families, scale: labelScale });
-  const labelSingle = labelPlans.texts.find((t) => t.name === "Label/md/• regular-single");
+  const labelSingle = labelPlans.texts.find((t) => t.name === "Label/md/regular-single •");
   ok(!!labelSingle && labelSingle.bind.lineHeight === "Label/MD/singleLineHeight", "Label's -single style BINDS live to its real singleLineHeight variable (Label is a box voice)");
   // Body-mono/Label-mono join Body/Label here (2026-07-13, at request) — both are BOX voices too (mono
   // role defaults box:true in buildCategory), so unlike Body's prose fallback, they bind live.
-  const bodyMonoSingle = labelPlans.texts.find((t) => t.name === "Body-mono/md/• regular-single");
+  const bodyMonoSingle = labelPlans.texts.find((t) => t.name === "Body-mono/md/regular-single •");
   ok(!!bodyMonoSingle && bodyMonoSingle.bind.lineHeight === "Body-mono/MD/singleLineHeight", "Body-mono's -single style BINDS live to its real singleLineHeight variable (box voice, unlike Body)");
-  const labelMonoSingle = labelPlans.texts.find((t) => t.name === "Label-mono/md/• regular-single");
+  const labelMonoSingle = labelPlans.texts.find((t) => t.name === "Label-mono/md/regular-single •");
   ok(!!labelMonoSingle && labelMonoSingle.bind.lineHeight === "Label-mono/MD/singleLineHeight", "Label-mono's -single style BINDS live to its real singleLineHeight variable");
   // sibling weights get the SAME -single suffix, flat next to their own multi-line style (the exact ask:
   // every configured sibling gets its own "-single" variant, not just the core). Body's sibling (600,
@@ -180,7 +180,7 @@ const plans = stylePlans({ families, scale });
   ok(JSON.stringify(stylePlans({ families, scale })) === JSON.stringify(stylePlans({ families, scale })), "same inputs ⇒ byte-identical plan (determinism)");
   const bareScale = typeScale({ treatment: "product" });
   const bare = stylePlans({ families, scale: bareScale });
-  const bareCores = bare.texts.filter((t) => t.name.includes("• "));
+  const bareCores = bare.texts.filter((t) => t.name.includes(" •"));
   ok(bareCores.length > 0 && bareCores.every((t) => !t.bind.fontStyle && !t.literal.styleName), "no styleName config ⇒ CORE styles carry no fontStyle binding (siblings still carry their own weight NAME regardless — that's the weight-style channel, not styleName)");
   ok(bareCores.every((t) => t.bind.fontWeight === `weight/${coreWeightKey(t.voice, weightNameFor(bareScale.categories[t.voice].MD.weight), bareScale.weights && bareScale.weights[t.voice])}`), "every CORE style binds fontWeight to the voice's core weight primitive, nested under its own weight-name slug (same group as its siblings)");
   ok(stylePlans({}).paints.length === 0 && stylePlans({}).texts.length === 0, "empty inputs ⇒ empty plan, no throw");
