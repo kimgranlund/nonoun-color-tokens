@@ -15,21 +15,25 @@
 //              varName: "primary/onPrimary" }]                   // → Color Modes variable, ratified grouping:
 //                                                                //   scrim* → scrims/ · surface*|container* → surfaces/
 //   texts:  [{ name: "Display/lg" (voice explicitly opted OUT of siblings via weights:[] — bare) |
-//                     "Display/lg/• heavier" (core, siblings exist — dot-prefixed, lowercase; the
+//                     "Display/lg/heavier •" (core, siblings exist — dot-SUFFIXED, lowercase; the
 //                     NORMALIZED relative label — see relativeWeightLabel — never the literal custom
 //                     style name or ladder name: a long custom face name ("Condensed Black Italic")
 //                     truncates illegibly in Figma's narrow Styles panel, with multiple siblings
 //                     collapsing to the same visible "condensed …" prefix; a short relative word never
-//                     does, and reads consistently regardless of what real font/weight sits underneath) |
+//                     does, and reads consistently regardless of what real font/weight sits underneath.
+//                     The "•" trails the label — 2026-07-14, at request — rather than leading it, so it
+//                     never gets clipped by Figma's own truncation of a long label) |
 //                     "Display/lg/heavy" (sibling, lowercase — the SAME relative-label vocabulary, by
 //                     its own rank among the voice's resolved weights) (2026-07-13 — normalized
 //                     Lighter/Light/Heavy/Heavier labels, superseding TKT-0001's literal-name templating) |
-//                     "Label/lg/• light-single" (Body/Body-mono/Label/Label-mono only — a "-single"
+//                     "Label/lg/light-single •" (Body/Body-mono/Label/Label-mono only — a "-single"
 //                     SUFFIX on the leaf itself, flat inside the SAME step folder as the multi-line
 //                     styles, never a NEW "/"-segment: a trailing "/single" segment made the plain leaf a
 //                     PATH PREFIX of its own single variant, and Figma's Styles panel folder-izes any name
 //                     that is a prefix of another — the plain leaf and the implied folder rendered as two
-//                     rows sharing the same visible label),
+//                     rows sharing the same visible label; the "•" trails "-single" too, always the LAST
+//                     token, so it consistently means "the default in this list" regardless of what
+//                     precedes it),
 //              voice, step,
 //              bind:    { fontSize, lineHeight, letterSpacing,   // → Typography collection keys
 //                         paragraphSpacing?,                     //   (prose voices only)
@@ -140,10 +144,12 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           textCase: s.textTransform || "none",
         };
         // the CORE style — `Voice/step` when the voice/step has NO configured siblings (nothing to
-        // disambiguate — a voice explicitly opted out via `weights:[]`); `Voice/step/• name` when it
-        // DOES (every voice by default, since 2026-07-13's auto-populated siblings). The `• ` (dot)
-        // prefix marks the default pick among its named siblings — not a plain label segment, so it can
-        // never collide with a sibling's own name. `name` is the NORMALIZED relative label (Lighter/
+        // disambiguate — a voice explicitly opted out via `weights:[]`); `Voice/step/name •` when it
+        // DOES (every voice by default, since 2026-07-13's auto-populated siblings). The ` •` (dot)
+        // SUFFIX marks the default pick among its named siblings — not a plain label segment, so it can
+        // never collide with a sibling's own name; it trails the label (2026-07-14, at request) rather
+        // than leading it, so it's never clipped by Figma's own truncation of a long label. `name` is
+        // the NORMALIZED relative label (Lighter/
         // Light/Heavy/Heavier, lowercased) by the core's own rank among `rankedWeights` — never the
         // literal custom style name or ladder name (2026-07-13, superseding TKT-0001's literal-name
         // templating): a long custom face name ("Condensed Black Italic") truncates illegibly in Figma's
@@ -162,7 +168,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         // weight number alone — found live via BZZR's Display core not rendering its bound style. A
         // custom styleName is strictly more specific than a numeric weight, so it alone drives the bind.
         texts.push({
-          name: coreLabel ? `${voice}/${stepSlug}/• ${coreLabel}` : `${voice}/${stepSlug}`,
+          name: coreLabel ? `${voice}/${stepSlug}/${coreLabel} •` : `${voice}/${stepSlug}`,
           voice, step,
           bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${coreKey}` } : { fontWeight: `weight/${coreKey}` }) },
           literal: { ...litBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
@@ -187,7 +193,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         // SINGLE-LINE variants (Body/Body-mono/Label/Label-mono only) — a sibling of every style above
         // (core + each configured weight), same font/size/tracking, but 1.0 leading (line-height = size,
         // no multi-line reading rhythm). Named with a "-single" SUFFIX on the leaf itself, flat inside the
-        // SAME "{step}" folder as the multi-line styles (e.g. "Voice/step/• label-single",
+        // SAME "{step}" folder as the multi-line styles (e.g. "Voice/step/label-single •",
         // "Voice/step/medium-single") — never a NEW "/"-segment. Two earlier shapes both broke: a
         // trailing "/single" segment ("Voice/step/• label/single") made "Voice/step/• label" a PATH
         // PREFIX of it, and Figma's "/"-grouped Styles panel folder-izes any name that is a prefix of
@@ -205,7 +211,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           if (s.singleLineHeight == null) delete singleBindBase.lineHeight; // no live variable for Body — literal only
           const singleLitBase = { ...litBase, lineHeight: singleLineHeight };
           texts.push({
-            name: coreLabel ? `${voice}/${stepSlug}/• ${coreLabel}-single` : `${voice}/${stepSlug}-single`,
+            name: coreLabel ? `${voice}/${stepSlug}/${coreLabel}-single •` : `${voice}/${stepSlug}-single`,
             voice, step,
             bind: { ...singleBindBase, ...(coreStyleName ? { fontStyle: `weight-style/${coreKey}` } : { fontWeight: `weight/${coreKey}` }) },
             literal: { ...singleLitBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
