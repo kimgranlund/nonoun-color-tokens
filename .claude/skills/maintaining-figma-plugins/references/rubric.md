@@ -3,10 +3,13 @@
 Scores a change to either Figma plugin in ultimate-tokens. `[gate]` = mechanically checkable (a named
 verifier / `npm test` / grep); `[review]` = judgment with cited evidence. Score each 1–5. This file OWNS the
 per-verifier gate-group list (the authoritative source is each verifier's report loop — the `for (const g of
-[...])` near its end): `binder.mjs` prints `bindings · offline · parity`; `plugin.mjs` prints `manifest ·
-offline · vmsyntax · ui · parse · apply · cascade · idempotent · prune · floatapply · floatidem · floatprune ·
-floatprov · applysys · applydone · config · read`. The `compliance` check runs in BOTH but is run-failing
-rather than a printed line; `node --check` is folded into the binder's `offline`.
+[...])` near its end): `binder.mjs` prints `bindings · offline · parity · floatanchor · floatcreate ·
+floatindep · floatnoop · floatparity`; `plugin.mjs` prints `manifest · offline · vmsyntax · ui · parse ·
+apply · cascade · idempotent · prune · collnames · floatapply · floatidem · floatprune · floatprov ·
+applysys · applydone · config · read · fonts · resolveface · sweep`. The `compliance` AND `styles` checks
+both run in `plugin.mjs` but are run-failing rather than a printed group line (mirroring `compliance`'s
+shape: an uncaught throw fails the run instead of appearing as a row); `node --check` is folded into the
+binder's `offline`.
 
 | # | Dimension | Type | What it checks | 1 (fail) → 3 (adequate) → 5 (excellent) |
 |---|---|---|---|---|

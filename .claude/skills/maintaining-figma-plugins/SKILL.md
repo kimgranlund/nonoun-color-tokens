@@ -74,11 +74,15 @@ Binder still looks up the DEFAULT names only. **STYLES (2026-07-09, PRs #231–#
 Modes via `setBoundVariableForPaint`; text styles per voice×step×sibling-weight bound to
 Typography/Font Primitives; `primitivesApplyPlan` = the ordered Font Primitives ensure-plan) →
 `code.js#applyStylePlans` + `applyFontPrimitives` execute them verbatim, provenance-pruned via
-`STYLE_REGISTRY_KEY` (user styles untouchable). v1 binds fontSize/fontFamily/fontStyle/fontWeight/
-paragraphSpacing; lineHeight/letterSpacing stay literal PERCENT (the Typography vars carry % of size —
-a FLOAT binding reads px). Verifier: `test/figma/style-plan.mjs` (both-directions parity vs exportUI3)
-+ the styles e2e in `plugin.mjs`. Sibling weights: `doc.type.voices[v].weights`, edited in the
-per-voice panel (Suggest = `siblingWeightDefaults`). Round-trip OUT: `configFromVariables` (`src/ui/model.mjs`) recovers each family's
+`STYLE_REGISTRY_KEY` (user styles untouchable). Binds fontSize/fontFamily/paragraphSpacing/
+lineHeight/letterSpacing (px FLOATs since #295) + EITHER fontStyle OR fontWeight — **never both**
+(2026-07-13, #292/#301, supersedes the v1 bind-all shape: real Figma resolves a bound fontWeight to
+"the closest valid weight" independently, silently overriding a bound fontStyle's named cut; the
+executor also explicitly UNBINDS the stale half of the pair on re-apply). The full hard-constraint
+list found live against real files: `references/figma-styles-hard-constraints.md`. Verifier:
+`test/figma/style-plan.mjs` (both-directions parity vs exportUI3) + the styles e2e in `plugin.mjs`.
+Sibling weights: `doc.type.voices[v].weights`, edited in the per-voice panel (Suggest =
+`siblingWeightDefaults`, or `bodyClassSiblingDefaults` for Body*/Label*/Tiny*/Lead — #303/#307). Round-trip OUT: `configFromVariables` (`src/ui/model.mjs`) recovers each family's
 500 hue/chroma from the live raw vars (the APPROXIMATE fallback when no config is embedded); `read-variables`
 → `receiveLiveVariables` feeds the drift diff. Geometry rides a separate `Geometry` collection of Figma
 NUMBER (FLOAT) vars via `geomTokensFigma` (`src/engine/geometry.mjs`).
@@ -125,6 +129,7 @@ verifiers and `npm test` are green.
 | `references/foundations.md` | the two-plugin split, the alias-cascade mechanism, the binder bind loop, the app apply/prune/rebuild contract, the parity model, the four constraints |
 | `references/best-practices.md` | the non-obvious do/don't (offline, `catch (e)`, friendly errors, idempotent find-or-create, the binder `missing` list) + a worked debug walkthrough |
 | `references/rubric.md` | score a Figma-plugin change before calling it done (offline + parity + VM-safe are the gates) |
+| `references/figma-styles-hard-constraints.md` | before changing the styles executor/planner — the five live-file API constraints (fontStyle/fontWeight XOR, NUMBER-only metric fields, path-prefix folder-ization, no variable-font axis metadata, real-font name/weight matching) |
 | `docs/reference/references/knowledge-05-figma-plugin.md` | the conceptual model — why aliasing gives the cascade, files/manifest, run instructions, failure modes (owned there — cite, don't copy) |
 | `.claude/skills/adding-semantic-roles/` | the `code.js#roleTable(n)` role-row edit + every parity site (owned there — a role change is THAT skill, not this one) |
 
