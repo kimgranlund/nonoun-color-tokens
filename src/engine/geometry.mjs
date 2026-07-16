@@ -9,18 +9,23 @@
 //
 //   THE TWO FAMILIES —
 //     • Frame  ∝ height : icon, slot, inline-pad, min-inline-size, pill radius (= height/2).
-//     • Rhythm ∝ font   : gap = font/2, caret = font. Density multiplies the RHYTHM only (never the
-//       frame — scaling the frame un-centers the glyph and breaks the square).
+//     • Rhythm ∝ font   : gap = font/2. Density multiplies the RHYTHM only (never the frame — scaling
+//       the frame un-centers the glyph and breaks the square).
 //
 // The six-size ramp (XS·SM·MD·LG·XL·2XL) is two bands that change gear at the MD|LG seam (compact +4
 // linear; expressive ×4/3 geometric). The glyphs scale SUBLINEARLY — a power law of height, exponent < 1
 // (the optical correction: a glyph occupies a shrinking fraction of the box as it grows):
 //
 //   icon = 2.49·h^0.58   (round to nearest even)        font = 3.16·h^0.45 ≈ √h   (round to nearest int)
-//   caret = font         (the v4 rhythm rule — the affordance mark equals the text height)
+//   caret = 3.5·h^0.39   (round to nearest int)
 //
-// These reproduce the hand-tuned reference ramp (20·24·28·36·48·64) to ±1px — so the table is not six
-// hand-picked points, it is ONE rule sampled six times, and it generalizes to any scaled baseHeight.
+// caret got its OWN power law (2026-07-15, at request — retired the old v4 "caret = font" rule): a
+// gentler exponent than font's 0.45 means the affordance mark grows SLOWER than the text at the top of
+// the ramp — 12·13·14·16·18 (SM…2XL), vs font's 12·13·14·18·21 there; they still land on the SAME value
+// through LG (14), diverging only in the expressive band (XL·2XL) where the caret no longer needs to
+// track the text 1:1. These reproduce the hand-tuned reference ramp (20·24·28·36·48·64) to ±1px — so the
+// table is not six hand-picked points, it is ONE rule sampled six times, and it generalizes to any
+// scaled baseHeight.
 
 const round = (v) => Math.round(v);
 const roundEven = (v) => 2 * Math.round(v / 2);
@@ -73,7 +78,9 @@ function buildSize(rawHeight, density, fontOverride) {
   const height = roundEven(rawHeight);
   const icon = roundEven(2.49 * height ** 0.58); // frame family — the leading content-icon / slot side
   const font = fontOverride != null ? fontOverride : round(3.16 * height ** 0.45); // ≈ √h — the text size
-  const caret = font; // rhythm family — the affordance mark = text height (the v4 rule)
+  // caret has its OWN power law off height (2026-07-15) — NEVER the composed fontOverride, so a type-scale
+  // composition (which only reaches SM/MD/LG) can't leave the top of the ramp on two different formulas.
+  const caret = round(3.5 * height ** 0.39);
   return {
     height,
     icon,
@@ -202,27 +209,45 @@ export function geomTokensCSS(scale, { unit = "px", prefix = "" } = {}) {
 // geomTokensBreakpointCSS — ONE self-contained override file PER breakpoint mode, the geometry mirror of
 // type.mjs's typeTokensBreakpointCSS: `geomTokensCSS(baseScale)` is a complete, valid stylesheet on its
 // own (the DESIGNED — Desktop — ramp, unconditional `:root`), and each entry this returns is an
-// independent bolt-on. Every entry is bounded on the ceiling (always `max-width`) and on the floor too
-// EXCEPT the NARROWEST mode, which stays open-ended below so the smallest viewports still land
-// somewhere instead of falling through to the unconditional Desktop values — a consumer can add any
-// subset in any load order and the cascade still resolves correctly. `desktopMinWidth` (default 1280 —
-// this app's Desktop anchor) bounds the widest mode's ceiling, since Desktop itself is the unconditional
-// base and never appears in `modes`. `modes` = [{ name, minWidth, scale }]; a mode without a positive
-// minWidth is skipped (preview-only, mirrors the DTCG files). Sorted DESCENDING by minWidth regardless
-// of storage order.
+// independent bolt-on. `desktopMinWidth` (default 1280 — this app's Desktop anchor) splits `modes` into
+// NARROW (< desktopMinWidth — Tablet/Mobile) and WIDE (≥ desktopMinWidth — e.g. Desktop Lg/Xl, 2026-07-15).
+// Each side is bounded on its own outward-facing edge — narrow modes on the ceiling (pinned to
+// `desktopMinWidth - 1` for the widest narrow mode), open on the floor only for the NARROWEST; wide modes
+// mirror this on the floor, open on the ceiling only for the WIDEST. Interior modes on both sides are
+// bounded both ends, so ranges never overlap — unchanged from the pre-wide-mode shape whenever no mode
+// exceeds `desktopMinWidth`. **One real caveat for WIDE modes:** Desktop itself is the unconditional
+// `:root` block (no media query) — a wide mode's bounded `@media` must load AFTER that base file to win
+// the cascade at its width; narrow modes stay load-order-independent as before. `modes` =
+// [{ name, minWidth, scale }]; a mode without a positive minWidth is skipped (preview-only, mirrors the
+// DTCG files).
 export function geomTokensBreakpointCSS(modes = [], { unit = "px", prefix = "", desktopMinWidth = 1280 } = {}) {
-  const ordered = (modes || []).filter((m) => m && m.scale && Number(m.minWidth) > 0).sort((a, b) => (Number(b.minWidth) || 0) - (Number(a.minWidth) || 0));
-  return ordered.map((m, i) => {
+  const valid = (modes || []).filter((m) => m && m.scale && Number(m.minWidth) > 0);
+  const narrow = valid.filter((m) => Number(m.minWidth) < desktopMinWidth).sort((a, b) => Number(b.minWidth) - Number(a.minWidth));
+  const wide = valid.filter((m) => Number(m.minWidth) >= desktopMinWidth).sort((a, b) => Number(a.minWidth) - Number(b.minWidth));
+  const out = [];
+  wide.forEach((m, i) => {
     const lower = Math.round(m.minWidth);
-    const upper = (i === 0 ? desktopMinWidth : Math.round(ordered[i - 1].minWidth)) - 1;
-    const narrowest = i === ordered.length - 1;
+    const widest = i === wide.length - 1;
+    const upper = widest ? null : Math.round(wide[i + 1].minWidth) - 1;
+    const name = m.name || "Mode";
+    const cond = widest ? `(min-width: ${lower}px)` : `(min-width: ${lower}px) and (max-width: ${upper}px)`;
+    out.push({
+      name, minWidth: lower,
+      css: `/* ${name} — ${widest ? `${lower}px+` : `${lower}–${upper}`}px — load AFTER the Desktop base file */\n@media ${cond} {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`,
+    });
+  });
+  narrow.forEach((m, i) => {
+    const lower = Math.round(m.minWidth);
+    const upper = (i === 0 ? desktopMinWidth : Math.round(narrow[i - 1].minWidth)) - 1;
+    const narrowest = i === narrow.length - 1;
     const name = m.name || "Mode";
     const cond = narrowest ? `(max-width: ${upper}px)` : `(min-width: ${lower}px) and (max-width: ${upper}px)`;
-    return {
+    out.push({
       name, minWidth: lower,
       css: `/* ${name} — ${narrowest ? `≤${upper}` : `${lower}–${upper}`}px */\n@media ${cond} {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`,
-    };
+    });
   });
+  return out;
 }
 
 // geomTokensDTCG — the geometry as DTCG dimension tokens: a `size` group (one composite of dimensions per

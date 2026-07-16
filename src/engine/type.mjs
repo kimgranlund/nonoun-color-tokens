@@ -69,9 +69,10 @@ const cat = (role, sizeKey, leading, weight, trackingEm, transform = "none", box
 // job, not a mono-font swap of Label).
 //
 // CASE is a per-treatment decision, not a blanket rule. The Display role defaults to TITLE/SENTENCE case
-// (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. The one
-// genuine "caps role" left is Sub-heading; it stays uppercase and tracks POSITIVE so small caps open up
-// (Kicker, pegged to Label's smaller size, keeps the same uppercase/positive-tracking character).
+// (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. Sub-heading,
+// Kicker, and Sub-title (o.stTransform, 2026-07-15) are the standing "caps roles" — uppercase, wide
+// POSITIVE tracking so small caps open up (Sub-title's own default is a heavier 30% em, vs Sub-heading/
+// Kicker's ~10%/16% — a small heading reads differently caps-tracked than an overline).
 // Display tracks NEGATIVE — big type tightens. LEADINGS are a system constant, uniform across
 // treatments: display 0.8 (< 1 — large type sets tight), heading-family (Headline/Sub-heading/Title)
 // 1.125, prose (Body/Lead/Sub-title/Tiny) 1.4–1.5, single-line control text (Label/Label-mono/Kicker/
@@ -84,7 +85,9 @@ function makeVoices(o = {}) {
     "Headline": cat("heading", "Headline", o.hLead ?? 1.125, o.hWeight ?? 700, o.hTrack ?? -0.005, "none"),
     "Sub-heading": cat("heading", "Sub-heading", o.shLead ?? 1.125, o.shWeight ?? 600, o.shTrack ?? 0.1, "uppercase"),
     "Title": cat("heading", "Title", o.tLead ?? 1.125, o.tWeight ?? 650, o.tTrack ?? -0.005, "none"),
-    "Sub-title": cat("mono", "Sub-title", o.stLead ?? 1.3, o.stWeight ?? 500, o.stTrack ?? 0.02, "none", false), // mono-by-default but PROSE (a small heading, not a control label)
+    // Sub-title is UPPERCASE, wide-tracked (2026-07-15, at request — the standing default; still a
+    // per-treatment lever like Display's dTransform, not hardcoded like Sub-heading/Kicker's caps).
+    "Sub-title": cat("mono", "Sub-title", o.stLead ?? 1.3, o.stWeight ?? 500, o.stTrack ?? 0.30, o.stTransform ?? "uppercase", false), // mono-by-default but PROSE (a small heading, not a control label)
     "Lead": cat("body", "Lead", o.leadLead ?? 1.4, o.leadWeight ?? 400, o.leadTrack ?? -0.005, "none"),
     // Body*/Label* core weights stay ≤450 so they SNAP to Regular (2026-07-14, at request): the
     // body-class ladder is a fixed face mapping — regular=Regular(400) · bolder=Medium(500) ·
@@ -546,32 +549,48 @@ export function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
 // typeTokensBreakpointCSS — ONE self-contained override file PER breakpoint mode, the SEPARATE-FILE
 // alternative to a single @media-embedded stylesheet: `typeTokensCSS(baseScale)` is a complete, valid
 // stylesheet on its own (the DESIGNED — Desktop — scale, unconditional `:root`, no media query needed),
-// and each entry this returns is an independent bolt-on a consumer may or may not add. Every entry is
-// BOUNDED on the ceiling — always `max-width`, so its condition can never leak into a wider mode's band
-// — and on the floor too EXCEPT the NARROWEST mode, which stays open-ended below (`max-width` only, so
-// the smallest viewports — narrower than any configured mode — still land somewhere instead of falling
-// through to the unconditional Desktop values). A consumer can add any subset, in ANY load order (even
-// one <link> per file, or all concatenated), and the cascade still resolves correctly; nothing here
-// depends on file/rule order. `desktopMinWidth` (default 1280 — this app's own Desktop anchor, the same
-// constant `addStandardTypeModes` commits and Figma's default mode uses) bounds the WIDEST mode's
-// ceiling, since Desktop itself is the unconditional base and never appears in `modes`. `modes` =
-// [{ name, minWidth, scale }] (the same shape typeTokensFigmaModes / the per-breakpoint DTCG files
-// take); a mode without a positive minWidth is skipped (preview-only, mirrors the DTCG files). Sorted
-// DESCENDING by minWidth regardless of storage order, so a narrower mode's ceiling is always its
-// next-wider sibling's floor minus one.
+// and each entry this returns is an independent bolt-on a consumer may or may not add. `desktopMinWidth`
+// (default 1280 — this app's own Desktop anchor) splits `modes` into NARROW (< desktopMinWidth — Tablet/
+// Mobile) and WIDE (≥ desktopMinWidth — e.g. Desktop Lg/Xl, 2026-07-15). Each side is bounded on its own
+// outward-facing edge — narrow modes on the ceiling (`max-width`, pinned to `desktopMinWidth - 1` for the
+// widest narrow mode) and open on the floor only for the NARROWEST; wide modes mirror this on the floor
+// (`min-width`) and are open on the ceiling only for the WIDEST. Interior modes on both sides are bounded
+// both ends, so ranges never overlap. This is unchanged from the pre-wide-mode shape whenever no mode
+// exceeds `desktopMinWidth` — the narrow half of the split is byte-identical to the old single-list logic.
+// **One real caveat for WIDE modes (not shared by narrow ones):** Desktop itself is the unconditional
+// `:root` block (`typeTokensCSS`, no media query) — a wide mode's bounded `@media` must be loaded AFTER
+// that base file to win the cascade at its width; narrow modes stay load-order-independent as before
+// since they're already bounded away from Desktop's own range by `desktopMinWidth`. `modes` =
+// [{ name, minWidth, scale }] (the same shape typeTokensFigmaModes / the per-breakpoint DTCG files take);
+// a mode without a positive minWidth is skipped (preview-only, mirrors the DTCG files).
 export function typeTokensBreakpointCSS(modes = [], { unit = "px", prefix = "type", desktopMinWidth = 1280 } = {}) {
-  const ordered = (modes || []).filter((m) => m && m.scale && Number(m.minWidth) > 0).sort((a, b) => (Number(b.minWidth) || 0) - (Number(a.minWidth) || 0));
-  return ordered.map((m, i) => {
+  const valid = (modes || []).filter((m) => m && m.scale && Number(m.minWidth) > 0);
+  const narrow = valid.filter((m) => Number(m.minWidth) < desktopMinWidth).sort((a, b) => Number(b.minWidth) - Number(a.minWidth));
+  const wide = valid.filter((m) => Number(m.minWidth) >= desktopMinWidth).sort((a, b) => Number(a.minWidth) - Number(b.minWidth));
+  const out = [];
+  wide.forEach((m, i) => {
     const lower = Math.round(m.minWidth);
-    const upper = (i === 0 ? desktopMinWidth : Math.round(ordered[i - 1].minWidth)) - 1;
-    const narrowest = i === ordered.length - 1;
+    const widest = i === wide.length - 1;
+    const upper = widest ? null : Math.round(wide[i + 1].minWidth) - 1;
+    const name = m.name || "Mode";
+    const cond = widest ? `(min-width: ${lower}px)` : `(min-width: ${lower}px) and (max-width: ${upper}px)`;
+    out.push({
+      name, minWidth: lower,
+      css: `/* ${name} — ${widest ? `${lower}px+` : `${lower}–${upper}`}px — load AFTER the Desktop base file */\n@media ${cond} {\n  :root {\n${typeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`,
+    });
+  });
+  narrow.forEach((m, i) => {
+    const lower = Math.round(m.minWidth);
+    const upper = (i === 0 ? desktopMinWidth : Math.round(narrow[i - 1].minWidth)) - 1;
+    const narrowest = i === narrow.length - 1;
     const name = m.name || "Mode";
     const cond = narrowest ? `(max-width: ${upper}px)` : `(min-width: ${lower}px) and (max-width: ${upper}px)`;
-    return {
+    out.push({
       name, minWidth: lower,
       css: `/* ${name} — ${narrowest ? `≤${upper}` : `${lower}–${upper}`}px */\n@media ${cond} {\n  :root {\n${typeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`,
-    };
+    });
   });
+  return out;
 }
 
 // typeTokensDTCG — the type scale as DTCG tokens: a fontFamily group + a typography group per

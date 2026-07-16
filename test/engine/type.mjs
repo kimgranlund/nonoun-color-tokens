@@ -26,9 +26,11 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
   ok(s.roleOf["Body-mono"] === "mono" && s.roleOf["Label-mono"] === "mono" && s.roleOf["Kicker"] === "mono" && s.roleOf["Sub-title"] === "mono", "Body-mono/Label-mono/Kicker/Sub-title map to the mono font role");
   ok(s.roleOf["Display"] === "display" && s.roleOf["Headline"] === "heading" && s.roleOf["Sub-heading"] === "heading" && s.roleOf["Title"] === "heading", "Display/Headline/Sub-heading/Title map to their roles");
   ok(s.roleOf["Body"] === "body" && s.roleOf["Lead"] === "body" && s.roleOf["Label"] === "ui" && s.roleOf["Tiny"] === "ui", "Body/Lead/Label/Tiny map to their roles");
-  // CASE is per-treatment now: Sub-heading + Kicker are the standing UPPERCASE "caps voices"; Display is
-  // title/sentence case by default (only Brutalist opts Display into caps — checked below).
-  ok(s.categories["Sub-heading"].MD.textTransform === "uppercase" && s.categories["Kicker"].MD.textTransform === "uppercase", "Sub-heading + Kicker are the UPPERCASE caps voices");
+  // CASE is per-treatment now: Sub-heading + Kicker + Sub-title (2026-07-15, at request) are the standing
+  // UPPERCASE "caps voices"; Display is title/sentence case by default (only Brutalist opts Display into
+  // caps — checked below).
+  ok(s.categories["Sub-heading"].MD.textTransform === "uppercase" && s.categories["Kicker"].MD.textTransform === "uppercase" && s.categories["Sub-title"].MD.textTransform === "uppercase", "Sub-heading + Kicker + Sub-title are the UPPERCASE caps voices");
+  ok(s.categories["Sub-title"].MD.letterSpacing > 0 && Math.abs(s.categories["Sub-title"].MD.trackingRatio - 0.30) < 1e-9, `Sub-title tracks positive at the 30% em default (got trackingRatio=${s.categories["Sub-title"].MD.trackingRatio})`);
   ok(s.categories["Display"].MD.textTransform === "none" && s.categories["Headline"].MD.textTransform === "none" && s.categories["Body"].MD.textTransform === "none", "Display + Headline + Body are title/sentence case by default (Display no longer forced ALL-CAPS)");
   // only the Brutalist/Statement treatment earns the ALL-CAPS display
   const st = T.typeScale({ treatment: "statement" });

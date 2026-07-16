@@ -2821,9 +2821,10 @@ const cat = (role, sizeKey, leading, weight, trackingEm, transform = "none", box
 // job, not a mono-font swap of Label).
 //
 // CASE is a per-treatment decision, not a blanket rule. The Display role defaults to TITLE/SENTENCE case
-// (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. The one
-// genuine "caps role" left is Sub-heading; it stays uppercase and tracks POSITIVE so small caps open up
-// (Kicker, pegged to Label's smaller size, keeps the same uppercase/positive-tracking character).
+// (o.dTransform) — only the Brutalist/Statement treatment opts its Display into ALL-CAPS. Sub-heading,
+// Kicker, and Sub-title (o.stTransform, 2026-07-15) are the standing "caps roles" — uppercase, wide
+// POSITIVE tracking so small caps open up (Sub-title's own default is a heavier 30% em, vs Sub-heading/
+// Kicker's ~10%/16% — a small heading reads differently caps-tracked than an overline).
 // Display tracks NEGATIVE — big type tightens. LEADINGS are a system constant, uniform across
 // treatments: display 0.8 (< 1 — large type sets tight), heading-family (Headline/Sub-heading/Title)
 // 1.125, prose (Body/Lead/Sub-title/Tiny) 1.4–1.5, single-line control text (Label/Label-mono/Kicker/
@@ -2836,7 +2837,9 @@ function makeVoices(o = {}) {
     "Headline": cat("heading", "Headline", o.hLead ?? 1.125, o.hWeight ?? 700, o.hTrack ?? -0.005, "none"),
     "Sub-heading": cat("heading", "Sub-heading", o.shLead ?? 1.125, o.shWeight ?? 600, o.shTrack ?? 0.1, "uppercase"),
     "Title": cat("heading", "Title", o.tLead ?? 1.125, o.tWeight ?? 650, o.tTrack ?? -0.005, "none"),
-    "Sub-title": cat("mono", "Sub-title", o.stLead ?? 1.3, o.stWeight ?? 500, o.stTrack ?? 0.02, "none", false), // mono-by-default but PROSE (a small heading, not a control label)
+    // Sub-title is UPPERCASE, wide-tracked (2026-07-15, at request — the standing default; still a
+    // per-treatment lever like Display's dTransform, not hardcoded like Sub-heading/Kicker's caps).
+    "Sub-title": cat("mono", "Sub-title", o.stLead ?? 1.3, o.stWeight ?? 500, o.stTrack ?? 0.30, o.stTransform ?? "uppercase", false), // mono-by-default but PROSE (a small heading, not a control label)
     "Lead": cat("body", "Lead", o.leadLead ?? 1.4, o.leadWeight ?? 400, o.leadTrack ?? -0.005, "none"),
     // Body*/Label* core weights stay ≤450 so they SNAP to Regular (2026-07-14, at request): the
     // body-class ladder is a fixed face mapping — regular=Regular(400) · bolder=Medium(500) ·
@@ -3298,32 +3301,48 @@ function typeTokensCSS(scale, { unit = "px", prefix = "type" } = {}) {
 // typeTokensBreakpointCSS — ONE self-contained override file PER breakpoint mode, the SEPARATE-FILE
 // alternative to a single @media-embedded stylesheet: `typeTokensCSS(baseScale)` is a complete, valid
 // stylesheet on its own (the DESIGNED — Desktop — scale, unconditional `:root`, no media query needed),
-// and each entry this returns is an independent bolt-on a consumer may or may not add. Every entry is
-// BOUNDED on the ceiling — always `max-width`, so its condition can never leak into a wider mode's band
-// — and on the floor too EXCEPT the NARROWEST mode, which stays open-ended below (`max-width` only, so
-// the smallest viewports — narrower than any configured mode — still land somewhere instead of falling
-// through to the unconditional Desktop values). A consumer can add any subset, in ANY load order (even
-// one <link> per file, or all concatenated), and the cascade still resolves correctly; nothing here
-// depends on file/rule order. `desktopMinWidth` (default 1280 — this app's own Desktop anchor, the same
-// constant `addStandardTypeModes` commits and Figma's default mode uses) bounds the WIDEST mode's
-// ceiling, since Desktop itself is the unconditional base and never appears in `modes`. `modes` =
-// [{ name, minWidth, scale }] (the same shape typeTokensFigmaModes / the per-breakpoint DTCG files
-// take); a mode without a positive minWidth is skipped (preview-only, mirrors the DTCG files). Sorted
-// DESCENDING by minWidth regardless of storage order, so a narrower mode's ceiling is always its
-// next-wider sibling's floor minus one.
+// and each entry this returns is an independent bolt-on a consumer may or may not add. `desktopMinWidth`
+// (default 1280 — this app's own Desktop anchor) splits `modes` into NARROW (< desktopMinWidth — Tablet/
+// Mobile) and WIDE (≥ desktopMinWidth — e.g. Desktop Lg/Xl, 2026-07-15). Each side is bounded on its own
+// outward-facing edge — narrow modes on the ceiling (`max-width`, pinned to `desktopMinWidth - 1` for the
+// widest narrow mode) and open on the floor only for the NARROWEST; wide modes mirror this on the floor
+// (`min-width`) and are open on the ceiling only for the WIDEST. Interior modes on both sides are bounded
+// both ends, so ranges never overlap. This is unchanged from the pre-wide-mode shape whenever no mode
+// exceeds `desktopMinWidth` — the narrow half of the split is byte-identical to the old single-list logic.
+// **One real caveat for WIDE modes (not shared by narrow ones):** Desktop itself is the unconditional
+// `:root` block (`typeTokensCSS`, no media query) — a wide mode's bounded `@media` must be loaded AFTER
+// that base file to win the cascade at its width; narrow modes stay load-order-independent as before
+// since they're already bounded away from Desktop's own range by `desktopMinWidth`. `modes` =
+// [{ name, minWidth, scale }] (the same shape typeTokensFigmaModes / the per-breakpoint DTCG files take);
+// a mode without a positive minWidth is skipped (preview-only, mirrors the DTCG files).
 function typeTokensBreakpointCSS(modes = [], { unit = "px", prefix = "type", desktopMinWidth = 1280 } = {}) {
-  const ordered = (modes || []).filter((m) => m && m.scale && Number(m.minWidth) > 0).sort((a, b) => (Number(b.minWidth) || 0) - (Number(a.minWidth) || 0));
-  return ordered.map((m, i) => {
+  const valid = (modes || []).filter((m) => m && m.scale && Number(m.minWidth) > 0);
+  const narrow = valid.filter((m) => Number(m.minWidth) < desktopMinWidth).sort((a, b) => Number(b.minWidth) - Number(a.minWidth));
+  const wide = valid.filter((m) => Number(m.minWidth) >= desktopMinWidth).sort((a, b) => Number(a.minWidth) - Number(b.minWidth));
+  const out = [];
+  wide.forEach((m, i) => {
     const lower = Math.round(m.minWidth);
-    const upper = (i === 0 ? desktopMinWidth : Math.round(ordered[i - 1].minWidth)) - 1;
-    const narrowest = i === ordered.length - 1;
+    const widest = i === wide.length - 1;
+    const upper = widest ? null : Math.round(wide[i + 1].minWidth) - 1;
+    const name = m.name || "Mode";
+    const cond = widest ? `(min-width: ${lower}px)` : `(min-width: ${lower}px) and (max-width: ${upper}px)`;
+    out.push({
+      name, minWidth: lower,
+      css: `/* ${name} — ${widest ? `${lower}px+` : `${lower}–${upper}`}px — load AFTER the Desktop base file */\n@media ${cond} {\n  :root {\n${typeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`,
+    });
+  });
+  narrow.forEach((m, i) => {
+    const lower = Math.round(m.minWidth);
+    const upper = (i === 0 ? desktopMinWidth : Math.round(narrow[i - 1].minWidth)) - 1;
+    const narrowest = i === narrow.length - 1;
     const name = m.name || "Mode";
     const cond = narrowest ? `(max-width: ${upper}px)` : `(min-width: ${lower}px) and (max-width: ${upper}px)`;
-    return {
+    out.push({
       name, minWidth: lower,
       css: `/* ${name} — ${narrowest ? `≤${upper}` : `${lower}–${upper}`}px */\n@media ${cond} {\n  :root {\n${typeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`,
-    };
+    });
   });
+  return out;
 }
 
 // typeTokensDTCG — the type scale as DTCG tokens: a fontFamily group + a typography group per
@@ -3489,18 +3508,23 @@ __M.geometry = (function(){
 //
 //   THE TWO FAMILIES —
 //     • Frame  ∝ height : icon, slot, inline-pad, min-inline-size, pill radius (= height/2).
-//     • Rhythm ∝ font   : gap = font/2, caret = font. Density multiplies the RHYTHM only (never the
-//       frame — scaling the frame un-centers the glyph and breaks the square).
+//     • Rhythm ∝ font   : gap = font/2. Density multiplies the RHYTHM only (never the frame — scaling
+//       the frame un-centers the glyph and breaks the square).
 //
 // The six-size ramp (XS·SM·MD·LG·XL·2XL) is two bands that change gear at the MD|LG seam (compact +4
 // linear; expressive ×4/3 geometric). The glyphs scale SUBLINEARLY — a power law of height, exponent < 1
 // (the optical correction: a glyph occupies a shrinking fraction of the box as it grows):
 //
 //   icon = 2.49·h^0.58   (round to nearest even)        font = 3.16·h^0.45 ≈ √h   (round to nearest int)
-//   caret = font         (the v4 rhythm rule — the affordance mark equals the text height)
+//   caret = 3.5·h^0.39   (round to nearest int)
 //
-// These reproduce the hand-tuned reference ramp (20·24·28·36·48·64) to ±1px — so the table is not six
-// hand-picked points, it is ONE rule sampled six times, and it generalizes to any scaled baseHeight.
+// caret got its OWN power law (2026-07-15, at request — retired the old v4 "caret = font" rule): a
+// gentler exponent than font's 0.45 means the affordance mark grows SLOWER than the text at the top of
+// the ramp — 12·13·14·16·18 (SM…2XL), vs font's 12·13·14·18·21 there; they still land on the SAME value
+// through LG (14), diverging only in the expressive band (XL·2XL) where the caret no longer needs to
+// track the text 1:1. These reproduce the hand-tuned reference ramp (20·24·28·36·48·64) to ±1px — so the
+// table is not six hand-picked points, it is ONE rule sampled six times, and it generalizes to any
+// scaled baseHeight.
 
 const round = (v) => Math.round(v);
 const roundEven = (v) => 2 * Math.round(v / 2);
@@ -3553,7 +3577,9 @@ function buildSize(rawHeight, density, fontOverride) {
   const height = roundEven(rawHeight);
   const icon = roundEven(2.49 * height ** 0.58); // frame family — the leading content-icon / slot side
   const font = fontOverride != null ? fontOverride : round(3.16 * height ** 0.45); // ≈ √h — the text size
-  const caret = font; // rhythm family — the affordance mark = text height (the v4 rule)
+  // caret has its OWN power law off height (2026-07-15) — NEVER the composed fontOverride, so a type-scale
+  // composition (which only reaches SM/MD/LG) can't leave the top of the ramp on two different formulas.
+  const caret = round(3.5 * height ** 0.39);
   return {
     height,
     icon,
@@ -3682,27 +3708,45 @@ function geomTokensCSS(scale, { unit = "px", prefix = "" } = {}) {
 // geomTokensBreakpointCSS — ONE self-contained override file PER breakpoint mode, the geometry mirror of
 // type.mjs's typeTokensBreakpointCSS: `geomTokensCSS(baseScale)` is a complete, valid stylesheet on its
 // own (the DESIGNED — Desktop — ramp, unconditional `:root`), and each entry this returns is an
-// independent bolt-on. Every entry is bounded on the ceiling (always `max-width`) and on the floor too
-// EXCEPT the NARROWEST mode, which stays open-ended below so the smallest viewports still land
-// somewhere instead of falling through to the unconditional Desktop values — a consumer can add any
-// subset in any load order and the cascade still resolves correctly. `desktopMinWidth` (default 1280 —
-// this app's Desktop anchor) bounds the widest mode's ceiling, since Desktop itself is the unconditional
-// base and never appears in `modes`. `modes` = [{ name, minWidth, scale }]; a mode without a positive
-// minWidth is skipped (preview-only, mirrors the DTCG files). Sorted DESCENDING by minWidth regardless
-// of storage order.
+// independent bolt-on. `desktopMinWidth` (default 1280 — this app's Desktop anchor) splits `modes` into
+// NARROW (< desktopMinWidth — Tablet/Mobile) and WIDE (≥ desktopMinWidth — e.g. Desktop Lg/Xl, 2026-07-15).
+// Each side is bounded on its own outward-facing edge — narrow modes on the ceiling (pinned to
+// `desktopMinWidth - 1` for the widest narrow mode), open on the floor only for the NARROWEST; wide modes
+// mirror this on the floor, open on the ceiling only for the WIDEST. Interior modes on both sides are
+// bounded both ends, so ranges never overlap — unchanged from the pre-wide-mode shape whenever no mode
+// exceeds `desktopMinWidth`. **One real caveat for WIDE modes:** Desktop itself is the unconditional
+// `:root` block (no media query) — a wide mode's bounded `@media` must load AFTER that base file to win
+// the cascade at its width; narrow modes stay load-order-independent as before. `modes` =
+// [{ name, minWidth, scale }]; a mode without a positive minWidth is skipped (preview-only, mirrors the
+// DTCG files).
 function geomTokensBreakpointCSS(modes = [], { unit = "px", prefix = "", desktopMinWidth = 1280 } = {}) {
-  const ordered = (modes || []).filter((m) => m && m.scale && Number(m.minWidth) > 0).sort((a, b) => (Number(b.minWidth) || 0) - (Number(a.minWidth) || 0));
-  return ordered.map((m, i) => {
+  const valid = (modes || []).filter((m) => m && m.scale && Number(m.minWidth) > 0);
+  const narrow = valid.filter((m) => Number(m.minWidth) < desktopMinWidth).sort((a, b) => Number(b.minWidth) - Number(a.minWidth));
+  const wide = valid.filter((m) => Number(m.minWidth) >= desktopMinWidth).sort((a, b) => Number(a.minWidth) - Number(b.minWidth));
+  const out = [];
+  wide.forEach((m, i) => {
     const lower = Math.round(m.minWidth);
-    const upper = (i === 0 ? desktopMinWidth : Math.round(ordered[i - 1].minWidth)) - 1;
-    const narrowest = i === ordered.length - 1;
+    const widest = i === wide.length - 1;
+    const upper = widest ? null : Math.round(wide[i + 1].minWidth) - 1;
+    const name = m.name || "Mode";
+    const cond = widest ? `(min-width: ${lower}px)` : `(min-width: ${lower}px) and (max-width: ${upper}px)`;
+    out.push({
+      name, minWidth: lower,
+      css: `/* ${name} — ${widest ? `${lower}px+` : `${lower}–${upper}`}px — load AFTER the Desktop base file */\n@media ${cond} {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`,
+    });
+  });
+  narrow.forEach((m, i) => {
+    const lower = Math.round(m.minWidth);
+    const upper = (i === 0 ? desktopMinWidth : Math.round(narrow[i - 1].minWidth)) - 1;
+    const narrowest = i === narrow.length - 1;
     const name = m.name || "Mode";
     const cond = narrowest ? `(max-width: ${upper}px)` : `(min-width: ${lower}px) and (max-width: ${upper}px)`;
-    return {
+    out.push({
       name, minWidth: lower,
       css: `/* ${name} — ${narrowest ? `≤${upper}` : `${lower}–${upper}`}px */\n@media ${cond} {\n  :root {\n${geomSizeVarLines(m.scale, "    ", unit, prefix)}\n  }\n}\n`,
-    };
+    });
   });
+  return out;
 }
 
 // geomTokensDTCG — the geometry as DTCG dimension tokens: a `size` group (one composite of dimensions per
@@ -7578,7 +7622,7 @@ __M.categoryIndex = (function(){
 // code-splits each category's PRESETS/VOLUMES into its own chunk, loaded on demand when opened.
 const CATEGORY_INDEX = [
   {"slug":"architecture","category":"Architecture","eyebrow":"Architecture Palette · Sourced from material & light","tagline":"Forty-eight buildings, read for their material, not their blueprint.","count":48,"strip":["#948F88","#958E87","#AEABA6","#7E5F49","#E3E2DF","#DFDEDC","#CBBCA6","#864D3B","#AA8967","#8E8D87","#CFC7B7","#683F32"]},
-  {"slug":"brands","category":"Brands","eyebrow":"Brand Palette · Sourced from real identities","tagline":"Seven real brands, read for their actual color — shipped products and researched public identities alike.","count":7,"strip":["#361DF1"]},
+  {"slug":"brands","category":"Brands","eyebrow":"Brand Palette · Sourced from real identities","tagline":"Seven real brands, read for their actual color — shipped products and researched public identities alike.","count":7,"strip":["#361DF1","#55C9F2","#1F1DF9","#23436E","#EA4F93","#101820","#D62300"]},
   {"slug":"cuisine","category":"Cuisine / Food","eyebrow":"Cuisine Palette · Sourced from ingredient & table","tagline":"Forty-eight dishes, read for their ingredients, not their menu photo.","count":48,"strip":["#DAD8D2","#CBA972","#4F2F22","#DB9A28","#B0C399","#567E51","#CCBC9D","#658E57","#C6A26D","#D8D5CC","#4C3125","#9F7852"]},
   {"slug":"film","category":"Film / Cinema","eyebrow":"Cinema Palette · Sourced from the frame","tagline":"Forty-eight films, read for their colour grade, not their poster.","count":48,"strip":["#9D9891","#E1B53C","#302721","#D5D9DA","#B5231E","#B39366","#273731","#71AA6B","#68766D","#E6A9AA","#C9AE7D","#27292F"]},
   {"slug":"literature","category":"Literature","eyebrow":"Literary Palette · Sourced from setting & page","tagline":"Forty-eight books, read for their colour, not their dust-jacket.","count":48,"strip":["#C49F60","#C6D0D6","#6F9E6A","#A8865B","#7A3F5F","#9E6042","#63676B","#6794C0","#C09B67","#68915A","#B0946E","#817A6F"]},
@@ -15399,8 +15443,15 @@ class HctApp extends HTMLElement {
   // 2026-07-10): the scale you design IS Desktop; Tablet/Mobile derive DOWN via the hierarchy-aware
   // modeFactor curve (body frozen, Display fully compressed — 5/6 at Tablet, 2/3 at Mobile). When the
   // doc carries configured modes they resolve override-aware (via _typeScaleFor, incl. factor modes);
-  // when it carries NONE the pair is synthesized — so every export/apply carries Desktop · Tablet ·
-  // Mobile with zero setup. Configuring your own modes (＋) takes full manual control.
+  // when it carries NONE the pair is synthesized — so every export/apply carries the full intrinsic set
+  // with zero setup. Configuring your own modes (＋) takes full manual control.
+  //
+  // Desktop Lg/Xl (2026-07-15, at request) — the INVERSE curve, same `modeFactor` knob: `bodyBase` scales
+  // UP (×1.125/×1.25 of the doc's own bodyBase, e.g. 16→18→20) while `modeFactor` (0.89/0.80) pulls the
+  // ceiling back down toward its ORIGINAL Desktop value instead of letting it scale proportionally — body
+  // grows, Display barely moves. The ratio-based recipe (not an absolute px target) means it generalizes
+  // to any doc bodyBase, not just the 16 default. Ordered BEFORE Tablet/Mobile so the Figma mode order
+  // reads Desktop · Desktop Lg · Desktop Xl · Tablet · Mobile (`_typeBaseOpts` prepends "Desktop" itself).
   //
   // Body's own Mobile-only nudge (2026-07-13, at request): the general modeFactor curve freezes anything
   // at-or-below bodyBase and barely compresses what's just above it (by design — "body-class text doesn't
@@ -15411,8 +15462,11 @@ class HctApp extends HTMLElement {
   _typeModeScales() {
     const t = this.doc.type || DEFAULT_TYPE;
     if ((t.modes || []).length) return t.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._typeScaleFor(m.id) }));
+    const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
     const mobileOverrides = { ...(t.overrides || {}), ...this._bodyMobileNudge(2 / 3) };
     return [
+      { name: "Desktop Lg", minWidth: 1728, scale: typeScale({ ...t, bodyBase: bb * 1.125, modeFactor: 0.89 }) },
+      { name: "Desktop Xl", minWidth: 2560, scale: typeScale({ ...t, bodyBase: bb * 1.25, modeFactor: 0.80 }) },
       { name: "Tablet", minWidth: 992, scale: typeScale({ ...t, modeFactor: 5 / 6 }) },
       { name: "Mobile", minWidth: 476, scale: typeScale({ ...t, modeFactor: 2 / 3, overrides: mobileOverrides }) },
     ];
@@ -15421,13 +15475,17 @@ class HctApp extends HTMLElement {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     if ((g.modes || []).length) return g.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._geomScaleFor(m.id) }));
     // synthesized, Desktop-anchored: the doc ramp IS Desktop; Tablet/Mobile derive DOWN (heights −2/−4,
-    // floor 20) and each rung composes the TYPE scale at the SAME rung so the shared `font` tracks.
+    // floor 20), Desktop Lg/Xl derive UP (heights +2/+4) — each rung composes the TYPE scale at the SAME
+    // rung (incl. the matching bodyBase×modeFactor pair for Lg/Xl) so the shared `font` tracks.
     const t = this.doc.type || DEFAULT_TYPE;
+    const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
     const bh = g.baseHeight ?? 28;
-    const synth = (drop, mf) => geomScale({ ...g, baseHeight: Math.max(20, bh - drop) }, { typeScale: typeScale({ ...t, modeFactor: mf }) });
+    const synth = (delta, mf, bodyBase) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: typeScale({ ...t, bodyBase: bodyBase ?? bb, modeFactor: mf }) });
     return [
-      { name: "Tablet", minWidth: 992, scale: synth(2, 5 / 6) },
-      { name: "Mobile", minWidth: 476, scale: synth(4, 2 / 3) },
+      { name: "Desktop Lg", minWidth: 1728, scale: synth(2, 0.89, bb * 1.125) },
+      { name: "Desktop Xl", minWidth: 2560, scale: synth(4, 0.80, bb * 1.25) },
+      { name: "Tablet", minWidth: 992, scale: synth(-2, 5 / 6) },
+      { name: "Mobile", minWidth: 476, scale: synth(-4, 2 / 3) },
     ];
   }
   // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The

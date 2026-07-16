@@ -6714,8 +6714,15 @@ class HctApp extends HTMLElement {
   // 2026-07-10): the scale you design IS Desktop; Tablet/Mobile derive DOWN via the hierarchy-aware
   // modeFactor curve (body frozen, Display fully compressed — 5/6 at Tablet, 2/3 at Mobile). When the
   // doc carries configured modes they resolve override-aware (via _typeScaleFor, incl. factor modes);
-  // when it carries NONE the pair is synthesized — so every export/apply carries Desktop · Tablet ·
-  // Mobile with zero setup. Configuring your own modes (＋) takes full manual control.
+  // when it carries NONE the pair is synthesized — so every export/apply carries the full intrinsic set
+  // with zero setup. Configuring your own modes (＋) takes full manual control.
+  //
+  // Desktop Lg/Xl (2026-07-15, at request) — the INVERSE curve, same `modeFactor` knob: `bodyBase` scales
+  // UP (×1.125/×1.25 of the doc's own bodyBase, e.g. 16→18→20) while `modeFactor` (0.89/0.80) pulls the
+  // ceiling back down toward its ORIGINAL Desktop value instead of letting it scale proportionally — body
+  // grows, Display barely moves. The ratio-based recipe (not an absolute px target) means it generalizes
+  // to any doc bodyBase, not just the 16 default. Ordered BEFORE Tablet/Mobile so the Figma mode order
+  // reads Desktop · Desktop Lg · Desktop Xl · Tablet · Mobile (`_typeBaseOpts` prepends "Desktop" itself).
   //
   // Body's own Mobile-only nudge (2026-07-13, at request): the general modeFactor curve freezes anything
   // at-or-below bodyBase and barely compresses what's just above it (by design — "body-class text doesn't
@@ -6726,8 +6733,11 @@ class HctApp extends HTMLElement {
   _typeModeScales() {
     const t = this.doc.type || DEFAULT_TYPE;
     if ((t.modes || []).length) return t.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._typeScaleFor(m.id) }));
+    const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
     const mobileOverrides = { ...(t.overrides || {}), ...this._bodyMobileNudge(2 / 3) };
     return [
+      { name: "Desktop Lg", minWidth: 1728, scale: typeScale({ ...t, bodyBase: bb * 1.125, modeFactor: 0.89 }) },
+      { name: "Desktop Xl", minWidth: 2560, scale: typeScale({ ...t, bodyBase: bb * 1.25, modeFactor: 0.80 }) },
       { name: "Tablet", minWidth: 992, scale: typeScale({ ...t, modeFactor: 5 / 6 }) },
       { name: "Mobile", minWidth: 476, scale: typeScale({ ...t, modeFactor: 2 / 3, overrides: mobileOverrides }) },
     ];
@@ -6736,13 +6746,17 @@ class HctApp extends HTMLElement {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     if ((g.modes || []).length) return g.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._geomScaleFor(m.id) }));
     // synthesized, Desktop-anchored: the doc ramp IS Desktop; Tablet/Mobile derive DOWN (heights −2/−4,
-    // floor 20) and each rung composes the TYPE scale at the SAME rung so the shared `font` tracks.
+    // floor 20), Desktop Lg/Xl derive UP (heights +2/+4) — each rung composes the TYPE scale at the SAME
+    // rung (incl. the matching bodyBase×modeFactor pair for Lg/Xl) so the shared `font` tracks.
     const t = this.doc.type || DEFAULT_TYPE;
+    const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
     const bh = g.baseHeight ?? 28;
-    const synth = (drop, mf) => geomScale({ ...g, baseHeight: Math.max(20, bh - drop) }, { typeScale: typeScale({ ...t, modeFactor: mf }) });
+    const synth = (delta, mf, bodyBase) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: typeScale({ ...t, bodyBase: bodyBase ?? bb, modeFactor: mf }) });
     return [
-      { name: "Tablet", minWidth: 992, scale: synth(2, 5 / 6) },
-      { name: "Mobile", minWidth: 476, scale: synth(4, 2 / 3) },
+      { name: "Desktop Lg", minWidth: 1728, scale: synth(2, 0.89, bb * 1.125) },
+      { name: "Desktop Xl", minWidth: 2560, scale: synth(4, 0.80, bb * 1.25) },
+      { name: "Tablet", minWidth: 992, scale: synth(-2, 5 / 6) },
+      { name: "Mobile", minWidth: 476, scale: synth(-4, 2 / 3) },
     ];
   }
   // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The

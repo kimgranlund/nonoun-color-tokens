@@ -38,11 +38,17 @@ ok(["comfortable", "compact", "spacious", "touch", "pill"].every((id) => G.GEOME
   }
 }
 
-// ── the two families: caret = font (rhythm); density rides the gap, NOT the frame ──
+// ── the two families: caret is its OWN power law (2026-07-15, retired the old "caret = font" v4 rule);
+// density rides the gap, NOT the frame ──
 {
   const comf = G.geomScale({ treatment: "comfortable" });
   const comp = G.geomScale({ treatment: "compact" });
-  ok(Object.values(comf.sizes).every((s) => s.caret === s.font), "caret = font at every size (the rhythm rule)");
+  ok(comf.sizes.SM.caret === 12 && comf.sizes.MD.caret === 13 && comf.sizes.LG.caret === 14 && comf.sizes.XL.caret === 16 && comf.sizes["2XL"].caret === 18, `caret's own ramp (SM..2XL) at the comfortable baseHeight (got ${["SM", "MD", "LG", "XL", "2XL"].map((k) => comf.sizes[k].caret)})`);
+  // caret's gentler exponent (0.39 vs font's 0.45) means it grows STRICTLY slower than the standalone
+  // font power law at every step, not just the expressive band — the two only end up equal when font
+  // itself is COMPOSED with a type scale's Label voice (fixed literals, not height-derived) at a step
+  // Label actually reaches (SM/MD/LG); see the composition test below.
+  ok(["XS", "SM", "MD", "LG", "XL", "2XL"].every((k) => comf.sizes[k].caret < comf.sizes[k].font), "caret < the standalone font power law at every step (retired the old caret=font v4 rule)");
   // compact (density 0.75) tightens the gap but NOT the centering padding (the frame is geometric).
   // compare at the SAME height so density is the only variable.
   const a = G.geomScale({ treatment: "comfortable", baseHeight: 28 }).sizes.MD;
@@ -149,7 +155,10 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
     ok(composed.sizes[name].font === standalone.sizes[name].font, `${name}: no Label counterpart (Label is SM/MD/LG-only) — falls back to the standalone power law, same as uncomposed`);
   }
   for (const name of ["XS", "SM", "MD", "LG", "XL", "2XL"]) {
-    ok(composed.sizes[name].caret === composed.sizes[name].font, `${name}: caret follows the shared font`);
+    // caret is its OWN power law off height (2026-07-15) — NEVER the composed fontOverride, so
+    // composition can't split caret onto two different formulas the way font's SM/MD/LG-only Label
+    // counterpart would; caret is byte-identical composed vs. standalone at every step.
+    ok(composed.sizes[name].caret === standalone.sizes[name].caret, `${name}: caret is unaffected by type composition (own formula, never the fontOverride)`);
     // the FRAME is unchanged by composition — the centering law still holds with the shared font
     ok(composed.sizes[name].height === standalone.sizes[name].height && composed.sizes[name].padding === standalone.sizes[name].padding, `${name}: composition leaves height + padding (the frame) untouched`);
     ok(composed.sizes[name].padding === (composed.sizes[name].height - composed.sizes[name].icon) / 2, `${name}: centering law holds on the composed scale`);

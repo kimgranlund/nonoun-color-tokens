@@ -1147,7 +1147,7 @@ const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
 // design-system-for-figma-make/ bundle: guidelines/{Guidelines.md, setup.md, styles.css,
 // foundations/{color,typography,spacing}.md, components/{overview,button}.md} + README.md (9, a routed tree),
 // all riding systems.color) + 4 figma-aliased + 5 typography (incl. figma/ + figma/ moded + figma/ primitives) + 4 geometry + config = 45.
-ok(eocdSig && entries === 55, `(ee) the EOCD reports 55 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (9, incl. type-tablet.css/type-mobile.css [#264] + the intrinsic type.1280/type.992 per-mode DTCG) + geometry (8, incl. geometry-tablet.css/geometry-mobile.css [#264] + geometry.1280/geometry.992) + figma/styles.plan.json (1) + config + the root README (got ${entries})`);
+ok(eocdSig && entries === 63, `(ee) the EOCD reports 63 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (13: type.css + type.tokens.json + 4 breakpoint CSS bolt-ons [desktop-lg/-xl 2026-07-15, tablet/mobile #264] + 4 per-mode DTCG [type.1728/2560/992/476] + 3 figma/* moded+primitives files) + geometry (12: geometry.css + geometry.tokens.json + 4 breakpoint CSS bolt-ons + 4 per-mode DTCG [geometry.1728/2560/992/476] + 2 figma/* moded+raw files) + figma/styles.plan.json (1) + config + the root README (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
 // the root README makes the zip self-describing: the folder map, the consumption-plugin install
 // commands (the skills layer deliberately NOT bundled — it updates via the marketplace), the MCP
@@ -1725,7 +1725,7 @@ const _typlan = _fplans.find((p) => p.collection === "Typography");
 const _geolan = _fplans.find((p) => p.collection === "Geometry");
 ok(!!_typlan && !!_geolan, "(ty-fig) _figmaFloatPlans yields a Typography + a Geometry apply plan");
 ok(_typlan && _typlan.modes[0] === "Base" && _typlan.modes.length === 2, `(ty-fig) the Typography plan has Base + the 768 breakpoint mode (got ${_typlan && _typlan.modes.join()})`);
-ok(_geolan && JSON.stringify(_geolan.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && _geolan.defaultMode === "Desktop", `(ty-fig) the Geometry plan carries the INTRINSIC Desktop·Tablet·Mobile set with Desktop as default — no configured modes needed (got ${_geolan && _geolan.modes.join()})`);
+ok(_geolan && JSON.stringify(_geolan.modes) === JSON.stringify(["Desktop", "Desktop Lg", "Desktop Xl", "Tablet", "Mobile"]) && _geolan.defaultMode === "Desktop", `(ty-fig) the Geometry plan carries the INTRINSIC Desktop·Desktop Lg·Desktop Xl·Tablet·Mobile set with Desktop as default — no configured modes needed (got ${_geolan && _geolan.modes.join()})`);
 ok(_fplans.every((p) => p.variables.length > 0 && p.variables.every((v) => v.type === "FLOAT" && v.values.length === p.modes.length && v.values.every((x) => Number.isFinite(x.value)))), "(ty-fig) every emitted plan is value-complete (FLOAT, one finite value per mode) — the validateModeInterchange gate held");
 // the apply payload RESPECTS the export-system toggles: a toggled-off system is not in floatPlans (the bug).
 app.exportSystems = { color: true, type: false, geometry: true };
@@ -2156,12 +2156,14 @@ app.commit((d) => { if (d.type) { d.type = { ...d.type }; delete d.type.modes; d
 const stdBB = (app.doc.type && app.doc.type.bodyBase) ?? 16;
 // Body's targeted Mobile-only nudge (2026-07-13, at request), checked on the SYNTHESIZED (no-modes)
 // path first, before addStandardTypeModes materializes real modes below — Desktop/Tablet both 18/16/14
-// (LG/MD/SM), Mobile steps down to 16/15/14.
+// (LG/MD/SM), Mobile steps down to 16/15/14. Desktop Lg/Xl (2026-07-15, at request) invert the curve:
+// bodyBase scales UP (×1.125/×1.25) while modeFactor (0.89/0.80) holds the ceiling back — Body climbs
+// 20/18/16 then 22/20/18, the mirror image of Tablet/Mobile's downward compression.
 {
   const bodyLGMDSM = (s) => ["LG", "MD", "SM"].map((k) => s.categories.Body[k].size).join("/");
   const synthMS = app._typeModeScales();
   ok(bodyLGMDSM(app._typeScaleFor("base")) === "18/16/14", `(std) the synthesized Desktop (base) scale: Body LG/MD/SM (got ${bodyLGMDSM(app._typeScaleFor("base"))})`);
-  ok(JSON.stringify(synthMS.map((m) => bodyLGMDSM(m.scale))) === JSON.stringify(["18/16/14", "16/15/14"]), `(std) the synthesized (no-modes) Tablet/Mobile pair: Body LG/MD/SM (got ${JSON.stringify(synthMS.map((m) => bodyLGMDSM(m.scale)))})`);
+  ok(JSON.stringify(synthMS.map((m) => bodyLGMDSM(m.scale))) === JSON.stringify(["20/18/16", "22/20/18", "18/16/14", "16/15/14"]), `(std) the synthesized (no-modes) Desktop Lg/Xl/Tablet/Mobile set: Body LG/MD/SM (got ${JSON.stringify(synthMS.map((m) => bodyLGMDSM(m.scale)))})`);
 }
 app.addStandardTypeModes(); flushRaf();
 {
