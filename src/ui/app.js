@@ -3352,16 +3352,24 @@ class HctApp extends HTMLElement {
   //   doc.geometry.tokenOverrides = { "<size>|<modeKey>": <heightPx> }
   // modeKey = "base" or a breakpoint mode's id; "|" never appears in a voice/step/size name. ──
 
-  // _bodyMobileNudge(modeFactor) — Body's own small step down at the canonical Mobile compression tier
-  // (modeFactor 2/3), 2026-07-13, at request. The general hierarchy-aware law freezes anything
-  // at-or-below bodyBase (by design — "body-class text doesn't move"), so it can't produce this on its
-  // own; a targeted per-cell override (the EXISTING size-override mechanism) lands Body's Mobile SM/MD/LG
-  // on its own pre-2026-07-13 sizes. Keyed on the FACTOR itself (not a mode's name/id), so it applies
-  // consistently whether the Mobile tier is the synthesized (no-modes) shape or the materialized Standard
-  // set (addStandardTypeModes) — both use this exact factor for their "Mobile" rung. The SINGLE source for
-  // both call sites (_typeScaleFor / _typeModeScales), so they can never independently drift.
-  _bodyMobileNudge(modeFactor) {
-    return Math.abs((modeFactor || 1) - 2 / 3) < 1e-9 ? { "Body|SM": 14, "Body|MD": 15, "Body|LG": 16 } : null;
+  // _modeTierNudge(modeFactor) — per-cell overrides for the canonical breakpoint tiers, from the ratified
+  // magnitude table (2026-07-16, at request — supersedes 2026-07-13's Body Mobile nudge: Body is now FROZEN
+  // across Desktop/Tablet/Mobile like the rest of the body class). The general hierarchy-aware law freezes
+  // everything at-or-below bodyBase, so it can't step the LABEL family down on the small tiers (or land the
+  // Label/Tiny cells on the table's off-ladder values on the large ones) on its own; targeted per-cell
+  // overrides (the EXISTING size-override mechanism) carry the table's cells. Keyed on the FACTOR itself
+  // (not a mode's name/id), so it applies consistently whether a tier is the synthesized (no-modes) shape
+  // or the materialized Standard set (addStandardTypeModes). The SINGLE source for both call sites
+  // (_typeScaleFor / _typeModeScales), so they can never independently drift.
+  _modeTierNudge(modeFactor) {
+    const near = (x) => Math.abs((modeFactor || 1) - x) < 1e-9;
+    const fam = (voices, sizes) => Object.fromEntries(voices.flatMap((v) => ["SM", "MD", "LG"].map((s, i) => [`${v}|${s}`, sizes[i]])));
+    const LABELS = ["Label", "Label-mono", "Kicker"]; // Label-mono + Kicker peg to Label's sizes by design
+    if (near(5 / 6)) return fam(LABELS, [11, 12, 13]); // Tablet
+    if (near(2 / 3)) return fam(LABELS, [10, 11, 12]); // Mobile
+    if (near(0.89)) return fam(LABELS, [13, 14, 15]); // Desktop Lg
+    if (near(0.80)) return { ...fam(LABELS, [16, 17, 18]), ...fam(["Tiny", "Tiny-mono"], [12, 13, 14]) }; // Desktop Xl
+    return null;
   }
   // _typeOverridesFor(modeKey) — the flat { "<voice>|<step>": size } slice for one mode (the suffix stripped).
   _typeOverridesFor(modeKey) {
@@ -3383,7 +3391,7 @@ class HctApp extends HTMLElement {
   _typeScaleFor(modeKey) {
     const t = this.doc.type || DEFAULT_TYPE;
     const base = modeKey === "base" ? t : (() => { const m = (t.modes || []).find((x) => x.id === modeKey); return m ? { ...t, bodyBase: m.bodyBase ?? t.bodyBase, modeFactor: m.factor ?? 1 } : t; })();
-    const overrides = { ...this._bodyMobileNudge(base.modeFactor), ...this._typeOverridesFor(modeKey) };
+    const overrides = { ...this._modeTierNudge(base.modeFactor), ...this._typeOverridesFor(modeKey) };
     return typeScale({ ...base, overrides });
   }
   // _geomOverridesFor(modeKey) — the flat { "<size>": height } slice for one mode (the suffix stripped).
@@ -6717,46 +6725,53 @@ class HctApp extends HTMLElement {
   // when it carries NONE the pair is synthesized — so every export/apply carries the full intrinsic set
   // with zero setup. Configuring your own modes (＋) takes full manual control.
   //
-  // Desktop Lg/Xl (2026-07-15, at request) — the INVERSE curve, same `modeFactor` knob: `bodyBase` scales
-  // UP (×1.125/×1.25 of the doc's own bodyBase, e.g. 16→18→20) while `modeFactor` (0.89/0.80) pulls the
-  // ceiling back down toward its ORIGINAL Desktop value instead of letting it scale proportionally — body
-  // grows, Display barely moves. The ratio-based recipe (not an absolute px target) means it generalizes
-  // to any doc bodyBase, not just the 16 default. Ordered BEFORE Tablet/Mobile so the Figma mode order
-  // reads Desktop · Desktop Lg · Desktop Xl · Tablet · Mobile (`_typeBaseOpts` prepends "Desktop" itself).
+  // Desktop Lg/Xl (2026-07-15, retuned to the ratified magnitude table 2026-07-16 — Xl is the TV tier,
+  // at request: "Desktop XL will be used for TV") — the INVERSE curve, same `modeFactor` knob: `bodyBase`
+  // scales UP (×1.125/×1.375 of the doc's own bodyBase → body 16→18→22 at the default) while `modeFactor`
+  // (0.89/0.80) pulls the ceiling back down toward its ORIGINAL Desktop value instead of letting it scale
+  // proportionally — body grows, Display barely moves. The ratio-based recipe (not an absolute px target)
+  // means it generalizes to any doc bodyBase, not just the 16 default. Ordered BEFORE Tablet/Mobile so
+  // the Figma mode order reads Desktop · Desktop Lg · Desktop Xl · Tablet · Mobile (`_typeBaseOpts`
+  // prepends "Desktop" itself).
   //
-  // Body's own Mobile-only nudge (2026-07-13, at request): the general modeFactor curve freezes anything
-  // at-or-below bodyBase and barely compresses what's just above it (by design — "body-class text doesn't
-  // move"), so it can't produce Body's small step down at just the smallest breakpoint on its own. A
-  // targeted per-cell override (reusing the EXISTING size-override mechanism, not a change to the general
-  // law) lands Body's Mobile SM/MD/LG on its own pre-2026-07-13 sizes — Tablet still uses the general
-  // curve untouched (frozen, same as Desktop).
+  // The per-tier Label/Tiny cells that the frozen-body law can't produce ride `_modeTierNudge` (the
+  // magnitude table's ladders — Label steps DOWN on Tablet/Mobile and lands off-ladder values on Lg/Xl;
+  // 2026-07-16 removed 2026-07-13's Body Mobile nudge: Body is frozen across Desktop/Tablet/Mobile).
   _typeModeScales() {
     const t = this.doc.type || DEFAULT_TYPE;
     if ((t.modes || []).length) return t.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._typeScaleFor(m.id) }));
     const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
-    const mobileOverrides = { ...(t.overrides || {}), ...this._bodyMobileNudge(2 / 3) };
+    // each tier layers its _modeTierNudge cells (the ratified magnitude table's Label/Tiny ladders) over
+    // the doc's own per-cell overrides. Desktop Xl is ×1.375 (not ×1.25): the table's Body 20/22/24 IS
+    // bodyBase 22 at the default 16 — the ratio keeps it true at any doc bodyBase.
+    const tier = (mult, mf) => typeScale({ ...t, bodyBase: bb * mult, modeFactor: mf, overrides: { ...(t.overrides || {}), ...this._modeTierNudge(mf) } });
     return [
-      { name: "Desktop Lg", minWidth: 1728, scale: typeScale({ ...t, bodyBase: bb * 1.125, modeFactor: 0.89 }) },
-      { name: "Desktop Xl", minWidth: 2560, scale: typeScale({ ...t, bodyBase: bb * 1.25, modeFactor: 0.80 }) },
-      { name: "Tablet", minWidth: 992, scale: typeScale({ ...t, modeFactor: 5 / 6 }) },
-      { name: "Mobile", minWidth: 476, scale: typeScale({ ...t, modeFactor: 2 / 3, overrides: mobileOverrides }) },
+      { name: "Desktop Lg", minWidth: 1728, scale: tier(1.125, 0.89) },
+      { name: "Desktop Xl", minWidth: 2560, scale: tier(1.375, 0.80) },
+      { name: "Tablet", minWidth: 992, scale: tier(1, 5 / 6) },
+      { name: "Mobile", minWidth: 476, scale: tier(1, 2 / 3) },
     ];
   }
   _geomModeScales() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     if ((g.modes || []).length) return g.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._geomScaleFor(m.id) }));
-    // synthesized, Desktop-anchored: the doc ramp IS Desktop; Tablet/Mobile derive DOWN (heights −2/−4,
-    // floor 20), Desktop Lg/Xl derive UP (heights +2/+4) — each rung composes the TYPE scale at the SAME
-    // rung (incl. the matching bodyBase×modeFactor pair for Lg/Xl) so the shared `font` tracks.
+    // synthesized, Desktop-anchored: the doc ramp IS Desktop; the other tiers carry the ratified magnitude
+    // table's height ramps (2026-07-16, at request) as per-size overrides scaled by bh/28, so they hold
+    // their shape at any baseHeight. Tablet needs none — the lawful −2 derivation already lands the
+    // table's exact heights. Each rung composes the TYPE scale at the SAME rung (incl. the matching
+    // bodyBase multiplier for Lg/Xl) so the shared `font` tracks; the composed scale deliberately SKIPS
+    // the Label tier-nudges — the table's own geometry `font` row tracks the un-nudged frozen Label, and
+    // its `label` row is the nudged one (the two are decoupled in the table itself).
     const t = this.doc.type || DEFAULT_TYPE;
     const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
     const bh = g.baseHeight ?? 28;
-    const synth = (delta, mf, bodyBase) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: typeScale({ ...t, bodyBase: bodyBase ?? bb, modeFactor: mf }) });
+    const ramp = (arr) => { const f = bh / 28; const [XS, SM, MD, LG, XL, XXL] = arr.map((h) => h * f); return { XS, SM, MD, LG, XL, "2XL": XXL }; };
+    const synth = (delta, mf, bodyBase, overrides) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: typeScale({ ...t, bodyBase: bodyBase ?? bb, modeFactor: mf }), overrides });
     return [
-      { name: "Desktop Lg", minWidth: 1728, scale: synth(2, 0.89, bb * 1.125) },
-      { name: "Desktop Xl", minWidth: 2560, scale: synth(4, 0.80, bb * 1.25) },
+      { name: "Desktop Lg", minWidth: 1728, scale: synth(4, 0.89, bb * 1.125, ramp([24, 28, 32, 40, 56, 72])) },
+      { name: "Desktop Xl", minWidth: 2560, scale: synth(28, 0.80, bb * 1.375, ramp([40, 48, 56, 64, 72, 80])) },
       { name: "Tablet", minWidth: 992, scale: synth(-2, 5 / 6) },
-      { name: "Mobile", minWidth: 476, scale: synth(-4, 2 / 3) },
+      { name: "Mobile", minWidth: 476, scale: synth(-4, 2 / 3, bb, ramp([16, 20, 24, 32, 40, 56])) },
     ];
   }
   // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The
