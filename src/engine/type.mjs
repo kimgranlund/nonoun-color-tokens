@@ -38,15 +38,18 @@ const SIZES = {
   Body: [14, 16, 18],
   Label: [12, 13, 14],
   Tiny: [9, 10, 11],
-  // TKT-0008 (2026-07-16): the two INTERACTIVE-text voices. UI-control (buttons/inputs/selects) =
-  // the ratified control table's SM/MD/LG; UI-widget (tags/badges/switches — compact widgets) = its
-  // own smaller reporter-supplied table. Both feed geometry: UI-control composes into the control
-  // ramp's SM/MD/LG `font` (geomScale opts.typeScale).
-  "UI-control": [13, 15, 16],
-  "UI-widget": [10, 11, 12],
+  // TKT-0008 (2026-07-16): the two INTERACTIVE-text voices — the ONLY voices on the FULL 6-step
+  // XS..2XL ramp (extended same day, at request; every other voice stays SM/MD/LG). UI-control
+  // (buttons/inputs/selects) = the ratified control table verbatim; UI-widget (tags/badges/switches —
+  // compact widgets) = its own smaller reporter-supplied table. UI-control composes into geometry's
+  // control ramp `font` at EVERY matching step (geomScale opts.typeScale).
+  "UI-control": [12, 13, 15, 16, 18, 20],
+  "UI-widget": [9, 10, 11, 12, 13, 14],
 };
 const RANKS = ["SM", "MD", "LG"];
-const stepsFor = (sizeKey) => RANKS.map((r, i) => [r, SIZES[sizeKey][i]]);
+const RANKS6 = ["XS", "SM", "MD", "LG", "XL", "2XL"]; // the interactive voices' full ramp (TKT-0008)
+const ranksFor = (sizeKey) => (SIZES[sizeKey].length === 6 ? RANKS6 : RANKS);
+const stepsFor = (sizeKey) => ranksFor(sizeKey).map((r, i) => [r, SIZES[sizeKey][i]]);
 
 // A "treatment" seeds the CHARACTER params, exactly as the color "Color Categories" presets seed
 // palette params. Each category: { role, base, leading, weight, trackingEm, steps, transform, box }.
@@ -59,7 +62,7 @@ const stepsFor = (sizeKey) => RANKS.map((r, i) => [r, SIZES[sizeKey][i]]);
 // height, reading paragraph spacing). It DEFAULTS from the role (ui/mono ⇒ box), overridable — Tiny
 // rides the ui FONT but is prose (box:false); Sub-title rides mono but is prose too (a small heading,
 // not a control label).
-const cat = (role, sizeKey, leading, weight, trackingEm, transform = "none", box = role === "ui" || role === "mono") => ({ role, base: SIZES[sizeKey][1], leading, weight, trackingEm, steps: stepsFor(sizeKey), transform, box });
+const cat = (role, sizeKey, leading, weight, trackingEm, transform = "none", box = role === "ui" || role === "mono") => ({ role, base: SIZES[sizeKey][ranksFor(sizeKey).indexOf("MD")], leading, weight, trackingEm, steps: stepsFor(sizeKey), transform, box });
 
 // makeVoices — the THIRTEEN named type VOICES (docs/reference/typography): Display · Headline ·
 // Sub-heading · Title · Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker · Tiny ·

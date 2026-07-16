@@ -3374,14 +3374,16 @@ class HctApp extends HTMLElement {
   _modeTierNudge(modeFactor) {
     const near = (x) => Math.abs((modeFactor || 1) - x) < 1e-9;
     const fam = (voices, sizes) => Object.fromEntries(voices.flatMap((v) => ["SM", "MD", "LG"].map((s, i) => [`${v}|${s}`, sizes[i]])));
+    const fam6 = (voices, sizes) => Object.fromEntries(voices.flatMap((v) => ["XS", "SM", "MD", "LG", "XL", "2XL"].map((s, i) => [`${v}|${s}`, sizes[i]])));
     const LABELS = ["Label", "Label-mono", "Kicker"]; // Label-mono + Kicker peg to Label's sizes by design
-    // UI-control/UI-widget (TKT-0008): the tiers the frozen/scale laws don't land on their own — both
-    // voices' Tablet/Mobile freezes come out of the ≤bodyBase law free; every Lg/Xl column needs hand
-    // cells (the nice-ladder re-rounds the scaled odd values). Verified at build.
-    if (near(5 / 6)) return fam(LABELS, [11, 12, 13]); // Tablet
-    if (near(2 / 3)) return fam(LABELS, [10, 11, 12]); // Mobile
-    if (near(0.89)) return { ...fam(LABELS, [13, 14, 15]), ...fam(["UI-control"], [15, 17, 18]), ...fam(["UI-widget"], [12, 13, 14]) }; // Desktop Lg
-    if (near(0.80)) return { ...fam(LABELS, [16, 17, 18]), ...fam(["Tiny", "Tiny-mono"], [12, 13, 14]), ...fam(["UI-control"], [17, 18, 20]), ...fam(["UI-widget"], [14, 15, 16]) }; // Desktop Xl
+    // UI-control/UI-widget (TKT-0008, extended to the full XS..2XL ramp 2026-07-16): every non-Desktop
+    // tier carries the ratified tables' full hand columns — the freeze law can't hold XL/2XL (they sit
+    // above bodyBase, so Tablet/Mobile would compress them) and the nice-ladder re-rounds the Lg/Xl
+    // scaled odd values, so hand cells are the deterministic path for all four tiers.
+    if (near(5 / 6)) return { ...fam(LABELS, [11, 12, 13]), ...fam6(["UI-control"], [12, 13, 15, 16, 18, 20]), ...fam6(["UI-widget"], [9, 10, 11, 12, 13, 14]) }; // Tablet (UI voices frozen at Desktop)
+    if (near(2 / 3)) return { ...fam(LABELS, [10, 11, 12]), ...fam6(["UI-control"], [12, 13, 15, 16, 18, 20]), ...fam6(["UI-widget"], [9, 10, 11, 12, 13, 14]) }; // Mobile (UI voices frozen at Desktop)
+    if (near(0.89)) return { ...fam(LABELS, [13, 14, 15]), ...fam6(["UI-control"], [14, 15, 17, 18, 20, 22]), ...fam6(["UI-widget"], [11, 12, 13, 14, 15, 16]) }; // Desktop Lg
+    if (near(0.80)) return { ...fam(LABELS, [16, 17, 18]), ...fam(["Tiny", "Tiny-mono"], [12, 13, 14]), ...fam6(["UI-control"], [16, 17, 18, 20, 22, 24]), ...fam6(["UI-widget"], [13, 14, 15, 16, 17, 18]) }; // Desktop Xl
     return null;
   }
   // _typeOverridesFor(modeKey) — the flat { "<voice>|<step>": size } slice for one mode (the suffix stripped).
@@ -6779,17 +6781,16 @@ class HctApp extends HTMLElement {
     const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
     const bh = g.baseHeight ?? 28;
     const ramp = (arr) => { const f = bh / 28; const out = {}; ["XS", "SM", "MD", "LG", "XL", "2XL"].forEach((k, i) => { if (arr[i] != null) out[k] = arr[i] * f; }); return out; };
-    // per-tier CONTROL-TEXT columns for the NON-COMPOSED steps only (XS/XL/2XL — the magnitude table's
-    // `controls` rows, scaled like the heights): SM/MD/LG compose from the tier's own UI-control voice
-    // (with its _modeTierNudge cells), which carries the same table rows — one source of truth.
+    // control text composes from the tier's own UI-control voice at EVERY step (the voice rides the
+    // full XS..2XL ramp since 2026-07-16, with its _modeTierNudge hand columns) — no per-step
+    // fontOverrides needed anymore; one source of truth.
     const tierType = (mult, mf) => typeScale({ ...t, bodyBase: bb * mult, modeFactor: mf, overrides: { ...(t.overrides || {}), ...this._modeTierNudge(mf) } });
-    const FROZEN_EDGE = ramp([12, null, null, null, 18, 20]);
-    const synth = (delta, mult, mf, overrides, fontOverrides) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: tierType(mult, mf), overrides, fontOverrides });
+    const synth = (delta, mult, mf, overrides) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: tierType(mult, mf), overrides });
     return [
-      { name: "Desktop Lg", minWidth: 1728, scale: synth(4, 1.125, 0.89, ramp([24, 28, 32, 40, 56, 72]), ramp([14, null, null, null, 20, 22])) },
-      { name: "Desktop Xl", minWidth: 2560, scale: synth(28, 1.375, 0.80, ramp([40, 48, 56, 64, 72, 80]), ramp([16, null, null, null, 22, 24])) },
-      { name: "Tablet", minWidth: 992, scale: synth(-2, 1, 5 / 6, undefined, FROZEN_EDGE) },
-      { name: "Mobile", minWidth: 476, scale: synth(-4, 1, 2 / 3, ramp([16, 20, 24, 32, 40, 56]), FROZEN_EDGE) },
+      { name: "Desktop Lg", minWidth: 1728, scale: synth(4, 1.125, 0.89, ramp([24, 28, 32, 40, 56, 72])) },
+      { name: "Desktop Xl", minWidth: 2560, scale: synth(28, 1.375, 0.80, ramp([40, 48, 56, 64, 72, 80])) },
+      { name: "Tablet", minWidth: 992, scale: synth(-2, 1, 5 / 6) },
+      { name: "Mobile", minWidth: 476, scale: synth(-4, 1, 2 / 3, ramp([16, 20, 24, 32, 40, 56])) },
     ];
   }
   // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The

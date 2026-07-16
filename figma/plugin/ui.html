@@ -2794,15 +2794,18 @@ const SIZES = {
   Body: [14, 16, 18],
   Label: [12, 13, 14],
   Tiny: [9, 10, 11],
-  // TKT-0008 (2026-07-16): the two INTERACTIVE-text voices. UI-control (buttons/inputs/selects) =
-  // the ratified control table's SM/MD/LG; UI-widget (tags/badges/switches — compact widgets) = its
-  // own smaller reporter-supplied table. Both feed geometry: UI-control composes into the control
-  // ramp's SM/MD/LG `font` (geomScale opts.typeScale).
-  "UI-control": [13, 15, 16],
-  "UI-widget": [10, 11, 12],
+  // TKT-0008 (2026-07-16): the two INTERACTIVE-text voices — the ONLY voices on the FULL 6-step
+  // XS..2XL ramp (extended same day, at request; every other voice stays SM/MD/LG). UI-control
+  // (buttons/inputs/selects) = the ratified control table verbatim; UI-widget (tags/badges/switches —
+  // compact widgets) = its own smaller reporter-supplied table. UI-control composes into geometry's
+  // control ramp `font` at EVERY matching step (geomScale opts.typeScale).
+  "UI-control": [12, 13, 15, 16, 18, 20],
+  "UI-widget": [9, 10, 11, 12, 13, 14],
 };
 const RANKS = ["SM", "MD", "LG"];
-const stepsFor = (sizeKey) => RANKS.map((r, i) => [r, SIZES[sizeKey][i]]);
+const RANKS6 = ["XS", "SM", "MD", "LG", "XL", "2XL"]; // the interactive voices' full ramp (TKT-0008)
+const ranksFor = (sizeKey) => (SIZES[sizeKey].length === 6 ? RANKS6 : RANKS);
+const stepsFor = (sizeKey) => ranksFor(sizeKey).map((r, i) => [r, SIZES[sizeKey][i]]);
 
 // A "treatment" seeds the CHARACTER params, exactly as the color "Color Categories" presets seed
 // palette params. Each category: { role, base, leading, weight, trackingEm, steps, transform, box }.
@@ -2815,7 +2818,7 @@ const stepsFor = (sizeKey) => RANKS.map((r, i) => [r, SIZES[sizeKey][i]]);
 // height, reading paragraph spacing). It DEFAULTS from the role (ui/mono ⇒ box), overridable — Tiny
 // rides the ui FONT but is prose (box:false); Sub-title rides mono but is prose too (a small heading,
 // not a control label).
-const cat = (role, sizeKey, leading, weight, trackingEm, transform = "none", box = role === "ui" || role === "mono") => ({ role, base: SIZES[sizeKey][1], leading, weight, trackingEm, steps: stepsFor(sizeKey), transform, box });
+const cat = (role, sizeKey, leading, weight, trackingEm, transform = "none", box = role === "ui" || role === "mono") => ({ role, base: SIZES[sizeKey][ranksFor(sizeKey).indexOf("MD")], leading, weight, trackingEm, steps: stepsFor(sizeKey), transform, box });
 
 // makeVoices — the THIRTEEN named type VOICES (docs/reference/typography): Display · Headline ·
 // Sub-heading · Title · Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker · Tiny ·
@@ -7993,10 +7996,11 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
       // an explicit override ever configures more than 3 total for one of these voices anyway.
       const labelWords = BODY_CLASS_VOICES.has(voice) ? BODY_WEIGHT_LABELS : undefined;
       const labelFor = (weight) => relativeWeightLabel(rankedWeights.indexOf(weight), rankedWeights.length, labelWords);
-      // text styles list LARGEST → smallest (LG, MD, SM) in the Figma Styles panel — the reverse of the
-      // engine's own SM/MD/LG insertion order (steps is a plain {SM,MD,LG} object; Figma preserves the
-      // plan's own order rather than re-sorting, so this array IS the panel order).
-      for (const step of ["LG", "MD", "SM"]) {
+      // text styles list LARGEST → smallest in the Figma Styles panel — the reverse of the engine's own
+      // insertion order (Figma preserves the plan's own order rather than re-sorting, so this array IS
+      // the panel order). Filtered per voice: most ride SM/MD/LG; the interactive voices (UI-control/
+      // UI-widget) carry the full XS..2XL ramp (2026-07-16).
+      for (const step of ["2XL", "XL", "LG", "MD", "SM", "XS"].filter((k) => k in steps)) {
         const s = steps[step];
         if (!s || !Number.isFinite(s.size)) continue;
         const stepSlug = String(step).toLowerCase();
@@ -12128,14 +12132,16 @@ class HctApp extends HTMLElement {
   _modeTierNudge(modeFactor) {
     const near = (x) => Math.abs((modeFactor || 1) - x) < 1e-9;
     const fam = (voices, sizes) => Object.fromEntries(voices.flatMap((v) => ["SM", "MD", "LG"].map((s, i) => [`${v}|${s}`, sizes[i]])));
+    const fam6 = (voices, sizes) => Object.fromEntries(voices.flatMap((v) => ["XS", "SM", "MD", "LG", "XL", "2XL"].map((s, i) => [`${v}|${s}`, sizes[i]])));
     const LABELS = ["Label", "Label-mono", "Kicker"]; // Label-mono + Kicker peg to Label's sizes by design
-    // UI-control/UI-widget (TKT-0008): the tiers the frozen/scale laws don't land on their own — both
-    // voices' Tablet/Mobile freezes come out of the ≤bodyBase law free; every Lg/Xl column needs hand
-    // cells (the nice-ladder re-rounds the scaled odd values). Verified at build.
-    if (near(5 / 6)) return fam(LABELS, [11, 12, 13]); // Tablet
-    if (near(2 / 3)) return fam(LABELS, [10, 11, 12]); // Mobile
-    if (near(0.89)) return { ...fam(LABELS, [13, 14, 15]), ...fam(["UI-control"], [15, 17, 18]), ...fam(["UI-widget"], [12, 13, 14]) }; // Desktop Lg
-    if (near(0.80)) return { ...fam(LABELS, [16, 17, 18]), ...fam(["Tiny", "Tiny-mono"], [12, 13, 14]), ...fam(["UI-control"], [17, 18, 20]), ...fam(["UI-widget"], [14, 15, 16]) }; // Desktop Xl
+    // UI-control/UI-widget (TKT-0008, extended to the full XS..2XL ramp 2026-07-16): every non-Desktop
+    // tier carries the ratified tables' full hand columns — the freeze law can't hold XL/2XL (they sit
+    // above bodyBase, so Tablet/Mobile would compress them) and the nice-ladder re-rounds the Lg/Xl
+    // scaled odd values, so hand cells are the deterministic path for all four tiers.
+    if (near(5 / 6)) return { ...fam(LABELS, [11, 12, 13]), ...fam6(["UI-control"], [12, 13, 15, 16, 18, 20]), ...fam6(["UI-widget"], [9, 10, 11, 12, 13, 14]) }; // Tablet (UI voices frozen at Desktop)
+    if (near(2 / 3)) return { ...fam(LABELS, [10, 11, 12]), ...fam6(["UI-control"], [12, 13, 15, 16, 18, 20]), ...fam6(["UI-widget"], [9, 10, 11, 12, 13, 14]) }; // Mobile (UI voices frozen at Desktop)
+    if (near(0.89)) return { ...fam(LABELS, [13, 14, 15]), ...fam6(["UI-control"], [14, 15, 17, 18, 20, 22]), ...fam6(["UI-widget"], [11, 12, 13, 14, 15, 16]) }; // Desktop Lg
+    if (near(0.80)) return { ...fam(LABELS, [16, 17, 18]), ...fam(["Tiny", "Tiny-mono"], [12, 13, 14]), ...fam6(["UI-control"], [16, 17, 18, 20, 22, 24]), ...fam6(["UI-widget"], [13, 14, 15, 16, 17, 18]) }; // Desktop Xl
     return null;
   }
   // _typeOverridesFor(modeKey) — the flat { "<voice>|<step>": size } slice for one mode (the suffix stripped).
@@ -15533,17 +15539,16 @@ class HctApp extends HTMLElement {
     const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
     const bh = g.baseHeight ?? 28;
     const ramp = (arr) => { const f = bh / 28; const out = {}; ["XS", "SM", "MD", "LG", "XL", "2XL"].forEach((k, i) => { if (arr[i] != null) out[k] = arr[i] * f; }); return out; };
-    // per-tier CONTROL-TEXT columns for the NON-COMPOSED steps only (XS/XL/2XL — the magnitude table's
-    // `controls` rows, scaled like the heights): SM/MD/LG compose from the tier's own UI-control voice
-    // (with its _modeTierNudge cells), which carries the same table rows — one source of truth.
+    // control text composes from the tier's own UI-control voice at EVERY step (the voice rides the
+    // full XS..2XL ramp since 2026-07-16, with its _modeTierNudge hand columns) — no per-step
+    // fontOverrides needed anymore; one source of truth.
     const tierType = (mult, mf) => typeScale({ ...t, bodyBase: bb * mult, modeFactor: mf, overrides: { ...(t.overrides || {}), ...this._modeTierNudge(mf) } });
-    const FROZEN_EDGE = ramp([12, null, null, null, 18, 20]);
-    const synth = (delta, mult, mf, overrides, fontOverrides) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: tierType(mult, mf), overrides, fontOverrides });
+    const synth = (delta, mult, mf, overrides) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: tierType(mult, mf), overrides });
     return [
-      { name: "Desktop Lg", minWidth: 1728, scale: synth(4, 1.125, 0.89, ramp([24, 28, 32, 40, 56, 72]), ramp([14, null, null, null, 20, 22])) },
-      { name: "Desktop Xl", minWidth: 2560, scale: synth(28, 1.375, 0.80, ramp([40, 48, 56, 64, 72, 80]), ramp([16, null, null, null, 22, 24])) },
-      { name: "Tablet", minWidth: 992, scale: synth(-2, 1, 5 / 6, undefined, FROZEN_EDGE) },
-      { name: "Mobile", minWidth: 476, scale: synth(-4, 1, 2 / 3, ramp([16, 20, 24, 32, 40, 56]), FROZEN_EDGE) },
+      { name: "Desktop Lg", minWidth: 1728, scale: synth(4, 1.125, 0.89, ramp([24, 28, 32, 40, 56, 72])) },
+      { name: "Desktop Xl", minWidth: 2560, scale: synth(28, 1.375, 0.80, ramp([40, 48, 56, 64, 72, 80])) },
+      { name: "Tablet", minWidth: 992, scale: synth(-2, 1, 5 / 6) },
+      { name: "Mobile", minWidth: 476, scale: synth(-4, 1, 2 / 3, ramp([16, 20, 24, 32, 40, 56])) },
     ];
   }
   // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The

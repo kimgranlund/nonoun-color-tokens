@@ -115,10 +115,11 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
       // an explicit override ever configures more than 3 total for one of these voices anyway.
       const labelWords = BODY_CLASS_VOICES.has(voice) ? BODY_WEIGHT_LABELS : undefined;
       const labelFor = (weight) => relativeWeightLabel(rankedWeights.indexOf(weight), rankedWeights.length, labelWords);
-      // text styles list LARGEST → smallest (LG, MD, SM) in the Figma Styles panel — the reverse of the
-      // engine's own SM/MD/LG insertion order (steps is a plain {SM,MD,LG} object; Figma preserves the
-      // plan's own order rather than re-sorting, so this array IS the panel order).
-      for (const step of ["LG", "MD", "SM"]) {
+      // text styles list LARGEST → smallest in the Figma Styles panel — the reverse of the engine's own
+      // insertion order (Figma preserves the plan's own order rather than re-sorting, so this array IS
+      // the panel order). Filtered per voice: most ride SM/MD/LG; the interactive voices (UI-control/
+      // UI-widget) carry the full XS..2XL ramp (2026-07-16).
+      for (const step of ["2XL", "XL", "LG", "MD", "SM", "XS"].filter((k) => k in steps)) {
         const s = steps[step];
         if (!s || !Number.isFinite(s.size)) continue;
         const stepSlug = String(step).toLowerCase();

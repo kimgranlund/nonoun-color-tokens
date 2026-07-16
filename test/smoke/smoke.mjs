@@ -168,7 +168,7 @@ try {
 
   // Typography SECTION: the app-header switcher flips this.section → the full 39-step canvas specimen.
   await evalJS(`${el}.setSection("typography")`); await sleep(300);
-  ok(await evalJS(`(()=>{return ${el}.section==="typography" && ${el}.querySelectorAll(".type-spec-line").length===45 && ${el}.querySelectorAll(".type-spec-group").length===15})()`), "Typography section shows the full 45-step specimen across the 15 named voices");
+  ok(await evalJS(`(()=>{return ${el}.section==="typography" && ${el}.querySelectorAll(".type-spec-line").length===51 && ${el}.querySelectorAll(".type-spec-group").length===15})()`), "Typography section shows the full 51-step specimen (13×3 + 2×6) across the 15 named voices");
   ok(await evalJS(`(()=>{return !!${el}.querySelector(".tyi-voices") && ${el}.querySelectorAll(".an-card").length>=4})()`), "Typography section: right-pane inspector + left-rail analysis cards render");
   // entering the section injects the SELF-HOSTED base64 @font-face <style> (TIER 1) — no CDN, so the 4 base
   // faces render offline + in the Figma plugin (networkAccess:none).

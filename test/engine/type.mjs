@@ -17,7 +17,10 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
   const s = T.typeScale({ treatment: "product", bodyBase: 16 });
   const c = s.categories;
   ok(Object.keys(c).length === 15, `15 voices total (got ${Object.keys(c).length})`);
-  for (const v of GROUPS) ok(Object.keys(c[v]).join() === "SM,MD,LG", `${v} rides the uniform 3-step ramp SM·MD·LG (got ${Object.keys(c[v])})`);
+  for (const v of GROUPS) {
+    const want = v === "UI-control" || v === "UI-widget" ? "XS,SM,MD,LG,XL,2XL" : "SM,MD,LG"; // the interactive voices ride the FULL ramp (2026-07-16)
+    ok(Object.keys(c[v]).join() === want, `${v} rides its ramp ${want} (got ${Object.keys(c[v])})`);
+  }
 }
 
 // ── the taxonomy: role mapping (Sub-title/Body-mono/Label-mono/Kicker ride MONO) + the UPPERCASE caps voices ──
