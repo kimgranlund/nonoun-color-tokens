@@ -22,9 +22,10 @@
 // caret got its OWN power law (2026-07-15, at request — retired the old v4 "caret = font" rule): a
 // gentler exponent means the affordance mark grows SLOWER than the text at the top of the ramp.
 // font is the ratified control-text table (2026-07-16, TKT-0008 — 12·13·15·16·18·20 at the canonical
-// baseHeight): SM/MD/LG compose from the type scale's UI-CONTROL voice when one is supplied (value-
-// neutral at defaults — the voice carries the same rows — but voice tuning flows into control boxes);
-// XS/XL/2XL use the table × baseHeight/28. Control text is DECOUPLED from Label (~2px larger by
+// baseHeight): EVERY step composes from the type scale's UI-CONTROL voice when one is supplied (the
+// voice rides the full XS..2XL ramp since the same day — value-neutral at defaults, the voice carries
+// the same rows, but voice tuning flows into control boxes); standalone (or for a step the voice
+// lacks), the table × baseHeight/28. Control text is DECOUPLED from Label (~2px larger by
 // design), and the ramp's MD kink fits no power law — hand-authored IS the law, like type's SIZES.
 // icon/caret remain rule-derived — they reproduce the hand-tuned reference ramp (20·24·28·36·48·64)
 // to ±1px and generalize to any scaled baseHeight.
@@ -103,19 +104,20 @@ function buildSize(rawHeight, density, font) {
 // height) uniformly scales the whole ramp; the treatment seeds density + the radius ladder + spacing.
 //
 // CONTROL TEXT (2026-07-16, TKT-0008): each size's `font` composes from the type scale's UI-CONTROL
-// voice (`opts.typeScale`, SM/MD/LG — the voice's Desktop sizes equal the ratified control table's
-// rows, so the composition is value-neutral at defaults and exists so voice-level tuning flows into
-// control boxes); geometry's XS/XL/2XL steps have no voice counterpart and fall back to the fixed
-// CONTROL_FONT ramp × (baseHeight/28). The old Label composition is retired — control text reads ~2px
-// larger than Label by design. The control-text sizes surface in the TYPOGRAPHY Figma collection as
-// the UI-control/UI-widget voices' own variables — the Geometry collection no longer carries font rows.
+// voice (`opts.typeScale`) at EVERY step — the voice rides the full XS..2XL ramp, and its Desktop
+// sizes equal the ratified control table's rows, so the composition is value-neutral at defaults and
+// exists so voice-level tuning flows into control boxes; a step the voice lacks (and the standalone,
+// no-opts form) falls back to the fixed CONTROL_FONT ramp × (baseHeight/28). The old Label composition
+// is retired — control text reads ~2px larger than Label by design. The control-text sizes surface as
+// the type/UI-control · type/UI-widget variables in the merged breakpoint-moded "Geometry" Figma
+// collection (TKT-0009) — geometry's own emitters carry no font rows.
 // `opts.overrides` (optional) — a flat per-size HEIGHT override map keyed "<sizeName>", already mode-selected
 // by the caller. When a positive number exists for a size, it REPLACES the scaled rawHeight fed to buildSize,
 // so icon/pad/radius/caret/gap ALL re-derive via the laws. Absent / non-positive ⇒ no effect, so the scale
 // is byte-identical (the identity gate).
-// `opts.fontOverrides` (optional) — the same shape for the per-size CONTROL TEXT size (the breakpoint
-// tiers' hand columns for the non-composed XS/XL/2XL steps); wins over the composition. Absent ⇒ the
-// UI-control composition (SM/MD/LG), then the CONTROL_FONT×factor law. gap re-derives from the
+// `opts.fontOverrides` (optional) — the same shape for the per-size CONTROL TEXT size; wins over the
+// composition. Absent ⇒ the UI-control composition (all steps), then the CONTROL_FONT×factor law
+// for a step the voice lacks. gap re-derives from the
 // resolved font either way (gap = font/2 · density).
 // `config.rampContrast` (optional, 0…1, default 1) — the RESPONSIVE ramp knob: how hard the expressive
 // band (LG·XL·2XL) changes gear at the MD|LG seam. At 1 (or absent — the identity gate) the band is

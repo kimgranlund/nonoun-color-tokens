@@ -251,15 +251,17 @@ function buildCategory(name, p, factor, overrides, vp, compress) {
       trackingRatio: trackingEm,
       weight,
       textTransform: p.transform || "none",
-      // paragraph rhythm tracks the resolved size, keyed on FLOW not just role: a BOX voice (control/label
-      // text — Label · Body-mono · Label-mono · Kicker) uses 1.0×size (its "paragraph" is its own height); a PROSE voice
-      // breathes at its reading factor (display/heading ~0.7, body 0.75, and a ui/mono-font prose voice —
-      // Tiny/Sub-title — falls back to 0.75). Indent is a constant 0 (schema parity).
+      // paragraph rhythm tracks the resolved size, keyed on FLOW not just role: a BOX voice (single-line
+      // text — Kicker · UI-control · UI-widget since 2026-07-16) uses 1.0×size (its "paragraph" is its own
+      // height); a PROSE voice breathes at its reading factor (display/heading ~0.7, body 0.75, and a
+      // ui/mono-font prose voice — Tiny · Sub-title · Label · Body-mono · Label-mono — falls back to 0.75).
+      // Indent is a constant 0 (schema parity).
       paragraphSpacing: Math.round(size * (p.box ? 1 : (PARA_PROSE[p.role] ?? 0.75))),
       paragraphIndent: 0,
-      // single-line height (= size, leading 1.0) — the CONTROL-text intent, distinct from the
-      // multi-line lineHeight above. Emitted only for the BOX voices (Label · Body-mono · Label-mono · Kicker), where text
-      // sits in a box and the box owns the rhythm — NOT for the prose voices (Tiny · Sub-title).
+      // single-line height (= size, leading 1.0) — the single-line-text intent, distinct from the
+      // multi-line lineHeight above. Emitted only for the BOX voices (Kicker · UI-control · UI-widget,
+      // 2026-07-16), where text sits in a box and the box owns the rhythm — NOT for the prose voices
+      // (incl. Label · Body-mono · Label-mono · Tiny · Sub-title).
       ...(p.box ? { singleLineHeight: size } : {}),
     };
   }

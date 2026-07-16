@@ -41,7 +41,7 @@ you set a control's padding independently of its height, you break centering —
 **Button (text + optional icon)** — box: `.control-md`, OR by hand: `block-size:
 var(--size-md-height); padding-inline: var(--size-md-pad-edge); padding-block: 0; gap:
 var(--size-md-gap); border-radius: var(--size-md-radius); min-inline-size: var(--size-md-min);`. Text
-= the UI type voice at the matching step (typography-tokens: `.type-ui-md`, `-line-single`).
+= the UI-control voice at the matching step (typography-tokens: `.type-ui-control-md`, `-line-single`).
 
 - **With a leading icon:** icon `--size-md-icon`, and use `--size-md-pad` (slot edge) instead of
   `-pad-edge`.
