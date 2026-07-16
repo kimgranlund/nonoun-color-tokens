@@ -138,35 +138,33 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(d.size.MD.padding.$type === "dimension" && d.radius.full.$type === "dimension", "DTCG padding + radius are dimension tokens");
 }
 
-// ── COMPOSITION with typography: the per-step `font` comes from the type Label scale (renamed from "UI"
-// 2026-07-13) at a MATCHING step name. Label is now a fixed SM/MD/LG-only ramp, so only geometry's
-// SM/MD/LG steps have a real Label counterpart; geometry's XS/XL/2XL have none and fall back to the
-// standalone power law (buildSize's pre-existing null-fontOverride path) — the frame
-// (height/icon/pad/radius) is untouched either way ──
+// ── CONTROL TEXT (2026-07-16): the per-step `font` is the fixed CONTROL_FONT ramp (12·13·15·16·18·20 at
+// the canonical baseHeight 28), scaled by baseHeight/28 — its own hand-ratified table, DECOUPLED from
+// the type scale's Label voice (the old opts.typeScale composition is RETIRED; controls read ~2px larger
+// than Label by design, and the ramp's MD kink fits no shared law). opts.fontOverrides carries a
+// per-mode hand column; gap re-derives from the resolved font either way ──
 {
+  const base = G.geomScale({ treatment: "comfortable", baseHeight: 28 });
+  ok(["XS", "SM", "MD", "LG", "XL", "2XL"].map((k) => base.sizes[k].font).join() === "12,13,15,16,18,20", `the control-font ramp at baseHeight 28 (got ${["XS", "SM", "MD", "LG", "XL", "2XL"].map((k) => base.sizes[k].font)})`);
+  ok(!("typed" in base), "the retired composition flag (`typed`) is gone from the scale");
+  // the ramp scales with baseHeight like everything else (factor = bh/28)
+  const tall = G.geomScale({ treatment: "comfortable", baseHeight: 56 });
+  ok(tall.sizes.MD.font === 30, `the ramp scales by baseHeight/28 (MD at bh56 = 15×2 = 30, got ${tall.sizes.MD.font})`);
+  // COMPOSITION (TKT-0008): SM/MD/LG compose from the type scale's UI-CONTROL voice — value-neutral at
+  // defaults (the voice carries the same table rows), so voice tuning is what flows through.
   const ts = typeScale({ treatment: "product", bodyBase: 16 });
-  const standalone = G.geomScale({ treatment: "comfortable", baseHeight: 28 });
   const composed = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { typeScale: ts });
-  ok(composed.typed === true && standalone.typed === false, "geomScale reports `typed` only when a type scale is supplied");
-  for (const name of ["SM", "MD", "LG"]) {
-    ok(composed.sizes[name].font === ts.categories.Label[name].size, `${name}: composed font = type Label ${name} size (${composed.sizes[name].font} vs ${ts.categories.Label[name].size})`);
-  }
-  for (const name of ["XS", "XL", "2XL"]) {
-    ok(composed.sizes[name].font === standalone.sizes[name].font, `${name}: no Label counterpart (Label is SM/MD/LG-only) — falls back to the standalone power law, same as uncomposed`);
-  }
-  for (const name of ["XS", "SM", "MD", "LG", "XL", "2XL"]) {
-    // caret is its OWN power law off height (2026-07-15) — NEVER the composed fontOverride, so
-    // composition can't split caret onto two different formulas the way font's SM/MD/LG-only Label
-    // counterpart would; caret is byte-identical composed vs. standalone at every step.
-    ok(composed.sizes[name].caret === standalone.sizes[name].caret, `${name}: caret is unaffected by type composition (own formula, never the fontOverride)`);
-    // the FRAME is unchanged by composition — the centering law still holds with the shared font
-    ok(composed.sizes[name].height === standalone.sizes[name].height && composed.sizes[name].padding === standalone.sizes[name].padding, `${name}: composition leaves height + padding (the frame) untouched`);
-    ok(composed.sizes[name].padding === (composed.sizes[name].height - composed.sizes[name].icon) / 2, `${name}: centering law holds on the composed scale`);
-  }
-  // the two engines share ONE number — a bigger body base scales the control text too (for a step with a
-  // real Label counterpart — MD does)
-  const big = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { typeScale: typeScale({ treatment: "product", bodyBase: 22 }) });
-  ok(big.sizes.MD.font > composed.sizes.MD.font, "a larger type bodyBase scales the geometry font (shared source of truth)");
+  ok(JSON.stringify(composed) === JSON.stringify(base), "composition is value-neutral at defaults (UI-control's rows ARE the control table's SM/MD/LG)");
+  const tuned = typeScale({ treatment: "product", bodyBase: 16, overrides: { "UI-control|MD": 17 } });
+  const flows = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { typeScale: tuned });
+  ok(flows.sizes.MD.font === 17 && flows.sizes.LG.font === base.sizes.LG.font, `a UI-control voice override flows into the composed control text (MD ${flows.sizes.MD.font})`);
+  ok(G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { typeScale: ts, fontOverrides: { MD: 19 } }).sizes.MD.font === 19, "fontOverrides wins over the composition (the tier-column escape hatch)");
+  // fontOverrides: a per-size hand column replaces the law for JUST that size; gap re-derives from it
+  const ov = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { fontOverrides: { MD: 17 } });
+  ok(ov.sizes.MD.font === 17 && ov.sizes.MD.gap === Math.round((17 / 2) * 1), `fontOverrides replaces the ramp for that size + gap re-derives (font ${ov.sizes.MD.font}, gap ${ov.sizes.MD.gap})`);
+  ok(ov.sizes.LG.font === base.sizes.LG.font, "a font override touches only its size, no others");
+  ok(ov.sizes.MD.height === base.sizes.MD.height && ov.sizes.MD.icon === base.sizes.MD.icon && ov.sizes.MD.caret === base.sizes.MD.caret, "the FRAME (height/icon) + caret are untouched by a font override");
+  ok(JSON.stringify(G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { fontOverrides: { MD: 0, LG: NaN } })) === JSON.stringify(base), "non-positive / NaN font overrides are ignored (identity gate)");
 }
 
 // ── per-cell HEIGHT overrides (Tokens-matrix Phase 3): the height lever; icon/font/pad/radius all re-derive ──
@@ -180,15 +178,16 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   const ref = G.geomScale({ treatment: "comfortable", baseHeight: 50 }).sizes.MD; // what a 50px raw height yields through buildSize
   const ov = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { overrides: { MD: ovH } }).sizes.MD;
   ok(ov.height === ref.height, `override height drives buildSize (got ${ov.height}, want ${ref.height})`);
-  ok(ov.icon === ref.icon && ov.font === ref.font && ov.padding === ref.padding && ov.radiusPill === ref.radiusPill && ov.caret === ref.caret && ov.gap === ref.gap, "icon/font/pad/radius/caret/gap ALL re-derive from the override via the laws");
+  // font does NOT track the height override — the control-text ramp is per-STEP (fixed table), not per-height (2026-07-16)
+  ok(ov.icon === ref.icon && ov.padding === ref.padding && ov.radiusPill === ref.radiusPill && ov.caret === ref.caret, "icon/pad/radius/caret ALL re-derive from the override via the laws");
+  ok(ov.font === baseline.sizes.MD.font, `font stays on the per-step control ramp under a height override (got ${ov.font})`);
   ok(ov.padding === (ov.height - ov.icon) / 2, "the centering law still holds on the overridden cell");
   // only the targeted size changes — every other size stays at the baseline.
   const ovScale = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { overrides: { MD: ovH } });
   ok(ovScale.sizes.LG.height === baseline.sizes.LG.height && ovScale.sizes.XS.height === baseline.sizes.XS.height, "an override touches only its size, no others");
-  // composition still applies on top: the type UI font wins for the overridden cell's `font` (frame re-derives from height).
-  const ts = typeScale({ treatment: "product", bodyBase: 16 });
-  const comp = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { typeScale: ts, overrides: { MD: ovH } }).sizes.MD;
-  ok(comp.font === ts.categories.Label.MD.size && comp.height === ref.height, "composition + override coexist: font from the type Label scale, frame from the override height");
+  // height + font overrides coexist independently (frame from the height, text from the font column)
+  const both = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { overrides: { MD: ovH }, fontOverrides: { MD: 17 } }).sizes.MD;
+  ok(both.font === 17 && both.height === ref.height, "height + font overrides coexist: frame from the override height, text from the font column");
   // a non-positive / non-numeric override is ignored (no effect).
   ok(JSON.stringify(G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { overrides: { MD: 0, LG: -3, XS: NaN } })) === JSON.stringify(baseline), "non-positive / NaN overrides are ignored (no effect)");
 }
@@ -210,7 +209,7 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(col && JSON.stringify(col.modes) === JSON.stringify(["Base", "Desktop"]), `modes = [Base, Desktop] (got ${JSON.stringify(col && col.modes)})`);
   const v = col.variables["size/MD/height"];
   ok(v && v.type === "FLOAT" && typeof v.values.Base === "number" && typeof v.values.Desktop === "number", "size/MD/height is a FLOAT variable with Base + Desktop values");
-  ok(["height", "icon", "font", "padding", "radius", "gap"].every((f) => col.variables[`size/MD/${f}`]), "size emits height/icon/font/padding/radius/gap (the geomTokensFigma fields)");
+  ok(["height", "icon", "padding", "radius", "gap"].every((f) => col.variables[`size/MD/${f}`]) && !col.variables["size/MD/font"], "size emits height/icon/padding/radius/gap and NO font row (control text lives in the Typography collection, 2026-07-16)");
   ok(col.variables["radius/full"] && col.variables["radius/full"].type === "FLOAT" && col.variables["space/4"], "radius + space land as FLOAT variables too");
   // per-mode values DIFFER for a breakpoint with a different baseHeight (40 vs 28) — the Desktop height is taller.
   ok(v.values.Base === base.sizes.MD.height && v.values.Desktop === wide.sizes.MD.height, "Base value = base scale; Desktop value = that mode's scale");

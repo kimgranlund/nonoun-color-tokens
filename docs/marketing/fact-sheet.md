@@ -18,7 +18,7 @@ is the cautionary tale — the product had moved to 59 while the copy still said
 | Color model | **OKLCH-native** source of truth; HCT/CAM16 + OKHSL modeling; HEX derived for output only | `src/engine/` |
 | Distribution modes | even · **perceptual (default)** · peak, plus vibrancy, relative-chroma, chroma floor | `src/engine/tonal.js` |
 | Composing systems | **3** — Color · Typography · Geometry (one document, one editor) | `CLAUDE.md` |
-| Type voices | **13** — Display · Headline · Sub-heading · Title · Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker · Tiny · Tiny-mono, each a fixed 3-step SM/MD/LG ramp shared across every treatment | `src/engine/type.mjs` `makeVoices` |
+| Type voices | **15** — Display · Headline · Sub-heading · Title · Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker · Tiny · Tiny-mono · UI-control · UI-widget, each a fixed 3-step SM/MD/LG ramp shared across every treatment | `src/engine/type.mjs` `makeVoices` |
 | Type treatments | **5** — Product / Lifestyle · Luxury / Premium · Editorial / Magazine · Technical / Data · Brutalist / Statement | `src/engine/type.mjs` `TYPE_TREATMENTS` |
 | Geometry | size ramp **XS–2XL** on one centering law: edge padding = (height − glyph) / 2 | `src/engine/geometry.mjs` |
 | Geometry treatments | **5** — Comfortable · Compact / Dense · Spacious / Airy · Touch / Mobile · Pill / Rounded | `src/engine/geometry.mjs` `GEOMETRY_TREATMENTS` |

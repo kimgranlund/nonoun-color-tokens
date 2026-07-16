@@ -16,10 +16,11 @@ few parameters → a systematic type scale → exported as [DTCG](https://tr.des
 | `Font Specs` | the **scales**, grouped by role category (below) |
 | `$extensions` | Figma mode metadata |
 
-### `Font Specs` — the thirteen named voices
+### `Font Specs` — the fifteen named voices
 
-The engine implements this as **thirteen voices**: Display · Headline · Sub-heading · Title ·
-Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker · Tiny · Tiny-mono. Each is a size
+The engine implements this as **fifteen voices**: Display · Headline · Sub-heading · Title ·
+Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker · Tiny · Tiny-mono · UI-control ·
+UI-widget. Each is a size
 ramp, each step carrying `Size · Line Height · Letter Spacing · Weight · Case · Paragraph Spacing ·
 Indent`.
 
@@ -43,8 +44,12 @@ treatments (previously each voice derived from its own `base × ratio^step`, wit
 | **Kicker** | **mono** (pegged to Label's sizes) | **UPPERCASE** | very wide positive |
 | **Tiny** | **ui, prose** | sentence | 0 |
 | **Tiny-mono** | **mono, prose** (pegged to Tiny's sizes) | sentence | 0 |
+| **UI-control** | ui | sentence | small positive (optical) |
+| **UI-widget** | ui | sentence | small positive (optical) |
 
-39 steps in all (13 voices × 3). Each treatment supplies the font palette + a few character knobs (a
+45 steps in all (15 voices × 3). UI-control (buttons/inputs/selects) and UI-widget (tags/badges/
+switches — compact widgets) are the interactive-text voices (TKT-0008): Label-like character, box
+voices, and UI-control composes into geometry's control ramp (`font` at SM/MD/LG). Each treatment supplies the font palette + a few character knobs (a
 shared `makeVoices()` factory); the FIXED SIZES table gives every step's size; the engine still
 derives leading, optical tracking, weight, and case per treatment. Body-mono, Label-mono, Tiny-mono,
 and Kicker all use the mono role, aliasing their non-mono sibling's own size triplet (same numbers,

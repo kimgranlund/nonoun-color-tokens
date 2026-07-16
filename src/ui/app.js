@@ -453,6 +453,8 @@ const TYPE_SPECIMENS = {
     "Kicker": "Daily Brief",
     "Tiny": "Your streak keeps itself — no daily check-in required.",
     "Tiny-mono": "sha256:a1b2c3d4 verified locally.",
+    "UI-control": "Add habit",
+    "UI-widget": "4 left",
     para: "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go — your streak keeps itself, so you can stay present for the part that actually counts.",
   },
   luxury: {
@@ -469,6 +471,8 @@ const TYPE_SPECIMENS = {
     "Kicker": "Private Reserve",
     "Tiny": "Finished entirely by hand in the atelier, Florence.",
     "Tiny-mono": "Serial no. MB-2026-0417.",
+    "UI-control": "Request an appointment",
+    "UI-widget": "New",
     para: "Crafted in limited number and finished entirely by hand, every piece leaves our atelier with the quiet confidence of something built to outlast its season — and to be passed, one day, to someone you love.",
   },
   editorial: {
@@ -485,6 +489,8 @@ const TYPE_SPECIMENS = {
     "Kicker": "Dispatch",
     "Tiny": "Above: the north cove at first light, September.",
     "Tiny-mono": "Archived at doi.org/10.1234/vc47.",
+    "UI-control": "Read the story",
+    "UI-widget": "12 min",
     para: "For thirty years she walked these shores at dawn, counting the birds the way her mother had taught her. What she saw over those decades, and what she slowly stopped finding, is the story we set out to tell.",
   },
   technical: {
@@ -501,6 +507,8 @@ const TYPE_SPECIMENS = {
     "Kicker": "System Status",
     "Tiny": "Fig. 3 — p99 latency, rolling 24-hour window.",
     "Tiny-mono": "trace-id: 7e2f9a1c-40b2-4e91.",
+    "UI-control": "Acknowledge all",
+    "UI-widget": "OK",
     para: "All regions are reporting nominal: latency held under 80ms across the last 24 hours, the error budget is untouched for the quarter, and the autoscaler released eleven nodes overnight without a single dropped request.",
   },
   statement: {
@@ -517,6 +525,8 @@ const TYPE_SPECIMENS = {
     "Kicker": "Doors 9PM",
     "Tiny": "Warehouse 9, DTLA — doors at nine.",
     "Tiny-mono": "Presented by NOCTURNE — est. 2019.",
+    "UI-control": "Get tickets",
+    "UI-widget": "Sold out",
     para: "No openers, no encore, no second chances: one set from start to finish, three nights only, loud enough to feel in your chest and gone before the city wakes up. Doors at nine — don't be the one telling it secondhand.",
   },
 };
@@ -1947,7 +1957,7 @@ class HctApp extends HTMLElement {
   typeAnalysisCards(view) {
     const scale = this._activeTypeScale();
     const card = (label, body) => h("div", { class: "an-card" }, h("div", { class: "an-label" }, label), body);
-    const SHORT = { "Display": "Disp", "Headline": "Head", "Sub-heading": "Sub", "Title": "Title", "Sub-title": "Subt", "Lead": "Lead", "Body": "Body", "Body-mono": "BodyM", "Label": "Label", "Label-mono": "LabelM", "Kicker": "Kick", "Tiny": "Tiny", "Tiny-mono": "TinyM" };
+    const SHORT = { "Display": "Disp", "Headline": "Head", "Sub-heading": "Sub", "Title": "Title", "Sub-title": "Subt", "Lead": "Lead", "Body": "Body", "Body-mono": "BodyM", "Label": "Label", "Label-mono": "LabelM", "Kicker": "Kick", "Tiny": "Tiny", "Tiny-mono": "TinyM", "UI-control": "UICtl", "UI-widget": "UIWdg" };
     const series = Object.keys(scale.categories)
       .map((c) => ({ cat: c, short: SHORT[c] || c, steps: Object.entries(scale.categories[c] || {}).map(([name, s]) => ({ name, ...s })) }))
       .filter((x) => x.steps.length);
@@ -3365,10 +3375,13 @@ class HctApp extends HTMLElement {
     const near = (x) => Math.abs((modeFactor || 1) - x) < 1e-9;
     const fam = (voices, sizes) => Object.fromEntries(voices.flatMap((v) => ["SM", "MD", "LG"].map((s, i) => [`${v}|${s}`, sizes[i]])));
     const LABELS = ["Label", "Label-mono", "Kicker"]; // Label-mono + Kicker peg to Label's sizes by design
+    // UI-control/UI-widget (TKT-0008): the tiers the frozen/scale laws don't land on their own — both
+    // voices' Tablet/Mobile freezes come out of the ≤bodyBase law free; every Lg/Xl column needs hand
+    // cells (the nice-ladder re-rounds the scaled odd values). Verified at build.
     if (near(5 / 6)) return fam(LABELS, [11, 12, 13]); // Tablet
     if (near(2 / 3)) return fam(LABELS, [10, 11, 12]); // Mobile
-    if (near(0.89)) return fam(LABELS, [13, 14, 15]); // Desktop Lg
-    if (near(0.80)) return { ...fam(LABELS, [16, 17, 18]), ...fam(["Tiny", "Tiny-mono"], [12, 13, 14]) }; // Desktop Xl
+    if (near(0.89)) return { ...fam(LABELS, [13, 14, 15]), ...fam(["UI-control"], [15, 17, 18]), ...fam(["UI-widget"], [12, 13, 14]) }; // Desktop Lg
+    if (near(0.80)) return { ...fam(LABELS, [16, 17, 18]), ...fam(["Tiny", "Tiny-mono"], [12, 13, 14]), ...fam(["UI-control"], [17, 18, 20]), ...fam(["UI-widget"], [14, 15, 16]) }; // Desktop Xl
     return null;
   }
   // _typeOverridesFor(modeKey) — the flat { "<voice>|<step>": size } slice for one mode (the suffix stripped).
@@ -3407,7 +3420,9 @@ class HctApp extends HTMLElement {
     return Object.keys(out).length ? out : undefined;
   }
   // _geomScaleFor(modeKey) — the resolved geometry scale for a mode WITH that mode's per-cell HEIGHT
-  // overrides applied, COMPOSED with the type scale at the SAME mode (so the shared `font` tracks too).
+  // overrides applied, COMPOSED with the type scale at the SAME mode — a control's text size (SM/MD/LG
+  // `font`) is the UI-CONTROL voice at that mode (TKT-0008; XS/XL/2XL fall back to the engine's fixed
+  // control-text ramp / the tier columns below).
   _geomScaleFor(modeKey) {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
     // a mode's rampContrast: mode-explicit wins; otherwise it INHERITS the doc's (the desktop-anchored
@@ -6758,20 +6773,23 @@ class HctApp extends HTMLElement {
     // synthesized, Desktop-anchored: the doc ramp IS Desktop; the other tiers carry the ratified magnitude
     // table's height ramps (2026-07-16, at request) as per-size overrides scaled by bh/28, so they hold
     // their shape at any baseHeight. Tablet needs none — the lawful −2 derivation already lands the
-    // table's exact heights. Each rung composes the TYPE scale at the SAME rung (incl. the matching
-    // bodyBase multiplier for Lg/Xl) so the shared `font` tracks; the composed scale deliberately SKIPS
-    // the Label tier-nudges — the table's own geometry `font` row tracks the un-nudged frozen Label, and
-    // its `label` row is the nudged one (the two are decoupled in the table itself).
+    // table's exact heights. Control text is the geometry engine's OWN ramp now (the type composition is
+    // retired); each tier passes its `controls` column as fontOverrides below.
     const t = this.doc.type || DEFAULT_TYPE;
     const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
     const bh = g.baseHeight ?? 28;
-    const ramp = (arr) => { const f = bh / 28; const [XS, SM, MD, LG, XL, XXL] = arr.map((h) => h * f); return { XS, SM, MD, LG, XL, "2XL": XXL }; };
-    const synth = (delta, mf, bodyBase, overrides) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: typeScale({ ...t, bodyBase: bodyBase ?? bb, modeFactor: mf }), overrides });
+    const ramp = (arr) => { const f = bh / 28; const out = {}; ["XS", "SM", "MD", "LG", "XL", "2XL"].forEach((k, i) => { if (arr[i] != null) out[k] = arr[i] * f; }); return out; };
+    // per-tier CONTROL-TEXT columns for the NON-COMPOSED steps only (XS/XL/2XL — the magnitude table's
+    // `controls` rows, scaled like the heights): SM/MD/LG compose from the tier's own UI-control voice
+    // (with its _modeTierNudge cells), which carries the same table rows — one source of truth.
+    const tierType = (mult, mf) => typeScale({ ...t, bodyBase: bb * mult, modeFactor: mf, overrides: { ...(t.overrides || {}), ...this._modeTierNudge(mf) } });
+    const FROZEN_EDGE = ramp([12, null, null, null, 18, 20]);
+    const synth = (delta, mult, mf, overrides, fontOverrides) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: tierType(mult, mf), overrides, fontOverrides });
     return [
-      { name: "Desktop Lg", minWidth: 1728, scale: synth(4, 0.89, bb * 1.125, ramp([24, 28, 32, 40, 56, 72])) },
-      { name: "Desktop Xl", minWidth: 2560, scale: synth(28, 0.80, bb * 1.375, ramp([40, 48, 56, 64, 72, 80])) },
-      { name: "Tablet", minWidth: 992, scale: synth(-2, 5 / 6) },
-      { name: "Mobile", minWidth: 476, scale: synth(-4, 2 / 3, bb, ramp([16, 20, 24, 32, 40, 56])) },
+      { name: "Desktop Lg", minWidth: 1728, scale: synth(4, 1.125, 0.89, ramp([24, 28, 32, 40, 56, 72]), ramp([14, null, null, null, 20, 22])) },
+      { name: "Desktop Xl", minWidth: 2560, scale: synth(28, 1.375, 0.80, ramp([40, 48, 56, 64, 72, 80]), ramp([16, null, null, null, 22, 24])) },
+      { name: "Tablet", minWidth: 992, scale: synth(-2, 1, 5 / 6, undefined, FROZEN_EDGE) },
+      { name: "Mobile", minWidth: 476, scale: synth(-4, 1, 2 / 3, ramp([16, 20, 24, 32, 40, 56]), FROZEN_EDGE) },
     ];
   }
   // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The
@@ -7076,9 +7094,7 @@ class HctApp extends HTMLElement {
       { class: "geom-spec" },
       h("div", { class: "geom-spec-head" }, h("b", {}, t.label), h("small", {}, `${scale.baseHeight}px base · 6 sizes · ${scale.density}× density`)),
       h("p", { class: "geom-spec-note" }, t.note + " — every glyph centers in a square cell of side = the control height, so edge padding = (height − glyph)/2. The ramp + paddings are computed, not authored."),
-      scale.typed
-        ? h("p", { class: "geom-shared-note" }, icon("type"), h("span", {}, "Text size (", h("b", {}, "font"), ") per step comes from the ", h("b", {}, "Typography UI"), " scale — one source of truth, so a control's box and its text stay in sync."))
-        : false,
+      h("p", { class: "geom-shared-note" }, icon("type"), h("span", {}, "Text size (", h("b", {}, "font"), ") per step is the control-text ramp — its own fixed table (12·13·15·16·18·20 at base 28), deliberately decoupled from the Label voice; it surfaces in Figma as the Typography collection's UI-widget/UI-control size variables.")),
       h(
         "div",
         { class: "geom-spec-group" },
@@ -7202,9 +7218,7 @@ class HctApp extends HTMLElement {
     return h(
       "div",
       { class: "geom-comp" },
-      h("p", { class: "geom-comp-note" }, scale.typed
-        ? "Each control's text size is the Typography UI voice at the matching step — the box and its text share one number; caret = font, gap = font/2."
-        : "Standalone power-law text size (no type scale composed)."),
+      h("p", { class: "geom-comp-note" }, "Each control's text size is the fixed control-text ramp (its own hand-ratified table, decoupled from the Label voice); gap = font/2, caret has its own power law."),
       h(
         "div",
         { class: "geom-comp-rows" },
@@ -7301,7 +7315,7 @@ class HctApp extends HTMLElement {
           );
         }),
       ),
-      scale.typed ? h("p", { class: "insp-sub tyi-future" }, "Text size (font) per step comes from the Typography UI scale — one source of truth.") : false,    );
+      h("p", { class: "insp-sub tyi-future" }, "Text size (font) per step is the control-text ramp — decoupled from the type scale; in Figma it lives in the Typography collection as UI-widget/UI-control sizes."),    );
   }
 
   // geomRadiusTab — the corner ladder the treatment resolves to (none·sm·md·lg·full). The radius STYLE is

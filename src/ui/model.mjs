@@ -32,12 +32,13 @@ import { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyA
 import { typeScale, DEFAULT_TYPE } from "../engine/type.mjs";
 import { geomScale, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 
-// geometryScale — the resolved geometry for a doc, COMPOSED with its type scale so a control's text size
-// (the per-step `font`) comes from the brand's Typography UI voice (one source of truth). The single place
-// the two systems are joined; brandKit + the app's Geometry modal/exports all go through it.
+// geometryScale — the resolved geometry for a doc, COMPOSED with its type scale so a control's text
+// size (the per-step `font` at SM/MD/LG) comes from the brand's UI-CONTROL voice (TKT-0008 — rerouted
+// off Label 2026-07-16; XS/XL/2XL fall back to the engine's fixed CONTROL_FONT ramp). The single place
+// the two systems are joined; brandKit + the app's Geometry section/exports all go through it.
 // `opts.overrides` (optional) — the flat `<size>→height` BASE override slice; threaded into geomScale.
-// `opts.typeOverrides` (optional) — the flat `<voice>|<step>→size` BASE slice for the COMPOSED type scale,
-// so the shared per-step `font` carries the type overrides too.
+// `opts.typeOverrides` (optional) — the flat `<voice>|<step>→size` BASE slice for the COMPOSED type
+// scale, so a UI-control override carries into the shared per-step `font` too.
 export function geometryScale(doc, opts = {}) {
   const tcfg = { ...(doc.type || DEFAULT_TYPE) };
   if (opts.typeOverrides) tcfg.overrides = opts.typeOverrides;

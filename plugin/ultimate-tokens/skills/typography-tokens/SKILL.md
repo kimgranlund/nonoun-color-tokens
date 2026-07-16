@@ -33,8 +33,8 @@ properties. Your job is never to pick a px size or a font stack — it is to pic
    `--font-ui`, `--font-mono`. Every voice resolves to one of these — you never name a family
    directly, you use the voice's `--font-*` var (the utility classes already do this).
 3. **Know the grammar.** `--type-{voice}-{step}-{prop}` where prop ∈
-   `size · line · tracking · weight · para` (+ `line-single` on the box voices — Label/Body-mono/
-   Label-mono/Kicker — only). Prefer the ready-made utility class `.type-{voice}-{step}` (it wires
+   `size · line · tracking · weight · para` (+ `line-single` on the box voices — Kicker/UI-control/
+   UI-widget — only; Label/Body-mono/Label-mono went prose 2026-07-16). Prefer the ready-made utility class `.type-{voice}-{step}` (it wires
    family+size+line+tracking+weight in one) over composing the vars by hand.
 
 ## Two axes — role (function) × level (hierarchy depth)
@@ -61,14 +61,16 @@ scale, and identical across every treatment (only font/weight/tracking/leading/c
 | **lead** | body | the standfirst / intro paragraph, or a block quote / pull-quote — larger than body |
 | **body** | body | running prose, paragraphs, descriptions, long-form reading, and fine-print/legal (body's own smallest step) |
 | **body-mono** | mono | code snippets, tabular figures, keyboard shortcuts, technical values in running text — pegged to body's own sizes |
-| **label** | ui | interface text: buttons, labels, inputs, menus, table cells, badges |
+| **label** | ui | STATIC labels: field labels, table cells, list metadata — prose flow (may wrap) since 2026-07-16 |
+| **UI-control** | ui | interactive control text: buttons, inputs, selects, menu items — box voice with `-line-single` |
+| **UI-widget** | ui | compact widget text: tags, badges, switches, checks — box voice with `-line-single` |
 | **label-mono** | mono | monospace interface text — IDs, version tags, status readouts — pegged to label's own sizes |
 | **kicker** | mono | the smallest overline / metadata label — mono, uppercase, tracked, pegged to label's own sizes |
 | **tiny** | ui (prose) | figure/image/media captions, table captions, chart annotations, small supporting text |
 | **tiny-mono** | mono (prose) | monospace small print — build hashes, trace IDs, technical footnotes — pegged to tiny's own sizes |
 
 Note the split: **body** is for *prose you read*; **label** is for *interface chrome you operate*. A
-button label is `label`, not `body`. A paragraph is `body`, not `label`. **Sub-title** and **tiny**
+button label is `UI-control`, not `body` (and not `label` — that voice is STATIC text now). A paragraph is `body`, not `label`. **Sub-title** and **tiny**
 are prose too, even though they render in the *mono*/*ui* font respectively; they wrap (use `-line`,
 not `-line-single`). Reach for `tiny` on a figure caption, not `label`. There's no separate
 "quote"/"caption"/"legal"/"UI" voice — those jobs live on `lead`, `tiny`, `body`, and `label`
@@ -90,8 +92,8 @@ merely LOOKS technical. Don't reach for a `-mono` voice just because the surroun
 3. **`line` and `para` come with the size.** Line-height (`-line`) and paragraph spacing (`-para`)
    are derived per step — use them; don't set your own `line-height: 1.5` or `margin-bottom`. For
    single-line control text (a button, an input value, an overline) use `-line-single` (leading
-   1.0), which exists on the box-text voices — **Label, Body-mono, Label-mono, and Kicker** (the
-   `ui`/`mono` roles); for multi-line text use `-line`.
+   1.0), which exists on the box-text voices — **UI-control, UI-widget, and Kicker** (Label/
+   Body-mono/Label-mono went prose 2026-07-16); for multi-line text use `-line`.
 4. **Tracking is baked and optical.** `-tracking` is tuned per step (tight on display, open on
    kicker) — apply it; never add your own `letter-spacing`.
 5. **Weight is the voice's, and case is the treatment's.** Use `-weight`; don't bold a voice by

@@ -1291,7 +1291,11 @@ a.account-manage:hover { text-decoration: underline; }
 .ty-s7 { stroke: var(--ink-dim); fill: var(--ink-dim); }                                                    /* Caption (ui font, prose) */
 .ty-s8 { stroke: var(--ink-faint); fill: var(--ink-faint); }                                                /* UI */
 .ty-s9 { stroke: var(--ink-faint); fill: var(--ink-faint); stroke-dasharray: 3 3; }                         /* Code (mono) */
-.ty-s10 { stroke: color-mix(in srgb, var(--ink-faint) 80%, var(--accent)); fill: color-mix(in srgb, var(--ink-faint) 80%, var(--accent)); stroke-dasharray: 3 3; } /* Legal (ui font, prose) */
+.ty-s10 { stroke: color-mix(in srgb, var(--ink-faint) 80%, var(--accent)); fill: color-mix(in srgb, var(--ink-faint) 80%, var(--accent)); stroke-dasharray: 3 3; } /* Kicker (mono) */
+.ty-s11 { stroke: color-mix(in srgb, var(--ink-dim) 70%, var(--panel)); fill: color-mix(in srgb, var(--ink-dim) 70%, var(--panel)); }                              /* Tiny (ui font, prose) */
+.ty-s12 { stroke: color-mix(in srgb, var(--ink-dim) 70%, var(--panel)); fill: color-mix(in srgb, var(--ink-dim) 70%, var(--panel)); stroke-dasharray: 3 3; }        /* Tiny-mono */
+.ty-s13 { stroke: color-mix(in srgb, var(--accent) 60%, var(--ink-faint)); fill: color-mix(in srgb, var(--accent) 60%, var(--ink-faint)); }                         /* UI-control (TKT-0008) */
+.ty-s14 { stroke: color-mix(in srgb, var(--accent) 35%, var(--ink-faint)); fill: color-mix(in srgb, var(--accent) 35%, var(--ink-faint)); }                         /* UI-widget (TKT-0008) */
 .an-leg-mark.ty { background: var(--ink-faint); }
 .an-leg-mark.ty.s0 { background: var(--accent); }
 .an-leg-mark.ty.s1 { background: color-mix(in srgb, var(--accent) 70%, #e0e0e0); }

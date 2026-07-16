@@ -1,7 +1,7 @@
 // type.mjs — the perceptual TYPOGRAPHY engine: the type analog of the color engine. A few parameters
-// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Thirteen named "voices" — Display ·
+// → a systematic type scale → DTCG / CSS tokens. Pure, no DOM. Fifteen named "voices" — Display ·
 // Headline · Sub-heading · Title · Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker ·
-// Tiny · Tiny-mono — each a 3-step SM/MD/LG ramp whose every step carries size, line-height,
+// Tiny · Tiny-mono · UI-control · UI-widget (TKT-0008) — each a 3-step SM/MD/LG ramp whose every step carries size, line-height,
 // letter-spacing, weight, and paragraph spacing. (The DTCG shape follows the Figma-variable export at
 // docs/reference/typography/typography.tokens.json, a frozen snapshot kept for reference.)
 //
@@ -38,6 +38,12 @@ const SIZES = {
   Body: [14, 16, 18],
   Label: [12, 13, 14],
   Tiny: [9, 10, 11],
+  // TKT-0008 (2026-07-16): the two INTERACTIVE-text voices. UI-control (buttons/inputs/selects) =
+  // the ratified control table's SM/MD/LG; UI-widget (tags/badges/switches — compact widgets) = its
+  // own smaller reporter-supplied table. Both feed geometry: UI-control composes into the control
+  // ramp's SM/MD/LG `font` (geomScale opts.typeScale).
+  "UI-control": [13, 15, 16],
+  "UI-widget": [10, 11, 12],
 };
 const RANKS = ["SM", "MD", "LG"];
 const stepsFor = (sizeKey) => RANKS.map((r, i) => [r, SIZES[sizeKey][i]]);
@@ -96,12 +102,17 @@ function makeVoices(o = {}) {
     // 450 snap boundary. (Lead/Tiny were already ≤450; Lead's weight stays a free treatment lever —
     // luxury deliberately sets it Light.)
     "Body": cat("body", "Body", o.bLead ?? 1.5, o.bWeight ?? 440, 0, "none"),
-    "Body-mono": cat("mono", "Body", o.bodyMonoLead ?? 1.5, o.bodyMonoWeight ?? 440, o.bodyMonoTrack ?? 0, "none"),
-    "Label": cat("ui", "Label", o.labelLead ?? 1.4, o.labelWeight ?? 440, o.labelTrack ?? 0.006, "none"),
-    "Label-mono": cat("mono", "Label", o.labelMonoLead ?? 1.4, o.labelMonoWeight ?? 440, o.labelMonoTrack ?? 0, "none"),
+    "Body-mono": cat("mono", "Body", o.bodyMonoLead ?? 1.5, o.bodyMonoWeight ?? 440, o.bodyMonoTrack ?? 0, "none", false), // prose flow (2026-07-16 — single-line/box behavior moved to the UI voices)
+    "Label": cat("ui", "Label", o.labelLead ?? 1.4, o.labelWeight ?? 440, o.labelTrack ?? 0.006, "none", false), // prose flow — the STATIC label voice (may wrap); interactive single-line text is UI-control/UI-widget
+    "Label-mono": cat("mono", "Label", o.labelMonoLead ?? 1.4, o.labelMonoWeight ?? 440, o.labelMonoTrack ?? 0, "none", false), // prose flow (mirrors Label)
     "Kicker": cat("mono", "Label", o.kickLead ?? 1.4, o.kickWeight ?? 600, o.kickTrack ?? 0.16, "uppercase"),
     "Tiny": cat("ui", "Tiny", o.tinyLead ?? 1.5, o.tinyWeight ?? 440, 0, "none", false), // ui FONT, prose flow (former Caption's job)
     "Tiny-mono": cat("mono", "Tiny", o.tinyMonoLead ?? 1.5, o.tinyMonoWeight ?? 440, 0, "none", false), // mono FONT, still prose (mirrors Tiny)
+    // TKT-0008 — the interactive-text voices (appended so existing voice indices hold): Label-like
+    // character (leading 1.4, core 440 ≤ the 450 Regular-face snap, gentle positive tracking), ui
+    // role ⇒ BOX voices (singleLineHeight + 1.0× paragraph rhythm — control text sits in a box).
+    "UI-control": cat("ui", "UI-control", o.ucLead ?? 1.4, o.ucWeight ?? 440, o.ucTrack ?? 0.006, "none"),
+    "UI-widget": cat("ui", "UI-widget", o.uwLead ?? 1.4, o.uwWeight ?? 440, o.uwTrack ?? 0.006, "none"),
   };
 }
 
@@ -384,7 +395,7 @@ export function siblingWeightDefaults(core) {
 // Regular/Bolder/Boldest vocabulary instead of the full Lighter/Light/Heavy/Heavier scale (see
 // relativeWeightLabel). The large, expressive voices (Display/Headline/Sub-heading/Title/Sub-title/
 // Kicker) are UNCHANGED — full 3-sibling siblingWeightDefaults, full 4-word label scale.
-export const BODY_CLASS_VOICES = new Set(["Lead", "Body", "Body-mono", "Label", "Label-mono", "Tiny", "Tiny-mono"]);
+export const BODY_CLASS_VOICES = new Set(["Lead", "Body", "Body-mono", "Label", "Label-mono", "Tiny", "Tiny-mono", "UI-control", "UI-widget"]);
 
 // bodyClassSiblingDefaults(core) — the "Regular/Bolder/Boldest" progression for BODY_CLASS_VOICES:
 // always the 2 ladder stops immediately ABOVE the snapped core, never below (unlike
@@ -659,21 +670,17 @@ export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
   const names = disambiguateModeNames(list.map((m) => m.name), baseName);
   const modeNames = baseLast ? [...names, baseName] : [baseName, ...names];
   const variables = {};
+  const set = (key, mode, value) => {
+    if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
+    variables[key].values[mode] = value;
+  };
   // for each mode (the base layer + each breakpoint), write every voice×step×prop value under that mode key.
   const layer = (scale, mode) => {
     for (const [cName, steps] of Object.entries(scale.categories)) {
       for (const [sName, s] of Object.entries(steps)) {
-        for (const prop of TYPE_FIGMA_PROPS) {
-          const key = `${cName}/${sName}/${prop}`;
-          if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
-          variables[key].values[mode] = s[prop];
-        }
+        for (const prop of TYPE_FIGMA_PROPS) set(`${cName}/${sName}/${prop}`, mode, s[prop]);
         // singleLineHeight exists only on the BOX voices (Label · Body-mono · Label-mono · Kicker) — pixels too.
-        if (s.singleLineHeight != null) {
-          const key = `${cName}/${sName}/singleLineHeight`;
-          if (!variables[key]) variables[key] = { type: "FLOAT", values: {} };
-          variables[key].values[mode] = s.singleLineHeight;
-        }
+        if (s.singleLineHeight != null) set(`${cName}/${sName}/singleLineHeight`, mode, s.singleLineHeight);
       }
     }
   };

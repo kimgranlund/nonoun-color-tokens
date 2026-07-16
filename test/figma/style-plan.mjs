@@ -119,10 +119,11 @@ const plans = stylePlans({ families, scale });
   }
   ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(\/[a-z0-9 -]+)?(-single)?( •)?$/.test(t.name)), "every text style name is Voice/lowerstep[/lower-kebab-slug OR relative-label OR /• relative-label][-single suffix on the leaf]");
   // volume: every voice×step gets 1 core + its siblings.length (auto-populated by default, 0 only for
-  // an explicit opt-out) — plus a "-single"-suffixed mirror of every Body/Body-mono/Label/Label-mono
-  // style. Derived from the resolved scale itself (not hand-counted) so this doesn't rot as voice
-  // defaults change.
-  const SINGLE_VOICES = new Set(["Body", "Body-mono", "Label", "Label-mono"]);
+  // an explicit opt-out) — plus a "-single"-suffixed mirror of every UI-control/UI-widget style
+  // (2026-07-16: the Body*/Label* -single variants are RETIRED — single-line behavior belongs to the
+  // interactive voices). Derived from the resolved scale itself (not hand-counted) so this doesn't rot
+  // as voice defaults change.
+  const SINGLE_VOICES = new Set(["UI-control", "UI-widget"]);
   let expected = 0;
   for (const [v, steps] of Object.entries(scale.categories)) {
     const perStep = 1 + ((scale.weights && scale.weights[v]) || []).length;
@@ -131,7 +132,7 @@ const plans = stylePlans({ families, scale });
     if (SINGLE_VOICES.has(v)) expected += n; // the -single mirror
   }
   ok(plans.texts.length === expected, `text style count ${plans.texts.length} != expected ${expected}`);
-  // every Body/Body-mono/Label/Label-mono style gets exactly one -single sibling; no other voice does.
+  // every UI-control/UI-widget style gets exactly one -single sibling; no other voice does.
   // Two earlier shapes both broke: a trailing "/single" SEGMENT made the plain leaf a PATH PREFIX of its
   // own single variant (Figma's Styles panel folder-izes any name that is a prefix of another — the
   // plain leaf and the implied folder rendered as two rows sharing one visible label); a separate
@@ -140,31 +141,23 @@ const plans = stylePlans({ families, scale });
   // no new path segment, so it can never become or collide with a folder, and it stays right beside its
   // multi-line sibling in the SAME step folder.
   const singles = plans.texts.filter((t) => /-single$/.test(t.name));
-  ok(singles.every((t) => SINGLE_VOICES.has(t.voice)), `only Body/Body-mono/Label/Label-mono carry a -single variant (voices: ${[...new Set(singles.map((t) => t.voice))].join(",")})`);
+  ok(singles.every((t) => SINGLE_VOICES.has(t.voice)), `only UI-control/UI-widget carry a -single variant (voices: ${[...new Set(singles.map((t) => t.voice))].join(",")})`);
   ok(!plans.texts.some((t) => t.name.endsWith("/single") || t.name.includes("/single/") || /-single\//.test(t.name)), "no text style name uses the old \"/single\" segment or \"{step}-single\" folder shape (both collided/hid siblings away)");
-  // Body is a BODY_CLASS_VOICE (2026-07-13, at request): its label vocabulary is the simpler
-  // Regular/Bolder/Boldest, not Lighter/Light/Heavy/Heavier. In THIS fixture (core + 1 explicit
-  // sibling, 2 total) the core (lighter of the 2) ranks "regular" — its -single mirror matches.
-  const bodySingle = plans.texts.find((t) => t.name === "Body/md/regular-single •");
-  ok(!!bodySingle && bodySingle.literal.lineHeight === bodySingle.literal.size && !bodySingle.bind.lineHeight, "Body's -single style: literal lineHeight = size, UNBOUND (Body has no singleLineHeight variable — it's prose)");
-  // a FRESH, fully-default scale — Label/Body-mono/Label-mono/Body all auto-populate via
-  // bodyClassSiblingDefaults now (2 siblings, BOTH heavier — capped for BODY_CLASS_VOICES), so each
-  // core is the LIGHTEST of its own 3-total set → "regular", matching the Regular/Bolder/Boldest scale.
+  // a FRESH, fully-default scale — the UI voices auto-populate via bodyClassSiblingDefaults (2
+  // siblings, BOTH heavier), so each core is the LIGHTEST of its own 3-total set → "regular",
+  // matching the Regular/Bolder/Boldest scale. Both bind live to their singleLineHeight variables
+  // (they're BOX voices); the retired Body*/Label* voices emit NO -single style at all.
   const labelScale = typeScale({ treatment: "product" });
   const labelPlans = stylePlans({ families, scale: labelScale });
-  const labelSingle = labelPlans.texts.find((t) => t.name === "Label/md/regular-single •");
-  ok(!!labelSingle && labelSingle.bind.lineHeight === "Label/MD/singleLineHeight", "Label's -single style BINDS live to its real singleLineHeight variable (Label is a box voice)");
-  // Body-mono/Label-mono join Body/Label here (2026-07-13, at request) — both are BOX voices too (mono
-  // role defaults box:true in buildCategory), so unlike Body's prose fallback, they bind live.
-  const bodyMonoSingle = labelPlans.texts.find((t) => t.name === "Body-mono/md/regular-single •");
-  ok(!!bodyMonoSingle && bodyMonoSingle.bind.lineHeight === "Body-mono/MD/singleLineHeight", "Body-mono's -single style BINDS live to its real singleLineHeight variable (box voice, unlike Body)");
-  const labelMonoSingle = labelPlans.texts.find((t) => t.name === "Label-mono/md/regular-single •");
-  ok(!!labelMonoSingle && labelMonoSingle.bind.lineHeight === "Label-mono/MD/singleLineHeight", "Label-mono's -single style BINDS live to its real singleLineHeight variable");
+  const ucSingle = labelPlans.texts.find((t) => t.name === "UI-control/md/regular-single •");
+  ok(!!ucSingle && ucSingle.bind.lineHeight === "UI-control/MD/singleLineHeight", "UI-control's -single style BINDS live to its real singleLineHeight variable (a box voice)");
+  const uwSingle = labelPlans.texts.find((t) => t.name === "UI-widget/md/regular-single •");
+  ok(!!uwSingle && uwSingle.bind.lineHeight === "UI-widget/MD/singleLineHeight", "UI-widget's -single style BINDS live to its real singleLineHeight variable");
+  ok(!labelPlans.texts.some((t) => /-single/.test(t.name) && ["Body", "Body-mono", "Label", "Label-mono"].includes(t.voice)), "the Body*/Label* -single variants are RETIRED (2026-07-16) — none emitted");
   // sibling weights get the SAME -single suffix, flat next to their own multi-line style (the exact ask:
-  // every configured sibling gets its own "-single" variant, not just the core). Body's sibling (600,
-  // the heavier of the 2 in THIS fixture) ranks "boldest".
-  const bodyBoldestSingle = plans.texts.find((t) => t.voice === "Body" && t.step === "MD" && t.name === "Body/md/boldest-single");
-  ok(!!bodyBoldestSingle, "Body's sibling weight carries its own -single variant, not just the core");
+  // every configured sibling gets its own "-single" variant, not just the core).
+  const ucBolderSingle = labelPlans.texts.find((t) => t.name === "UI-control/md/bolder-single");
+  ok(!!ucBolderSingle, "UI-control's sibling weight carries its own -single variant, not just the core");
   // BODY_CLASS_VOICES auto-populate ONLY 2 siblings (never 3) — both heavier than the core, never
   // lighter, matching the Regular/Bolder/Boldest progression's one-directional meaning.
   const labelBolder = labelPlans.texts.find((t) => t.name === "Label/md/bolder");

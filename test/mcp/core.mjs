@@ -49,7 +49,7 @@ ok(typeof callTool("get_semantic", { scheme: "dark" })["primary/surface"] === "s
 const ty = callTool("get_type", {});
 const geo = callTool("get_geometry", {});
 ok(ty.categories && ty.categories.Body && geo.sizes && geo.sizes.MD.padding === (geo.sizes.MD.height - geo.sizes.MD.icon) / 2, "get_type + get_geometry serve the scales (the centering law holds)");
-ok(geo.sizes.MD.font === ty.categories.Label.MD.size, "the served geometry font is composed from the served type Label scale (renamed from \"UI\" 2026-07-13 — one source of truth)");
+ok(geo.sizes.MD.font !== ty.categories.Label.MD.size && geo.sizes.MD.font === 15, `the served geometry font is the DECOUPLED control-text ramp (15 at bh28, 2026-07-16 — not the Label size ${ty.categories.Label.MD.size})`);
 
 // resources/read + prompts/get
 ok((req("resources/read", { uri: "brand://guide" }).result.contents[0].text || "").length > 50, "resources/read brand://guide → the usage guide");

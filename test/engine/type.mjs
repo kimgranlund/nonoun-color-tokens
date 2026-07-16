@@ -7,16 +7,16 @@ const ok = (c, m) => { if (!c) fails.push(m); };
 
 // ── treatments: 5 presets, each with the THIRTEEN named voices (2026-07-13 taxonomy + Body-mono/
 // Label-mono/Tiny-mono) ──
-const GROUPS = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Body-mono", "Label", "Label-mono", "Kicker", "Tiny", "Tiny-mono"];
+const GROUPS = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Body-mono", "Label", "Label-mono", "Kicker", "Tiny", "Tiny-mono", "UI-control", "UI-widget"];
 ok(T.TYPE_TREATMENTS.length === 5, `5 treatments (got ${T.TYPE_TREATMENTS.length})`);
-ok(T.TYPE_TREATMENTS.every((t) => t.fonts && GROUPS.every((c) => t.categories[c])), "every treatment has the 13 voices (Display · Headline · Sub-heading · Title · Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker · Tiny · Tiny-mono) + fonts");
+ok(T.TYPE_TREATMENTS.every((t) => t.fonts && GROUPS.every((c) => t.categories[c])), "every treatment has the 15 voices (Display · Headline · Sub-heading · Title · Sub-title · Lead · Body · Body-mono · Label · Label-mono · Kicker · Tiny · Tiny-mono · UI-control · UI-widget) + fonts");
 ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((t) => t.id === "luxury") && T.TYPE_TREATMENTS.some((t) => t.id === "editorial"), "has product/luxury/editorial");
 
 // ── every voice is now a FIXED, uniform 3-step SM/MD/LG ramp (2026-07-13 — was 5/3/8 steps by voice) ──
 {
   const s = T.typeScale({ treatment: "product", bodyBase: 16 });
   const c = s.categories;
-  ok(Object.keys(c).length === 13, `13 voices total (got ${Object.keys(c).length})`);
+  ok(Object.keys(c).length === 15, `15 voices total (got ${Object.keys(c).length})`);
   for (const v of GROUPS) ok(Object.keys(c[v]).join() === "SM,MD,LG", `${v} rides the uniform 3-step ramp SM·MD·LG (got ${Object.keys(c[v])})`);
 }
 
@@ -76,9 +76,9 @@ ok(T.TYPE_TREATMENTS.some((t) => t.id === "product") && T.TYPE_TREATMENTS.some((
   ok(!("singleLineHeight" in s.Tiny.MD) && !("singleLineHeight" in s["Tiny-mono"].MD) && !("singleLineHeight" in s["Sub-title"].MD), "Tiny/Tiny-mono/Sub-title ride ui/mono roles but do NOT emit a single-line height (box:false — prose flow)");
   ok(s.Tiny.MD.lineHeight === Math.round(s.Tiny.MD.size * 1.5), "Tiny uses prose leading 1.5 (not the ui box leading 1.4)");
   ok(s.Tiny.MD.paragraphSpacing === Math.round(s.Tiny.MD.size * 0.75), `Tiny paragraphSpacing = prose 0.75×size (not the ui box 1.0×) — got ${s.Tiny.MD.paragraphSpacing} for size ${s.Tiny.MD.size}`);
-  ok(s.Label.MD.paragraphSpacing === s.Label.MD.size && s["Body-mono"].MD.paragraphSpacing === s["Body-mono"].MD.size && s["Label-mono"].MD.paragraphSpacing === s["Label-mono"].MD.size && s.Kicker.MD.paragraphSpacing === s.Kicker.MD.size, "the BOX voices (Label/Body-mono/Label-mono/Kicker) paragraphSpacing = 1.0×size");
-  ok(s.Label.MD.singleLineHeight === s.Label.MD.size && s["Body-mono"].SM.singleLineHeight === s["Body-mono"].SM.size && s["Label-mono"].MD.singleLineHeight === s["Label-mono"].MD.size && s.Kicker.MD.singleLineHeight === s.Kicker.MD.size, "singleLineHeight = size on the BOX voices Label/Body-mono/Label-mono/Kicker");
-  ok(GROUPS.filter((v) => !["Label", "Body-mono", "Label-mono", "Kicker"].includes(v)).every((v) => !("singleLineHeight" in s[v].MD)), "singleLineHeight is ABSENT on every PROSE voice — incl. Tiny/Tiny-mono/Sub-title, which ride ui/mono roles but are prose (box:false)");
+  ok(s.Kicker.MD.paragraphSpacing === s.Kicker.MD.size && s["UI-control"].MD.paragraphSpacing === s["UI-control"].MD.size && s["UI-widget"].MD.paragraphSpacing === s["UI-widget"].MD.size, "the BOX voices (Kicker/UI-control/UI-widget) paragraphSpacing = 1.0×size");
+  ok(s.Kicker.MD.singleLineHeight === s.Kicker.MD.size && s["UI-control"].MD.singleLineHeight === s["UI-control"].MD.size && s["UI-widget"].SM.singleLineHeight === s["UI-widget"].SM.size, "singleLineHeight = size on the BOX voices Kicker/UI-control/UI-widget (Label/Body-mono/Label-mono went prose 2026-07-16)");
+  ok(GROUPS.filter((v) => !["Kicker", "UI-control", "UI-widget"].includes(v)).every((v) => !("singleLineHeight" in s[v].MD)), "singleLineHeight is ABSENT on every PROSE voice — incl. Label/Body-mono/Label-mono (prose since 2026-07-16) and Tiny/Sub-title; the BOX set is exactly Kicker/UI-control/UI-widget");
   // Title/Sub-heading ride the heading role → inherit each treatment's display face (e.g. serif in Editorial)
   const ed = T.typeScale({ treatment: "editorial" });
   ok(ed.fonts[ed.roleOf.Title] === ed.fonts.heading, "Title uses the heading font role");
@@ -250,7 +250,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
 {
   const d = T.typeTokensDTCG(T.typeScale({ treatment: "editorial" }));
   ok(d.fontFamily && d.fontFamily.Display.$type === "fontFamily", "DTCG fontFamily group (voice-keyed, TKT-0006)");
-  ok(Object.keys(d.fontFamily).length === 13, `DTCG fontFamily group carries all 13 voices (got ${Object.keys(d.fontFamily).length})`);
+  ok(Object.keys(d.fontFamily).length === 15, `DTCG fontFamily group carries all 15 voices (got ${Object.keys(d.fontFamily).length})`);
   const tok = d.typography.Body.MD;
   ok(tok.$type === "typography" && /px$/.test(tok.$value.fontSize) && typeof tok.$value.fontWeight === "number", "DTCG composite typography token (px sizes + numeric weight)");
 }
@@ -292,17 +292,17 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(near(s.Display.MD.paragraphSpacing, Math.round(s.Display.MD.size * 0.7)), `Display paragraphSpacing = 0.7×size (got ${s.Display.MD.paragraphSpacing} for size ${s.Display.MD.size})`);
   ok(near(s.Headline.MD.paragraphSpacing, Math.round(s.Headline.MD.size * 0.7)), "Headline paragraphSpacing = 0.7×size");
   ok(near(s.Body.MD.paragraphSpacing, Math.round(s.Body.MD.size * 0.75)), `Body (prose) paragraphSpacing = 0.75×size (got ${s.Body.MD.paragraphSpacing})`);
-  ok(s.Label.MD.paragraphSpacing === s.Label.MD.size && s["Body-mono"].MD.paragraphSpacing === s["Body-mono"].MD.size, "the BOX voices (Label/Body-mono) paragraphSpacing = 1.0×size");
+  ok(s.Kicker.MD.paragraphSpacing === s.Kicker.MD.size && Math.abs(s.Label.MD.paragraphSpacing - Math.round(s.Label.MD.size * 0.75)) <= 1, "box para on Kicker; Label breathes at the prose factor (0.75×) since 2026-07-16");
   // singleLineHeight: control-text intent — present IFF a voice is a BOX voice (Label/Body-mono/Label-mono/Kicker), equal to size.
-  ok(s.Label.MD.singleLineHeight === s.Label.MD.size && s["Body-mono"].SM.singleLineHeight === s["Body-mono"].SM.size && s.Kicker.MD.singleLineHeight === s.Kicker.MD.size, "singleLineHeight = size on the BOX voices Label/Body-mono/Kicker");
-  ok(["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Tiny"].every((v) => !("singleLineHeight" in s[v].MD)), "singleLineHeight is ABSENT on every PROSE voice — incl. Tiny/Sub-title, which ride ui/mono roles but are prose (box:false)");
+  ok(s.Kicker.MD.singleLineHeight === s.Kicker.MD.size && s["UI-control"].MD.singleLineHeight === s["UI-control"].MD.size, "singleLineHeight = size on the BOX voices Kicker/UI-control/UI-widget");
+  ok(["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Body-mono", "Label", "Label-mono", "Tiny"].every((v) => !("singleLineHeight" in s[v].MD)), "singleLineHeight is ABSENT on every PROSE voice — incl. Label/Body-mono/Label-mono (prose since 2026-07-16) and Tiny/Sub-title");
   // the emitters carry both: CSS -para (+ -line-single where present), DTCG composite, Figma-modes vars.
   const css = T.typeTokensCSS(T.typeScale({ treatment: "product" }));
-  ok(css.includes("-para:") && css.includes("--type-label-md-line-single:") && !css.includes("--type-display-md-line-single") && !css.includes("--type-tiny-md-line-single"), "CSS emits -para everywhere and -line-single only on the BOX voices (absent on Tiny, though it rides ui)");
+  ok(css.includes("-para:") && css.includes("--type-ui-control-md-line-single:") && !css.includes("--type-label-md-line-single") && !css.includes("--type-display-md-line-single"), "CSS emits -para everywhere and -line-single only on the BOX voices (gone from Label since 2026-07-16)");
   const dt = T.typeTokensDTCG(T.typeScale({ treatment: "product" })).typography;
-  ok(dt.Label.MD.$value.singleLineHeight && !dt.Display.MD.$value.singleLineHeight && /px$/.test(dt.Display.MD.$value.paragraphSpacing), "DTCG composite carries paragraphSpacing (px) + singleLineHeight on ui/mono box voices");
+  ok(dt["UI-control"].MD.$value.singleLineHeight && !dt.Label.MD.$value.singleLineHeight && !dt.Display.MD.$value.singleLineHeight && /px$/.test(dt.Display.MD.$value.paragraphSpacing), "DTCG composite carries paragraphSpacing (px) + singleLineHeight on the box voices only");
   const fv = T.typeTokensFigmaModes(T.typeScale({ treatment: "product" }), []).collections.Typography.variables;
-  ok(fv["Display/MD/paragraphSpacing"] && fv["Label/MD/singleLineHeight"] && !fv["Display/MD/singleLineHeight"], "Figma modes carry paragraphSpacing (all) + singleLineHeight (ui/mono box voices only)");
+  ok(fv["Display/MD/paragraphSpacing"] && fv["UI-control/MD/singleLineHeight"] && !fv["Label/MD/singleLineHeight"] && !fv["Display/MD/singleLineHeight"], "Figma modes carry paragraphSpacing (all) + singleLineHeight (box voices only — gone from Label)");
 }
 
 // ── leading + tracking are ALWAYS relative — never px — in every emitter (the units rule; overhaul P1) ──
@@ -315,7 +315,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const css = T.typeTokensCSS(s);
   ok(css.includes(`--type-body-md-line: ${relLine(b.leadingRatio)};`), `CSS -line is the exact leadingRatio, not line÷size (= ${relLine(b.leadingRatio)})`);
   ok(/--type-body-md-tracking: -?\d+(?:\.\d+)?em;/.test(css), "CSS -tracking is em (relative to font size)");
-  ok(/--type-label-md-line-single: \d+(?:\.\d+)?;/.test(css), "CSS -line-single is a unitless factor");
+  ok(/--type-ui-control-md-line-single: \d+(?:\.\d+)?;/.test(css), "CSS -line-single is a unitless factor");
   ok(!/-line: -?\d+(?:\.\d+)?px/.test(css) && !/-tracking: -?\d+(?:\.\d+)?px/.test(css) && !/-line-single: -?\d+(?:\.\d+)?px/.test(css), "NO px leading or tracking anywhere in the CSS export");
   // the SIZE / paragraph dims are still absolute px (only leading/tracking go relative).
   ok(/--type-body-md-size: \d+px;/.test(css) && /--type-body-md-para: \d+px;/.test(css), "size + paragraph spacing stay absolute px (box metrics, not leading)");
@@ -324,7 +324,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(typeof dt.lineHeight === "number" && dt.lineHeight === relLine(b.leadingRatio), "DTCG lineHeight is a unitless number (= the exact leadingRatio)");
   ok(typeof dt.letterSpacing === "string" && /em$/.test(dt.letterSpacing), "DTCG letterSpacing is an em string (relative)");
   ok(/px$/.test(dt.fontSize) && /px$/.test(dt.paragraphSpacing), "DTCG fontSize + paragraphSpacing stay px (absolute dims)");
-  ok(typeof T.typeTokensDTCG(s).typography.Label.MD.$value.singleLineHeight === "number", "DTCG singleLineHeight is a unitless number too");
+  ok(typeof T.typeTokensDTCG(s).typography["UI-control"].MD.$value.singleLineHeight === "number", "DTCG singleLineHeight is a unitless number too");
   // Figma: leading + tracking ride as ABSOLUTE PIXELS (unlike CSS/DTCG) — a Figma-bound percent FLOAT
   // displays as a bare, unit-less number in Figma's own Properties panel, indistinguishable from a pixel
   // value at a glance; an absolute pixel reads unambiguously there instead. size/weight/singleLineHeight
@@ -332,7 +332,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const gv = T.typeTokensFigmaModes(s, []).collections.Typography.variables;
   ok(gv["Body/MD/lineHeight"].values.Base === b.lineHeight, "Figma lineHeight is the absolute pixel value, not a %");
   ok(gv["Body/MD/letterSpacing"].values.Base === b.letterSpacing, "Figma letterSpacing is the absolute pixel value, not a %");
-  ok(gv["Label/MD/singleLineHeight"].values.Base === s.categories.Label.MD.singleLineHeight, "Figma singleLineHeight is the absolute pixel value too");
+  ok(gv["UI-control/MD/singleLineHeight"].values.Base === s.categories["UI-control"].MD.singleLineHeight, "Figma singleLineHeight is the absolute pixel value too");
   ok(gv["Body/MD/size"].values.Base === b.size && gv["Body/MD/weight"].values.Base === b.weight, "Figma size + weight stay raw (absolute)");
   // CSS/DTCG still use the exact ratio (unaffected by Figma's pixel choice): a voice with ONE configured
   // leading ratio must show the SAME constant number at every step — never drift, because
@@ -404,17 +404,17 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // AUTO-POPULATE (2026-07-13): every voice's `weights` seeds from siblingWeightDefaults on its OWN
   // resolved core weight, with NO config at all — replacing the old opt-in identity gate.
   const base = T.typeScale({ treatment: "product" });
-  ok(base.weights && Object.keys(base.weights).length === 13, `every voice auto-populates weights with zero config (got ${base.weights && Object.keys(base.weights).length})`);
+  ok(base.weights && Object.keys(base.weights).length === 15, `every voice auto-populates weights with zero config (got ${base.weights && Object.keys(base.weights).length})`);
   ok(w(base.weights.Display) === w(T.siblingWeightDefaults(base.categories.Display.MD.weight)), "a non-BODY_CLASS voice's auto weights derive from siblingWeightDefaults on its own RESOLVED core weight (post per-voice override)");
   // BODY_CLASS_VOICES (Lead/Body*/Label*/Tiny*, 2026-07-13 at request) auto-populate from
   // bodyClassSiblingDefaults instead — capped at 2 siblings, BOTH heavier than the core (never lighter).
   ok(w(base.weights.Body) === w(T.bodyClassSiblingDefaults(base.categories.Body.MD.weight)), "a BODY_CLASS_VOICE's auto weights derive from bodyClassSiblingDefaults, not siblingWeightDefaults");
   ok(base.weights.Body.length === 2 && base.weights.Body.every((wv) => wv.weight > base.categories.Body.MD.weight), `Body auto-populates exactly 2 siblings, BOTH heavier than its core (got ${JSON.stringify(base.weights.Body)})`);
-  ok(T.BODY_CLASS_VOICES.has("Body") && T.BODY_CLASS_VOICES.has("Body-mono") && T.BODY_CLASS_VOICES.has("Label") && T.BODY_CLASS_VOICES.has("Label-mono") && T.BODY_CLASS_VOICES.has("Lead") && T.BODY_CLASS_VOICES.has("Tiny") && T.BODY_CLASS_VOICES.has("Tiny-mono") && !T.BODY_CLASS_VOICES.has("Display") && !T.BODY_CLASS_VOICES.has("Headline") && !T.BODY_CLASS_VOICES.has("Sub-heading") && !T.BODY_CLASS_VOICES.has("Title") && !T.BODY_CLASS_VOICES.has("Sub-title") && !T.BODY_CLASS_VOICES.has("Kicker"), "BODY_CLASS_VOICES is exactly the 7 named voices — Sub-title/Kicker stay on the full Lighter/Light/Heavy/Heavier scale");
+  ok(T.BODY_CLASS_VOICES.has("Body") && T.BODY_CLASS_VOICES.has("Body-mono") && T.BODY_CLASS_VOICES.has("Label") && T.BODY_CLASS_VOICES.has("Label-mono") && T.BODY_CLASS_VOICES.has("Lead") && T.BODY_CLASS_VOICES.has("Tiny") && T.BODY_CLASS_VOICES.has("Tiny-mono") && T.BODY_CLASS_VOICES.has("UI-control") && T.BODY_CLASS_VOICES.has("UI-widget") && !T.BODY_CLASS_VOICES.has("Display") && !T.BODY_CLASS_VOICES.has("Headline") && !T.BODY_CLASS_VOICES.has("Sub-heading") && !T.BODY_CLASS_VOICES.has("Title") && !T.BODY_CLASS_VOICES.has("Sub-title") && !T.BODY_CLASS_VOICES.has("Kicker"), "BODY_CLASS_VOICES is exactly the 9 named voices (TKT-0008 adds UI-control/UI-widget) — Sub-title/Kicker stay on the full Lighter/Light/Heavy/Heavier scale");
   // explicit weights:[] (or an array with no valid entries) is the one remaining opt-OUT lever.
   const withEmpty = T.typeScale({ treatment: "product", voices: { Display: { weights: [] }, Body: { weights: [{ name: "", weight: 700 }, { name: "Bad", weight: 0 }] } } });
   ok(!("Display" in withEmpty.weights) && !("Body" in withEmpty.weights), "explicit [] (or all-invalid entries) opts a voice OUT of weights entirely");
-  ok(Object.keys(withEmpty.weights).length === 11, "every OTHER voice still auto-populates (13 total − 2 opted out)");
+  ok(Object.keys(withEmpty.weights).length === 13, "every OTHER voice still auto-populates (15 total − 2 opted out)");
   ok(T.typeTokensCSS(T.typeScale({ treatment: "product" })) === T.typeTokensCSS(T.typeScale({ treatment: "product" })), "determinism: identical config ⇒ byte-identical CSS, including auto-populated weights");
 
   // the channel — validation, slugs, dedupe
@@ -438,7 +438,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // DTCG — a weights group of fontWeight tokens
   const dtcg = T.typeTokensDTCG(sc);
   ok(dtcg.weights && dtcg.weights.Display && dtcg.weights.Display.Bold && dtcg.weights.Display.Bold.$type === "fontWeight" && dtcg.weights.Display.Bold.$value === 700, "DTCG emits the weights group");
-  ok("weights" in T.typeTokensDTCG(base) && Object.keys(T.typeTokensDTCG(base).weights).length === 13, "DTCG weights group covers every auto-populated voice by default (no siblings config needed)");
+  ok("weights" in T.typeTokensDTCG(base) && Object.keys(T.typeTokensDTCG(base).weights).length === 15, "DTCG weights group covers every auto-populated voice by default (no siblings config needed)");
   ok(!("Display" in T.typeTokensDTCG(withEmpty).weights), "DTCG: a voice opted OUT (Display) carries no weights entry");
 
   // Figma primitives — FLOAT + STRING per sibling, core un-suffixed names unchanged
@@ -477,7 +477,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const baseCss = T.typeTokensCSS(baseline);
   // count DECLARATIONS only (`  --font-voice-x: '...';`) — utility classes below also REFERENCE
   // these vars (`var(--font-voice-x)`), which would otherwise inflate the count past 11.
-  ok((baseCss.match(/ {2}--font-voice-[a-z0-9-]+: '/g) || []).length === 13, `--font-voice-* is declared for all 13 voices even with no overrides (got ${(baseCss.match(/ {2}--font-voice-[a-z0-9-]+: '/g) || []).length})`);
+  ok((baseCss.match(/ {2}--font-voice-[a-z0-9-]+: '/g) || []).length === 15, `--font-voice-* is declared for all 15 voices even with no overrides (got ${(baseCss.match(/ {2}--font-voice-[a-z0-9-]+: '/g) || []).length})`);
   ok(baseCss.includes(`--font-voice-sub-heading: '${baseline.fonts[baseline.roleOf["Sub-heading"]]}';`), "an un-overridden voice's --font-voice-* repeats its role's shared default");
   ok(JSON.stringify(T.typeTokensDTCG(baseline)) === JSON.stringify(T.typeTokensDTCG(emptyV)), "DTCG byte-identical with an empty voices map");
   ok(JSON.stringify(T.typeTokensFigmaPrimitives(baseline)) === JSON.stringify(T.typeTokensFigmaPrimitives(emptyV)), "Figma primitives byte-identical with an empty voices map");

@@ -26,7 +26,7 @@
 //                     "Display/lg/heavy" (sibling, lowercase — the SAME relative-label vocabulary, by
 //                     its own rank among the voice's resolved weights) (2026-07-13 — normalized
 //                     Lighter/Light/Heavy/Heavier labels, superseding TKT-0001's literal-name templating) |
-//                     "Label/lg/light-single •" (Body/Body-mono/Label/Label-mono only — a "-single"
+//                     "UI-control/lg/regular-single •" (UI-control/UI-widget only — a "-single"
 //                     SUFFIX on the leaf itself, flat inside the SAME step folder as the multi-line
 //                     styles, never a NEW "/"-segment: a trailing "/single" segment made the plain leaf a
 //                     PATH PREFIX of its own single variant, and Figma's Styles panel folder-izes any name
@@ -61,10 +61,10 @@ import { weightNameFor, resolvedFontFor, siblingStyleName, coreWeightKey, relati
 
 // SINGLE_LINE_VOICES — voices that additionally get a "-single"-suffixed text-style sibling (1.0
 // leading — line-height = size), flat alongside their normal multi-line style in the SAME step folder,
-// per step and per configured weight. Body-mono/Label-mono join their non-mono siblings here (both
-// already carry singleLineHeight as engine DATA — they're BOX voices too, see buildCategory's `box`
-// default).
-const SINGLE_LINE_VOICES = new Set(["Body", "Body-mono", "Label", "Label-mono"]);
+// per step and per configured weight. 2026-07-16 (TKT-0008 follow-up, at request): the Body*/Label*
+// -single variants are RETIRED — single-line/box behavior belongs to the interactive voices,
+// UI-control + UI-widget, which carry singleLineHeight as engine data (BOX voices).
+const SINGLE_LINE_VOICES = new Set(["UI-control", "UI-widget"]);
 
 // siblingStyleName lives in the engine (src/engine/type.mjs) — it's the ONE source of truth shared
 // with typeTokensFigmaPrimitives's own weight-style/<voice>/<slug> primitive, so the two can never
@@ -190,7 +190,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
             literal: { ...litBase, styleName: wvStyleName, weight: wv.weight },
           });
         }
-        // SINGLE-LINE variants (Body/Body-mono/Label/Label-mono only) — a sibling of every style above
+        // SINGLE-LINE variants (UI-control/UI-widget only, 2026-07-16) — a sibling of every style above
         // (core + each configured weight), same font/size/tracking, but 1.0 leading (line-height = size,
         // no multi-line reading rhythm). Named with a "-single" SUFFIX on the leaf itself, flat inside the
         // SAME "{step}" folder as the multi-line styles (e.g. "Voice/step/label-single •",
@@ -201,10 +201,9 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         // sharing one visible label); a separate "{step}-single" FOLDER avoided that but hid the
         // single-line siblings in their own group instead of sitting next to their multi-line counterpart.
         // A hyphen suffix on the leaf is neither: it's a distinct LEAF NAME with no extra path segment, so
-        // it can never become — or collide with — a folder. `singleLineHeight` only exists as engine DATA
-        // on the BOX voices (Label/Body-mono/Label-mono/Kicker) — Label/Body-mono/Label-mono bind live to
-        // that Figma variable; Body has no such variable (it's prose), so its single-line lineHeight is a
-        // LITERAL (size, unbound) — the plan's own bind-or-literal-fallback pattern.
+        // it can never become — or collide with — a folder. `singleLineHeight` exists as engine DATA on
+        // the BOX voices (Kicker/UI-control/UI-widget) — both UI voices bind live to that Figma variable;
+        // the literal fallback below survives for any prose voice a future config might opt in.
         if (SINGLE_LINE_VOICES.has(voice)) {
           const singleLineHeight = s.singleLineHeight ?? s.size;
           const singleBindBase = { ...bindBase, ...(s.singleLineHeight != null ? { lineHeight: `${voice}/${step}/singleLineHeight` } : {}) };

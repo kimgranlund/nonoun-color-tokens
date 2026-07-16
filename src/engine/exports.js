@@ -983,10 +983,11 @@ export function exportDesignSystemComponents(state, typeSc, geomSc) {
   const bodyStack = dsFontStack(fonts.body, sans);
   const headStack = dsFontStack(fonts.heading || fonts.display, sans);
   const monoStack = dsFontStack(fonts.mono, "ui-monospace, SFMono-Regular, monospace");
-  // Control text (buttons/inputs/labels) is the UI voice — its own font, weight, and optical tracking —
-  // NOT the body voice at a hardcoded 600. Read the ui-md step so the previews render what the tokens say.
+  // Control text (buttons/inputs/labels) is the UI-CONTROL voice (TKT-0008; the old "UI" voice name died
+  // in the 2026-07-13 rename) — its own font, weight, and optical tracking, NOT the body voice at a
+  // hardcoded 600. Read the UI-control MD step so the previews render what the tokens say.
   const uiStack = dsFontStack(fonts.ui, sans);
-  const uiStep = (typeSc && typeSc.categories && typeSc.categories.UI && typeSc.categories.UI.MD) || null;
+  const uiStep = (typeSc && typeSc.categories && typeSc.categories["UI-control"] && typeSc.categories["UI-control"].MD) || null;
   const uiWeight = uiStep && uiStep.weight ? uiStep.weight : 500;
   const uiTrackEm = uiStep && uiStep.size ? Number((uiStep.letterSpacing / uiStep.size).toFixed(4)) : 0;
   const uiFont = `font-family:${uiStack};font-weight:${uiWeight};letter-spacing:${uiTrackEm}em`;

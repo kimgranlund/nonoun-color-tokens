@@ -16,16 +16,18 @@
 // linear; expressive ×4/3 geometric). The glyphs scale SUBLINEARLY — a power law of height, exponent < 1
 // (the optical correction: a glyph occupies a shrinking fraction of the box as it grows):
 //
-//   icon = 2.49·h^0.58   (round to nearest even)        font = 3.16·h^0.45 ≈ √h   (round to nearest int)
-//   caret = 3.5·h^0.39   (round to nearest int)
+//   icon = 2.49·h^0.58   (round to nearest even)        caret = 3.5·h^0.39   (round to nearest int)
+//   font = CONTROL_FONT[step] · (baseHeight/28)          (the ratified control-text ramp, 2026-07-16)
 //
 // caret got its OWN power law (2026-07-15, at request — retired the old v4 "caret = font" rule): a
-// gentler exponent than font's 0.45 means the affordance mark grows SLOWER than the text at the top of
-// the ramp — 12·13·14·16·18 (SM…2XL), vs font's 12·13·14·18·21 there; they still land on the SAME value
-// through LG (14), diverging only in the expressive band (XL·2XL) where the caret no longer needs to
-// track the text 1:1. These reproduce the hand-tuned reference ramp (20·24·28·36·48·64) to ±1px — so the
-// table is not six hand-picked points, it is ONE rule sampled six times, and it generalizes to any
-// scaled baseHeight.
+// gentler exponent means the affordance mark grows SLOWER than the text at the top of the ramp.
+// font is the ratified control-text table (2026-07-16, TKT-0008 — 12·13·15·16·18·20 at the canonical
+// baseHeight): SM/MD/LG compose from the type scale's UI-CONTROL voice when one is supplied (value-
+// neutral at defaults — the voice carries the same rows — but voice tuning flows into control boxes);
+// XS/XL/2XL use the table × baseHeight/28. Control text is DECOUPLED from Label (~2px larger by
+// design), and the ramp's MD kink fits no power law — hand-authored IS the law, like type's SIZES.
+// icon/caret remain rule-derived — they reproduce the hand-tuned reference ramp (20·24·28·36·48·64)
+// to ±1px and generalize to any scaled baseHeight.
 
 const round = (v) => Math.round(v);
 const roundEven = (v) => 2 * Math.round(v / 2);
@@ -37,6 +39,11 @@ const SIZES = [
   ["XS", 20], ["SM", 24], ["MD", 28], ["LG", 36], ["XL", 48], ["2XL", 64],
 ];
 const CANON_MD = 28;
+
+// The FIXED control-text ramp (the ratified magnitude table's `controls` row, 2026-07-16) — per-step
+// literal px at the canonical baseHeight 28, scaled by baseHeight/28 in geomScale. Deliberately kinked
+// at MD (13→15) and capped at 20, which no power law fits — hand-authored is the law, like type's SIZES.
+const CONTROL_FONT = { XS: 12, SM: 13, MD: 15, LG: 16, XL: 18, "2XL": 20 };
 
 // A "treatment" seeds the spatial feel, exactly as the type "treatment" seeds the type params. Each is a
 // density + a default radius ladder + a layout-spacing base. Fonts/sizes are universal; the FEEL is the
@@ -71,15 +78,13 @@ const RADIUS_DEFAULT = { sharp: "sm", soft: "md", round: "lg", pill: "full" };
 const SPACE_STEPS = [0, 1, 2, 3, 4, 6, 8, 12, 16, 24];
 
 // buildSize — derive the full geometry of one size row from its (scaled) control height + the density.
-// Everything below the height is DERIVED — the glyphs by the power law, the pads by the centering law.
-// `fontOverride` (when the geometry COMPOSES with a type scale) replaces the power-law text size with the
-// type scale's UI voice at the matching step, so a control's box and its text share ONE number.
-function buildSize(rawHeight, density, fontOverride) {
+// Everything below the height is DERIVED — icon/caret by their power laws, the pads by the centering law.
+// `font` arrives PRE-RESOLVED from geomScale (a per-mode override, the composed UI-control voice size,
+// or the fixed CONTROL_FONT ramp × factor — in that precedence; TKT-0008).
+function buildSize(rawHeight, density, font) {
   const height = roundEven(rawHeight);
   const icon = roundEven(2.49 * height ** 0.58); // frame family — the leading content-icon / slot side
-  const font = fontOverride != null ? fontOverride : round(3.16 * height ** 0.45); // ≈ √h — the text size
-  // caret has its OWN power law off height (2026-07-15) — NEVER the composed fontOverride, so a type-scale
-  // composition (which only reaches SM/MD/LG) can't leave the top of the ramp on two different formulas.
+  // caret has its OWN power law off height (2026-07-15) — independent of the text size.
   const caret = round(3.5 * height ** 0.39);
   return {
     height,
@@ -97,20 +102,21 @@ function buildSize(rawHeight, density, fontOverride) {
 // geomScale — the resolved geometry for a config { treatment, baseHeight }. `baseHeight` (the MD control
 // height) uniformly scales the whole ramp; the treatment seeds density + the radius ladder + spacing.
 //
-// COMPOSITION with typography: pass `opts.typeScale` (a resolved `typeScale(...)`) and each size's text
-// `font` comes from the type scale's Label voice (renamed from "UI" 2026-07-13) at the MATCHING step —
-// SM/MD/LG only, since every type voice is now a fixed 3-step ramp (was XS..2XL, 3 of geometry's 6 steps
-// matched) — instead of the standalone power law, so the box (geometry) and the text in it (typography)
-// share one source of truth where a step exists. Geometry's XS, XL, and 2XL (the compact floor plus the
-// expressive band's top two — LG itself still matches, being the third of SM/MD/LG) have no Label
-// counterpart anymore, so THOSE THREE fall back to the standalone power law (buildSize's null-check — an
-// intentional, pre-existing fallback, not new). `caret = font` and `gap = font/2` follow; the FRAME
-// (height/icon/pad/radius) is untouched, so the centering law still holds. `typed` reports whether the
-// fonts came from the type scale.
+// CONTROL TEXT (2026-07-16, TKT-0008): each size's `font` composes from the type scale's UI-CONTROL
+// voice (`opts.typeScale`, SM/MD/LG — the voice's Desktop sizes equal the ratified control table's
+// rows, so the composition is value-neutral at defaults and exists so voice-level tuning flows into
+// control boxes); geometry's XS/XL/2XL steps have no voice counterpart and fall back to the fixed
+// CONTROL_FONT ramp × (baseHeight/28). The old Label composition is retired — control text reads ~2px
+// larger than Label by design. The control-text sizes surface in the TYPOGRAPHY Figma collection as
+// the UI-control/UI-widget voices' own variables — the Geometry collection no longer carries font rows.
 // `opts.overrides` (optional) — a flat per-size HEIGHT override map keyed "<sizeName>", already mode-selected
 // by the caller. When a positive number exists for a size, it REPLACES the scaled rawHeight fed to buildSize,
-// so icon/font/pad/radius/caret/gap ALL re-derive via the laws (and the type-composition `fontOverride` still
-// applies on top). Absent / non-positive ⇒ no effect, so the scale is byte-identical (the identity gate).
+// so icon/pad/radius/caret/gap ALL re-derive via the laws. Absent / non-positive ⇒ no effect, so the scale
+// is byte-identical (the identity gate).
+// `opts.fontOverrides` (optional) — the same shape for the per-size CONTROL TEXT size (the breakpoint
+// tiers' hand columns for the non-composed XS/XL/2XL steps); wins over the composition. Absent ⇒ the
+// UI-control composition (SM/MD/LG), then the CONTROL_FONT×factor law. gap re-derives from the
+// resolved font either way (gap = font/2 · density).
 // `config.rampContrast` (optional, 0…1, default 1) — the RESPONSIVE ramp knob: how hard the expressive
 // band (LG·XL·2XL) changes gear at the MD|LG seam. At 1 (or absent — the identity gate) the band is
 // today's ×4/3 geometric ramp. At 0 the gear change disappears: the band continues the compact band's
@@ -124,8 +130,9 @@ export function geomScale(config = {}, opts = {}) {
   const factor = baseHeight / CANON_MD;
   const c = Number(config.rampContrast);
   const rampContrast = Number.isFinite(c) ? Math.max(0, Math.min(1, c)) : 1;
-  const uiSteps = opts.typeScale && opts.typeScale.categories && opts.typeScale.categories.Label;
   const overrides = opts.overrides && typeof opts.overrides === "object" ? opts.overrides : null;
+  const fontOverrides = opts.fontOverrides && typeof opts.fontOverrides === "object" ? opts.fontOverrides : null;
+  const uiSteps = opts.typeScale && opts.typeScale.categories && opts.typeScale.categories["UI-control"];
   const sizes = {};
   let expr = 0; // 0 for the compact band, then 1·2·3 across LG·XL·2XL (the expressive band)
   for (const [name, h] of SIZES) {
@@ -135,7 +142,10 @@ export function geomScale(config = {}, opts = {}) {
     // full contrast (the default) takes the geometric path EXACTLY — no float blend on the identity path.
     const blended = rampContrast >= 1 || expr === 0 ? geoRaw : (baseHeight + 4 * expr) * (1 - rampContrast) + geoRaw * rampContrast;
     const rawHeight = (typeof ovH === "number" && Number.isFinite(ovH) && ovH > 0) ? ovH : blended;
-    sizes[name] = buildSize(rawHeight, t.density, uiSteps && uiSteps[name] ? uiSteps[name].size : null);
+    const ovF = fontOverrides && fontOverrides[name];
+    const composed = uiSteps && uiSteps[name] ? uiSteps[name].size : null;
+    const font = (typeof ovF === "number" && Number.isFinite(ovF) && ovF > 0) ? round(ovF) : (composed != null ? composed : round(CONTROL_FONT[name] * factor));
+    sizes[name] = buildSize(rawHeight, t.density, font);
   }
   const radii = { ...M3_CORNERS }; // the fixed M3 shape-corner scale (treatment-independent)
   const radiusDefault = RADIUS_DEFAULT[t.radiusStyle] || "md"; // the treatment's favoured corner level
@@ -153,7 +163,7 @@ export function geomScale(config = {}, opts = {}) {
   // clear of the control edge so it survives any radius).
   const borders = { thin: 1, thick: 2 };
   const focus = { ringWidth: 2, ringOffset: 2 };
-  return { treatment: t.id, label: t.label, density: t.density, radiusStyle: t.radiusStyle, radiusDefault, baseHeight, rampContrast, typed: !!uiSteps, sizes, radii, space, insets, gaps, borders, focus };
+  return { treatment: t.id, label: t.label, density: t.density, radiusStyle: t.radiusStyle, radiusDefault, baseHeight, rampContrast, sizes, radii, space, insets, gaps, borders, focus };
 }
 
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
@@ -273,14 +283,16 @@ export function geomTokensDTCG(scale, { unit = "px" } = {}) {
 // geomTokensFigma — the geometry as DTCG `number` tokens (UNITLESS values), the shape a Figma variable
 // importer turns into **FLOAT (number) variables** — a "Geometry" collection with size/radius/space groups
 // (px is 1:1 with Figma's unitless floats). Same numbers as the DTCG dimension export, minus the `px`
-// suffix, so height/icon/font/gap/padding/radius/space land as native number variables you can bind to
-// auto-layout, corner radius, gaps, and sizing.
+// suffix, so height/icon/gap/padding/radius/space land as native number variables you can bind to
+// auto-layout, corner radius, gaps, and sizing. NO `font` rows (2026-07-16): control-text sizes moved to
+// the TYPOGRAPHY collection as UI-widget/UI-control size variables (typeTokensFigmaModes controlFonts) —
+// the Geometry collection is box geometry only.
 export function geomTokensFigma(scale) {
   const num = (v) => ({ $type: "number", $value: v });
   const size = {};
   for (const [name, s] of Object.entries(scale.sizes)) {
     size[name] = {
-      height: num(s.height), icon: num(s.icon), caret: num(s.caret), font: num(s.font),
+      height: num(s.height), icon: num(s.icon), caret: num(s.caret),
       gap: num(s.gap), padding: num(s.padding), edgePadding: num(s.edgePadding),
       radius: num(s.radiusPill), minWidth: num(s.minWidth),
     };
@@ -298,12 +310,13 @@ export function geomTokensFigma(scale) {
 // (`exportUI3`): `{ collections: { "Geometry": { modes:[…], variables: { "size/<NAME>/<field>": {
 // type:"FLOAT", values:{ Base:…, <modeName>:… } }, "radius/<k>", "space/<k>" } } } }`. So a Figma user
 // imports ONE breakpoint-moded collection instead of N separate per-width files. The size fields mirror
-// `geomTokensFigma` (height/icon/caret/font/gap/padding/edgePadding/radius/minWidth). `modes` = the SAME
+// `geomTokensFigma` (height/icon/caret/gap/padding/edgePadding/radius/minWidth — NO font, 2026-07-16:
+// control text lives in the Typography collection as UI-widget/UI-control size vars). `modes` = the SAME
 // shape `_geomModeScales()` returns: [{ name, scale }] (minWidth, if present, is ignored — Figma modes are
 // named, not media-queried). IDENTITY: `modes = []` ⇒ a single base mode whose values equal the base.
 // `opts.baseName` (default "Base") NAMES the synthetic base layer (e.g. "Mobile" — the standard set);
 // `opts.baseLast` (default false) places it AFTER the breakpoints (Figma's default mode = the FIRST mode).
-const GEOM_SIZE_FIELDS = [["height", "height"], ["icon", "icon"], ["caret", "caret"], ["font", "font"], ["gap", "gap"], ["padding", "padding"], ["edgePadding", "edgePadding"], ["radius", "radiusPill"], ["minWidth", "minWidth"]];
+const GEOM_SIZE_FIELDS = [["height", "height"], ["icon", "icon"], ["caret", "caret"], ["gap", "gap"], ["padding", "padding"], ["edgePadding", "edgePadding"], ["radius", "radiusPill"], ["minWidth", "minWidth"]];
 // Figma requires DISTINCT mode names per collection; the synthetic base layer (`baseName`) is reserved +
 // de-dup (case-insensitively) so a breakpoint sharing its name / two same-named modes can't collide on import.
 function disambiguateModeNames(names, baseName = "Base") {

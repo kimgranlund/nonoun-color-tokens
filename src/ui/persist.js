@@ -370,7 +370,7 @@ function clampType(t) {
   // into Lead, Caption folded into Tiny, Legal folded into Body; Title/Sub-title/Tiny added. `ratio` no longer
   // means anything (size is now a fixed table, not base×ratio^n — see type.mjs).
   if (t.voices && typeof t.voices === "object") {
-    const VOICES = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Body-mono", "Label", "Label-mono", "Kicker", "Tiny", "Tiny-mono"];
+    const VOICES = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Body-mono", "Label", "Label-mono", "Kicker", "Tiny", "Tiny-mono", "UI-control", "UI-widget"];
     const num = (x, lo, hi, round) => { const n = Number(x); if (!Number.isFinite(n)) return undefined; const c = Math.max(lo, Math.min(hi, n)); return round ? Math.round(c) : c; };
     const voices = {};
     for (const name of VOICES) {
