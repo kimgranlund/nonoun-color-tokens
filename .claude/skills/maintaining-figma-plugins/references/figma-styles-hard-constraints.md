@@ -61,3 +61,25 @@ zero-from-400 and the first array entry wins arbitrarily. — `figma/plugin/code
   weight, deterministically — never by `listAvailableFontsAsync` array order, which is
   install-dependent. — PR #300. Preset-side: sibling weights must be researched against the real
   font's actual cuts (see `type-scale`'s `references/weight-ladders-and-labels.md`).
+
+## 6. Mixed-styled TEXT nodes carry PER-SEGMENT bindings — node-level setBoundVariable silently no-ops on them
+
+A text node whose runs differ (e.g. a specimen line "LeBron James · 29 PTS" with the name and the
+stats styled apart) binds `fontSize`/`letterSpacing` **per segment**. `node.setBoundVariable(field,
+var)` on such a node **succeeds without effect** — no error, no change; a same-call readback still
+shows the old variable. Re-point those via `getStyledTextSegments(["boundVariables"])` →
+`setRangeBoundVariable(seg.start, seg.end, field, var)`. `paragraphSpacing` is the exact INVERSE:
+not a substring field (`setRangeBoundVariable` throws "not supported on text substrings") — it
+re-binds node-level only, and only takes once every segment's font is loaded. A migration must
+handle BOTH layers and re-scan **in the same script** to prove each write took — the success return
+of the setter proves nothing. — TKT-0009's BZZR migration (60 specimen nodes), 2026-07-16.
+
+## 7. A new collection MODE needs a value set on EVERY variable — addMode leaves them on the default mode's values
+
+`collection.addMode(name)` mints the mode; each variable then resolves the new mode from its
+existing default-mode value until explicitly `setValueForMode`'d. Nothing errors and nothing looks
+empty — the new column silently reads as a copy of the default. When adding a breakpoint mode by
+hand (the BZZR TV mode: 350 variables), build the payload from the collection's FULL variable list
+and assert `unset === 0` (payload keys ∖ collection names and vice versa) before calling it done.
+Mode-independent constants (space/radius ladders, borders, focus) still need their value written —
+"same as every other mode" is a value, not an omission. — TKT-0009 follow-up, 2026-07-16.
