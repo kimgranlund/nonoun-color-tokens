@@ -53,9 +53,9 @@ const plans = stylePlans({ families, scale });
   ok(o && o.name === "Primary/onPrimary", `flat style name: ${o && o.name}`);
 }
 
-// ── text parity: every bind target exists in the Typography or Font Primitives collections ──
+// ── text parity: every bind target exists in the merged Geometry (type/ half) or Font Primitives collections ──
 {
-  const typo = new Set(Object.keys(typeTokensFigmaModes(scale).collections["Typography"].variables));
+  const typo = new Set(Object.keys(typeTokensFigmaModes(scale).collections["Geometry"].variables));
   const prim = new Set(Object.keys(typeTokensFigmaPrimitives(scale).collections["Font Primitives"].variables));
   const bad = [];
   for (const t of plans.texts) for (const [field, target] of Object.entries(t.bind)) {
@@ -150,9 +150,9 @@ const plans = stylePlans({ families, scale });
   const labelScale = typeScale({ treatment: "product" });
   const labelPlans = stylePlans({ families, scale: labelScale });
   const ucSingle = labelPlans.texts.find((t) => t.name === "UI-control/md/regular-single •");
-  ok(!!ucSingle && ucSingle.bind.lineHeight === "UI-control/MD/singleLineHeight", "UI-control's -single style BINDS live to its real singleLineHeight variable (a box voice)");
+  ok(!!ucSingle && ucSingle.bind.lineHeight === "type/UI-control/MD/singleLineHeight", "UI-control's -single style BINDS live to its real singleLineHeight variable (a box voice)");
   const uwSingle = labelPlans.texts.find((t) => t.name === "UI-widget/md/regular-single •");
-  ok(!!uwSingle && uwSingle.bind.lineHeight === "UI-widget/MD/singleLineHeight", "UI-widget's -single style BINDS live to its real singleLineHeight variable");
+  ok(!!uwSingle && uwSingle.bind.lineHeight === "type/UI-widget/MD/singleLineHeight", "UI-widget's -single style BINDS live to its real singleLineHeight variable");
   ok(!labelPlans.texts.some((t) => /-single/.test(t.name) && ["Body", "Body-mono", "Label", "Label-mono"].includes(t.voice)), "the Body*/Label* -single variants are RETIRED (2026-07-16) — none emitted");
   // sibling weights get the SAME -single suffix, flat next to their own multi-line style (the exact ask:
   // every configured sibling gets its own "-single" variant, not just the core).

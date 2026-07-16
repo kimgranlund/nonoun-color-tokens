@@ -121,6 +121,14 @@ async function applyFloatPlans(plans) {
       byName[v.name] = vr; current.add(v.name); variables++;
     }
     for (const name of Object.keys(byName)) if (!current.has(name)) byName[name].remove();
+    // retire — collections THIS plan supersedes (plan.retire; TKT-0009, see the flagship's comment).
+    for (const nm of (Array.isArray(plan.retire) ? plan.retire : [])) {
+      if (!reg[nm]) continue;
+      const cols = await figma.variables.getLocalVariableCollectionsAsync();
+      const stale = cols.find((c) => c.id === reg[nm]);
+      if (stale) stale.remove();
+      delete reg[nm];
+    }
     collections++;
   }
   writeFloatRegistry(reg); // persist the name→id provenance map (any newly-created collections)

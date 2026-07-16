@@ -639,11 +639,16 @@ export function typeTokensDTCG(scale, { unit = "px" } = {}) {
   return { fontFamily, typography, ...(Object.keys(weights).length ? { weights } : {}) };
 }
 
-// typeTokensFigmaModes — the type scale as a single Figma-variable COLLECTION ("Typography") with one MODE
-// per breakpoint (a "Base" mode + one per supplied breakpoint mode), mirroring the UI3 color shape
-// (`exportUI3`): `{ collections: { "Typography": { modes:[…], variables: { "<voice>/<step>/<prop>": {
+// typeTokensFigmaModes — the type scale as the TYPE HALF of the single breakpoint-moded Figma-variable
+// COLLECTION ("Geometry", TKT-0009: one collection = one mode switch flips type + geometry together —
+// two same-moded collections let a frame sit at Geometry=Mobile / Typography=Desktop, drift by
+// construction). Keys ride a `type/` group so the collection rail stays border · focus · gap · inset ·
+// radius · size · space · type. Shape mirrors the UI3 color interchange (`exportUI3`):
+// `{ collections: { "Geometry": { modes:[…], variables: { "type/<voice>/<step>/<prop>": {
 // type:"FLOAT", values:{ Base:…, <modeName>:… } } } } }`. So a Figma user imports ONE breakpoint-moded
-// collection instead of N separate per-width files. Every voice×step emits four FLOAT variables — size,
+// collection instead of N separate per-width files (merge with geomTokensFigmaModes via
+// mergeModeInterchanges, figma/binder/mode-apply-plan.mjs — the executor prunes per-collection, so the
+// two halves MUST land as one plan). Every voice×step emits four FLOAT variables — size,
 // lineHeight, letterSpacing, weight — all in PIXELS (a Figma-bound percent FLOAT displays as a bare,
 // unit-less number in Figma's own Properties panel — indistinguishable from a pixel value at a glance —
 // so a PIXEL absolute reads unambiguously there instead; CSS/DTCG keep the ratio/em relative units, where
@@ -681,9 +686,9 @@ export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
   const layer = (scale, mode) => {
     for (const [cName, steps] of Object.entries(scale.categories)) {
       for (const [sName, s] of Object.entries(steps)) {
-        for (const prop of TYPE_FIGMA_PROPS) set(`${cName}/${sName}/${prop}`, mode, s[prop]);
-        // singleLineHeight exists only on the BOX voices (Label · Body-mono · Label-mono · Kicker) — pixels too.
-        if (s.singleLineHeight != null) set(`${cName}/${sName}/singleLineHeight`, mode, s.singleLineHeight);
+        for (const prop of TYPE_FIGMA_PROPS) set(`type/${cName}/${sName}/${prop}`, mode, s[prop]);
+        // singleLineHeight exists only on the BOX voices (Kicker · UI-control · UI-widget) — pixels too.
+        if (s.singleLineHeight != null) set(`type/${cName}/${sName}/singleLineHeight`, mode, s.singleLineHeight);
       }
     }
   };
@@ -691,7 +696,7 @@ export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
   list.forEach((m, i) => layer(m.scale, names[i]));
   return {
     $schema: "figma-ui3-variables.float.schema.v1",
-    collections: { "Typography": { modes: modeNames, variables } },
+    collections: { "Geometry": { modes: modeNames, variables } },
   };
 }
 
@@ -702,7 +707,8 @@ export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
 // primitive; every voice sharing it follows), and a `weight/<voice>` FLOAT primitive (the voice's uniform
 // weight — one edit point per voice). Alias entries carry `{ type:"ALIAS", target:"<variable key>" }`
 // INSTEAD of `values` — a consumer resolves them within the same collection. Single "Value" mode
-// (families/weights don't vary by breakpoint; breakpoints live in the Typography collection). This file is
+// (families/weights don't vary by breakpoint; breakpoints live in the Geometry collection's type/ group,
+// TKT-0009). This file is
 // an IMPORT artifact only — the in-Figma apply path (`_figmaFloatPlans`) never consumes it, so the plugin
 // executor stays float-only.
 export function typeTokensFigmaPrimitives(scale) {

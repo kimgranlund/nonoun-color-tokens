@@ -1,5 +1,5 @@
 // style-plan.mjs — the PURE, testable planner for the Figma STYLES swatches (paint styles bound to the
-// Color Modes variables; text styles bound to the Typography + Font Primitives variables). The third
+// Color Modes variables; text styles bound to the Geometry (type/) + Font Primitives variables). The third
 // planner sibling: bind-plan.mjs plans the color alias cascade, mode-apply-plan.mjs plans the moded
 // float collections, THIS plans the styles layer that sits on top of both. No `figma` calls here —
 // `figma/plugin/code.js#applyStylePlans` executes the plan verbatim (the executor is dumb by design).
@@ -35,7 +35,7 @@
 //                     token, so it consistently means "the default in this list" regardless of what
 //                     precedes it),
 //              voice, step,
-//              bind:    { fontSize, lineHeight, letterSpacing,   // → Typography collection keys
+//              bind:    { fontSize, lineHeight, letterSpacing,   // → Geometry collection type/ keys (TKT-0009)
 //                         paragraphSpacing?,                     //   (prose voices only)
 //                         fontFamily,                            // → Font Primitives font/<voice> (STRING alias)
 //                         fontStyle? | fontWeight? },            // → weight-style/<voice>/<slug> OR
@@ -126,10 +126,10 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         // paragraphSpacing rides only where the engine emits it (prose voices); a 0 is still a value.
         const hasPara = Number.isFinite(s.paragraphSpacing);
         const bindBase = {
-          fontSize: `${voice}/${step}/size`,
-          lineHeight: `${voice}/${step}/lineHeight`,
-          letterSpacing: `${voice}/${step}/letterSpacing`,
-          ...(hasPara ? { paragraphSpacing: `${voice}/${step}/paragraphSpacing` } : {}),
+          fontSize: `type/${voice}/${step}/size`,
+          lineHeight: `type/${voice}/${step}/lineHeight`,
+          letterSpacing: `type/${voice}/${step}/letterSpacing`,
+          ...(hasPara ? { paragraphSpacing: `type/${voice}/${step}/paragraphSpacing` } : {}),
           fontFamily: `font/${voice}`,
         };
         const litBase = {
@@ -207,7 +207,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         // the literal fallback below survives for any prose voice a future config might opt in.
         if (SINGLE_LINE_VOICES.has(voice)) {
           const singleLineHeight = s.singleLineHeight ?? s.size;
-          const singleBindBase = { ...bindBase, ...(s.singleLineHeight != null ? { lineHeight: `${voice}/${step}/singleLineHeight` } : {}) };
+          const singleBindBase = { ...bindBase, ...(s.singleLineHeight != null ? { lineHeight: `type/${voice}/${step}/singleLineHeight` } : {}) };
           if (s.singleLineHeight == null) delete singleBindBase.lineHeight; // no live variable for Body — literal only
           const singleLitBase = { ...litBase, lineHeight: singleLineHeight };
           texts.push({

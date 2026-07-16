@@ -134,9 +134,9 @@ if (!binderSrc.includes(FLOAT_ANCHOR)) FAIL("floatanchor", "code.js is missing t
 if (!/FLOAT_REGISTRY_KEY\s*=\s*"ultimate-tokens-float-collections"/.test(binderSrc)) FAIL("floatanchor", "code.js FLOAT_REGISTRY_KEY does not match the flagship plugin's key string");
 if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no applyFloatPlans executor");
 
-// ── floatcreate: applyFloatPlans creates Typography + Geometry collections (Base + a breakpoint mode
-//    each), the sized vars carry a DIFFERENT value per mode, re-apply is idempotent (no doubling), and
-//    removing a breakpoint prunes its mode (mirrors test/figma/plugin.mjs:241-249) ──
+// ── floatcreate: applyFloatPlans creates the MERGED "Geometry" collection (type/ + box-geometry halves,
+//    TKT-0009; Base + a breakpoint mode), the sized vars carry a DIFFERENT value per mode, re-apply is
+//    idempotent (no doubling), and removing a breakpoint prunes its mode (mirrors test/figma/plugin.mjs) ──
 {
   const F = mockFigma();
   try {
@@ -145,31 +145,34 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
     else {
       const typeIx = TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), [{ name: "Desktop", scale: TYPE.typeScale({ treatment: "product", bodyBase: 19 }) }]);
       const geomIx = GEOM.geomTokensFigmaModes(GEOM.geomScale({ treatment: "comfortable", baseHeight: 28 }), [{ name: "Desktop", scale: GEOM.geomScale({ treatment: "comfortable", baseHeight: 40 }) }]);
-      const plans = [...MAP.modeApplyPlan(typeIx), ...MAP.modeApplyPlan(geomIx)];
+      const plans = MAP.modeApplyPlan(MAP.mergeModeInterchanges(typeIx, geomIx));
       const fr = await applyFloatPlans(plans);
-      const typ = F.collections.find((c) => c.name === "Typography");
       const geo = F.collections.find((c) => c.name === "Geometry");
-      if (!typ) FAIL("floatcreate", "no Typography collection created");
+      if (F.collections.some((c) => c.name === "Typography")) FAIL("floatcreate", "the merged apply minted a Typography collection (the pre-TKT-0009 shape)");
       if (!geo) FAIL("floatcreate", "no Geometry collection created");
-      if (typ && typ.modes.map((m) => m.name).join() !== "Base,Desktop") FAIL("floatcreate", `Typography modes = ${typ && typ.modes.map((m) => m.name)}, want Base,Desktop`);
       if (geo && geo.modes.map((m) => m.name).join() !== "Base,Desktop") FAIL("floatcreate", `Geometry modes = ${geo && geo.modes.map((m) => m.name)}, want Base,Desktop`);
-      if (fr.collections !== 2) FAIL("floatcreate", `applyFloatPlans reported ${fr.collections} collections, want 2`);
-      if (typ) {
-        const tVars = F.variables.filter((v) => v.variableCollectionId === typ.id);
-        const baseId = typ.modes[0].modeId, bpId = typ.modes[1].modeId;
-        const bodyMd = tVars.find((v) => v.name === "Body/MD/size");
-        if (!bodyMd) FAIL("floatcreate", "Body/MD/size variable missing");
-        else if (!Number.isFinite(bodyMd.valuesByMode[baseId]) || !Number.isFinite(bodyMd.valuesByMode[bpId])) FAIL("floatcreate", "Body/MD/size not value-complete across modes");
-        else if (bodyMd.valuesByMode[baseId] === bodyMd.valuesByMode[bpId]) FAIL("floatcreate", "Body/MD/size Base == Desktop (per-mode values should differ)");
+      if (fr.collections !== 1) FAIL("floatcreate", `applyFloatPlans reported ${fr.collections} collections, want 1 (merged)`);
+      if (geo) {
+        const gVars = F.variables.filter((v) => v.variableCollectionId === geo.id);
+        if (!gVars.some((v) => v.name.startsWith("type/"))) FAIL("floatcreate", "the type/ half is missing from the merged collection");
+        if (!gVars.some((v) => v.name.startsWith("size/"))) FAIL("floatcreate", "the box-geometry half is missing from the merged collection");
+        const baseId = geo.modes[0].modeId, bpId = geo.modes[1].modeId;
+        const bodyMd = gVars.find((v) => v.name === "type/Body/MD/size");
+        if (!bodyMd) FAIL("floatcreate", "type/Body/MD/size variable missing");
+        else if (!Number.isFinite(bodyMd.valuesByMode[baseId]) || !Number.isFinite(bodyMd.valuesByMode[bpId])) FAIL("floatcreate", "type/Body/MD/size not value-complete across modes");
+        else if (bodyMd.valuesByMode[baseId] === bodyMd.valuesByMode[bpId]) FAIL("floatcreate", "type/Body/MD/size Base == Desktop (per-mode values should differ)");
       }
       // idempotency: re-apply → no doubled collection/modes/vars
       await applyFloatPlans(plans);
-      if (F.collections.filter((c) => c.name === "Typography").length !== 1) FAIL("floatcreate", "re-apply duplicated the Typography collection");
-      if (typ && typ.modes.length !== 2) FAIL("floatcreate", `re-apply left ${typ && typ.modes.length} Typography modes, want 2 (no duplicate mode)`);
+      if (F.collections.filter((c) => c.name === "Geometry").length !== 1) FAIL("floatcreate", "re-apply duplicated the Geometry collection");
+      if (geo && geo.modes.length !== 2) FAIL("floatcreate", `re-apply left ${geo && geo.modes.length} Geometry modes, want 2 (no duplicate mode)`);
       // drop the breakpoint → its mode is pruned on re-apply (Base survives, is never removable)
-      const typeBaseOnly = TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), []);
-      await applyFloatPlans(MAP.modeApplyPlan(typeBaseOnly));
-      if (typ && typ.modes.map((m) => m.name).join() !== "Base") FAIL("floatcreate", `after removing the breakpoint, Typography modes = ${typ && typ.modes.map((m) => m.name)}, want Base`);
+      const baseOnly = MAP.mergeModeInterchanges(
+        TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), []),
+        GEOM.geomTokensFigmaModes(GEOM.geomScale({ treatment: "comfortable", baseHeight: 28 }), []),
+      );
+      await applyFloatPlans(MAP.modeApplyPlan(baseOnly));
+      if (geo && geo.modes.map((m) => m.name).join() !== "Base") FAIL("floatcreate", `after removing the breakpoint, Geometry modes = ${geo && geo.modes.map((m) => m.name)}, want Base`);
     }
   } catch (e) { FAIL("floatcreate", "applyFloatPlans threw: " + e.message); }
 }
@@ -186,7 +189,7 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
     const { main } = loadBinder(injected, F.figma);
     await main();
     if (F.collections.some((c) => c.name === "Color Modes" || c.name === "Color Primitives")) FAIL("floatindep", "main() created a Color collection with no Color Primitives present");
-    if (!F.collections.some((c) => c.name === "Typography")) FAIL("floatindep", "main() skipped the Typography breakpoint collection when Color Primitives was absent (color-abort still blocking breakpoints)");
+    if (!F.collections.some((c) => c.name === "Geometry")) FAIL("floatindep", "main() skipped the merged Geometry breakpoint collection when Color Primitives was absent (color-abort still blocking breakpoints)");
   } catch (e) { FAIL("floatindep", "main() threw with no Color Primitives + a non-empty FLOAT_PLANS: " + e.message); }
 }
 

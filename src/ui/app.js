@@ -40,7 +40,7 @@ import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.m
 import { typeScale, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, siblingWeightDefaults, WEIGHT_NAMES, resolvedFontFor } from "../engine/type.mjs";
 import { geomScale, geomTokensCSS, geomTokensBreakpointCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
-import { modeApplyPlan, validateModeInterchange } from "../../figma/binder/mode-apply-plan.mjs";
+import { modeApplyPlan, validateModeInterchange, mergeModeInterchanges } from "../../figma/binder/mode-apply-plan.mjs";
 import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
 import { ICON_SYSTEMS, iconSystem, iconSystemById, iconSystemLabel } from "../engine/icon-systems.mjs";
 import { icon } from "./icons.js";
@@ -5796,6 +5796,9 @@ class HctApp extends HTMLElement {
       files.push(...exportDesignSystemMakeBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"), { date: dsDate })
         .map((f) => ({ name: `design-system-for-figma-make/${f.name}`, data: f.data })));
     }
+    // the two halves of the merged breakpoint-moded "Geometry" collection (TKT-0009) — filled by the
+    // type/geometry blocks below, merged + pushed as ONE figma/tokens.modes.variables.json after both.
+    const modesHalves = [];
     if (sys.type) {
       const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
       const tDtcg = JSON.stringify(typeTokensDTCG(tsc, u), null, 2); // the chosen unit — for the typography/ folder
@@ -5809,13 +5812,12 @@ class HctApp extends HTMLElement {
         { name: "typography/type.tokens.json", data: tDtcg },
         ...this._typeModeDTCGFiles("typography/type", u),
         { name: "figma/type.tokens.json", data: JSON.stringify(typeTokensDTCG(tsc), null, 2) }, // ALWAYS px — Figma import (a tokens plugin)
-        // a single "Typography" collection with a MODE per breakpoint (Base + each) — one moded Figma-variable
-        // file instead of N per-width DTCG files. Always emitted (Base-only when there are no breakpoints).
-        { name: "figma/typography.modes.variables.json", data: JSON.stringify(typeTokensFigmaModes(tsc, this._typeModeScales(), this._typeBaseOpts()), null, 2) },
         // the companion "Font Primitives" collection — deduped family STRING primitives + per-voice
         // font aliases + per-voice weight primitives (import artifact; never enters the apply path).
         { name: "figma/typography.primitives.variables.json", data: JSON.stringify(typeTokensFigmaPrimitives(tsc), null, 2) },
       );
+      // the type HALF of the merged breakpoint-moded collection (pushed after the geometry block below).
+      modesHalves.push(typeTokensFigmaModes(tsc, this._typeModeScales(), this._typeBaseOpts()));
     }
     if (sys.geometry) {
       const gsc = this._geomScaleFor("base"); // composed with the type scale (the per-step `font` is shared); override-aware (Phase 3)
@@ -5829,10 +5831,16 @@ class HctApp extends HTMLElement {
         { name: "geometry/geometry.tokens.json", data: gDtcg },
         ...this._geomModeDTCGFiles("geometry/geometry", u),
         { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
-        // a single "Geometry" collection with a MODE per breakpoint (Base + each) — one moded Figma-variable
-        // file instead of N per-width DTCG files. Always emitted (Base-only when there are no breakpoints).
-        { name: "figma/dimension.modes.variables.json", data: JSON.stringify(geomTokensFigmaModes(gsc, this._geomModeScales(), this._geomBaseOpts()), null, 2) },
       );
+      modesHalves.push(geomTokensFigmaModes(gsc, this._geomModeScales(), this._geomBaseOpts()));
+    }
+    // ONE breakpoint-moded Figma-variable file — the merged "Geometry" collection (type/ + box-geometry
+    // halves, TKT-0009) with a MODE per breakpoint (Base + each), instead of the pre-merge
+    // typography.modes/dimension.modes pair: the plugin executor prunes variables per collection, so the
+    // halves must land as one interchange. Emitted whenever either system is on (Base-only, no breakpoints ok).
+    {
+      const modesIx = mergeModeInterchanges(...modesHalves);
+      if (modesIx) files.push({ name: "figma/tokens.modes.variables.json", data: JSON.stringify(modesIx, null, 2) });
     }
     // figma/styles.plan.json — the plugin-free STYLES import artifact (rides the Styles opt-out chip,
     // compositional with the system toggles like the apply path): the same pure plans the in-Figma
@@ -6155,19 +6163,34 @@ class HctApp extends HTMLElement {
     this.render();
   }
 
-  // _figmaFloatPlans — the Type + Geometry breakpoint-moded collections (typeTokensFigmaModes /
-  // geomTokensFigmaModes over the override-aware base + per-breakpoint mode scales), turned into the
-  // pure apply PLANS code.js executes (figma/binder/mode-apply-plan.mjs). Only the systems toggled ON in
-  // this.exportSystems are included (a toggled-off system is never applied). Each interchange is VALIDATED
-  // here first — a malformed one (the half-bound-import failure) is dropped rather than half-applied to
-  // the user's file; an engine error on one system never blocks the other (or the color apply).
+  // _figmaFloatPlans — the Type + Geometry halves of the single breakpoint-moded "Geometry" collection
+  // (typeTokensFigmaModes / geomTokensFigmaModes over the override-aware base + per-breakpoint mode
+  // scales, TKT-0009), MERGED into one interchange and turned into the pure apply PLANS code.js executes
+  // (figma/binder/mode-apply-plan.mjs) — one plan per collection is load-bearing: the executor prunes
+  // variables per collection against ITS plan, so two plans on "Geometry" would delete each other's
+  // halves. Only the systems toggled ON in this.exportSystems are included (a toggled-off system is
+  // never applied). Each HALF is validated separately first — a malformed one (the half-bound-import
+  // failure) is dropped rather than half-applied; an engine error on one system never blocks the other
+  // (or the color apply) — and the merged interchange is validated again (a mode-list mismatch between
+  // halves surfaces as missing values there, never as a half-applied file).
   _figmaFloatPlans() {
-    const out = [];
     const sys = this.exportSystems || {};
-    const add = (ix) => { try { if (ix && validateModeInterchange(ix).length === 0) out.push(...modeApplyPlan(ix)); } catch { /* skip a malformed system */ } };
-    if (sys.type !== false) try { add(typeTokensFigmaModes(this._typeScaleFor("base"), this._typeModeScales(), this._typeBaseOpts())); } catch { /* skip type */ }
-    if (sys.geometry !== false) try { add(geomTokensFigmaModes(this._geomScaleFor("base"), this._geomModeScales(), this._geomBaseOpts())); } catch { /* skip geometry */ }
-    return out;
+    const halves = [];
+    const add = (make) => { try { const ix = make(); if (ix && validateModeInterchange(ix).length === 0) halves.push(ix); } catch { /* skip a malformed system */ } };
+    if (sys.type !== false) add(() => typeTokensFigmaModes(this._typeScaleFor("base"), this._typeModeScales(), this._typeBaseOpts()));
+    if (sys.geometry !== false) add(() => geomTokensFigmaModes(this._geomScaleFor("base"), this._geomModeScales(), this._geomBaseOpts()));
+    const ix = mergeModeInterchanges(...halves);
+    if (!ix) return [];
+    try {
+      if (validateModeInterchange(ix).length) return [];
+      const plans = modeApplyPlan(ix);
+      // the merged shape supersedes the two-collection era's moded "Typography" collection — mark it for
+      // executor retirement (registry-tracked only) whenever this apply actually lands type/ variables.
+      for (const p of plans) {
+        if (p.collection === "Geometry" && p.variables.some((v) => typeof v.name === "string" && v.name.startsWith("type/"))) p.retire = ["Typography"];
+      }
+      return plans;
+    } catch { return []; }
   }
 
   // _syncApplyGate — reconcile the gate <dialog> with applyGateOpen (mirrors _syncDrawer/_syncNewPal).

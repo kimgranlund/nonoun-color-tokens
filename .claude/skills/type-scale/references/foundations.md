@@ -181,7 +181,7 @@ lives in the display/heading/kicker weights instead (weight-ladders-and-labels.m
 All five take a resolved `scale`; the CSS/DTCG dimension emitters take `{unit}` — `dimUnit(px, unit)`
 formats a px value as `px` (default/identity), or `rem`/`em` = px÷16 with trailing zeros stripped.
 Leading/tracking are ALWAYS relative in CSS/DTCG (never px — see §3's `leadingRatio`/`trackingRatio` law);
-Figma's Typography collection is the one PIXEL exception.
+Figma's type/ variables (the merged breakpoint-moded Geometry collection, TKT-0009) are the one PIXEL exception.
 
 - **`typeTokensCSS(scale, {unit, prefix})`** → `:root` custom props (`--font-{role}: '{family}'` — QUOTED;
   a `--font-voice-{voice}` prop per voice via `resolvedFontFor`; per-step

@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 import { figmaBundle, defaultDocument } from "../../src/ui/model.mjs";
 import * as TYPE from "../../src/engine/type.mjs";
 import * as GEOM from "../../src/engine/geometry.mjs";
-import { modeApplyPlan } from "../../figma/binder/mode-apply-plan.mjs";
+import { modeApplyPlan, mergeModeInterchanges } from "../../figma/binder/mode-apply-plan.mjs";
 import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
 
 const HERE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "figma", "plugin"); // the generator-as-plugin lives in figma/plugin/
@@ -288,45 +288,52 @@ if (applyBundle) {
 
 // ── breakpoint-moded FLOAT apply (Type + Geometry) — the NATIVE side of #125's interchange export ──
 // applyFloatPlans executes the UI-computed plans (figma/binder/mode-apply-plan.mjs.modeApplyPlan) against
-// the figma API: one collection per system, mode[0]="Base" + one mode per breakpoint, value-complete FLOAT
-// vars. Proven (not assumed): idempotent re-apply, stale-mode prune on breakpoint removal, orphan-var prune.
+// the figma API: since TKT-0009 the type + geometry halves land as ONE merged "Geometry" collection
+// (type/ + box-geometry variables), mode[0]="Base" + one mode per breakpoint, value-complete FLOAT vars.
+// Proven (not assumed): idempotent re-apply, stale-mode prune on breakpoint removal, orphan-var prune,
+// and retirement of a registry-tracked two-collection-era "Typography".
 if (applyFloatPlans) {
   try {
     const typeIx = TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), [{ name: "Mobile", scale: TYPE.typeScale({ treatment: "product", bodyBase: 13 }) }]);
-    const geomIx = GEOM.geomTokensFigmaModes(GEOM.geomScale({ treatment: "comfortable", baseHeight: 28 }), [{ name: "Desktop", scale: GEOM.geomScale({ treatment: "comfortable", baseHeight: 40 }) }]);
-    const fr = await applyFloatPlans([...modeApplyPlan(typeIx), ...modeApplyPlan(geomIx)]);
+    const geomIx = GEOM.geomTokensFigmaModes(GEOM.geomScale({ treatment: "comfortable", baseHeight: 28 }), [{ name: "Mobile", scale: GEOM.geomScale({ treatment: "comfortable", baseHeight: 24 }) }]);
+    const mergedPlans = modeApplyPlan(mergeModeInterchanges(typeIx, geomIx));
+    if (mergedPlans.length !== 1) FAIL("floatapply", `merged plan count = ${mergedPlans.length}, want 1 (one collection)`);
+    const fr = await applyFloatPlans(mergedPlans);
 
-    const typ = F.collections.find((c) => c.name === "Typography");
     const geo = F.collections.find((c) => c.name === "Geometry");
-    if (!typ) FAIL("floatapply", "no Typography collection created");
+    if (F.collections.some((c) => c.name === "Typography")) FAIL("floatapply", "the merged apply minted a Typography collection (the pre-TKT-0009 shape)");
     if (!geo) FAIL("floatapply", "no Geometry collection created");
-    if (typ && typ.modes.map((m) => m.name).join() !== "Base,Mobile") FAIL("floatapply", `Typography modes = ${typ && typ.modes.map((m) => m.name)}, want Base,Mobile`);
-    if (geo && geo.modes.map((m) => m.name).join() !== "Base,Desktop") FAIL("floatapply", `Geometry modes = ${geo && geo.modes.map((m) => m.name)}, want Base,Desktop`);
-    if (fr.collections !== 2) FAIL("floatapply", `applyFloatPlans reported ${fr.collections} collections, want 2`);
+    if (geo && geo.modes.map((m) => m.name).join() !== "Base,Mobile") FAIL("floatapply", `Geometry modes = ${geo && geo.modes.map((m) => m.name)}, want Base,Mobile`);
+    if (fr.collections !== 1) FAIL("floatapply", `applyFloatPlans reported ${fr.collections} collections, want 1 (merged)`);
 
-    // every Typography var is FLOAT + value-complete across both modes; per-mode values DIFFER (16 vs 13).
-    if (typ) {
-      const tVars = F.variables.filter((v) => v.variableCollectionId === typ.id);
-      const planLen = modeApplyPlan(typeIx)[0].variables.length;
-      if (tVars.length !== planLen) FAIL("floatapply", `Typography has ${tVars.length} vars, want ${planLen}`);
-      if (!tVars.every((v) => v.type === "FLOAT")) FAIL("floatapply", "a Typography variable is not FLOAT");
-      const baseId = typ.modes[0].modeId, mobId = typ.modes[1].modeId;
-      const bodyMd = tVars.find((v) => v.name === "Body/MD/size");
-      if (!bodyMd) FAIL("floatapply", "Body/MD/size variable missing");
-      else if (!Number.isFinite(bodyMd.valuesByMode[baseId]) || !Number.isFinite(bodyMd.valuesByMode[mobId])) FAIL("floatapply", "Body/MD/size not value-complete across modes");
-      else if (bodyMd.valuesByMode[baseId] === bodyMd.valuesByMode[mobId]) FAIL("floatapply", "Body/MD/size Base == Mobile (per-mode values should differ at bodyBase 16 vs 13)");
+    // every var is FLOAT + value-complete across both modes; per-mode TYPE values DIFFER (16 vs 13); both halves present.
+    if (geo) {
+      const gVars = F.variables.filter((v) => v.variableCollectionId === geo.id);
+      const planLen = mergedPlans[0].variables.length;
+      if (gVars.length !== planLen) FAIL("floatapply", `Geometry has ${gVars.length} vars, want ${planLen}`);
+      if (!gVars.every((v) => v.type === "FLOAT")) FAIL("floatapply", "a Geometry variable is not FLOAT");
+      if (!gVars.some((v) => v.name.startsWith("type/"))) FAIL("floatapply", "the type/ half is missing from the merged collection");
+      if (!gVars.some((v) => v.name.startsWith("size/"))) FAIL("floatapply", "the box-geometry half is missing from the merged collection");
+      const baseId = geo.modes[0].modeId, mobId = geo.modes[1].modeId;
+      const bodyMd = gVars.find((v) => v.name === "type/Body/MD/size");
+      if (!bodyMd) FAIL("floatapply", "type/Body/MD/size variable missing");
+      else if (!Number.isFinite(bodyMd.valuesByMode[baseId]) || !Number.isFinite(bodyMd.valuesByMode[mobId])) FAIL("floatapply", "type/Body/MD/size not value-complete across modes");
+      else if (bodyMd.valuesByMode[baseId] === bodyMd.valuesByMode[mobId]) FAIL("floatapply", "type/Body/MD/size Base == Mobile (per-mode values should differ at bodyBase 16 vs 13)");
     }
 
     // IDEMPOTENT re-apply — no duplicate collection / modes / variables.
-    await applyFloatPlans([...modeApplyPlan(typeIx), ...modeApplyPlan(geomIx)]);
-    if (F.collections.filter((c) => c.name === "Typography").length !== 1) FAIL("floatidem", "re-apply duplicated the Typography collection");
-    if (typ && typ.modes.length !== 2) FAIL("floatidem", `re-apply left ${typ && typ.modes.length} Typography modes, want 2`);
-    const tVars2 = typ ? F.variables.filter((v) => v.variableCollectionId === typ.id).length : 0;
-    if (tVars2 !== modeApplyPlan(typeIx)[0].variables.length) FAIL("floatidem", `re-apply left ${tVars2} Typography vars (duplicates)`);
+    await applyFloatPlans(modeApplyPlan(mergeModeInterchanges(typeIx, geomIx)));
+    if (F.collections.filter((c) => c.name === "Geometry").length !== 1) FAIL("floatidem", "re-apply duplicated the Geometry collection");
+    if (geo && geo.modes.length !== 2) FAIL("floatidem", `re-apply left ${geo && geo.modes.length} Geometry modes, want 2`);
+    const gVars2 = geo ? F.variables.filter((v) => v.variableCollectionId === geo.id).length : 0;
+    if (gVars2 !== mergedPlans[0].variables.length) FAIL("floatidem", `re-apply left ${gVars2} Geometry vars (duplicates)`);
 
-    // BREAKPOINT REMOVED ⇒ the stale mode is pruned (re-apply with no breakpoints ⇒ Base only).
-    await applyFloatPlans(modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), [])));
-    if (typ && typ.modes.map((m) => m.name).join() !== "Base") FAIL("floatprune", `after removing the breakpoint, Typography modes = ${typ && typ.modes.map((m) => m.name)}, want Base`);
+    // BREAKPOINT REMOVED ⇒ the stale mode is pruned (re-apply the merged no-breakpoints plan ⇒ Base only).
+    await applyFloatPlans(modeApplyPlan(mergeModeInterchanges(
+      TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), []),
+      GEOM.geomTokensFigmaModes(GEOM.geomScale({ treatment: "comfortable", baseHeight: 28 }), []),
+    )));
+    if (geo && geo.modes.map((m) => m.name).join() !== "Base") FAIL("floatprune", `after removing the breakpoint, Geometry modes = ${geo && geo.modes.map((m) => m.name)}, want Base`);
 
     // ORPHAN VAR pruned — a synthetic collection: apply {a,b} then {a} ⇒ b removed, a updated to 9.
     const synthVar = (name, value) => ({ name, type: "FLOAT", values: [{ mode: "Base", value }] });
@@ -341,17 +348,36 @@ if (applyFloatPlans) {
 
     // PROVENANCE: apply must NEVER canonicalize a USER's own pre-existing same-named collection — it tracks
     // the collections IT created by id in root pluginData and makes a SEPARATE one. Fresh mock so the user's
-    // "Typography" is the only one until apply runs.
+    // "Geometry" is the only one until apply runs.
     const F2 = mockFigma();
     const a2 = new Function("figma", "__html__", "module", code + "\nreturn { applyFloatPlans };")(F2.figma, "<html>", undefined).applyFloatPlans;
-    const userColl = F2.figma.variables.createVariableCollection("Typography"); // the user's own, pre-existing
+    const userColl = F2.figma.variables.createVariableCollection("Geometry"); // the user's own, pre-existing
     F2.figma.variables.createVariable("user/keepme", userColl, "FLOAT").setValueForMode(userColl.modes[0].modeId, 123);
     await a2(modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), [])));
-    if (F2.collections.filter((c) => c.name === "Typography").length !== 2) FAIL("floatprov", `expected the user's Typography + a separate plugin-created one (2), got ${F2.collections.filter((c) => c.name === "Typography").length}`);
-    if (!F2.variables.some((v) => v.variableCollectionId === userColl.id && v.name === "user/keepme")) FAIL("floatprov", "apply pruned a variable from the user's OWN Typography collection");
-    if (userColl.modes[0].name !== "Mode 1") FAIL("floatprov", "apply renamed the default mode of the user's OWN Typography collection");
+    if (F2.collections.filter((c) => c.name === "Geometry").length !== 2) FAIL("floatprov", `expected the user's Geometry + a separate plugin-created one (2), got ${F2.collections.filter((c) => c.name === "Geometry").length}`);
+    if (!F2.variables.some((v) => v.variableCollectionId === userColl.id && v.name === "user/keepme")) FAIL("floatprov", "apply pruned a variable from the user's OWN Geometry collection");
+    if (userColl.modes[0].name !== "Mode 1") FAIL("floatprov", "apply renamed the default mode of the user's OWN Geometry collection");
     await a2(modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), []))); // re-apply: reconcile OURS by id, not the user's
-    if (F2.collections.filter((c) => c.name === "Typography").length !== 2) FAIL("floatprov", "re-apply made a 3rd Typography (provenance registry not persisted to root pluginData)");
+    if (F2.collections.filter((c) => c.name === "Geometry").length !== 2) FAIL("floatprov", "re-apply made a 3rd Geometry (provenance registry not persisted to root pluginData)");
+
+    // RETIREMENT (TKT-0009 migration): a registry-tracked two-collection-era "Typography" is removed by a
+    // merged plan carrying retire:["Typography"] (what _figmaFloatPlans attaches) — while a user's OWN
+    // same-named collection survives (provenance: retire matches by registry id, never by name).
+    const F8 = mockFigma();
+    const a8 = new Function("figma", "__html__", "module", code + "\nreturn { applyFloatPlans };")(F8.figma, "<html>", undefined).applyFloatPlans;
+    await a8([{ collection: "Typography", modes: ["Base"], defaultMode: "Base", addModes: [], variables: [synthVar("Body/MD/size", 16)] }]); // the old era: OURS, registry-tracked
+    const userTypo = F8.figma.variables.createVariableCollection("Typography"); // the user's own beside ours
+    F8.figma.variables.createVariable("user/keepme", userTypo, "FLOAT").setValueForMode(userTypo.modes[0].modeId, 5);
+    if (F8.collections.filter((c) => c.name === "Typography").length !== 2) FAIL("floatretire", "fixture: expected ours + the user's Typography before the merged apply");
+    const retirePlans = modeApplyPlan(mergeModeInterchanges(typeIx, geomIx));
+    retirePlans[0].retire = ["Typography"];
+    await a8(retirePlans);
+    const typosLeft = F8.collections.filter((c) => c.name === "Typography");
+    if (typosLeft.length !== 1) FAIL("floatretire", `expected ONLY the user's own Typography to survive retirement, got ${typosLeft.length}`);
+    if (!F8.variables.some((v) => v.variableCollectionId === userTypo.id && v.name === "user/keepme")) FAIL("floatretire", "retirement removed the user's OWN Typography collection (provenance violated)");
+    if (!F8.variables.some((v) => v.name === "type/Body/MD/size")) FAIL("floatretire", "the merged Geometry collection missing after retirement");
+    await a8(retirePlans); // idempotent: a retire with no registry entry left is a no-op
+    if (F8.collections.filter((c) => c.name === "Typography").length !== 1) FAIL("floatretire", "re-applying a retire-carrying plan touched the user's own Typography");
   } catch (e) { FAIL("floatapply", "applyFloatPlans threw: " + e.message); }
 } else {
   FAIL("floatapply", "code.js exported no applyFloatPlans");
@@ -367,11 +393,11 @@ if (applyFloatPlans) {
     const typePlan = modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), []));
     await F3.figma.ui._h({ type: "apply", floatPlans: typePlan, config: { name: "x" } }); // Color OFF → no dtcg
     if (F3.collections.some((c) => c.name === "Color Primitives" || c.name === "Color Modes")) FAIL("applysys", "apply with no dtcg still created a Color collection (the Color toggle was ignored)");
-    if (!F3.collections.some((c) => c.name === "Typography")) FAIL("applysys", "apply with no dtcg did not apply the Typography float plan");
+    if (!F3.collections.some((c) => c.name === "Geometry")) FAIL("applysys", "apply with no dtcg did not apply the merged Geometry float plan");
     // COMPLETION FEEDBACK: a finished apply posts {apply-done} back to the UI (its counts drive the "Applied N…" toast).
     const done = F3.figma.ui._posted.find((m) => m && m.type === "apply-done");
     if (!done) FAIL("applydone", "a completed apply posted no {apply-done} message to the UI (no done-feedback)");
-    else if (!(done.floatVars > 0)) FAIL("applydone", `apply-done floatVars=${done.floatVars}, expected the applied Typography variables`);
+    else if (!(done.floatVars > 0)) FAIL("applydone", `apply-done floatVars=${done.floatVars}, expected the applied float variables`);
   }
 }
 
@@ -498,13 +524,14 @@ if (sweepCandidates) {
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "applysys", "applydone", "config", "read", "fonts", "resolveface", "sweep"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "floatretire", "applysys", "applydone", "config", "read", "fonts", "resolveface", "sweep"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
 // ── STYLES apply: paint styles bound to Color Modes vars; text styles set + bound; registry prune ──
 // Runs on the SAME mock F: applyBundle already created Color Modes, the float e2e already created the
-// Typography collection (base "product/16" scale) — exactly the state a real apply leaves behind.
+// merged Geometry collection with its type/ half (base "product/16" scale) — exactly the state a real
+// apply leaves behind.
 if (applyStylePlans && applyFontPrimitives) {
   try {
     const scale = TYPE.typeScale({ treatment: "product", bodyBase: 16, voices: { Display: { weights: [{ name: "Medium", weight: 500 }] } } });
@@ -544,7 +571,7 @@ if (applyStylePlans && applyFontPrimitives) {
     if (core && (!core.fontName || core.fontName.style !== "Bold")) FAIL("styles", `Display core face = ${core && core.fontName && core.fontName.style}, want Bold (700 candidates)`);
     if (sib && (!sib.fontName || sib.fontName.style !== "Medium")) FAIL("styles", `Display sibling face = ${sib && sib.fontName && sib.fontName.style}, want Medium`);
     if (core && (!core.lineHeight || core.lineHeight.unit !== "PIXELS")) FAIL("styles", "text style lineHeight is not PIXELS-united");
-    if (core && !core._bound.fontSize) FAIL("styles", "core fontSize not bound to the Typography variable");
+    if (core && !core._bound.fontSize) FAIL("styles", "core fontSize not bound to the type/ variable in the Geometry collection");
     if (core && !core._bound.lineHeight) FAIL("styles", "core lineHeight not bound (percent FLOAT after unit set)");
     if (core && !core._bound.letterSpacing) FAIL("styles", "core letterSpacing not bound (percent FLOAT after unit set)");
     if (core && !core._bound.fontFamily) FAIL("styles", "core fontFamily not bound to the Font Primitives alias");

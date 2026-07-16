@@ -25,8 +25,9 @@ These accept FLOAT variables only — **no STRING binding exists** for a metric 
 "accepts number variables"), so an explicit `"112.5%"` string token is impossible. `fontFamily` and
 `fontStyle` bind STRING variables and are unaffected. Worse, Figma's own Properties panel renders a
 bound percent FLOAT as a bare unit-less number ("112.5"), indistinguishable from a pixel value.
-Resolution: the Typography
-collection emits `lineHeight`/`letterSpacing`/`singleLineHeight` as **absolute pixels** (legible,
+Resolution: the type/ variables
+(the merged breakpoint-moded Geometry collection, TKT-0009) emit
+`lineHeight`/`letterSpacing`/`singleLineHeight` as **absolute pixels** (legible,
 unambiguous; Figma is a fully-regenerated snapshot per apply, so nothing is lost) while CSS/DTCG
 keep the exact ratio/em relative units. — `src/engine/type.mjs#typeTokensFigmaModes`, PRs #294/#295.
 

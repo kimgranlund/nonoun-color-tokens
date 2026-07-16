@@ -258,34 +258,35 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(tok.$type === "typography" && /px$/.test(tok.$value.fontSize) && typeof tok.$value.fontWeight === "number", "DTCG composite typography token (px sizes + numeric weight)");
 }
 
-// ── Figma breakpoint-MODED variables: a single "Typography" collection, one MODE per breakpoint (5.4b) ──
+// ── Figma breakpoint-MODED variables: the TYPE HALF of the single "Geometry" collection (type/ group,
+// TKT-0009), one MODE per breakpoint (5.4b) ──
 {
   const base = T.typeScale({ treatment: "product", bodyBase: 16 });
   const mobile = T.typeScale({ treatment: "product", bodyBase: 13 });
   const out = T.typeTokensFigmaModes(base, [{ name: "Mobile", minWidth: 768, scale: mobile }]);
-  const col = out.collections.Typography;
+  const col = out.collections.Geometry;
   ok(col && JSON.stringify(col.modes) === JSON.stringify(["Base", "Mobile"]), `modes = [Base, Mobile] (got ${JSON.stringify(col && col.modes)})`);
   // four FLOAT variables per voice×step: size/lineHeight/letterSpacing/weight (weight too — Figma numbers).
-  const v = col.variables["Body/MD/size"];
-  ok(v && v.type === "FLOAT" && typeof v.values.Base === "number" && typeof v.values.Mobile === "number", "Body/MD/size is a FLOAT variable with Base + Mobile values");
-  ok(col.variables["Body/MD/weight"] && col.variables["Body/MD/weight"].type === "FLOAT" && typeof col.variables["Body/MD/weight"].values.Base === "number", "weight is emitted as a FLOAT variable too (Figma numbers)");
-  ok(["size", "lineHeight", "letterSpacing", "weight"].every((p) => col.variables[`Body/MD/${p}`]), "every voice×step emits size/lineHeight/letterSpacing/weight");
+  const v = col.variables["type/Body/MD/size"];
+  ok(v && v.type === "FLOAT" && typeof v.values.Base === "number" && typeof v.values.Mobile === "number", "type/Body/MD/size is a FLOAT variable with Base + Mobile values");
+  ok(col.variables["type/Body/MD/weight"] && col.variables["type/Body/MD/weight"].type === "FLOAT" && typeof col.variables["type/Body/MD/weight"].values.Base === "number", "weight is emitted as a FLOAT variable too (Figma numbers)");
+  ok(["size", "lineHeight", "letterSpacing", "weight"].every((p) => col.variables[`type/Body/MD/${p}`]), "every voice×step emits size/lineHeight/letterSpacing/weight (type/-prefixed)");
   // per-mode values DIFFER for a breakpoint with a different bodyBase (13 vs 16) — the Mobile size is smaller.
   ok(v.values.Base === base.categories.Body.MD.size && v.values.Mobile === mobile.categories.Body.MD.size, "Base value = base scale; Mobile value = that mode's scale (per-mode values DIFFER)");
   ok(v.values.Mobile !== v.values.Base, `the breakpoint's value differs from Base (Base ${v.values.Base}, Mobile ${v.values.Mobile})`);
   // IDENTITY: with no modes, a single "Base" mode whose values equal the base export.
   const idn = T.typeTokensFigmaModes(base, []);
-  const idCol = idn.collections.Typography;
+  const idCol = idn.collections.Geometry;
   ok(JSON.stringify(idCol.modes) === JSON.stringify(["Base"]), "no modes ⇒ a single \"Base\" mode");
   ok(Object.values(idCol.variables).every((x) => x.type === "FLOAT" && Object.keys(x.values).join() === "Base"), "no modes ⇒ every variable has exactly one Base value");
   const dlg = base.categories.Display.LG;
-  ok(idCol.variables["Body/MD/size"].values.Base === base.categories.Body.MD.size && idCol.variables["Display/LG/letterSpacing"].values.Base === dlg.letterSpacing, "no-modes Base values equal the base scale (size + letterSpacing both raw px — Figma's own relative-units rule)");
+  ok(idCol.variables["type/Body/MD/size"].values.Base === base.categories.Body.MD.size && idCol.variables["type/Display/LG/letterSpacing"].values.Base === dlg.letterSpacing, "no-modes Base values equal the base scale (size + letterSpacing both raw px — Figma's own relative-units rule)");
   // DISTINCT mode names: a breakpoint named "Base" (reserved) and duplicate names are disambiguated, so
   // Figma never sees modes:["Base","Base"] (which it rejects on import) or a silently-shadowed mode.
-  const dup = T.typeTokensFigmaModes(base, [{ name: "Base", scale: mobile }, { name: "Wide", scale: base }, { name: "Wide", scale: mobile }]).collections.Typography;
+  const dup = T.typeTokensFigmaModes(base, [{ name: "Base", scale: mobile }, { name: "Wide", scale: base }, { name: "Wide", scale: mobile }]).collections.Geometry;
   ok(JSON.stringify(dup.modes) === JSON.stringify(["Base", "Base 2", "Wide", "Wide 2"]), `clashing/duplicate mode names are disambiguated (got ${JSON.stringify(dup.modes)})`);
   ok(new Set(dup.modes.map((s) => s.toLowerCase())).size === dup.modes.length, "every mode name is distinct (case-insensitively)");
-  ok(dup.variables["Body/MD/size"].values["Base 2"] === mobile.categories.Body.MD.size, "the breakpoint renamed off \"Base\" keeps its own value (didn't overwrite the synthetic Base)");
+  ok(dup.variables["type/Body/MD/size"].values["Base 2"] === mobile.categories.Body.MD.size, "the breakpoint renamed off \"Base\" keeps its own value (didn't overwrite the synthetic Base)");
 }
 
 // ── paragraphSpacing (box=1.0 / prose factor) + singleLineHeight (BOX voices only) — the schema-parity props ──
@@ -304,8 +305,8 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(css.includes("-para:") && css.includes("--type-ui-control-md-line-single:") && !css.includes("--type-label-md-line-single") && !css.includes("--type-display-md-line-single"), "CSS emits -para everywhere and -line-single only on the BOX voices (gone from Label since 2026-07-16)");
   const dt = T.typeTokensDTCG(T.typeScale({ treatment: "product" })).typography;
   ok(dt["UI-control"].MD.$value.singleLineHeight && !dt.Label.MD.$value.singleLineHeight && !dt.Display.MD.$value.singleLineHeight && /px$/.test(dt.Display.MD.$value.paragraphSpacing), "DTCG composite carries paragraphSpacing (px) + singleLineHeight on the box voices only");
-  const fv = T.typeTokensFigmaModes(T.typeScale({ treatment: "product" }), []).collections.Typography.variables;
-  ok(fv["Display/MD/paragraphSpacing"] && fv["UI-control/MD/singleLineHeight"] && !fv["Label/MD/singleLineHeight"] && !fv["Display/MD/singleLineHeight"], "Figma modes carry paragraphSpacing (all) + singleLineHeight (box voices only — gone from Label)");
+  const fv = T.typeTokensFigmaModes(T.typeScale({ treatment: "product" }), []).collections.Geometry.variables;
+  ok(fv["type/Display/MD/paragraphSpacing"] && fv["type/UI-control/MD/singleLineHeight"] && !fv["type/Label/MD/singleLineHeight"] && !fv["type/Display/MD/singleLineHeight"], "Figma modes carry paragraphSpacing (all) + singleLineHeight (box voices only — gone from Label)");
 }
 
 // ── leading + tracking are ALWAYS relative — never px — in every emitter (the units rule; overhaul P1) ──
@@ -332,11 +333,11 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // displays as a bare, unit-less number in Figma's own Properties panel, indistinguishable from a pixel
   // value at a glance; an absolute pixel reads unambiguously there instead. size/weight/singleLineHeight
   // are raw px too (unchanged from before).
-  const gv = T.typeTokensFigmaModes(s, []).collections.Typography.variables;
-  ok(gv["Body/MD/lineHeight"].values.Base === b.lineHeight, "Figma lineHeight is the absolute pixel value, not a %");
-  ok(gv["Body/MD/letterSpacing"].values.Base === b.letterSpacing, "Figma letterSpacing is the absolute pixel value, not a %");
-  ok(gv["UI-control/MD/singleLineHeight"].values.Base === s.categories["UI-control"].MD.singleLineHeight, "Figma singleLineHeight is the absolute pixel value too");
-  ok(gv["Body/MD/size"].values.Base === b.size && gv["Body/MD/weight"].values.Base === b.weight, "Figma size + weight stay raw (absolute)");
+  const gv = T.typeTokensFigmaModes(s, []).collections.Geometry.variables;
+  ok(gv["type/Body/MD/lineHeight"].values.Base === b.lineHeight, "Figma lineHeight is the absolute pixel value, not a %");
+  ok(gv["type/Body/MD/letterSpacing"].values.Base === b.letterSpacing, "Figma letterSpacing is the absolute pixel value, not a %");
+  ok(gv["type/UI-control/MD/singleLineHeight"].values.Base === s.categories["UI-control"].MD.singleLineHeight, "Figma singleLineHeight is the absolute pixel value too");
+  ok(gv["type/Body/MD/size"].values.Base === b.size && gv["type/Body/MD/weight"].values.Base === b.weight, "Figma size + weight stay raw (absolute)");
   // CSS/DTCG still use the exact ratio (unaffected by Figma's pixel choice): a voice with ONE configured
   // leading ratio must show the SAME constant number at every step — never drift, because
   // round(size·leading)/size ≠ leading at most sizes. Sub-heading's fixed sizes (28/34/40) don't all

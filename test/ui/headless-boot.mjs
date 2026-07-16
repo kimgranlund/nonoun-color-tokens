@@ -1147,7 +1147,7 @@ const entries = zb[eocd + 10] | (zb[eocd + 11] << 8);
 // design-system-for-figma-make/ bundle: guidelines/{Guidelines.md, setup.md, styles.css,
 // foundations/{color,typography,spacing}.md, components/{overview,button}.md} + README.md (9, a routed tree),
 // all riding systems.color) + 4 figma-aliased + 5 typography (incl. figma/ + figma/ moded + figma/ primitives) + 4 geometry + config = 45.
-ok(eocdSig && entries === 63, `(ee) the EOCD reports 63 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (13: type.css + type.tokens.json + 4 breakpoint CSS bolt-ons [desktop-lg/-xl 2026-07-15, tablet/mobile #264] + 4 per-mode DTCG [type.1728/2560/992/476] + 3 figma/* moded+primitives files) + geometry (12: geometry.css + geometry.tokens.json + 4 breakpoint CSS bolt-ons + 4 per-mode DTCG [geometry.1728/2560/992/476] + 2 figma/* moded+raw files) + figma/styles.plan.json (1) + config + the root README (got ${entries})`);
+ok(eocdSig && entries === 62, `(ee) the EOCD reports 62 entries — colour (31, incl. the design-system-for-claude-code/ bundle of 10 + design-system-for-google-stitch/ of 2 + design-system-for-figma-make/ of 9) + figma-aliased (4) + typography (12: type.css + type.tokens.json + 4 breakpoint CSS bolt-ons [desktop-lg/-xl 2026-07-15, tablet/mobile #264] + 4 per-mode DTCG [type.1728/2560/992/476] + 2 figma/* type-tokens+primitives files) + geometry (11: geometry.css + geometry.tokens.json + 4 breakpoint CSS bolt-ons + 4 per-mode DTCG [geometry.1728/2560/992/476] + 1 figma/* raw-variables file) + the MERGED moded-variables file figma/tokens.modes.variables.json (1, TKT-0009 — was typography.modes + dimension.modes) + figma/styles.plan.json (1) + config + the root README (got ${entries})`);
 const zipText = Buffer.from(zb).toString("latin1");
 // the root README makes the zip self-describing: the folder map, the consumption-plugin install
 // commands (the skills layer deliberately NOT bundled — it updates via the marketplace), the MCP
@@ -1167,7 +1167,7 @@ ok(/renamed in Settings/.test(zipText2) && /Token mapping/.test(zipText2) && /Br
 app.commit((d) => { delete d.figmaCollections; }); flushRaf(); // restore default names for later legs
 const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_tokens.json", "figma/Dark_tokens.json", "figma/palette.tokens.json", "ui3/", "tailwind/", "shadcn/", "design-system-for-claude-code/DESIGN.md", "design-system-for-claude-code/tokens.json", "design-system-for-claude-code/components/colors.html", "design-system-for-claude-code/README.md", "design-system-for-google-stitch/DESIGN.md", "design-system-for-google-stitch/README.md", "design-system-for-figma-make/guidelines/Guidelines.md", "design-system-for-figma-make/guidelines/setup.md", "design-system-for-figma-make/guidelines/styles.css", "design-system-for-figma-make/guidelines/foundations/color.md", "design-system-for-figma-make/guidelines/foundations/typography.md", "design-system-for-figma-make/guidelines/foundations/spacing.md", "design-system-for-figma-make/guidelines/components/overview.md", "design-system-for-figma-make/guidelines/components/button.md", "design-system-for-figma-make/README.md", "ultimate-tokens-my-set-config.json",
   "figma-aliased/Light_tokens.json", "figma-aliased/Dark_tokens.json", "figma-aliased/palette.tokens.json", "figma-aliased/README.txt",
-  "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "figma/typography.modes.variables.json", "figma/typography.primitives.variables.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.variables.json", "figma/dimension.modes.variables.json"];
+  "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "figma/tokens.modes.variables.json", "figma/typography.primitives.variables.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.variables.json"];
 ok(wantPaths.every((p) => zipText.includes(p)), "(ee) every colour format + typography/ + geometry/ + the moded Figma-variable files + the config + the figma-aliased/ cascade variant is present in the archive");
 // the Figma dimension file is NUMBER-typed (FLOAT variables), not the px dimension strings — so Figma imports it as number variables
 ok(zipText.includes("dimension.variables.json") && /"\$type":\s*"number"/.test(zipText) && zipText.includes('"Geometry"'), "(ee) figma/dimension.variables.json is a Geometry collection of number ($type number) variables");
@@ -1716,20 +1716,26 @@ ok(app._activeType().bodyBase === 24 && tScale(app._activeType()).categories.Bod
 app.setTypeModeMinWidth(_bpId, 768); flushRaf();
 ok(app.doc.type.modes[0].minWidth === 768 && app._typeModeScales()[0].minWidth === 768, "(ty-bp) setTypeModeMinWidth persists + flows to the responsive-export mode scales (→ @media min-width)");
 ok(app._typeModeDTCGFiles().length === 1 && app._typeModeDTCGFiles()[0].name === "type.768.tokens.json" && JSON.parse(app._typeModeDTCGFiles()[0].data).typography, "(ty-bp) the breakpoint emits a per-mode DTCG file keyed by width");
-// (ty-fig) the NATIVE Figma apply payload: _figmaFloatPlans() composes the emitters → validateModeInterchange
-// → modeApplyPlan, so the "Apply to Figma" message carries a Typography plan (Base + this 768 breakpoint —
-// the CONFIGURED-modes path) and a Geometry plan carrying the INTRINSIC standard set (no geometry modes
-// configured ⇒ Desktop · Tablet · Mobile synthesized, the Light/Dark-style always-there shape).
+// (ty-fig) the NATIVE Figma apply payload: _figmaFloatPlans() composes the emitters → per-half validation
+// → mergeModeInterchanges → modeApplyPlan, so the "Apply to Figma" message carries ONE merged Geometry
+// plan (TKT-0009): the type half's configured 768 breakpoint (Base default) union'd with geometry's
+// INTRINSIC standard set (no geometry modes configured ⇒ Desktop · Tablet · Mobile · Lg · Xl synthesized),
+// each half back-filled with its own base values at the modes it doesn't define.
 const _fplans = app._figmaFloatPlans();
-const _typlan = _fplans.find((p) => p.collection === "Typography");
-const _geolan = _fplans.find((p) => p.collection === "Geometry");
-ok(!!_typlan && !!_geolan, "(ty-fig) _figmaFloatPlans yields a Typography + a Geometry apply plan");
-ok(_typlan && _typlan.modes[0] === "Base" && _typlan.modes.length === 2, `(ty-fig) the Typography plan has Base + the 768 breakpoint mode (got ${_typlan && _typlan.modes.join()})`);
-ok(_geolan && JSON.stringify(_geolan.modes) === JSON.stringify(["Desktop", "Desktop Lg", "Desktop Xl", "Tablet", "Mobile"]) && _geolan.defaultMode === "Desktop", `(ty-fig) the Geometry plan carries the INTRINSIC Desktop·Desktop Lg·Desktop Xl·Tablet·Mobile set with Desktop as default — no configured modes needed (got ${_geolan && _geolan.modes.join()})`);
-ok(_fplans.every((p) => p.variables.length > 0 && p.variables.every((v) => v.type === "FLOAT" && v.values.length === p.modes.length && v.values.every((x) => Number.isFinite(x.value)))), "(ty-fig) every emitted plan is value-complete (FLOAT, one finite value per mode) — the validateModeInterchange gate held");
+ok(_fplans.length === 1 && _fplans[0].collection === "Geometry", `(ty-fig) _figmaFloatPlans yields ONE merged Geometry apply plan (TKT-0009 — got ${_fplans.map((p) => p.collection).join()})`);
+const _mplan = _fplans[0];
+ok(_mplan && _mplan.modes[0] === "Base" && _mplan.defaultMode === "Base", `(ty-fig) the type half's configured shape leads: Base is the default mode (got ${_mplan && _mplan.modes.join()})`);
+ok(_mplan && ["Desktop", "Desktop Lg", "Desktop Xl", "Tablet", "Mobile"].every((m) => _mplan.modes.includes(m)) && _mplan.modes.length === 7, `(ty-fig) the merged plan unions the 768 breakpoint with geometry's INTRINSIC Desktop·Desktop Lg·Desktop Xl·Tablet·Mobile set (got ${_mplan && _mplan.modes.join()})`);
+ok(_mplan && _mplan.variables.some((v) => v.name.startsWith("type/")) && _mplan.variables.some((v) => v.name.startsWith("size/")), "(ty-fig) the merged plan carries both the type/ half and the box-geometry half");
+ok(_fplans.every((p) => p.variables.length > 0 && p.variables.every((v) => v.type === "FLOAT" && v.values.length === p.modes.length && v.values.every((x) => Number.isFinite(x.value)))), "(ty-fig) every emitted plan is value-complete (FLOAT, one finite value per mode) — the merge back-fill + validateModeInterchange gate held");
+ok(_mplan && JSON.stringify(_mplan.retire) === JSON.stringify(["Typography"]), "(ty-fig) the merged plan carrying type/ variables retires the two-collection era's Typography collection");
 // the apply payload RESPECTS the export-system toggles: a toggled-off system is not in floatPlans (the bug).
 app.exportSystems = { color: true, type: false, geometry: true };
-ok(app._figmaFloatPlans().every((p) => p.collection !== "Typography") && app._figmaFloatPlans().some((p) => p.collection === "Geometry"), "(ty-fig) Typography OFF → its plan is omitted, Geometry stays");
+{
+  const _gOnly = app._figmaFloatPlans();
+  ok(_gOnly.length === 1 && _gOnly[0].collection === "Geometry" && _gOnly[0].variables.every((v) => !v.name.startsWith("type/")), "(ty-fig) Type OFF → the type/ half is omitted, the geometry half stays");
+  ok(_gOnly[0].retire === undefined, "(ty-fig) Type OFF → NO Typography retirement rides the plan (a partial apply must never strand still-bound styles)");
+}
 app.exportSystems = { color: true, type: false, geometry: false };
 ok(app._figmaFloatPlans().length === 0, "(ty-fig) Type + Geometry OFF → no float plans applied");
 app.exportSystems = { color: true, type: true, geometry: true }; // restore
@@ -2208,9 +2214,10 @@ app.addStandardGeomModes(); flushRaf();
   // the Figma float plans emit the desktop-first moded collections: Desktop (the designed scale) leads
   // as the base = Figma's default mode; Tablet · Mobile follow.
   const plans = app._figmaFloatPlans();
-  const typo = plans.find((p) => p.collection === "Typography"), geo = plans.find((p) => p.collection === "Geometry");
-  ok(typo && JSON.stringify(typo.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && typo.defaultMode === "Desktop", `(std) the Typography float plan is [Desktop, Tablet, Mobile], default Desktop (got ${typo && JSON.stringify(typo.modes)})`);
-  ok(geo && JSON.stringify(geo.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && geo.defaultMode === "Desktop", `(std) the Geometry float plan is [Desktop, Tablet, Mobile], default Desktop (got ${geo && JSON.stringify(geo.modes)})`);
+  const geo = plans.find((p) => p.collection === "Geometry");
+  ok(plans.length === 1 && !!geo, `(std) ONE merged Geometry float plan (TKT-0009 — got ${plans.map((p) => p.collection).join()})`);
+  ok(geo && JSON.stringify(geo.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && geo.defaultMode === "Desktop", `(std) the merged float plan is [Desktop, Tablet, Mobile], default Desktop — both standard sets align, no union residue (got ${geo && JSON.stringify(geo.modes)})`);
+  ok(geo && geo.variables.some((v) => v.name.startsWith("type/")) && geo.variables.some((v) => v.name.startsWith("size/")), "(std) the merged plan carries both halves");
 }
 {
   // the split CSS export (#264) is DESKTOP-ANCHORED and SEPARATE-FILE, not one @media-embedded

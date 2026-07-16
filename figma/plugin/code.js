@@ -386,9 +386,9 @@ function sweepCandidates(knownTextNames, knownPaintNames, localTexts, localPaint
 }
 
 // applyStylePlans — paint styles bound to the Color Modes variables; text styles set from the plan's
-// literals then BOUND per field to the Typography / Font Primitives variables where the target exists
+// literals then BOUND per field to the Geometry (type/) / Font Primitives variables where the target exists
 // (per-field graceful fallback: an absent variable or an unsupported binding leaves the literal value).
-// lineHeight/letterSpacing stay LITERAL PERCENT in v1 — the Typography vars carry them as % of size,
+// lineHeight/letterSpacing stay LITERAL PERCENT in v1 — the type/ vars carry them as % of size,
 // and a FLOAT binding on those fields reads as px, which would mis-set them.
 async function applyStylePlans(sp) {
   const out = { paints: 0, texts: 0, pruned: 0, missingVars: 0 };
@@ -421,7 +421,7 @@ async function applyStylePlans(sp) {
     reg.paints = current;
   }
 
-  // ── text styles → Typography + Font Primitives variables ──
+  // ── text styles → Geometry (type/) + Font Primitives variables ──
   const texts = Array.isArray(sp.texts) ? sp.texts : [];
   if (texts.length) {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
@@ -434,7 +434,9 @@ async function applyStylePlans(sp) {
       const id = floatReg[name];
       return (id && cols.find(function (c) { return c.id === id; })) || cols.find(function (c) { return c.name === name; });
     };
-    const typoColl = byRegistry("Typography");
+    // the METRIC pool (fontSize/lineHeight/letterSpacing/paragraphSpacing) lives in the merged
+    // "Geometry" collection's type/ group since TKT-0009 — the plan's bind keys carry the prefix.
+    const typoColl = byRegistry("Geometry");
     const primColl = byRegistry("Font Primitives");
     const typoVars = typoColl ? await varsByName(typoColl.id) : {};
     const primVars = primColl ? await varsByName(primColl.id) : {};
@@ -502,7 +504,7 @@ async function applyStylePlans(sp) {
       };
       bindField("fontSize", typoVars);
       // leading/tracking: the PIXELS literals above set the unit context; the bound FLOAT carries the
-      // same pixel number (the Typography collection emits lineHeight/letterSpacing in pixels too — see
+      // same pixel number (the type/ group emits lineHeight/letterSpacing in pixels too — see
       // typeTokensFigmaModes).
       bindField("lineHeight", typoVars);
       bindField("letterSpacing", typoVars);
@@ -530,7 +532,7 @@ async function applyStylePlans(sp) {
     // diagnostics — the console is the debugging surface (figma.notify races and truncates):
     if (out.substitutedFonts.length) console.warn("[Ultimate Tokens]", out.substituted, "text style(s) built on a placeholder face — these families are not in this Figma:", out.substitutedFonts.join(", "), "· their fontFamily stays BOUND to the Font Primitives variable, so installing the font adopts it.");
     if (out.missingFonts.length) console.warn("[Ultimate Tokens] text styles skipped — no usable face at all:", out.missingFonts.join(", "), "(font list size:", Object.keys(fontsByFamily).length, "families)");
-    if (!Object.keys(typoVars).length) console.warn("[Ultimate Tokens] Typography collection empty/missing at styles time — fontSize/leading/tracking bindings degraded to literals");
+    if (!Object.keys(typoVars).length) console.warn("[Ultimate Tokens] Geometry collection empty/missing at styles time — fontSize/leading/tracking bindings degraded to literals");
     if (!Object.keys(primVars).length) console.warn("[Ultimate Tokens] Font Primitives collection empty/missing at styles time — family/weight bindings degraded to literals");
   }
 
@@ -662,6 +664,17 @@ async function applyFloatPlans(plans) {
       byName[v.name] = vr; current.add(v.name); variables++;
     }
     for (const name of Object.keys(byName)) if (!current.has(name)) byName[name].remove();
+    // retire — collections THIS plan supersedes (plan.retire; TKT-0009: the pre-merge "Typography"
+    // moded collection, now folded into "Geometry" as the type/ group): registry-tracked ONLY
+    // (provenance — never a user's own same-named collection), removed with their variables. Styles
+    // re-bind to the merged targets in the SAME apply run (applyStylePlans executes after this).
+    for (const nm of (Array.isArray(plan.retire) ? plan.retire : [])) {
+      if (!reg[nm]) continue;
+      const cols = await figma.variables.getLocalVariableCollectionsAsync();
+      const stale = cols.find((c) => c.id === reg[nm]);
+      if (stale) stale.remove();
+      delete reg[nm];
+    }
     collections++;
   }
   writeFloatRegistry(reg); // persist the name→id provenance map (any newly-created collections)

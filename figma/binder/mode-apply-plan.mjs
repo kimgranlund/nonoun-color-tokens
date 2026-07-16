@@ -1,7 +1,9 @@
 // mode-apply-plan.mjs — the PURE, testable planner for APPLYING a breakpoint-moded variable collection
-// (Typography / Geometry) into a Figma file. The companion to bind-plan.mjs (which plans the COLOR cascade):
-// where bind-plan aliases semantic→raw across Light/Dark, this plans the Type/Geometry token write across
-// the "Base" + per-breakpoint MODES that `typeTokensFigmaModes` / `geomTokensFigmaModes` already emit.
+// into a Figma file. The companion to bind-plan.mjs (which plans the COLOR cascade): where bind-plan
+// aliases semantic→raw across Light/Dark, this plans the Type/Geometry token write across the "Base" +
+// per-breakpoint MODES that `typeTokensFigmaModes` / `geomTokensFigmaModes` already emit — BOTH into the
+// single "Geometry" collection since TKT-0009 (type/ + box-geometry halves), merged into one interchange
+// via mergeModeInterchanges below before planning.
 //
 // INPUT — the UI3 float interchange those producers return:
 //   { collections: { "<Name>": { modes: ["Base", <bp>…], variables: { "<key>": { type, values: { <mode>: n } } } } } }
@@ -26,6 +28,51 @@
 // mode), the apply never leaves a mode unset — the failure that makes a Figma import look half-bound.
 
 const FIGMA_VAR_TYPES = new Set(["FLOAT", "STRING", "BOOLEAN", "COLOR"]);
+
+// mergeModeInterchanges(...interchanges) → ONE interchange whose same-named collections are merged
+// (modes: first-writer order + any new names appended; variables: combined, later writer wins a key
+// collision). THE reason this exists (TKT-0009): typeTokensFigmaModes + geomTokensFigmaModes both emit
+// the "Geometry" collection (type/ + box-geometry halves), and the executor's applyFloatPlans prunes
+// variables per-collection against ITS plan — two sequential plans on one collection would each delete
+// the other's variables, so the halves MUST merge into one plan before modeApplyPlan.
+//
+// MISMATCHED MODE LISTS (a configured type breakpoint beside geometry's intrinsic set, or vice versa)
+// union — and each half BACK-FILLS the modes it doesn't define with its OWN default-mode (modes[0])
+// value: one collection can only carry one mode set, and "this system doesn't vary at that breakpoint"
+// honestly means "its base values there" (exactly what the two-collection era showed: the other
+// collection simply had no such mode, so consumers resolved its default). Pure and non-validating
+// otherwise; values objects are cloned (emitter output is never mutated). Falsy inputs are skipped;
+// zero mergeable inputs ⇒ null.
+export function mergeModeInterchanges(...interchanges) {
+  const collections = {};
+  const defOf = new Map(); // merged variable entry → its source half's default mode (for the back-fill)
+  let schema = null;
+  for (const ix of interchanges) {
+    if (!ix || typeof ix !== "object" || !ix.collections || typeof ix.collections !== "object") continue;
+    schema = schema || ix.$schema;
+    for (const [name, c] of Object.entries(ix.collections)) {
+      if (!c || typeof c !== "object") continue;
+      const tgt = collections[name] || (collections[name] = { modes: [], variables: {} });
+      const modes = Array.isArray(c.modes) ? c.modes : [];
+      for (const m of modes) if (!tgt.modes.includes(m)) tgt.modes.push(m);
+      for (const [k, v] of Object.entries(c.variables || {})) {
+        const entry = { ...v, ...(v && v.values ? { values: { ...v.values } } : {}) };
+        tgt.variables[k] = entry;
+        defOf.set(entry, modes[0]);
+      }
+    }
+  }
+  if (!Object.keys(collections).length) return null;
+  for (const c of Object.values(collections)) {
+    for (const v of Object.values(c.variables)) {
+      if (!v.values) continue;
+      const dv = v.values[defOf.get(v)];
+      if (dv === undefined) continue;
+      for (const m of c.modes) if (!(m in v.values)) v.values[m] = dv;
+    }
+  }
+  return { ...(schema ? { $schema: schema } : {}), collections };
+}
 
 // modeApplyPlan(interchange) → the ordered per-collection apply plan (see header). Pure; deterministic
 // (variables name-sorted, values in `modes` order). Does NOT validate — call validateModeInterchange first.
