@@ -2154,16 +2154,19 @@ app.inFigma = false; app.closeSettings(); flushRaf();
 // compressed ×5/6 / ×2/3), geometry via heights −2/−4.
 app.commit((d) => { if (d.type) { d.type = { ...d.type }; delete d.type.modes; delete d.type.baseName; } if (d.geometry) { d.geometry = { ...d.geometry }; delete d.geometry.modes; delete d.geometry.baseName; } }); flushRaf();
 const stdBB = (app.doc.type && app.doc.type.bodyBase) ?? 16;
-// Body's targeted Mobile-only nudge (2026-07-13, at request), checked on the SYNTHESIZED (no-modes)
-// path first, before addStandardTypeModes materializes real modes below — Desktop/Tablet both 18/16/14
-// (LG/MD/SM), Mobile steps down to 16/15/14. Desktop Lg/Xl (2026-07-15, at request) invert the curve:
-// bodyBase scales UP (×1.125/×1.25) while modeFactor (0.89/0.80) holds the ceiling back — Body climbs
-// 20/18/16 then 22/20/18, the mirror image of Tablet/Mobile's downward compression.
+// The ratified magnitude table (2026-07-16), checked on the SYNTHESIZED (no-modes) path first, before
+// addStandardTypeModes materializes real modes below — Body is FROZEN across Desktop/Tablet/Mobile at
+// 18/16/14 (LG/MD/SM; 2026-07-13's Mobile nudge is retired), while Desktop Lg/Xl invert the curve:
+// bodyBase scales UP (×1.125/×1.375) with modeFactor (0.89/0.80) holding the ceiling back — Body climbs
+// 20/18/16 then 24/22/20. Label steps DOWN on the small tiers and lands the table's cells on the large
+// ones via _modeTierNudge: 15/14/13 · 18/17/16 · 13/12/11 · 12/11/10 (Lg · Xl · Tablet · Mobile).
 {
   const bodyLGMDSM = (s) => ["LG", "MD", "SM"].map((k) => s.categories.Body[k].size).join("/");
+  const labelLGMDSM = (s) => ["LG", "MD", "SM"].map((k) => s.categories.Label[k].size).join("/");
   const synthMS = app._typeModeScales();
   ok(bodyLGMDSM(app._typeScaleFor("base")) === "18/16/14", `(std) the synthesized Desktop (base) scale: Body LG/MD/SM (got ${bodyLGMDSM(app._typeScaleFor("base"))})`);
-  ok(JSON.stringify(synthMS.map((m) => bodyLGMDSM(m.scale))) === JSON.stringify(["20/18/16", "22/20/18", "18/16/14", "16/15/14"]), `(std) the synthesized (no-modes) Desktop Lg/Xl/Tablet/Mobile set: Body LG/MD/SM (got ${JSON.stringify(synthMS.map((m) => bodyLGMDSM(m.scale)))})`);
+  ok(JSON.stringify(synthMS.map((m) => bodyLGMDSM(m.scale))) === JSON.stringify(["20/18/16", "24/22/20", "18/16/14", "18/16/14"]), `(std) the synthesized (no-modes) Desktop Lg/Xl/Tablet/Mobile set: Body LG/MD/SM (got ${JSON.stringify(synthMS.map((m) => bodyLGMDSM(m.scale)))})`);
+  ok(JSON.stringify(synthMS.map((m) => labelLGMDSM(m.scale))) === JSON.stringify(["15/14/13", "18/17/16", "13/12/11", "12/11/10"]), `(std) the tier Label ladders (magnitude table): Lg/Xl/Tablet/Mobile LG/MD/SM (got ${JSON.stringify(synthMS.map((m) => labelLGMDSM(m.scale)))})`);
 }
 app.addStandardTypeModes(); flushRaf();
 {
@@ -2181,10 +2184,13 @@ app.addStandardTypeModes(); flushRaf();
   ok(bodyAt[0] === bodyAt[1], `(std) Body/MD is FROZEN Desktop→Tablet (${bodyAt.join("·")})`);
   const dispTop = cols.map((c) => { const st = Object.values(c.scale.categories.Display); return st[st.length - 1].size; });
   ok(dispTop[0] > dispTop[1] && dispTop[1] > dispTop[2], `(std) the Display top strictly compresses Desktop→Tablet→Mobile (${dispTop.join("→")})`);
-  // the SAME Mobile nudge via the MATERIALIZED Standard set (addStandardTypeModes → _typeScaleFor per
-  // mode) — must match the synthesized (no-modes) check above exactly, so the two paths can never drift.
+  // the SAME tier cells via the MATERIALIZED Standard set (addStandardTypeModes → _typeScaleFor per
+  // mode) — must match the synthesized (no-modes) check above exactly, so the two paths can never drift:
+  // Body frozen 18/16/14 everywhere (the retired Mobile nudge), Label stepping 12/11/10 ← 13/12/11 ← 14/13/12.
   const bodyLGMDSM = (s) => ["LG", "MD", "SM"].map((k) => s.categories.Body[k].size).join("/");
-  ok(bodyLGMDSM(cols[0].scale) === "18/16/14" && bodyLGMDSM(cols[1].scale) === "18/16/14" && bodyLGMDSM(cols[2].scale) === "16/15/14", `(std) Body LG/MD/SM: Desktop ${bodyLGMDSM(cols[0].scale)}, Tablet ${bodyLGMDSM(cols[1].scale)}, Mobile ${bodyLGMDSM(cols[2].scale)} (want 18/16/14, 18/16/14, 16/15/14)`);
+  const labelLGMDSM = (s) => ["LG", "MD", "SM"].map((k) => s.categories.Label[k].size).join("/");
+  ok(bodyLGMDSM(cols[0].scale) === "18/16/14" && bodyLGMDSM(cols[1].scale) === "18/16/14" && bodyLGMDSM(cols[2].scale) === "18/16/14", `(std) Body LG/MD/SM is FROZEN: Desktop ${bodyLGMDSM(cols[0].scale)}, Tablet ${bodyLGMDSM(cols[1].scale)}, Mobile ${bodyLGMDSM(cols[2].scale)} (want 18/16/14 across all three)`);
+  ok(labelLGMDSM(cols[0].scale) === "14/13/12" && labelLGMDSM(cols[1].scale) === "13/12/11" && labelLGMDSM(cols[2].scale) === "12/11/10", `(std) Label LG/MD/SM steps down: Desktop ${labelLGMDSM(cols[0].scale)}, Tablet ${labelLGMDSM(cols[1].scale)}, Mobile ${labelLGMDSM(cols[2].scale)}`);
 }
 const stdBH = (app.doc.geometry && app.doc.geometry.baseHeight) ?? 28;
 app.addStandardGeomModes(); flushRaf();
