@@ -253,6 +253,51 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
   } catch (e) { FAIL("floatnoop", "main() threw on the generic (FLOAT_PLANS []) binder: " + e.message); }
 }
 
+// ── colorprov (TKT-0024): main() must NEVER canonicalize a USER's own pre-existing "Color Semantic"
+//    collection either — the same provenance guarantee floatindep/floatnoop prove for Type/Geometry,
+//    back-ported to the color cascade's semantic-collection creation via COLOR_REGISTRY_KEY. A "Color
+//    Primitives" collection's mere PRESENCE is enough to enter the cascade branch (main() checks `if
+//    (rawColl)`, not a variable count), so an empty one is enough to exercise the Color Semantic path. ──
+{
+  const F = mockFigma();
+  F.figma.variables.createVariableCollection("Color Primitives"); // presence alone enters the cascade branch
+  const userSem = F.figma.variables.createVariableCollection("Color Semantic"); // the user's own, pre-existing
+  F.figma.variables.createVariable("user/keepme", userSem, "COLOR").setValueForMode(userSem.modes[0].modeId, 1);
+  try {
+    const { main } = loadBinder(binderSrc, F.figma);
+    await main();
+    if (F.collections.filter((c) => c.name === "Color Semantic").length !== 2) FAIL("colorprov", `expected the user's Color Semantic + a separate binder-created one (2), got ${F.collections.filter((c) => c.name === "Color Semantic").length}`);
+    if (!F.variables.some((v) => v.variableCollectionId === userSem.id && v.name === "user/keepme")) FAIL("colorprov", "bind removed/touched a variable in the user's OWN Color Semantic collection");
+    if (userSem.modes.length !== 1) FAIL("colorprov", "bind added a mode (e.g. Dark) to the user's OWN Color Semantic collection");
+    // re-bind: reconcile OURS by id (the registry persisted), never touching the user's collection again
+    const { main: main2 } = loadBinder(binderSrc, F.figma);
+    await main2();
+    if (F.collections.filter((c) => c.name === "Color Semantic").length !== 2) FAIL("colorprov", "re-bind made a 3rd Color Semantic (provenance registry not persisted to root pluginData)");
+  } catch (e) { FAIL("colorprov", "main() threw with a foreign pre-existing Color Semantic collection: " + e.message); }
+}
+
+// ── colorparity: the binder's checked-in code.js's readColorRegistry/writeColorRegistry/ensureCollection
+//    are GENERATED (TKT-0024, splicing the FLOAT_EXECUTOR technique from TKT-0019) — spliced verbatim from
+//    the flagship figma/plugin/code.js by scripts/gen-figma-binder-code.mjs into the
+//    `// === GENERATED:COLOR_EXECUTOR ===` markers, same discipline as floatparity below. This gate is now
+//    a TRIPWIRE proving the splice landed correctly, not the mechanism keeping the two copies in lockstep. ──
+{
+  const FLAGSHIP_PATH = join(HERE, "..", "plugin", "code.js");
+  const COLOR_FNS = ["readColorRegistry", "writeColorRegistry", "ensureCollection"];
+  const norm = (code) => code.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ").trim();
+  const keyLit = (src) => (/COLOR_REGISTRY_KEY\s*=\s*("[^"]*")/.exec(src) || [])[1];
+  try {
+    const flagSrc = readFileSync(FLAGSHIP_PATH, "utf8");
+    for (const fn of COLOR_FNS) {
+      const a = extractFunctionSource(binderSrc, fn), b = extractFunctionSource(flagSrc, fn);
+      if (!a) { FAIL("colorparity", `binder is missing ${fn}()`); continue; }
+      if (!b) { FAIL("colorparity", `flagship is missing ${fn}()`); continue; }
+      if (norm(a) !== norm(b)) FAIL("colorparity", `${fn}() body drifted between the binder and the flagship (executor copies must stay byte-identical — regenerate with scripts/gen-figma-binder-code.mjs)`);
+    }
+    if (!keyLit(binderSrc) || keyLit(binderSrc) !== keyLit(flagSrc)) FAIL("colorparity", `COLOR_REGISTRY_KEY literal differs (binder ${keyLit(binderSrc)} vs flagship ${keyLit(flagSrc)}) — the two would not converge on one collection`);
+  } catch (e) { FAIL("colorparity", "could not load/compare the flagship color-provenance functions: " + e.message); }
+}
+
 // ── floatparity: the binder ports 5 float-executor functions VERBATIM from the flagship
 //    (figma/plugin/code.js). They're a pure DATA executor with no planner to spec-gate against, so — per
 //    the repo's culture (see the roleTable PARITY GUARD above; scrim-drift incident 2026-06-18) — the two
@@ -281,7 +326,7 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-for (const g of ["bindings", "themes", "offline", "parity", "floatanchor", "floatcreate", "floatindep", "floatnoop", "floatparity"]) {
+for (const g of ["bindings", "themes", "offline", "parity", "floatanchor", "floatcreate", "floatindep", "floatnoop", "colorprov", "colorparity", "floatparity"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

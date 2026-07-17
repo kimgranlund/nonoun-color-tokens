@@ -48,9 +48,14 @@ const CONFIG_KEY = "ultimate-tokens-config"; // (matches SETS_KEY's `ultimate-to
 // `root.setPluginData` BY PLUGIN ID, and this plugin's id changed (nonoun-color-tokens ->
 // ultimate-tokens) with the product rename: data written under the old id is unreadable by this
 // plugin, at any key. Files applied before the rename lose their embedded config (re-import the
-// config JSON, or re-apply) and their provenance registries (the first apply re-adopts collections
-// and styles BY NAME, then re-registers them — nothing is duplicated, nothing stale is pruned once).
-                                        // rename still load; the next writeConfig migrates them forward.
+// config JSON, or re-apply) and every provenance registry — FLOAT_REGISTRY_KEY, COLOR_REGISTRY_KEY (TKT-0024),
+// STYLE_REGISTRY_KEY. STYLES self-heal by name (applyStylePlans looks up a real local style by name FIRST,
+// registry second) — a re-key with no data loss. COLLECTIONS do not: ensureCollection/ensureFloatCollection
+// match by registry id ONLY (never by name, so a user's own same-named collection is never adopted — the
+// whole point of the registry), so a reset registry makes the next apply mint a fresh, SEPARATE collection
+// rather than re-adopting the pre-rename one — nothing is deleted or corrupted, but the old collection is
+// orphaned (unmanaged) until a user manually removes it. Rare in practice: a plugin id change is a one-off,
+// deliberate event, not a routine upgrade.
 
 // SETS_KEY — the gallery's "Your Palettes" sets, persisted in figma.clientStorage (PER-USER, survives
 // across plugin sessions). The plugin UI iframe has an opaque origin, so its localStorage is blocked /
@@ -63,6 +68,15 @@ const SETS_KEY = "ultimate-tokens-sets";
 // reconciles/prunes ONLY a collection we created (matched by id), so a user's OWN pre-existing collection
 // named "Typography"/"Geometry" is never canonicalized or pruned — we make a separate one instead.
 const FLOAT_REGISTRY_KEY = "ultimate-tokens-float-collections";
+// COLOR_REGISTRY_KEY — TKT-0024: the SAME provenance discipline, back-ported to Color Primitives / Color
+// Semantic. Before this, ensureCollection adopted ANY same-named collection by NAME alone — a user's own
+// collection literally called "Color Primitives"/"Color Semantic" got silently adopted and mutated on the
+// next Apply, the exact failure class FLOAT_REGISTRY_KEY already closed for Type/Geometry (#155). Same
+// shape: name→collectionId, travels with the .fig; applyBundle reconciles/prunes ONLY a collection it
+// created (matched by id). A collection this registry doesn't yet know about — including one this SAME
+// plugin created before this fix shipped — is now treated as foreign and gets its own separate collection;
+// nothing existing is ever deleted, so a pre-fix file just needs its normal next Apply to re-converge.
+const COLOR_REGISTRY_KEY = "ultimate-tokens-color-collections";
 
 // writeConfig / readConfig — the file-embedded parametric config (root pluginData is a string store;
 // getPluginData returns "" when unset). JSON-encoded; a corrupt value reads back as null, never throws.
@@ -79,6 +93,13 @@ function readFloatRegistry() {
   try { const r = JSON.parse(raw); return r && typeof r === "object" ? r : {}; } catch (e) { return {}; }
 }
 function writeFloatRegistry(reg) { figma.root.setPluginData(FLOAT_REGISTRY_KEY, JSON.stringify(reg)); }
+// readColorRegistry / writeColorRegistry — the {name: collectionId} provenance map (see COLOR_REGISTRY_KEY).
+function readColorRegistry() {
+  const raw = figma.root.getPluginData(COLOR_REGISTRY_KEY);
+  if (!raw) return {};
+  try { const r = JSON.parse(raw); return r && typeof r === "object" ? r : {}; } catch (e) { return {}; }
+}
+function writeColorRegistry(reg) { figma.root.setPluginData(COLOR_REGISTRY_KEY, JSON.stringify(reg)); }
 
 // ACTIONS — each request mapped to a human action, so a failure reads as "couldn't <do X>" instead of a
 // raw developer error (Figma policy: never surface raw error text / stack traces to users).
@@ -204,20 +225,33 @@ function aliasTarget(leaf) {
   const ad = leaf && leaf.$extensions && leaf.$extensions["com.figma.aliasData"];
   return ad ? ad.targetVariableName : null;
 }
-async function ensureCollection(name, renameFrom) {
+// ensureCollection — OUR managed Color Primitives / Color Semantic collection for `name`, by PROVENANCE
+// (the registry's stored id), creating + registering it if absent. TKT-0024: this used to adopt ANY
+// same-named collection found by getLocalVariableCollectionsAsync().find(c => c.name === name) — including
+// a user's own hand-built collection that happens to share the name — mutating it on the next Apply. Now it
+// NEVER adopts a same-named collection it didn't create, mirroring ensureFloatCollection below exactly: a
+// user manual-rename survives (we track id, not name); a user-deleted one is re-created; a foreign
+// same-named collection is left alone and we make a separate one instead. `reg` is mutated in place; the
+// caller persists it once via writeColorRegistry.
+async function ensureCollection(name, reg, renameFrom) {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const hit = cols.find((c) => c.name === name);
-  if (hit) return hit;
-  // TKT-0012: adopt a collection under a superseded name (id + every binding preserved) — color
-  // collections are name-adopted (no provenance registry yet, TKT-0024), so the rename is by name too.
+  const known = reg[name] && cols.find((c) => c.id === reg[name]);
+  if (known) return known;
   for (const old of (Array.isArray(renameFrom) ? renameFrom : [])) {
-    const prev = cols.find((c) => c.name === old);
-    if (prev) { prev.name = name; return prev; }
+    const prev = reg[old] && cols.find((c) => c.id === reg[old]);
+    if (prev) {
+      prev.name = name;
+      reg[name] = prev.id;
+      delete reg[old];
+      return prev;
+    }
   }
-  return figma.variables.createVariableCollection(name);
+  const made = figma.variables.createVariableCollection(name);
+  reg[name] = made.id;
+  return made;
 }
-// ensureFloatCollection — OUR managed Type/Geometry collection for `name`, by PROVENANCE (the registry's
-// stored id), creating + registering it if absent. Unlike ensureCollection (color), it NEVER adopts a
+// ensureFloatCollection — the SAME pattern (see ensureCollection above), for OUR managed Type/Geometry
+// collection: PROVENANCE (the registry's stored id), creating + registering it if absent. It NEVER adopts a
 // same-named collection it didn't create — so applyFloatPlans' rename/prune can't ever hit a user's own
 // "Typography"/"Geometry". A user manual-rename survives (we track id, not name); a user-deleted one is
 // re-created. `reg` is mutated in place; the caller persists it once via writeFloatRegistry.
@@ -257,7 +291,12 @@ async function readRawColors() {
     if (cfg && cfg.figmaCollections && typeof cfg.figmaCollections.raw === "string" && cfg.figmaCollections.raw.trim()) rawName = cfg.figmaCollections.raw.trim();
   } catch (e) { /* unreadable config → default name */ }
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const raw = cols.find((c) => c.name === rawName);
+  // PROVENANCE FIRST (see ensureCollection) — resolve OUR raw collection by the registry id; name is only
+  // a fallback for the read-only diff (harmless here — reading never mutates — but the registry id is
+  // still the correct signal when a foreign same-named collection also exists in the file).
+  const colorReg = readColorRegistry();
+  const rawId = colorReg[rawName];
+  const raw = (rawId && cols.find((c) => c.id === rawId)) || cols.find((c) => c.name === rawName);
   if (!raw) return { found: false, raw: {} };
   const mode = raw.modes[0].modeId;
   const all = await figma.variables.getLocalVariablesAsync();
@@ -484,7 +523,12 @@ async function applyStylePlans(sp) {
   const paints = Array.isArray(sp.paints) ? sp.paints : [];
   if (paints.length) {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const sem = cols.find(function (c) { return c.name === COLL.semantic; });
+    // PROVENANCE FIRST (see ensureCollection/COLOR_REGISTRY_KEY) — resolve OUR Color Semantic by the
+    // registry id, falling back to name: a name-only find could bind these paint styles to a foreign
+    // same-named collection's variables instead of ours.
+    const colorReg = readColorRegistry();
+    const semId = colorReg[COLL.semantic];
+    const sem = (semId && cols.find(function (c) { return c.id === semId; })) || cols.find(function (c) { return c.name === COLL.semantic; });
     const semVars = sem ? await varsByName(sem.id) : {};
     const local = await figma.getLocalPaintStylesAsync();
     const byName = {};
@@ -677,8 +721,10 @@ async function applyBundle(dtcg, opts) {
   if (!themeEntries.length) throw new Error("bundle has no theme files (e.g. Light_tokens.json/Dark_tokens.json)");
   const themeNames = themeEntries.map((f) => f.$extensions["com.figma.modeName"]);
 
+  const reg = readColorRegistry(); // provenance: only ever touch a collection this plugin created (see ensureCollection)
+
   // 1) RAW collection — single "Value" mode, one COLOR var per stop/scrim.
-  const raw = await ensureCollection(COLL.raw, collectionRenames[COLL.raw]);
+  const raw = await ensureCollection(COLL.raw, reg, collectionRenames[COLL.raw]);
   raw.renameMode(raw.modes[0].modeId, "Value");
   const rawMode = raw.modes[0].modeId;
   const rawByName = await varsByName(raw.id);
@@ -699,12 +745,17 @@ async function applyBundle(dtcg, opts) {
   // surfaces · scrims).
   let rebuilt = false;
   if (opts.rebuildSemantic) {
+    // PROVENANCE, not name: only OUR registry-tracked Color Semantic (under its current name or a
+    // renameFrom key still pending re-key) is ever dropped — never a foreign same-named collection.
     const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-    const oldNames = [COLL.semantic].concat(Array.isArray(collectionRenames[COLL.semantic]) ? collectionRenames[COLL.semantic] : []);
-    const old = cols0.find((c) => oldNames.includes(c.name));
+    const oldKeys = [COLL.semantic].concat(Array.isArray(collectionRenames[COLL.semantic]) ? collectionRenames[COLL.semantic] : []);
+    let oldId = null;
+    for (const k of oldKeys) { if (reg[k]) { oldId = reg[k]; break; } }
+    const old = oldId && cols0.find((c) => c.id === oldId);
     if (old) { old.remove(); rebuilt = true; }
+    for (const k of oldKeys) delete reg[k];
   }
-  const sem = await ensureCollection(COLL.semantic, collectionRenames[COLL.semantic]);
+  const sem = await ensureCollection(COLL.semantic, reg, collectionRenames[COLL.semantic]);
   // the collection's DEFAULT mode (Figma rejects removing it) is renamed to the FIRST theme; the rest
   // are added-or-reused BY NAME (mirrors applyFloatPlans' generic mode reconciliation, below) — never
   // assumes exactly two.
@@ -770,6 +821,7 @@ async function applyBundle(dtcg, opts) {
     if (!currentRaw.has(name)) { rawByName[name].remove(); pruned++; }
   }
 
+  writeColorRegistry(reg); // persist the name→id provenance map (any newly-created collections)
   return { raw: rawCount, semantic: semCount, pruned: pruned, rebuilt: rebuilt, themeNames: themeNames };
 }
 

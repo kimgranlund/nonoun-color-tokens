@@ -522,6 +522,60 @@ if (applyBundle && applyStylePlans) {
   } catch (e) { FAIL("renamecap", "color rename capability threw: " + e.message); }
 }
 
+// ── TKT-0024: PROVENANCE — apply must NEVER canonicalize a USER's own pre-existing same-named collection
+//    for Color Primitives/Color Semantic either — the exact guarantee the float path has had since #155
+//    (see "floatprov" above), back-ported to ensureCollection via COLOR_REGISTRY_KEY. Fresh mock so the
+//    user's "Color Primitives"/"Color Semantic" are the ONLY ones of that name until apply runs. ──
+if (applyBundle) {
+  try {
+    const FC = mockFigma();
+    const lc = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle };")(FC.figma, "<html>", undefined);
+    const userRaw = FC.figma.variables.createVariableCollection("Color Primitives"); // the user's own, pre-existing
+    FC.figma.variables.createVariable("user/keepme", userRaw, "COLOR").setValueForMode(userRaw.modes[0].modeId, { r: 1, g: 0, b: 0, a: 1 });
+    const userSem = FC.figma.variables.createVariableCollection("Color Semantic"); // the user's own, pre-existing
+    FC.figma.variables.createVariable("user/keepme-sem", userSem, "COLOR").setValueForMode(userSem.modes[0].modeId, { r: 0, g: 1, b: 0, a: 1 });
+    const bundleC = figmaBundle(defaultDocument());
+    await lc.applyBundle(bundleC, {});
+    if (FC.collections.filter((c) => c.name === "Color Primitives").length !== 2) FAIL("colorprov", `expected the user's Color Primitives + a separate plugin-created one (2), got ${FC.collections.filter((c) => c.name === "Color Primitives").length}`);
+    if (FC.collections.filter((c) => c.name === "Color Semantic").length !== 2) FAIL("colorprov", `expected the user's Color Semantic + a separate plugin-created one (2), got ${FC.collections.filter((c) => c.name === "Color Semantic").length}`);
+    if (!FC.variables.some((v) => v.variableCollectionId === userRaw.id && v.name === "user/keepme")) FAIL("colorprov", "apply pruned/removed a variable from the user's OWN Color Primitives collection");
+    if (!FC.variables.some((v) => v.variableCollectionId === userSem.id && v.name === "user/keepme-sem")) FAIL("colorprov", "apply pruned/removed a variable from the user's OWN Color Semantic collection");
+    if (userRaw.modes[0].name !== "Mode 1") FAIL("colorprov", "apply renamed the default mode of the user's OWN Color Primitives collection");
+    if (userSem.modes[0].name !== "Mode 1") FAIL("colorprov", "apply renamed the default mode of the user's OWN Color Semantic collection");
+    if (userSem.modes.length !== 1) FAIL("colorprov", "apply added a mode (e.g. Dark) to the user's OWN Color Semantic collection");
+    // re-apply: reconcile OURS by id (the registry persisted), never touching the user's collections again
+    await lc.applyBundle(bundleC, {});
+    if (FC.collections.filter((c) => c.name === "Color Primitives").length !== 2) FAIL("colorprov", "re-apply made a 3rd Color Primitives (provenance registry not persisted to root pluginData)");
+    if (FC.collections.filter((c) => c.name === "Color Semantic").length !== 2) FAIL("colorprov", "re-apply made a 3rd Color Semantic (provenance registry not persisted to root pluginData)");
+  } catch (e) { FAIL("colorprov", "provenance guard threw: " + e.message); }
+}
+
+// ── TKT-0024: the color collections' id-preserving RENAME capability still works once ensureCollection
+//    switched from name-only to registry-by-id matching — a plan.renames.collections rename adopts the
+//    REGISTRY-TRACKED collection by id, renames it in place, and re-keys the registry (mirrors the float
+//    "renamecap" collection leg above). ──
+if (applyBundle) {
+  try {
+    const FD = mockFigma();
+    const ld = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, setCollectionNames };")(FD.figma, "<html>", undefined);
+    const bundleD = figmaBundle(defaultDocument());
+    await ld.applyBundle(bundleD, {}); // era 1: default-named collections, registered under "Color Semantic"
+    const semD0 = FD.collections.find((c) => c.name === "Color Semantic");
+    const keepId = semD0.id;
+    ld.setCollectionNames({ raw: "Color Primitives", semantic: "Brand Colors" }); // era 2: renamed semantic collection
+    await ld.applyBundle(bundleD, { renames: { collections: { "Brand Colors": ["Color Semantic"] } } });
+    const semD1 = FD.collections.find((c) => c.name === "Brand Colors");
+    if (!semD1) FAIL("colorrenamecap", "renameFrom did not produce the renamed Color Semantic collection");
+    else {
+      if (semD1.id !== keepId) FAIL("colorrenamecap", "collection rename minted a NEW collection (id changed — bindings would orphan)");
+      if (FD.collections.filter((c) => c.name === "Color Semantic").length !== 0) FAIL("colorrenamecap", "the old-name Color Semantic collection lingers after renameFrom");
+    }
+    // registry re-keyed: a THIRD apply under the new name must reuse the same collection, not mint another
+    await ld.applyBundle(bundleD, { renames: { collections: { "Brand Colors": ["Color Semantic"] } } });
+    if (FD.collections.filter((c) => c.name === "Brand Colors").length !== 1) FAIL("colorrenamecap", "re-apply after renameFrom duplicated the collection (registry not re-keyed)");
+  } catch (e) { FAIL("colorrenamecap", "color collection rename capability threw: " + e.message); }
+}
+
 // ── list-fonts: the UI asks which families Figma can use; the sandbox answers with families only ──
 {
   const F5 = mockFigma();
@@ -645,7 +699,7 @@ if (sweepCandidates) {
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "themes", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "floatretire", "renamecap", "applysys", "applydone", "config", "read", "fonts", "resolveface", "sweep"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "themes", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "floatretire", "renamecap", "colorprov", "colorrenamecap", "applysys", "applydone", "config", "read", "fonts", "resolveface", "sweep"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
