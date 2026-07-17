@@ -351,6 +351,38 @@ Format: Context → Decision → Rationale → Consequences → Status.
 
 ---
 
+## ADR-016 — One kebab-case naming grammar across every emitted surface; the moded collection is "Breakpoints"
+- **Context.** The 2026-07-17 six-seat architecture review (reports:
+  `docs/reference/reviews/2026-07-17-*.md`) found the emitted naming bimodal — semantic roles
+  kebab in CSS/Tailwind but camelCase in JSON/DTCG/UI3; `paddingNarrow` beside `stack-tight`
+  inside one collection; type's Figma emitter preserving `Sub-heading/MD` while geometry kebabs
+  its groups — plus a three-way collection-name split (`Color / Primitives` vs `Color
+  Primitives`), the merged moded collection still named "Geometry" while hosting all of
+  typography (TKT-0009), and two homonym pairs (`size/*/gap` vs `gap/*`, `size/*/radius` vs
+  `radius/*`).
+- **Decision.** Adopt the librarian grammar in full (report §"Proposed naming grammar", 8
+  rules), ratified 2026-07-17: **kebab-case for every emitted token/path segment on every
+  surface** — CSS, DTCG keys, JSON, UI3, Figma variable paths *including voice/step segments*
+  (`type/ui-control/md/line-single`) — `/` as the only path delimiter (never inside a display
+  name), base-variant-modifier word order (`padding-narrow-compact`), suffixes always trailing
+  (`-single`, ` •`), 3-digit stop padding, the homonym-check gate, and collection names per
+  rule 8. Homonyms resolve by leaf rename: `size/*/gap` → `size/*/icon-gap`, `size/*/radius` →
+  `size/*/pill-radius`. Scrims nest (`{n}/scrim/{step}`), JSON keys by palette slug. The
+  canonical collection set (one shared constant, both export + plugin): **"Color Primitives" ·
+  "Color Semantic"** (renamed from "Color Modes", rule 8: name the content when the mode axis is
+  self-evident) **· "Breakpoints"** (renamed from "Geometry" — its modes ARE the axis; the
+  domain name became a lie when type/ moved in) **· "Font Primitives"**.
+- **Rationale.** One grammar ends the C1/C2/M1 drift class at the root instead of per-emitter;
+  kebab matches the shipped CSS surface, W3C DTCG style practice, and the ratified TKT-0010
+  token names. Engine-INTERNAL JS identifiers stay camelCase — the grammar governs emissions.
+- **Consequences.** A one-shot migration wave (TKT-0013) across engine emitters, tests, consumer
+  skills, the design-systems plugin, and BZZR — gated on the rename-capability prerequisite
+  (TKT-0012), because all apply-loops reconcile by name and a bare rename orphans user bindings
+  (collections-arch review, CRITICAL-1). Collection renames additionally migrate the provenance
+  registry keys. Deliberate divergences stay fenced: Tailwind's literal `color` namespace,
+  ShadCN's fixed vocabulary, Figma's all-pixel rule.
+- **Status.** DECIDED (ratified 2026-07-17; execution TKT-0011..0014).
+
 ## Quick map: decisions an enhancing agent is most likely to "fix" (don't)
 | ADR | Looks wrong because… | But it's intentional because… |
 |-----|----------------------|-------------------------------|
