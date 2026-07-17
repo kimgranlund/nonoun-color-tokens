@@ -31,6 +31,8 @@ const MODS = [
   ["figmaMigrations", "figma/binder/migrations.mjs"],
   ["modeApplyPlan", "figma/binder/mode-apply-plan.mjs"],
   ["stylePlan", "figma/binder/style-plan.mjs"],
+  ["liveDiff", "figma/binder/live-diff.mjs"], // TKT-0020: pure apply-vs-live diff, imported by apply-gate.js
+
   ["icons", "src/ui/icons.js"],
   ["model", "src/ui/model.mjs"],
   // TKT-0023: app.js decomposed into a bootstrap/core + per-section prototype mixins. appHelpers is the
@@ -47,7 +49,7 @@ const MODS = [
   ["app", "src/ui/app.js"],
 ];
 const KEY = { "hct.js": "hct", "okhsl.js": "okhsl", "semantic.js": "semantic", "tonal.js": "tonal", "derive.mjs": "derive", "type.mjs": "type", "geometry.mjs": "geometry", "flags.js": "flags", "persist.js": "persist",
-  "ds-gates.js": "dsGates", "exports.js": "exports", "ds-export.js": "dsExport", "figma-plugin-assets.js": "figmaPlugin", "mcp-assets.js": "mcpAssets", "type-fonts.js": "typeFonts", "zip.mjs": "zip", "mode-apply-plan.mjs": "modeApplyPlan", "migrations.mjs": "figmaMigrations", "collections.js": "collections", "style-plan.mjs": "stylePlan", "icon-systems.mjs": "iconSystems", "motion.mjs": "motion", "icons.js": "icons", "model.mjs": "model",
+  "ds-gates.js": "dsGates", "exports.js": "exports", "ds-export.js": "dsExport", "figma-plugin-assets.js": "figmaPlugin", "mcp-assets.js": "mcpAssets", "type-fonts.js": "typeFonts", "zip.mjs": "zip", "mode-apply-plan.mjs": "modeApplyPlan", "migrations.mjs": "figmaMigrations", "live-diff.mjs": "liveDiff", "collections.js": "collections", "style-plan.mjs": "stylePlan", "icon-systems.mjs": "iconSystems", "motion.mjs": "motion", "icons.js": "icons", "model.mjs": "model",
   "app-helpers.mjs": "appHelpers", "color.js": "colorSection", "typography.js": "typeSection", "geometry.js": "geomSection",
   "drawer.js": "drawerMixin", "apply-gate.js": "applyGateMixin", "settings.js": "settingsMixin",
   ...Object.fromEntries(CATEGORY_FILES.map((f) => [f, categoryKey(f)])) };

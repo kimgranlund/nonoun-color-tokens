@@ -1145,6 +1145,8 @@ dialog.apply-gate::backdrop { background: rgba(10,14,22,.34); }
 }
 .apply-gate-warn svg { flex: none; margin-top: 1px; color: var(--c-warning-600, #b88a00); }
 .apply-gate-learn { font-size: 12px; color: var(--ink-dim); margin: 0 0 12px; }
+.apply-gate-drift { font-size: 12px; color: var(--ink-dim); margin: 0 0 12px; }
+.apply-gate-drift.has-changes { color: var(--c-warning-600, #b88a00); font-weight: 600; }
 .linklike {
   color: var(--accent); font: inherit; font-size: inherit; text-decoration: underline;
   text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0;

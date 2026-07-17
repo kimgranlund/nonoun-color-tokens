@@ -81,6 +81,7 @@ const ACTIONS = {
   "save-config": "save the palette set",
   "load-config": "load the palette set",
   "read-variables": "read this file's variables",
+  "read-float-variables": "read this file's geometry/type variables",
   "list-fonts": "read Figma's font list",
   "load-sets": "load your palettes",
   "save-sets": "save your palettes",
@@ -145,6 +146,9 @@ figma.ui.onmessage = async (msg) => {
       const live = await readRawColors(); // read-only reference for the drift diff
       figma.ui.postMessage({ type: "variables-read", found: live.found, raw: live.raw });
       if (!live.found) figma.notify('No "Color Primitives" collection in this file yet');
+    } else if (msg.type === "read-float-variables") {
+      const live = await readFloatVariables(); // read-only reference for the pre-apply changed-value count
+      figma.ui.postMessage({ type: "float-variables-read", breakpoints: live.breakpoints, fontPrimitives: live.fontPrimitives });
     } else if (msg.type === "load-sets") {
       // the gallery's saved sets, from this user's clientStorage (null on first run).
       const sets = await figma.clientStorage.getAsync(SETS_KEY);
@@ -258,6 +262,46 @@ async function readRawColors() {
     if (val && typeof val.r === "number") out[v.name] = rgbaToHex(val); // skip aliases (no .r)
   }
   return { found: true, raw: out };
+}
+
+// readFloatCollection — the live values of a REGISTRY-TRACKED float collection (Breakpoints/Font
+// Primitives), read-only, in a shape directly comparable to a modeApplyPlan/primitivesApplyPlan entry:
+// { found, modes: [<mode name>, …], values: { "<var name>": { "<mode name>": <value> } } }. Resolved by
+// PROVENANCE (FLOAT_REGISTRY_KEY), exactly like ensureFloatCollection — a user's own same-named
+// collection this plugin never created is invisible here too (found:false), never adopted for a read.
+// An ALIAS value (Font Primitives' font/<voice> vars) has no independently-set value to diff against —
+// skipped, matching primitivesApplyPlan's own "aliases aren't literals" treatment.
+async function readFloatCollection(name, reg) {
+  const id = reg[name];
+  if (!id) return { found: false, modes: [], values: {} };
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const coll = cols.find((c) => c.id === id);
+  if (!coll) return { found: false, modes: [], values: {} };
+  const modeName = {};
+  for (const m of coll.modes) modeName[m.modeId] = m.name;
+  const all = await figma.variables.getLocalVariablesAsync();
+  const values = {};
+  for (const v of all) {
+    if (v.variableCollectionId !== coll.id) continue;
+    const byMode = {};
+    const vbm = v.valuesByMode || {};
+    for (const mid of Object.keys(vbm)) {
+      const mn = modeName[mid];
+      const val = vbm[mid];
+      if (mn === undefined || (val && typeof val === "object" && val.type === "VARIABLE_ALIAS")) continue;
+      byMode[mn] = val;
+    }
+    if (Object.keys(byMode).length) values[v.name] = byMode; // an all-ALIAS variable (e.g. font/<voice>) carries no literal to diff — omit it entirely, not just its modes
+  }
+  return { found: true, modes: coll.modes.map((m) => m.name), values };
+}
+
+// readFloatVariables — the live Breakpoints + Font Primitives collections together, for the apply
+// gate's pre-overwrite diff (collections-arch review C2 / TKT-0020) — the Geometry/Type counterpart to
+// readRawColors' color drift reference. Read-only; never reconstructs a scale from the raw numbers.
+async function readFloatVariables() {
+  const reg = readFloatRegistry();
+  return { breakpoints: await readFloatCollection("Breakpoints", reg), fontPrimitives: await readFloatCollection("Font Primitives", reg) };
 }
 
 async function varsByName(collectionId) {

@@ -815,8 +815,13 @@ app.exportOpen = false; app.render(); flushRaf();
 try { localStorage.removeItem("ultimate-tokens-apply-consent-v1"); } catch {}
 app.applyGateOpen = false; posted = null;
 app.requestApplyToFigma(false);
-ok(app.applyGateOpen === true && posted === null, "(xg) requestApplyToFigma opens the consent gate and does NOT post yet");
+// TKT-0020: opening the gate now ALSO kicks off a read-float-variables request for the gate's
+// changed-value diff — "does not post yet" means the real "apply" write, not this read-only probe.
+ok(app.applyGateOpen === true && posted && posted.pluginMessage.type === "read-float-variables", "(xg) requestApplyToFigma opens the consent gate, posts a read-float-variables probe (not the apply yet)");
 ok(!!app.querySelector(".apply-gate"), "(xg) the apply-gate <dialog> is in the tree");
+ok(app._figmaChangedCount() === null, "(xg) the changed-value count is null (still checking) until the read-back replies");
+ok(/Checking for hand-edited values/.test(txtOf(app.querySelector(".apply-gate"))), "(xg) the gate shows a 'checking' state while the read-back is in flight");
+posted = null;
 app.applyGateDontShow = false; app.confirmApplyGate();
 ok(posted && posted.pluginMessage && posted.pluginMessage.type === "apply" && !posted.pluginMessage.rebuildSemantic, "(xg) confirming the gate posts the apply");
 ok(app.applyGateOpen === false, "(xg) confirming the gate CLOSES it (render → _syncApplyGate → dialog.close)");
@@ -834,10 +839,37 @@ ok(app._applyConsented() === true && posted && posted.pluginMessage.type === "ap
 app.applyGateOpen = false; posted = null; app.requestApplyToFigma(false);
 ok(app.applyGateOpen === false && posted && posted.pluginMessage.type === "apply", "(xg) once consented, a normal apply skips the gate (posts directly)");
 posted = null; app.requestApplyToFigma(true);
-ok(app.applyGateOpen === true && posted === null, "(xg) the destructive Regroup ALWAYS re-shows the gate, even when consented");
+ok(app.applyGateOpen === true && posted && posted.pluginMessage.type === "read-float-variables", "(xg) the destructive Regroup ALWAYS re-shows the gate (posting only the read-float-variables probe), even when consented");
+posted = null;
 app.confirmApplyGate();
 ok(posted && posted.pluginMessage.rebuildSemantic === true, "(xg) confirming the Regroup gate posts rebuildSemantic:true");
 ok(app._applyConsented() === true, "(xg) Regroup confirm does NOT change the apply consent");
+try { localStorage.removeItem("ultimate-tokens-apply-consent-v1"); } catch {}
+
+// ── (xg) TKT-0020: the changed-value diff — receiveLiveFloatVariables + _figmaChangedCount + the
+// gate's rendered count, over the app's OWN real next-apply plan (not a synthetic fixture) ──
+app.applyGateOpen = false; posted = null;
+app.requestApplyToFigma(false);
+{
+  const bpPlan = app._figmaFloatPlans().find((p) => p.collection === "Breakpoints");
+  ok(!!(bpPlan && bpPlan.variables.length), "(xg) fixture: the default doc's next apply carries a Breakpoints plan to diff against");
+  if (bpPlan && bpPlan.variables.length) {
+    const v0 = bpPlan.variables[0];
+    const pair0 = v0.values[0];
+    // IN SYNC: the live value equals exactly what the next apply would write ⇒ count 0
+    app.receiveLiveFloatVariables({ breakpoints: { found: true, modes: bpPlan.modes, values: { [v0.name]: { [pair0.mode]: pair0.value } } }, fontPrimitives: { found: false, values: {} } });
+    ok(app._figmaChangedCount() === 0, "(xg) an in-sync live read-back ⇒ changed count 0");
+    ok(/No hand-edited Geometry\/Type values found/.test(txtOf(app.querySelector(".apply-gate"))), "(xg) the gate reports 'nothing will be overwritten' at count 0");
+    ok(!/has-changes/.test((app.querySelector(".apply-gate-drift") || {}).className || ""), "(xg) no has-changes class at count 0");
+    // DRIFTED: the live value differs ⇒ count ≥ 1, and the gate's text names the count
+    app.receiveLiveFloatVariables({ breakpoints: { found: true, modes: bpPlan.modes, values: { [v0.name]: { [pair0.mode]: Number(pair0.value) + 1000 } } }, fontPrimitives: { found: false, values: {} } });
+    const n = app._figmaChangedCount();
+    ok(n >= 1, `(xg) a drifted live value ⇒ changed count ≥ 1 (got ${n})`);
+    ok(new RegExp(`${n} existing Geometry/Type value`).test(txtOf(app.querySelector(".apply-gate"))), "(xg) the gate names the changed-value count before the overwrite");
+    ok(/has-changes/.test((app.querySelector(".apply-gate-drift") || {}).className || ""), "(xg) the drift paragraph gets the has-changes class when count > 0");
+  }
+}
+app.closeApplyGate();
 try { localStorage.removeItem("ultimate-tokens-apply-consent-v1"); } catch {}
 
 globalThis.parent = realParent;

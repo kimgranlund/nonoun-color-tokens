@@ -57,6 +57,8 @@ else {
     FAIL("ui", "ui.html missing the config round-trip bridge (config-loaded → applyLoadedConfig)");
   if (!/variables-read/.test(ui) || !/receiveLiveVariables/.test(ui))
     FAIL("ui", "ui.html missing the drift-diff bridge (variables-read → receiveLiveVariables)");
+  if (!/float-variables-read/.test(ui) || !/receiveLiveFloatVariables/.test(ui))
+    FAIL("ui", "ui.html missing the TKT-0020 Geometry/Type drift-diff bridge (float-variables-read → receiveLiveFloatVariables)");
 }
 
 // ── a mock figma: in-memory collections + variables ─────────────────────────────
@@ -767,6 +769,46 @@ if (applyStylePlans && applyFontPrimitives) {
   } catch (e) { FAIL("styles", "styles apply threw: " + e.message); }
 }
 
+// ── READ-FLOAT-VARIABLES (TKT-0020, Geometry/Type drift reference): the live Breakpoints + Font
+// Primitives values come back in a shape comparable to a modeApplyPlan/primitivesApplyPlan entry — the
+// apply gate's pre-overwrite diff (collections-arch review C2). Runs on the SAME mock F: by this point
+// the float e2e + styles sections above have left a real, registry-tracked Breakpoints AND Font
+// Primitives collection in place — exactly the state a real apply leaves behind.
+if (applyFloatPlans) {
+  try {
+    F.figma.ui._posted.length = 0;
+    await F.figma.ui._h({ type: "read-float-variables" });
+    const rf = F.figma.ui._posted.find((m) => m && m.type === "float-variables-read");
+    if (!rf) FAIL("readfloat", "read-float-variables posted no {type:'float-variables-read'} message");
+    else {
+      if (!rf.breakpoints || !rf.breakpoints.found) FAIL("readfloat", "read-float-variables did not find the (registry-tracked) Breakpoints collection");
+      else {
+        if (!Array.isArray(rf.breakpoints.modes) || !rf.breakpoints.modes.includes("Base")) FAIL("readfloat", `Breakpoints read-back modes missing "Base" (got ${JSON.stringify(rf.breakpoints.modes)})`);
+        const bodyMd = rf.breakpoints.values["type/body/md/size"];
+        if (!bodyMd || typeof bodyMd.Base !== "number") FAIL("readfloat", "Breakpoints read-back missing a numeric type/body/md/size Base value");
+      }
+      if (!rf.fontPrimitives || !rf.fontPrimitives.found) FAIL("readfloat", "read-float-variables did not find the (registry-tracked) Font Primitives collection");
+      else {
+        const famNames = Object.keys(rf.fontPrimitives.values).filter((n) => n.startsWith("family/"));
+        if (!famNames.length) FAIL("readfloat", "Font Primitives read-back has no family/ literal values");
+        if (Object.keys(rf.fontPrimitives.values).some((n) => n.startsWith("font/"))) FAIL("readfloat", "Font Primitives read-back surfaced an ALIAS (font/<voice>) as a comparable value");
+      }
+    }
+    // PROVENANCE: a user's OWN pre-existing "Breakpoints" this plugin never created (no registry entry)
+    // must be invisible to the read too — exactly as it's invisible to applyFloatPlans/ensureFloatCollection.
+    const F10 = mockFigma();
+    new Function("figma", "__html__", "module", code)(F10.figma, "<html>", undefined); // registers figma.ui.onmessage as a side effect
+    F10.figma.variables.createVariableCollection("Breakpoints");
+    await F10.figma.ui._h({ type: "read-float-variables" });
+    const rf10 = F10.figma.ui._posted.find((m) => m && m.type === "float-variables-read");
+    if (!rf10 || (rf10.breakpoints && rf10.breakpoints.found)) FAIL("readfloat", "read-float-variables must NOT surface a user's own un-registered Breakpoints collection (provenance violated)");
+  } catch (e) { FAIL("readfloat", "read-float-variables threw: " + e.message); }
+}
+
+{
+  const f = fails.find((x) => x.startsWith("readfloat:"));
+  console.log(`  ${f ? "FAIL" : "pass"}  readfloat${f ? "  — " + f.slice(11) : ""}`);
+}
 {
   const f = fails.find((x) => x.startsWith("styles:"));
   console.log(`  ${f ? "FAIL" : "pass"}  styles${f ? "  — " + f.slice(8) : ""}`);
