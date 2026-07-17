@@ -116,6 +116,9 @@
                 "leading": "150%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate"
             }
           }
         },
@@ -218,6 +221,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate"
             }
           }
         },
@@ -320,6 +326,9 @@
                 "leading": "152%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate"
             }
           }
         },
@@ -422,6 +431,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate"
             }
           }
         }
@@ -537,6 +549,9 @@
                 "leading": "150%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Fjalla One"
             }
           }
         },
@@ -639,6 +654,9 @@
                 "leading": "150%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Fjalla One"
             }
           }
         },
@@ -741,6 +759,9 @@
                 "leading": "150%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "Fjalla One"
             }
           }
         },
@@ -843,6 +864,9 @@
                 "leading": "150%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Fjalla One"
             }
           }
         }
@@ -957,6 +981,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Public Sans"
             }
           }
         },
@@ -1060,6 +1087,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Public Sans"
             }
           }
         },
@@ -1162,6 +1192,9 @@
                 "leading": "152%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "Public Sans"
             }
           }
         },
@@ -1264,6 +1297,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Public Sans"
             }
           }
         }
@@ -1378,6 +1414,9 @@
                 "leading": "155%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Alternate Gothic No2 D"
             }
           }
         },
@@ -1481,6 +1520,9 @@
                 "leading": "155%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Alternate Gothic No2 D"
             }
           }
         },
@@ -1584,6 +1626,9 @@
                 "leading": "155%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Alternate Gothic No2 D"
             }
           }
         },
@@ -1688,6 +1733,9 @@
                 "leading": "155%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Alternate Gothic No2 D"
             }
           }
         }
@@ -1803,6 +1851,9 @@
                 "leading": "150%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bebas Neue"
             }
           }
         },
@@ -1905,6 +1956,9 @@
                 "leading": "152%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bebas Neue"
             }
           }
         },
@@ -2008,6 +2062,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bebas Neue"
             }
           }
         },
@@ -2110,6 +2167,9 @@
                 "leading": "150%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bebas Neue"
             }
           }
         }
@@ -2224,6 +2284,9 @@
                 "leading": "150%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Saira Condensed"
             }
           }
         },
@@ -2326,6 +2389,9 @@
                 "leading": "150%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Saira Condensed"
             }
           }
         },
@@ -2428,6 +2494,9 @@
                 "leading": "150%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "Saira Condensed"
             }
           }
         },
@@ -2531,6 +2600,9 @@
                 "leading": "152%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Saira Condensed"
             }
           }
         }
@@ -2645,6 +2717,9 @@
                 "leading": "152%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "Yanone Kaffeesatz"
             }
           }
         },
@@ -2748,6 +2823,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Yanone Kaffeesatz"
             }
           }
         },
@@ -2850,6 +2928,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Yanone Kaffeesatz"
             }
           }
         },
@@ -2952,6 +3033,9 @@
                 "leading": "152%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Yanone Kaffeesatz"
             }
           }
         }
@@ -3066,6 +3150,9 @@
                 "leading": "150%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Staatliches"
             }
           }
         },
@@ -3168,6 +3255,9 @@
                 "leading": "150%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "Staatliches"
             }
           }
         },
@@ -3270,6 +3360,9 @@
                 "leading": "150%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Staatliches"
             }
           }
         },
@@ -3373,6 +3466,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Staatliches"
             }
           }
         }
@@ -3488,6 +3584,9 @@
                 "leading": "152%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Antonio"
             }
           }
         },
@@ -3590,6 +3689,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Antonio"
             }
           }
         },
@@ -3692,6 +3794,9 @@
                 "leading": "150%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Antonio"
             }
           }
         },
@@ -3794,6 +3899,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Antonio"
             }
           }
         }
@@ -3908,6 +4016,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Big Shoulders Text"
             }
           }
         },
@@ -4011,6 +4122,9 @@
                 "leading": "150%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Big Shoulders Text"
             }
           }
         },
@@ -4115,6 +4229,9 @@
                 "leading": "150%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Big Shoulders Text"
             }
           }
         },
@@ -4218,6 +4335,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Big Shoulders Text"
             }
           }
         }
@@ -4333,6 +4453,9 @@
                 "leading": "152%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Rajdhani"
             }
           }
         },
@@ -4436,6 +4559,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Rajdhani"
             }
           }
         },
@@ -4539,6 +4665,9 @@
                 "leading": "150%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Rajdhani"
             }
           }
         },
@@ -4642,6 +4771,9 @@
                 "leading": "150%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "Rajdhani"
             }
           }
         }
@@ -4757,6 +4889,9 @@
                 "leading": "152%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "PT Sans Narrow"
             }
           }
         },
@@ -4861,6 +4996,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "PT Sans Narrow"
             }
           }
         },
@@ -4963,6 +5101,9 @@
                 "leading": "150%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "PT Sans Narrow"
             }
           }
         },
@@ -5067,6 +5208,9 @@
                 "leading": "150%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "PT Sans Narrow"
             }
           }
         }

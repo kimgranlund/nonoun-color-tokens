@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { typeScale, DEFAULT_TYPE, siblingWeightDefaults, bodyClassSiblingDefaults, BODY_CLASS_VOICES } from "../../src/engine/type.mjs";
+import { typeScale, DEFAULT_TYPE, siblingWeightDefaults, bodyClassSiblingDefaults, BODY_CLASS_VOICES, resolvedFontFor } from "../../src/engine/type.mjs";
 import { hydrate } from "../../src/ui/persist.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -93,6 +93,27 @@ for (const slug of CATS) {
         if (!eq(vv.weights || [], want)) FAIL("faithful", `${slug}[${i}] ${r} weights: preset ${JSON.stringify(vv.weights)} != derived ${JSON.stringify(want)}`);
       }
     }
+    // (d2) INTERACTIVE-VOICE LADDERS (TKT-0005 sibling change, the BZZR shape): a designed ui slot keys
+    //      UI-control + UI-widget weight ladders off ITS weight — ladders ONLY, never character overrides
+    //      (the interactive voices keep the engine's control-text character).
+    if (sd && Number.isFinite(sd.ui?.weight)) {
+      const want = bodyClassSiblingDefaults(sd.ui.weight);
+      for (const uv of ["UI-control", "UI-widget"]) {
+        const e = t.voices?.[uv];
+        if (!e) { FAIL("uiladder", `${slug}[${i}] designed ui slot but no ${uv} ladder`); continue; }
+        if (!eq(e.weights || [], want)) FAIL("uiladder", `${slug}[${i}] ${uv} ladder ${JSON.stringify(e.weights)} != bodyClassSiblingDefaults(${sd.ui.weight})`);
+        const extra = Object.keys(e).filter((k) => k !== "weights" && k !== "font");
+        if (extra.length) FAIL("uiladder", `${slug}[${i}] ${uv} carries character overrides ${JSON.stringify(extra)} (ladders only)`);
+      }
+    }
+    // (d3) AUTHORED FACES (TKT-0005): the spec's faces map flows to voices[voice].font and resolves via
+    //      the TKT-0002 voiceFonts escape hatch (resolvedFontFor) — the differentiated face is REAL in
+    //      the resolved scale, not just carried config.
+    const faces = specPals[i]?.type?.faces;
+    if (faces && typeof faces === "object") for (const [fv, fam] of Object.entries(faces)) {
+      if (t.voices?.[fv]?.font !== fam) FAIL("faces", `${slug}[${i}] ${fv} face: preset ${t.voices?.[fv]?.font} != spec ${fam}`);
+      else if (resolvedFontFor(typeScale(t), fv) !== fam) FAIL("faces", `${slug}[${i}] ${fv} face does not resolve via voiceFonts`);
+    }
     // (e) typeScale RESOLVES the design fonts (the picker reads scale.fonts[role])
     const sc = typeScale(t);
     if (!eq(sc.fonts, t.fonts)) FAIL("resolve", `${slug}[${i}] typeScale.fonts != type.fonts`);
@@ -110,7 +131,7 @@ const noType = hydrate({ palettes: [{ name: "x", hue: 200, chroma: 60, on: true 
 if (typeScale(noType.type || DEFAULT_TYPE).fonts.display !== "Inter Tight") FAIL("fallback", "un-typed palette lost the product default");
 
 // ── REPORT ──
-for (const g of ["count", "hastype", "fonts", "base", "voices", "kicker", "faithful", "resolve", "apply", "fallback"]) {
+for (const g of ["count", "hastype", "fonts", "base", "voices", "kicker", "faithful", "uiladder", "faces", "resolve", "apply", "fallback"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

@@ -212,6 +212,30 @@ function design5ToTypeConfig(t) {
       if (sibs.length) v.weights = sibs;
     }
     if (Object.keys(v).length) voices[TYPE_VOICE_OF[role]] = v;
+    // INTERACTIVE-VOICE LADDERS (TKT-0005 sibling change, the BZZR shape): the ui slot's designed
+    // weight also keys UI-control + UI-widget weight ladders — ladders ONLY (like BZZR's config),
+    // never the core weight/tracking/leading, so the interactive voices keep the engine's own
+    // control-text character while the preset's exported text styles carry emphasis options.
+    // Separate arrays per voice (the array-field round-trip gate compares by value, but a shared
+    // reference would let one voice's future mutation alias the other).
+    if (role === "ui" && Number.isFinite(v.weight)) {
+      const uiSibs = bodyClassSiblingDefaults(v.weight);
+      if (uiSibs.length) {
+        voices["UI-control"] = { weights: uiSibs.map((w) => ({ ...w })) };
+        voices["UI-widget"] = { weights: uiSibs.map((w) => ({ ...w })) };
+      }
+    }
+  }
+  // AUTHORED PER-VOICE FACES (TKT-0005): the spec's optional `faces` map — voice name → family —
+  // rides the TKT-0002 per-voice font escape hatch (`type.voices[voice].font` → `scale.voiceFonts`
+  // → `resolvedFontFor`). Currently curated for Sub-title (the CAPS wide-tracked alternate-face
+  // heading, which otherwise borrows the mono font). An off-allowlist voice name ships a preset
+  // clampType would trim — the categories gate rejects it at generation instead.
+  if (t.faces && typeof t.faces === "object") {
+    for (const [voice, fam] of Object.entries(t.faces)) {
+      if (typeof fam !== "string" || !fam.trim()) continue;
+      voices[voice] = { ...(voices[voice] || {}), font: fam.trim() };
+    }
   }
   if (Object.keys(fonts).length) out.fonts = fonts;
   if (Object.keys(voices).length) out.voices = voices;

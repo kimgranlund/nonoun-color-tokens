@@ -118,6 +118,9 @@
                 "leading": "150%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Pragmatica"
             }
           }
         },
@@ -222,6 +225,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Peignot"
             }
           }
         },
@@ -328,6 +334,9 @@
                 "leading": "152%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate Gothic"
             }
           }
         },
@@ -433,6 +442,9 @@
                 "leading": "150%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Eurostile"
             }
           }
         }
@@ -549,6 +561,9 @@
                 "leading": "150%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Univers"
             }
           }
         },
@@ -653,6 +668,9 @@
                 "leading": "150%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bell Gothic"
             }
           }
         },
@@ -757,6 +775,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Compacta"
             }
           }
         },
@@ -860,6 +881,9 @@
                 "leading": "152%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Charlemagne"
             }
           }
         }
@@ -976,6 +1000,9 @@
                 "leading": "150%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Akkurat"
             }
           }
         },
@@ -1080,6 +1107,9 @@
                 "leading": "152%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Kabel"
             }
           }
         },
@@ -1184,6 +1214,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Architype Renner"
             }
           }
         },
@@ -1287,6 +1320,9 @@
                 "leading": "152%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Highway Gothic"
             }
           }
         }
@@ -1402,6 +1438,9 @@
                 "leading": "150%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Alternate Gothic"
             }
           }
         },
@@ -1505,6 +1544,9 @@
                 "leading": "150%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Interstate Condensed"
             }
           }
         },
@@ -1609,6 +1651,9 @@
                 "leading": "148%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "DIN Condensed"
             }
           }
         },
@@ -1711,6 +1756,9 @@
                 "leading": "150%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Folio"
             }
           }
         }
@@ -1826,6 +1874,9 @@
                 "leading": "152%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bank Gothic"
             }
           }
         },
@@ -1929,6 +1980,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Univers Extended"
             }
           }
         },
@@ -2032,6 +2086,9 @@
                 "leading": "152%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Eurostile"
             }
           }
         },
@@ -2135,6 +2192,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate Gothic"
             }
           }
         }
@@ -2250,6 +2310,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Compacta"
             }
           }
         },
@@ -2353,6 +2416,9 @@
                 "leading": "152%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Trade Gothic Condensed No. 18"
             }
           }
         },
@@ -2456,6 +2522,9 @@
                 "leading": "150%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Univers Condensed"
             }
           }
         },
@@ -2558,6 +2627,9 @@
                 "leading": "148%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Pragmatica"
             }
           }
         }
@@ -2673,6 +2745,9 @@
                 "leading": "150%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bookman Old Style"
             }
           }
         },
@@ -2777,6 +2852,9 @@
                 "leading": "150%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Alternate Gothic"
             }
           }
         },
@@ -2881,6 +2959,9 @@
                 "leading": "152%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Neuzeit Grotesk"
             }
           }
         },
@@ -2985,6 +3066,9 @@
                 "leading": "148%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bell Gothic"
             }
           }
         }
@@ -3100,6 +3184,9 @@
                 "leading": "150%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Rail Alphabet"
             }
           }
         },
@@ -3204,6 +3291,9 @@
                 "leading": "150%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Eurostile"
             }
           }
         },
@@ -3309,6 +3399,9 @@
                 "leading": "152%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Interstate"
             }
           }
         },
@@ -3414,6 +3507,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Suisse Int'l"
             }
           }
         }
@@ -3530,6 +3626,9 @@
                 "leading": "152%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Herculanum"
             }
           }
         },
@@ -3632,6 +3731,9 @@
                 "leading": "152%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate Gothic"
             }
           }
         },
@@ -3736,6 +3838,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Cooper Black"
             }
           }
         },
@@ -3840,6 +3945,9 @@
                 "leading": "155%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "American Typewriter"
             }
           }
         }
@@ -3957,6 +4065,9 @@
                 "leading": "152%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bank Gothic"
             }
           }
         },
@@ -4061,6 +4172,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Clarendon"
             }
           }
         },
@@ -4165,6 +4279,9 @@
                 "leading": "152%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Eurostile"
             }
           }
         },
@@ -4269,6 +4386,9 @@
                 "leading": "152%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Highway Gothic"
             }
           }
         }
@@ -4384,6 +4504,9 @@
                 "leading": "152%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Rockwell"
             }
           }
         },
@@ -4487,6 +4610,9 @@
                 "leading": "150%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "DIN Condensed"
             }
           }
         },
@@ -4591,6 +4717,9 @@
                 "leading": "152%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Windsor"
             }
           }
         },
@@ -4694,6 +4823,9 @@
                 "leading": "150%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Pragmatica"
             }
           }
         }
@@ -4810,6 +4942,9 @@
                 "leading": "152%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Cheltenham"
             }
           }
         },
@@ -4914,6 +5049,9 @@
                 "leading": "150%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Akkurat"
             }
           }
         },
@@ -5017,6 +5155,9 @@
                 "leading": "148%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Univers Condensed"
             }
           }
         },
@@ -5121,6 +5262,9 @@
                 "leading": "152%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Rockwell"
             }
           }
         }

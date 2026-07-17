@@ -115,6 +115,9 @@
                 "leading": "144%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Suisse Int'l Condensed"
             }
           }
         },
@@ -217,6 +220,9 @@
                 "leading": "140%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Suisse Int'l Condensed"
             }
           }
         },
@@ -320,6 +326,9 @@
                 "leading": "146%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Suisse Int'l Condensed"
             }
           }
         },
@@ -422,6 +431,9 @@
                 "leading": "140%",
                 "tracking": "16%"
               }
+            },
+            "faces": {
+              "Sub-title": "Suisse Int'l Condensed"
             }
           }
         }
@@ -536,6 +548,9 @@
                 "leading": "140%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bernhard Gothic"
             }
           }
         },
@@ -640,6 +655,9 @@
                 "leading": "144%",
                 "tracking": "17%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bernhard Gothic"
             }
           }
         },
@@ -743,6 +761,9 @@
                 "leading": "144%",
                 "tracking": "16%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bernhard Gothic"
             }
           }
         },
@@ -848,6 +869,9 @@
                 "leading": "142%",
                 "tracking": "15.5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bernhard Gothic"
             }
           }
         }
@@ -962,6 +986,9 @@
                 "leading": "146%",
                 "tracking": "17%"
               }
+            },
+            "faces": {
+              "Sub-title": "Trajan"
             }
           }
         },
@@ -1064,6 +1091,9 @@
                 "leading": "145%",
                 "tracking": "18%"
               }
+            },
+            "faces": {
+              "Sub-title": "Trajan"
             }
           }
         },
@@ -1166,6 +1196,9 @@
                 "leading": "144%",
                 "tracking": "16%"
               }
+            },
+            "faces": {
+              "Sub-title": "Trajan"
             }
           }
         },
@@ -1268,6 +1301,9 @@
                 "leading": "146%",
                 "tracking": "18%"
               }
+            },
+            "faces": {
+              "Sub-title": "Trajan"
             }
           }
         }
@@ -1383,6 +1419,9 @@
                 "leading": "150%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Tazugane Gothic"
             }
           }
         },
@@ -1485,6 +1524,9 @@
                 "leading": "150%",
                 "tracking": "16%"
               }
+            },
+            "faces": {
+              "Sub-title": "Tazugane Gothic"
             }
           }
         },
@@ -1588,6 +1630,9 @@
                 "leading": "146%",
                 "tracking": "16%"
               }
+            },
+            "faces": {
+              "Sub-title": "Tazugane Gothic"
             }
           }
         },
@@ -1691,6 +1736,9 @@
                 "leading": "150%",
                 "tracking": "17%"
               }
+            },
+            "faces": {
+              "Sub-title": "Tazugane Gothic"
             }
           }
         }
@@ -1806,6 +1854,9 @@
                 "leading": "145%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Requiem"
             }
           }
         },
@@ -1909,6 +1960,9 @@
                 "leading": "146%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "Requiem"
             }
           }
         },
@@ -2012,6 +2066,9 @@
                 "leading": "144%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Requiem"
             }
           }
         },
@@ -2116,6 +2173,9 @@
                 "leading": "146%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Requiem"
             }
           }
         }
@@ -2231,6 +2291,9 @@
                 "leading": "142%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "ITC Kabel"
             }
           }
         },
@@ -2334,6 +2397,9 @@
                 "leading": "142%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "ITC Kabel"
             }
           }
         },
@@ -2438,6 +2504,9 @@
                 "leading": "140%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "ITC Kabel"
             }
           }
         },
@@ -2542,6 +2611,9 @@
                 "leading": "144%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "ITC Kabel"
             }
           }
         }
@@ -2657,6 +2729,9 @@
                 "leading": "145%",
                 "tracking": "16%"
               }
+            },
+            "faces": {
+              "Sub-title": "Cairo"
             }
           }
         },
@@ -2760,6 +2835,9 @@
                 "leading": "144%",
                 "tracking": "17%"
               }
+            },
+            "faces": {
+              "Sub-title": "Cairo"
             }
           }
         },
@@ -2863,6 +2941,9 @@
                 "leading": "146%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Cairo"
             }
           }
         },
@@ -2966,6 +3047,9 @@
                 "leading": "142%",
                 "tracking": "17%"
               }
+            },
+            "faces": {
+              "Sub-title": "Cairo"
             }
           }
         }
@@ -3080,6 +3164,9 @@
                 "leading": "145%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "Sharp Grotesk"
             }
           }
         },
@@ -3182,6 +3269,9 @@
                 "leading": "144%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Sharp Grotesk"
             }
           }
         },
@@ -3286,6 +3376,9 @@
                 "leading": "146%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Sharp Grotesk"
             }
           }
         },
@@ -3389,6 +3482,9 @@
                 "leading": "146%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "Sharp Grotesk"
             }
           }
         }
@@ -3503,6 +3599,9 @@
                 "leading": "148%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate Gothic"
             }
           }
         },
@@ -3606,6 +3705,9 @@
                 "leading": "150%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate Gothic"
             }
           }
         },
@@ -3709,6 +3811,9 @@
                 "leading": "150%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate Gothic"
             }
           }
         },
@@ -3813,6 +3918,9 @@
                 "leading": "150%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate Gothic"
             }
           }
         }
@@ -3927,6 +4035,9 @@
                 "leading": "144%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Eurostile"
             }
           }
         },
@@ -4030,6 +4141,9 @@
                 "leading": "146%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "Eurostile"
             }
           }
         },
@@ -4133,6 +4247,9 @@
                 "leading": "142%",
                 "tracking": "16%"
               }
+            },
+            "faces": {
+              "Sub-title": "Eurostile"
             }
           }
         },
@@ -4236,6 +4353,9 @@
                 "leading": "146%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "Eurostile"
             }
           }
         }
@@ -4351,6 +4471,9 @@
                 "leading": "144%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "ITC Avant Garde Gothic"
             }
           }
         },
@@ -4454,6 +4577,9 @@
                 "leading": "145%",
                 "tracking": "15%"
               }
+            },
+            "faces": {
+              "Sub-title": "ITC Avant Garde Gothic"
             }
           }
         },
@@ -4558,6 +4684,9 @@
                 "leading": "146%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "ITC Avant Garde Gothic"
             }
           }
         },
@@ -4660,6 +4789,9 @@
                 "leading": "144%",
                 "tracking": "16%"
               }
+            },
+            "faces": {
+              "Sub-title": "ITC Avant Garde Gothic"
             }
           }
         }
@@ -4774,6 +4906,9 @@
                 "leading": "144%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Alternate Gothic"
             }
           }
         },
@@ -4877,6 +5012,9 @@
                 "leading": "144%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Alternate Gothic"
             }
           }
         },
@@ -4979,6 +5117,9 @@
                 "leading": "146%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "Alternate Gothic"
             }
           }
         },
@@ -5081,6 +5222,9 @@
                 "leading": "142%",
                 "tracking": "13%"
               }
+            },
+            "faces": {
+              "Sub-title": "Alternate Gothic"
             }
           }
         }

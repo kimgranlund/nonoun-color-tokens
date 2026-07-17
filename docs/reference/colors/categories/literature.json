@@ -116,6 +116,9 @@
                 "leading": "145%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Walbaum"
             }
           }
         },
@@ -218,6 +221,9 @@
                 "leading": "140%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Walbaum"
             }
           }
         },
@@ -321,6 +327,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Kabel"
             }
           }
         },
@@ -424,6 +433,9 @@
                 "leading": "145%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Walbaum"
             }
           }
         }
@@ -540,6 +552,9 @@
                 "leading": "145%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate Gothic"
             }
           }
         },
@@ -642,6 +657,9 @@
                 "leading": "140%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Trajan Pro"
             }
           }
         },
@@ -744,6 +762,9 @@
                 "leading": "145%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Rockwell"
             }
           }
         },
@@ -846,6 +867,9 @@
                 "leading": "145%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bernhard Modern"
             }
           }
         }
@@ -961,6 +985,9 @@
                 "leading": "145%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Futura"
             }
           }
         },
@@ -1063,6 +1090,9 @@
                 "leading": "140%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Erbar"
             }
           }
         },
@@ -1166,6 +1196,9 @@
                 "leading": "145%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "Broadway"
             }
           }
         },
@@ -1269,6 +1302,9 @@
                 "leading": "140%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Baskerville"
             }
           }
         }
@@ -1384,6 +1420,9 @@
                 "leading": "150%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Perpetua"
             }
           }
         },
@@ -1488,6 +1527,9 @@
                 "leading": "150%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Big Caslon"
             }
           }
         },
@@ -1591,6 +1633,9 @@
                 "leading": "150%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Windsor"
             }
           }
         },
@@ -1694,6 +1739,9 @@
                 "leading": "150%",
                 "tracking": "7%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bulmer"
             }
           }
         }
@@ -1810,6 +1858,9 @@
                 "leading": "150%",
                 "tracking": "12%"
               }
+            },
+            "faces": {
+              "Sub-title": "Requiem"
             }
           }
         },
@@ -1913,6 +1964,9 @@
                 "leading": "150%",
                 "tracking": "14%"
               }
+            },
+            "faces": {
+              "Sub-title": "Weiss"
             }
           }
         },
@@ -2016,6 +2070,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Avenir"
             }
           }
         },
@@ -2119,6 +2176,9 @@
                 "leading": "150%",
                 "tracking": "11%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bernhard Modern"
             }
           }
         }
@@ -2235,6 +2295,9 @@
                 "leading": "150%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Stymie"
             }
           }
         },
@@ -2338,6 +2401,9 @@
                 "leading": "145%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Copperplate Gothic"
             }
           }
         },
@@ -2441,6 +2507,9 @@
                 "leading": "150%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bell MT"
             }
           }
         },
@@ -2543,6 +2612,9 @@
                 "leading": "145%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Cheltenham"
             }
           }
         }
@@ -2657,6 +2729,9 @@
                 "leading": "140%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "DIN"
             }
           }
         },
@@ -2760,6 +2835,9 @@
                 "leading": "140%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Eurostile"
             }
           }
         },
@@ -2863,6 +2941,9 @@
                 "leading": "140%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Univers"
             }
           }
         },
@@ -2965,6 +3046,9 @@
                 "leading": "140%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Interstate"
             }
           }
         }
@@ -3081,6 +3165,9 @@
                 "leading": "145%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Caslon Antique"
             }
           }
         },
@@ -3184,6 +3271,9 @@
                 "leading": "145%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Neuland"
             }
           }
         },
@@ -3288,6 +3378,9 @@
                 "leading": "150%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Cochin"
             }
           }
         },
@@ -3392,6 +3485,9 @@
                 "leading": "145%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Goudy Old Style"
             }
           }
         }
@@ -3507,6 +3603,9 @@
                 "leading": "150%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bank Gothic"
             }
           }
         },
@@ -3611,6 +3710,9 @@
                 "leading": "145%",
                 "tracking": "4%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bodoni"
             }
           }
         },
@@ -3713,6 +3815,9 @@
                 "leading": "150%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Century Gothic"
             }
           }
         },
@@ -3815,6 +3920,9 @@
                 "leading": "145%",
                 "tracking": "4%"
               }
+            },
+            "faces": {
+              "Sub-title": "Cheltenham"
             }
           }
         }
@@ -3929,6 +4037,9 @@
                 "leading": "150%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Cloister Black"
             }
           }
         },
@@ -4033,6 +4144,9 @@
                 "leading": "150%",
                 "tracking": "9%"
               }
+            },
+            "faces": {
+              "Sub-title": "Herculanum"
             }
           }
         },
@@ -4136,6 +4250,9 @@
                 "leading": "150%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Charlemagne"
             }
           }
         },
@@ -4238,6 +4355,9 @@
                 "leading": "150%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bank Gothic"
             }
           }
         }
@@ -4352,6 +4472,9 @@
                 "leading": "150%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Centaur"
             }
           }
         },
@@ -4454,6 +4577,9 @@
                 "leading": "150%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bodoni"
             }
           }
         },
@@ -4557,6 +4683,9 @@
                 "leading": "145%",
                 "tracking": "5%"
               }
+            },
+            "faces": {
+              "Sub-title": "Akzidenz Grotesk"
             }
           }
         },
@@ -4660,6 +4789,9 @@
                 "leading": "150%",
                 "tracking": "6%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bulmer"
             }
           }
         }
@@ -4774,6 +4906,9 @@
                 "leading": "145%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Clarendon"
             }
           }
         },
@@ -4876,6 +5011,9 @@
                 "leading": "145%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Caslon"
             }
           }
         },
@@ -4978,6 +5116,9 @@
                 "leading": "145%",
                 "tracking": "10%"
               }
+            },
+            "faces": {
+              "Sub-title": "Weiss"
             }
           }
         },
@@ -5080,6 +5221,9 @@
                 "leading": "145%",
                 "tracking": "8%"
               }
+            },
+            "faces": {
+              "Sub-title": "Bell MT"
             }
           }
         }
