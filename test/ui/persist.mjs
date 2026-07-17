@@ -2,6 +2,8 @@
 // verify.mjs — ui-persistence validation adapter (CRITIC side; deny-on-write to the advancer).
 import * as U from "../../src/ui/persist.js";
 import * as X from "../../src/engine/exports.js";   // theme-invariance tests the exporters against state.theme
+import * as Ty from "../../src/engine/type.mjs";     // allowlist-parity: canonical TYPE_TREATMENTS ids + voice set
+import * as Ge from "../../src/engine/geometry.mjs"; // allowlist-parity: canonical GEOMETRY_TREATMENTS ids
 
 let _s = 0x1234abcd >>> 0;
 const rnd = () => { _s = (Math.imul(_s, 1103515245) + 12345) >>> 0; return _s / 0x100000000; };
@@ -227,8 +229,34 @@ const out = (theme) => JSON.stringify({ css: X.exportCSS({ ...st, theme }), json
 const oL = out("light"), oD = out("dark"), oA = out("auto");
 if (!(oL === oD && oD === oA)) FAIL("theme-invariant", "export output differs across theme light/dark/auto");
 
+// ── allowlist-parity (TKT-0017): persist.js hand-tracks TYPE_TREATMENTS / VOICES / GEOMETRY_TREATMENTS
+// as copies of what type.mjs / geometry.mjs already define canonically — nothing enforced they stay in
+// sync until now. A voice/treatment renamed in the engine and not mirrored here has its hydrate-time
+// clamp silently reject every doc using it (VOICES) or fall the whole facet back to its default
+// (TYPE_TREATMENTS/GEOMETRY_TREATMENTS) — the same failure class the role-table↔semanticRoles parity gate
+// guards elsewhere, generalized to this file. Compared as SETS (sorted), not literal array order, since
+// persist.js only ever consults these via `.includes()`. ────────────────────────────────────────────────
+{
+  const sorted = (a) => [...a].sort();
+  const eqSet = (a, b) => JSON.stringify(sorted(a)) === JSON.stringify(sorted(b));
+
+  const engineTypeIds = Ty.TYPE_TREATMENTS.map((t) => t.id);
+  if (!eqSet(U.TYPE_TREATMENTS, engineTypeIds))
+    FAIL("allowlist-parity", `persist.js TYPE_TREATMENTS ${JSON.stringify(sorted(U.TYPE_TREATMENTS))} != type.mjs TYPE_TREATMENTS ids ${JSON.stringify(sorted(engineTypeIds))}`);
+
+  const engineGeomIds = Ge.GEOMETRY_TREATMENTS.map((t) => t.id);
+  if (!eqSet(U.GEOMETRY_TREATMENTS, engineGeomIds))
+    FAIL("allowlist-parity", `persist.js GEOMETRY_TREATMENTS ${JSON.stringify(sorted(U.GEOMETRY_TREATMENTS))} != geometry.mjs GEOMETRY_TREATMENTS ids ${JSON.stringify(sorted(engineGeomIds))}`);
+
+  // the voice set: every treatment's `categories` carries the same 15 keys (asserted in test/engine/
+  // type.mjs), so any one treatment's categories is the canonical voice list.
+  const engineVoices = Object.keys(Ty.TYPE_TREATMENTS[0].categories);
+  if (!eqSet(U.VOICES, engineVoices))
+    FAIL("allowlist-parity", `persist.js VOICES ${JSON.stringify(sorted(U.VOICES))} != type.mjs voice set ${JSON.stringify(sorted(engineVoices))}`);
+}
+
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-for (const g of ["roundtrip", "clamp", "field-default", "token-overrides", "huespace-default", "theme-invariant"]) {
+for (const g of ["roundtrip", "clamp", "field-default", "token-overrides", "huespace-default", "theme-invariant", "allowlist-parity"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

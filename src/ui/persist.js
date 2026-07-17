@@ -341,7 +341,18 @@ function clampTokenOverrides(o, min, max, parts) {
 
 // clampType — the typography config (treatment + body base). Treatment to a known id, base size to a
 // sane integer range. Identity-preserving for an in-domain value (so the roundtrip gate holds).
-const TYPE_TREATMENTS = ["product", "luxury", "editorial", "technical", "statement"];
+// Exported (with VOICES below and GEOMETRY_TREATMENTS further down) so test/ui/persist.mjs can assert
+// these hand-tracked allowlists stay in lockstep with their engine sources — type.mjs's TYPE_TREATMENTS
+// ids / the 15 voice names in a treatment's `categories` / geometry.mjs's GEOMETRY_TREATMENTS ids
+// (TKT-0017: the same parity-gate failure class the role-table gate already guards elsewhere, generalized
+// here — nothing else in this file consumes these engine modules, so it's a hand-tracked copy, not an import).
+export const TYPE_TREATMENTS = ["product", "luxury", "editorial", "technical", "statement"];
+// The 15 named type VOICES (docs/reference/typography) — MUST track makeVoices in type.mjs. A voice
+// renamed/added/removed there and not here has its per-voice overrides SILENTLY DROPPED on hydrate
+// (2026-07-13's voice renames were a live example of exactly this — see the rename-map note in hydrate()
+// below, TKT-0016, which fixes the hydrate-drop for a RENAME; this allowlist itself still needs its own
+// hand update whenever the voice set changes, which is what the allowlist-parity test gate below guards).
+export const VOICES = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Body-mono", "Label", "Label-mono", "Kicker", "Tiny", "Tiny-mono", "UI-control", "UI-widget"];
 function clampType(t) {
   t = (t && typeof t === "object") ? t : {};
   const treatment = TYPE_TREATMENTS.includes(t.treatment) ? t.treatment : "product";
@@ -363,14 +374,14 @@ function clampType(t) {
     for (const r of ["display", "heading", "body", "ui", "mono"]) if (typeof t.fonts[r] === "string" && t.fonts[r].trim()) fonts[r] = t.fonts[r].trim();
     if (Object.keys(fonts).length) out.fonts = fonts;
   }
-  // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading } } for the 13 known
-  // voices; each field clamped to a sane range, kept only when finite, attached only when non-empty. This
-  // allowlist MUST track makeVoices's voices — a voice missing here has its per-voice overrides SILENTLY
-  // DROPPED on hydrate. 2026-07-13 — voice set + `ratio` retired: Heading→Headline, UI→Label, Quote folded
-  // into Lead, Caption folded into Tiny, Legal folded into Body; Title/Sub-title/Tiny added. `ratio` no longer
-  // means anything (size is now a fixed table, not base×ratio^n — see type.mjs).
+  // per-VOICE shaping overrides — OPTIONAL { "<voice>": { weight, tracking, leading } } for the 15 known
+  // voices (module-level VOICES above); each field clamped to a sane range, kept only when finite, attached
+  // only when non-empty. This allowlist MUST track makeVoices's voices — a voice missing here has its
+  // per-voice overrides SILENTLY DROPPED on hydrate. 2026-07-13 — voice set + `ratio` retired: Heading→
+  // Headline, UI→Label, Quote folded into Lead, Caption folded into Tiny, Legal folded into Body; Title/
+  // Sub-title/Tiny added. `ratio` no longer means anything (size is now a fixed table, not base×ratio^n —
+  // see type.mjs).
   if (t.voices && typeof t.voices === "object") {
-    const VOICES = ["Display", "Headline", "Sub-heading", "Title", "Sub-title", "Lead", "Body", "Body-mono", "Label", "Label-mono", "Kicker", "Tiny", "Tiny-mono", "UI-control", "UI-widget"];
     const num = (x, lo, hi, round) => { const n = Number(x); if (!Number.isFinite(n)) return undefined; const c = Math.max(lo, Math.min(hi, n)); return round ? Math.round(c) : c; };
     const voices = {};
     for (const name of VOICES) {
@@ -429,7 +440,9 @@ function clampType(t) {
 
 // clampGeometry — the dimensional config (treatment + base control height). Treatment to a known id, base
 // height to a sane integer range. Identity-preserving for an in-domain value (so the roundtrip gate holds).
-const GEOMETRY_TREATMENTS = ["comfortable", "compact", "spacious", "touch", "pill"];
+// Exported so test/ui/persist.mjs's allowlist-parity gate can assert this stays in lockstep with
+// geometry.mjs's GEOMETRY_TREATMENTS ids (see the TYPE_TREATMENTS/VOICES note above — TKT-0017).
+export const GEOMETRY_TREATMENTS = ["comfortable", "compact", "spacious", "touch", "pill"];
 function clampGeometry(g) {
   g = (g && typeof g === "object") ? g : {};
   const treatment = GEOMETRY_TREATMENTS.includes(g.treatment) ? g.treatment : "comfortable";
