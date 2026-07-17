@@ -86,14 +86,21 @@ serializer) with no rubric of record in this directory yet. It is out of scope f
 Stop keys padded to 3 digits. The `semantic` block lists every role with its CSS var name
 and both resolved hexes.
 
-## 4. Figma DTCG (3-file zip)
+## 4. Figma DTCG (the raw file plus one semantic file per theme)
 
 `download()` emits `figma-tokens.zip` containing:
 
-- `palette.tokens.json` — **raw** collection, mode `Value`. Solid stops + 11 scrims per
-  palette as resolved `colorLeaf`s.
-- `Light_tokens.json` — **semantic**, mode `Light`. Every role resolved to a `colorLeaf`.
-- `Dark_tokens.json` — **semantic**, mode `Dark`.
+- `palette.tokens.json` — **raw** collection, mode `Value`. Solid stops + 11 scrims (+ any key
+  colors, §9) per palette as resolved `colorLeaf`s.
+- One `"{theme.name}_tokens.json"` per entry in the **theme axis** — **semantic**, mode
+  `theme.name`. Every role resolved to a `colorLeaf` using that theme's `side` end (`"light"` or
+  `"dark"`). By default (no `opts.themes`), the axis is `semantic.js`'s `DEFAULT_THEMES` —
+  `[{name:"Light",side:"light"}, {name:"Dark",side:"dark"}]` — producing the historical
+  `Light_tokens.json`/`Dark_tokens.json` pair, byte-identically (ADR-019, TKT-0021). A doc/caller
+  can pass a longer `opts.themes` (e.g. `+ {name:"Dim", side:"dark"}`) to add a named companion
+  mode with no engine change — this does NOT give a theme its own independent resolved color per
+  role (that needs a third ref in the role table itself, a separate change); every theme's value is
+  one of the role's two existing ends.
 
 `colorLeaf(rgb, alpha)`:
 ```
@@ -101,8 +108,14 @@ and both resolved hexes.
   "$value":{ "colorSpace":"srgb", "components":[r/255,g/255,b/255], "alpha":a, "hex":"#RRGGBB[AA]" },
   "$extensions":{ "com.figma.hiddenFromPublishing":true, "com.figma.scopes":["ALL_SCOPES"] } }
 ```
-`figmaMode(tree, mode)` adds top-level `$extensions.com.figma.modeName`. Export preview shows
-the Light semantic tree; the download adds raw + Dark.
+`figmaMode(tree, mode)` adds top-level `$extensions.com.figma.modeName` — `figma/plugin/code.js`'s
+`applyBundle` reads this tag (not the filename) to discover which theme files a bundle carries and
+how many Color Semantic modes to create. Export preview shows the first theme's semantic tree; the
+download adds raw + every other theme.
+
+**`exportUI3`'s `Color Semantic` collection still hardcodes the Light/Dark pair** (`values:{Light,
+Dark}`) — deliberately out of TKT-0021/ADR-019's scope (a documented follow-up, not an oversight;
+see ADR-019's Consequences). Don't assume UI3 already generalizes the same way DTCG now does.
 
 The zip is built by a dependency-free **store/deflate writer** (`makeZip`, with `crc32`); it
 works fully offline.

@@ -93,6 +93,19 @@ export function refKey(ref) {
   return base.padStart(3, '0') + '-' + step.padStart(3, '0');
 }
 
+// DEFAULT_THEMES — the THEME axis's default (TKT-0021). A role is a two-ended model (a `light` ref
+// and a `dark` ref, per the header note above); a "theme" is a NAMED Figma mode bound to one of those
+// two already-resolved ends via `side`. This generalizes the AXIS — how many named modes exist and
+// what they're called — the same way the breakpoint axis is already just a `modes[]` list (see
+// type.mjs/geometry.mjs's typeTokensFigmaModes/geomTokensFigmaModes); it does NOT add a third ref per
+// role — that would be a much larger, separate change to the role table itself. Every export/bind/apply
+// surface that used to hardcode exactly "Light"/"Dark" now takes an optional `themes` list and falls
+// back to this exact pair, so existing output is byte-identical by construction, not by convention.
+export const DEFAULT_THEMES = [
+  { name: 'Light', side: 'light' },
+  { name: 'Dark', side: 'dark' },
+];
+
 /**
  * Build the canonical 53-role semantic table for a palette.
  * @param {string} paletteName lowercase palette name (e.g. "primary")

@@ -11,8 +11,17 @@ import { dirname, join } from "node:path";
 import { figmaBundle, defaultDocument } from "../../src/ui/model.mjs";
 import * as TYPE from "../../src/engine/type.mjs";
 import * as GEOM from "../../src/engine/geometry.mjs";
+import { exportDTCG } from "../../src/engine/exports.js";
 import { modeApplyPlan, mergeModeInterchanges } from "../../figma/binder/mode-apply-plan.mjs";
 import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
+
+// stateOfDefault — a minimal engine State over role-table.json's default palettes, for building a
+// custom-themes DTCG bundle directly (figmaBundle() itself takes no themes option — TKT-0021
+// generalizes the engine/bind/apply axis; a per-doc UI control for extra themes is a later ticket).
+function stateOfDefault() {
+  const RT = JSON.parse(readFileSync(new URL("../../docs/reference/data/role-table.json", import.meta.url), "utf8"));
+  return { palettes: RT.defaults.map((p) => ({ ...p, on: true })), curve: "logistic", tension: 0, lmin: 5, lmax: 100, damp: 80, hueSpace: "cam16" };
+}
 
 const HERE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "figma", "plugin"); // the generator-as-plugin lives in figma/plugin/
 const fails = [];
@@ -246,6 +255,49 @@ if (applyBundle) {
       if (res6.raw !== rawExpect) FAIL("collnames", "setCollectionNames(null) did not fall back to the default names");
     }
   } catch (e) { FAIL("apply", "applyBundle threw: " + e.message); }
+
+  // ── THEMES (TKT-0021 — the theme axis flows generically all the way to the apply executor): a
+  //    3-theme bundle (Light/Dark/Dim, Dim on the "dark" side) creates a THREE-mode Color Semantic
+  //    collection, every var aliased in all three modes, and re-applying a plain 2-theme bundle prunes
+  //    the now-unwanted "Dim" mode back down to two — proves N-way, not just "2 still works". Built
+  //    directly off exportDTCG (the same engine call figmaBundle wraps) since figmaBundle itself takes
+  //    no themes option (this ticket generalizes the engine/bind/apply axis; a per-doc UI control for
+  //    extra themes is a separate, later ticket). ──
+  {
+    const F7 = mockFigma();
+    let load7;
+    try {
+      load7 = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle };")(F7.figma, "<html>", undefined);
+    } catch (e) { FAIL("themes", "could not load code.js for the themes leg: " + e.message); }
+    if (load7 && load7.applyBundle) {
+      const THEMES_3 = [{ name: "Light", side: "light" }, { name: "Dark", side: "dark" }, { name: "Dim", side: "dark" }];
+      const bundle3 = exportDTCG(stateOfDefault(), { rawColl: "Color Primitives", themes: THEMES_3 });
+      try {
+        const res7 = await load7.applyBundle(bundle3);
+        const sem7 = F7.collections.find((c) => c.name === "Color Semantic");
+        if (!sem7) FAIL("themes", "no Color Semantic collection created for a 3-theme bundle");
+        else if (sem7.modes.map((m) => m.name).join() !== "Light,Dark,Dim") FAIL("themes", `Color Semantic modes = ${sem7.modes.map((m) => m.name)}, want Light,Dark,Dim`);
+        else {
+          const lightId = sem7.modes[0].modeId, darkId = sem7.modes[1].modeId, dimId = sem7.modes[2].modeId;
+          const semVars7 = F7.variables.filter((v) => v.variableCollectionId === sem7.id);
+          if (semVars7.length !== res7.semantic) FAIL("themes", `${semVars7.length} semantic vars in the collection, applyBundle reported ${res7.semantic}`);
+          let missingMode = 0, dimNeqDark = 0;
+          for (const v of semVars7) {
+            if (!v.values[lightId] || !v.values[darkId] || !v.values[dimId]) { missingMode++; continue; }
+            if (JSON.stringify(v.values[dimId]) !== JSON.stringify(v.values[darkId])) dimNeqDark++;
+          }
+          if (missingMode) FAIL("themes", `${missingMode} semantic var(s) missing a value in one of the 3 modes`);
+          if (dimNeqDark) FAIL("themes", `${dimNeqDark} semantic var(s) have Dim != Dark (same "dark" side should alias/resolve identically)`);
+        }
+
+        // re-apply a PLAIN 2-theme bundle (the default axis) → Dim is no longer wanted → its mode is pruned.
+        const bundle2 = exportDTCG(stateOfDefault(), { rawColl: "Color Primitives" });
+        await load7.applyBundle(bundle2);
+        const sem7b = F7.collections.find((c) => c.name === "Color Semantic");
+        if (!sem7b || sem7b.modes.map((m) => m.name).join() !== "Light,Dark") FAIL("themes", `after reverting to a 2-theme bundle, Color Semantic modes = ${sem7b && sem7b.modes.map((m) => m.name)}, want Light,Dark (Dim should be pruned)`);
+      } catch (e) { FAIL("themes", "applyBundle threw on a 3-theme bundle: " + e.message); }
+    }
+  }
 
   // ── CONFIG round-trip via the file's root pluginData (the project source of truth, travels with the
   //    .fig): save → stored IN the file → load → posted back; AND "apply" embeds the config alongside the vars. ──
@@ -593,7 +645,7 @@ if (sweepCandidates) {
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "floatretire", "renamecap", "applysys", "applydone", "config", "read", "fonts", "resolveface", "sweep"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "themes", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "floatretire", "renamecap", "applysys", "applydone", "config", "read", "fonts", "resolveface", "sweep"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

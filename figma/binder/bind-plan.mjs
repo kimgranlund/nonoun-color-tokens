@@ -18,14 +18,18 @@
 //     scrim grammar cannot drift ("50"->"050", never the dangling "50"; a scrim is
 //     "500-{step}" with step an EXPORT_STOP, e.g. "500-200").
 //
-//   bindingPlan(paletteNames) -> [{ semanticVar, lightTarget, darkTarget }, ...]
-//     One entry per (palette, role) in role order, no de-dup: the explicit Light/Dark alias
-//     plan a binder executes (createVariableAlias on the light raw var into the Light mode,
-//     on the dark raw var into the Dark mode). semanticVar is "{n}{suffix}" (the palette name
-//     followed by the role's suffix, e.g. "primary" for the prime role, "primary-dim",
-//     "neutral-scrim").
+//   bindingPlan(paletteNames, themes) -> [{ semanticVar, targets: [{mode, target}, ...] }, ...]
+//     One entry per (palette, role) in role order, no de-dup: the explicit per-theme alias plan
+//     a binder executes (createVariableAlias on the ref for THAT theme's `side` into the mode
+//     named `theme.name` — TKT-0021, genericized from the historical fixed Light/Dark pair).
+//     `themes` defaults to semantic.js's DEFAULT_THEMES ([Light/light, Dark/dark]), so an absent
+//     argument reproduces the pre-TKT-0021 two-target shape (now spelled as a 2-entry `targets`
+//     array instead of the old `lightTarget`/`darkTarget` fields — no consumer read those field
+//     names directly; test/figma/binder.mjs only asserts the plan's LENGTH). semanticVar is
+//     "{n}{suffix}" (the palette name followed by the role's suffix, e.g. "primary" for the prime
+//     role, "primary-dim", "neutral-scrim").
 
-import { semanticRoles, refPath, roleLeaf } from "../../src/engine/semantic.js";
+import { semanticRoles, refPath, roleLeaf, DEFAULT_THEMES } from "../../src/engine/semantic.js";
 
 /**
  * The raw-colors target a single ref resolves to for a palette: "{n}/{refPath(ref)}".
@@ -40,34 +44,39 @@ function targetName(paletteName, ref) {
 
 /**
  * Every raw-colors variable name the binder aliases across the given palettes.
- * For each palette, each of its 53 roles contributes BOTH its light and its dark target.
+ * For each palette, each of its 53 roles contributes ONE target per theme (its `side`'s ref) —
+ * with the default 2-theme (Light/Dark) axis that's still both the light AND the dark target,
+ * exactly as before; a longer `themes` list contributes no NEW target names (every theme's side
+ * is still "light" or "dark" — see semantic.js's DEFAULT_THEMES note), only more theme entries in
+ * bindingPlan below.
  * @param {string[]} paletteNames lowercase palette names
+ * @param {{name:string,side:'light'|'dark'}[]} [themes] the theme axis (TKT-0021); default DEFAULT_THEMES
  * @returns {string[]} de-duped, lexicographically sorted target names
  */
-export function bindingTargets(paletteNames) {
+export function bindingTargets(paletteNames, themes = DEFAULT_THEMES) {
   const targets = new Set();
   for (const n of paletteNames) {
     for (const r of semanticRoles(n)) {
-      targets.add(targetName(n, r.light));
-      targets.add(targetName(n, r.dark));
+      for (const t of themes) targets.add(targetName(n, r[t.side]));
     }
   }
   return [...targets].sort();
 }
 
 /**
- * The explicit Light/Dark alias plan: one entry per (palette, role), in role order.
+ * The explicit per-theme alias plan: one entry per (palette, role), in role order, each carrying
+ * one target per theme (TKT-0021 — genericized from the fixed lightTarget/darkTarget pair).
  * @param {string[]} paletteNames lowercase palette names
- * @returns {{ semanticVar: string, lightTarget: string, darkTarget: string }[]}
+ * @param {{name:string,side:'light'|'dark'}[]} [themes] the theme axis (TKT-0021); default DEFAULT_THEMES
+ * @returns {{ semanticVar: string, targets: { mode: string, target: string }[] }[]}
  */
-export function bindingPlan(paletteNames) {
+export function bindingPlan(paletteNames, themes = DEFAULT_THEMES) {
   const plan = [];
   for (const n of paletteNames) {
     for (const r of semanticRoles(n)) {
       plan.push({
         semanticVar: `${n}${r.suffix}`,
-        lightTarget: targetName(n, r.light),
-        darkTarget: targetName(n, r.dark),
+        targets: themes.map((t) => ({ mode: t.name, target: targetName(n, r[t.side]) })),
       });
     }
   }
