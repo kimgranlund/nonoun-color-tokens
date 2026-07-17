@@ -23,7 +23,7 @@ path; a question the corpus doesn't answer is reported as absent, never guessed.
 | Problem, users, outcomes — the why | `docs/prd/` (PRD-*) — not present yet |
 | Requirements, exact behavior, acceptance criteria (scribe-authored) | `docs/spec/` (SPEC-*) — not present yet |
 | A ratified decision and its alternatives | `docs/adr/` (ADR-*, accepted = append-only) — not present yet |
-| What's queued, in flight, or done | `docs/tickets/` (TKT-*; frontmatter `kind:` bug/feature, `size:`, status) |
+| What's queued, in flight, or done | **GitHub Issues first** (`gh issue list` — ADR-017, 2026-07-17: the live ticket backend) — `docs/tickets/` is the pre-2026-07-17 ARCHIVE only (frontmatter `kind:`/`size:`/`status:` on those files reflects state as of the migration date, not current; a migrated file's `migrated-to:` frontmatter + top-of-file pointer names its Issue) |
 | Sequenced steps with done-whens | `docs/plan/` (PLAN-*) — not present yet |
 | Horizons of intent — Now / Next / Later | `docs/roadmap/` (ROADMAP-*) — not present yet |
 | One actor, one sitting, one done-when | `docs/task/` (TASK-*) — not present yet |
@@ -47,11 +47,13 @@ intake are linked from their ticket, not mapped here.)
 
 ## Consult procedure
 
-1. Classify the ask against the table; Grep the corpus for the feature's nouns or the TKT-/PRD-
-   id first — the files are records, not linear reads.
-2. Answer with **the claim + the file path (+ the record's status where it has one)**. A record's
-   frontmatter (`status`, `kind`, `size`) is part of the answer — an open ticket and a done one
-   answer "is X built?" oppositely.
+1. Classify the ask against the table; for tickets/bugs/features run `gh issue list --search
+   "<nouns>"` (or `--label kind:bug`/`kind:feature`) FIRST — Grep the corpus for the feature's
+   nouns or the TKT-/PRD- id only for the pre-2026-07-17 archive or non-ticket record types.
+2. Answer with **the claim + the source (+ the record's status where it has one)** — an Issue's
+   own open/closed state for live tickets, or the file path + frontmatter `status` for archive
+   files (`docs/tickets/`) and other record types. An open ticket and a done one answer "is X
+   built?" oppositely.
 3. Cross-references between records use ids (the ID spine: a TKT links its SPEC by id) — follow
    them rather than assuming one file is complete.
 4. Route all making: a new idea → `/feature`; a bug → `/bug-report`; building a queued record →
