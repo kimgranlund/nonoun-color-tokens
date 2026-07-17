@@ -1852,7 +1852,7 @@ const { typeScale: tScaleGeo } = await import("../../src/engine/type.mjs");
 app.commit((d) => { d.geometry = { treatment: "spacious", baseHeight: 40 }; }); flushRaf();
 const gsc = gScale(app.doc.geometry);
 ok(gsc.treatment === "spacious" && gsc.baseHeight === 40, `(geo) treatment + base apply (treatment ${gsc.treatment}, base ${gsc.baseHeight})`);
-ok(gsc.sizes.MD.padding === (gsc.sizes.MD.height - gsc.sizes.MD.icon) / 2, "(geo) the centering law holds on the resolved scale (pad = (h−icon)/2)");
+ok(gsc.sizes.MD.paddingNarrow === (gsc.sizes.MD.height - gsc.sizes.MD.icon) / 2, "(geo) the centering law holds on the resolved scale (paddingNarrow = (h−icon)/2)");
 ok(hydSet(serSet(app.doc)).geometry.treatment === "spacious" && hydSet(serSet(app.doc)).geometry.baseHeight === 40, "(geo) the geometry config round-trips through persist");
 ok(bkGeo(app.doc).geometry && bkGeo(app.doc).geometry.sizes && bkGeo(app.doc).geometry.treatment === "spacious", "(geo) brandKit carries the geometry scale (the MCP serves it)");
 // CONTROL TEXT (TKT-0008): geometry's per-step `font` composes from the type scale's UI-CONTROL voice
@@ -1923,7 +1923,7 @@ const gIn = gCellInput("geotok:MD:base"); gIn.value = "50"; gIn.dispatch("change
 ok(app.doc.geometry.tokenOverrides && app.doc.geometry.tokenOverrides["MD|base"] === 50, "(geo-tok-ov) editing a cell writes doc.geometry.tokenOverrides[<size>|<modeKey>]");
 {
   const md = app._geomScaleFor("base").sizes.MD;
-  ok(md.height === 50 && md.padding === (md.height - md.icon) / 2, "(geo-tok-ov) the override re-derives the frame via the laws (height = override, pad = (h−icon)/2)");
+  ok(md.height === 50 && md.paddingNarrow === (md.height - md.icon) / 2, "(geo-tok-ov) the override re-derives the frame via the laws (height = override, paddingNarrow = (h−icon)/2)");
 }
 ok(app._geomTokenColumns()[0].scale.sizes.MD.height === 50, "(geo-tok-ov) the matrix Base column reflects the override");
 ok(hydSet(serSet(app.doc)).geometry.tokenOverrides["MD|base"] === 50, "(geo-tok-ov) the override survives serialize → hydrate (persists)");
@@ -1931,7 +1931,7 @@ ok(hydSet(serSet(app.doc)).geometry.tokenOverrides["MD|base"] === 50, "(geo-tok-
 // NEGATIVE padding ((h−icon)/2 < 0); it stores the floor (8) live, matching the input min + persist range.
 app.setGeomTokenOverride("XS", "base", 3); flushRaf();
 ok(app.doc.geometry.tokenOverrides["XS|base"] === 8, `(geo-tok-clamp) a sub-floor geom edit (3) is clamped to 8 LIVE (got ${app.doc.geometry.tokenOverrides["XS|base"]})`);
-ok(app._geomScaleFor("base").sizes.XS.padding >= 0, "(geo-tok-clamp) the clamped height keeps padding non-negative (no negative ½(h−icon))");
+ok(app._geomScaleFor("base").sizes.XS.paddingNarrow >= 0, "(geo-tok-clamp) the clamped height keeps padding non-negative (no negative ½(h−icon))");
 ok(hydSet(serSet(app.doc)).geometry.tokenOverrides["XS|base"] === 8, "(geo-tok-clamp) the clamped live value equals the persisted value (live === persist)");
 app.setGeomTokenOverride("XS", "base", 9999); flushRaf();
 ok(app.doc.geometry.tokenOverrides["XS|base"] === 256, `(geo-tok-clamp) an over-max geom edit (9999) is clamped to 256 LIVE (got ${app.doc.geometry.tokenOverrides["XS|base"]})`);

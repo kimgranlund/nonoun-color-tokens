@@ -38,13 +38,16 @@ is a derivation, not a fit. The `.control-{size}` CSS utility **embodies** it (b
 
 ## THE TWO FAMILIES — density rides the rhythm, never the frame
 
-**Frame** (`icon`, slot `padding`, `edgePadding`, `minWidth`, `radiusPill`) scales with the box **height** and
-is **density-invariant**; **Rhythm** (`gap = font/2`) scales with the **font** and is all density may
-touch (`caret` rides its OWN height law, `3.5·h^0.39` — 2026-07-15, never `= font` and never composed).
-The full table: `references/foundations.md` §3.
+**Frame** (`icon`, `paddingNarrow`, `paddingWide`, `minWidth`, `radiusPill`) scales with the box **height**
+and is **density-invariant**; **Rhythm** (`gap` = the hand-CALIBRATED `GAP_UNIT` per size — 3·3·4·6·6·8 at
+the canonical baseHeight, × bh/28; TKT-0010 retired `font/2`) is all density may touch (`caret` rides its
+OWN height law, `3.5·h^0.39` — 2026-07-15, never `= font` and never composed). The compact pads
+(`paddingNarrowCompact`/`paddingWideCompact` = the same edges with the gap absorbed) straddle the two
+families: frame formulas with the rhythm's gap inside. The full table: `references/foundations.md` §3.
 
 `density` (treatment knob: comfortable 1 · compact 0.75 · spacious 1.25 · touch 1.1 · pill 1) multiplies
-**`gap` and only `gap`** (`gap = max(1, round((font/2)·density))`). **Scaling the frame would un-center the
+**`gap` and only `gap`** (`gap = max(1, round(GAP_UNIT[name]·(bh/28)·density))`; per-breakpoint hand
+columns ride `opts.gapOverrides` as FINAL values). **Scaling the frame would un-center the
 glyph** — so density (and the type scale) must never touch it. Depth: `references/foundations.md` §3.
 
 ## THE RAMP — one power law, six samples
@@ -76,7 +79,8 @@ geometryScale(doc) = geomScale(doc.geometry, { typeScale: typeScale(doc.type) })
 When `opts.typeScale` is supplied, `geomScale` reads `opts.typeScale.categories["UI-control"]` and each
 step's `font` becomes the brand's **UI-control voice** at the matching step (XS→UI-control XS … 2XL→2XL —
 all six steps compose since the voice rides the full XS..2XL ramp; TKT-0008 rerouted the join off the old
-UI/Label voice); `caret` keeps its OWN power law (`3.5·h^0.39`, never composed) and `gap = font/2` follows.
+UI/Label voice); `caret` keeps its OWN power law (`3.5·h^0.39`, never composed); `gap` rides its own
+GAP_UNIT calibration (TKT-0010 — no longer follows the font).
 Precedence per step: `opts.fontOverrides` > the composed UI-control size > `round(CONTROL_FONT[name] ×
 factor)` (the ratified fallback row `{XS:12, SM:13, MD:15, LG:16, XL:18, 2XL:20}`). **The FRAME is
 untouched**, so the centering law still holds. The pure `geomScale(config)` (no opts) rides the
@@ -116,7 +120,8 @@ each a named `space[k]` so the tier follows the treatment's rhythm; plus stroke 
    `(height − icon)/2` fall out. Never add `padding-block` to center text. `roundEven` for height/icon, `round`
    for font/caret. (`references/best-practices.md`.)
 3. **Keep density (and composition) out of the frame.** `density` multiplies `gap` only. `fontOverride`
-   replaces `font` only. The frame (`height·icon·padding·edgePadding·radiusPill·minWidth`) must be identical
+   replaces `font` only; `gapOverrides` replaces `gap` only (and the compact pads re-derive from it). The
+   frame (`height·icon·paddingNarrow·paddingWide·radiusPill·minWidth`) must be identical
    across densities AND between composed/standalone — the gates compare exactly that.
 4. **Constants are tuned, not arbitrary.** The power-law coefficients/exponents (`references/foundations.md`
    §4) reproduce the reference ramp to ±1px; `CANON_MD = 28` is the pivot. Don't retune without updating the

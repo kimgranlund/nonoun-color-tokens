@@ -31,9 +31,10 @@ and around components). Your job is never to type a px value — it's to pick th
 2. **Know the two tiers.** *Control* geometry is per-size (`--size-{step}-*`, steps XS–2XL) and
    scales with the control height. *Container* geometry (`--inset-*`, `--gap-*`, and the raw
    `--space-*` ladder) is treatment-derived and mode-independent. Don't cross them — a control's
-   inner padding is `--size-{step}-pad`, a card's inner padding is `--inset-card`.
+   inner padding is `--size-{step}-padding-narrow`, a card's inner padding is `--inset-card`.
 3. **Know the grammar.** Control: `--size-{step}-{field}` where field ∈
-   `height · icon · caret · font · gap · pad · pad-edge · radius · min`. Ladders: `--radius-{none|xs|
+   `height · icon · caret · font · gap · padding-narrow · padding-wide · padding-narrow-compact ·
+   padding-wide-compact · radius · min`. Ladders: `--radius-{none|xs|
    sm|md|lg|xl|full}` (the **Material 3 shape-corner scale** — 0/4/8/12/16/28/pill — plus
    `--radius-default`, aliased to the treatment's favoured corner), `--space-{0…9}`. Container tier:
    `--inset-{control-group|card|panel|dialog|page}`,
@@ -48,10 +49,12 @@ and around components). Your job is never to type a px value — it's to pick th
 2. **A control is one size step; everything inside derives from it.** Pick the control's step
    (XS–2XL); its height, icon, font, and paddings all come from `--size-{step}-*` — the centering law
    guarantees the glyph sits optically centered. Don't set a control's padding independently of its
-   height (that breaks the centering); use the paired `--size-{step}-pad` / `-pad-edge`. See
+   height (that breaks the centering); use the paired `--size-{step}-padding-narrow` / `-padding-wide`. See
    [`references/controls.md`](references/controls.md).
-3. **Two paddings, by anatomy.** `--size-{step}-pad` is the SLOT edge (a control WITH a leading
-   icon); `--size-{step}-pad-edge` is the SLOTLESS edge (a bare text button/label). Use the one that
+3. **Four paddings, by anatomy (TKT-0010).** `--size-{step}-padding-narrow` is the SLOT edge (a control
+   WITH a leading icon — the centering law); `--size-{step}-padding-wide` is the caret/bare edge (a bare
+   text button/label, or the caret side of a select); the `-compact` twins absorb the control's own gap
+   into the edge for dense layouts. Use the one that
    matches the control's anatomy — mixing them mis-centers the content.
 4. **Container spacing is the container tier, not raw `--space-N`.** Reach for a semantic
    `--inset-*` / `--gap-*` first (they ARE named `--space-*` rungs, so you get the rhythm without

@@ -18,9 +18,13 @@ config {treatment, baseHeight}
       icon   = roundEven(2.49·height^0.58) # frame family — the power law
       font   = fontOverride ?? round(3.16·height^0.45)   # rhythm family (≈ √h) OR the type UI voice
       caret  = font                        # rhythm — the affordance mark = text height
-      gap    = max(1, round((font/2)·density))           # rhythm — density rides HERE, only here
+      gap    = max(1, round(GAP_UNIT[name]·(bh/28)·density))  # rhythm — the calibrated unit (3·3·4·6·6·8
+                                                          # at bh 28, TKT-0010); density rides HERE, only here
       padding     = (height − icon)/2      # THE CENTERING LAW (slot edge)
-      edgePadding = round(height/2)        # the slotless/bare-label edge
+      paddingWide = (height − caret)/2     # the caret/bare edge (TKT-0010 — was edgePadding = h/2)
+      paddingNarrowCompact = (height − gap − icon)/2   # the slot edge with the gap absorbed
+      paddingWideCompact   = (height − gap − caret)/2  # the caret edge with the gap absorbed
+                                           # EXACT halves ratified — 7.5px is a real value, never rounded
       radiusPill  = round(height/2)        # the one size-linked radius
       minWidth    = height                 # the 1:1 square floor
   → radii (ladder per radiusStyle) · space (SPACE_STEPS × spaceBase)
@@ -38,14 +42,15 @@ loops the six `SIZES`. Pure, no DOM, no RNG — same input → identical output.
 From that single rule fall out, mechanically:
 
 - `padding` = `(height − icon)/2` — the **slot** edge (icon centered in a height² cell).
-- `edgePadding` = `round(height/2)` — the **slotless** (bare-label) edge. Algebraically the text pad
+- `paddingWide` = `(height − caret)/2` — the caret/bare edge (TKT-0010; replaced `edgePadding = h/2`,
+  landing much tighter — md 14 → 7.5). Historically the h/2 edge was the text pad
   `½(h − font)` + the absent slot's gap `½·font` = `h/2` — that is why the two-term pad collapses to a single
   clean number.
 - `minWidth` = `height` — an icon-only control is **exactly square** (the 1:1 floor); the glyph centers in it.
 - `radiusPill` = `round(height/2)` — a fully-round control is a pill; the corner radius is half the height.
 
 The `.control-{size}` utility class **embodies** the law: `block-size: var(--size-{s}-height)` (the lever),
-`padding-block: 0`, `padding-inline: var(--size-{s}-pad-edge)` (the slotless `h/2`), `border-radius:
+`padding-block: 0`, `padding-inline: var(--size-{s}-padding-wide)` (the caret/bare edge), `border-radius:
 var(--size-{s}-radius)` (the pill). The test's `centering-law` block asserts `padding === (height − icon)/2`
 **exactly** (not within a tolerance) for every size — it is a derivation, not a fit.
 
@@ -53,11 +58,13 @@ var(--size-{s}-radius)` (the pill). The test's `centering-law` block asserts `pa
 
 | Family | Scales with | Members | Density |
 |---|---|---|---|
-| **Frame** | the box **height** | `icon`, slot `padding`, `edgePadding`, `minWidth`, `radiusPill` | **density-invariant** |
-| **Rhythm** | the **font** | `gap = font/2` (caret rides its own height law) | density **multiplies the rhythm only** |
+| **Frame** | the box **height** | `icon`, `paddingNarrow`, `paddingWide`, `minWidth`, `radiusPill` | **density-invariant** |
+| **Rhythm** | the **GAP_UNIT calibration** | `gap` (caret rides its own height law; the compact pads absorb the gap into the frame edges) | density **multiplies the rhythm only** |
 
 `density` (a treatment property: comfortable 1 · compact 0.75 · spacious 1.25 · touch 1.1 · pill 1) multiplies
-**`gap` and only `gap`** — `gap = max(1, round((font/2)·density))`. It is deliberately kept out of the frame:
+**`gap` and only `gap`** — `gap = max(1, round(GAP_UNIT[name]·(bh/28)·density))`; per-breakpoint hand
+columns (the ratified TKT-0010 matrix) ride `opts.gapOverrides` as FINAL values. It is deliberately kept
+out of the frame:
 the frame is geometric (proportional to height), and **scaling the frame would un-center the glyph** — the slot
 pad `(height − icon)/2` only centers the icon if neither side is rescaled. The `two-families` test block pins
 this: at the **same** height, compact's `gap < ` comfortable's `gap`, but `padding` is **identical** (`density
@@ -116,11 +123,12 @@ Inside `geomScale`, when `opts.typeScale` is supplied, it reads `opts.typeScale.
 passes `uiSteps[name].size` as the composed font to `buildSize` for each step — geometry `XS → UI-control XS …
 2XL → 2XL` (the voice rides the full 6-step ramp since TKT-0008, so every step composes; a missing step falls
 back to `round(CONTROL_FONT[name] × factor)`, and `opts.fontOverrides` wins over both). So each size's `font`
-becomes the brand's **UI-control voice** at the matching step. `gap = font/2` follows automatically; `caret`
+becomes the brand's **UI-control voice** at the matching step. `gap` rides its own GAP_UNIT calibration
+(TKT-0010 — decoupled from the font); `caret`
 keeps its own height law (never composed).
 
 Critically: **the FRAME is untouched** by composition. `fontOverride` only replaces `font` (a rhythm member);
-`height`/`icon`/`padding`/`edgePadding`/`radiusPill`/`minWidth` are all computed before/around it, so the
+`height`/`icon`/`paddingNarrow`/`paddingWide`/`radiusPill`/`minWidth` are all computed before/around it, so the
 centering law `padding === (height − icon)/2` **still holds on the composed scale**. The `composition` test
 block proves all of this: composed `font === ts.categories["UI-control"][name].size`, height + padding
 are **identical** to the standalone scale, the law still holds, a bigger type `bodyBase` scales the control
@@ -155,7 +163,8 @@ gaps, section rhythm). This is the space **BETWEEN** components — a **distinct
 
 ### 7. THREE EMITTERS — same numbers, three shapes
 
-- **`geomTokensCSS(scale)`** — `:root` custom props (per-size `height/icon/caret/font/gap/pad/pad-edge/
+- **`geomTokensCSS(scale)`** — `:root` custom props (per-size `height/icon/caret/font/gap/padding-narrow/
+  padding-wide/padding-narrow-compact/padding-wide-compact/
   radius/min`, the radius ladder, the space scale, `--density`) **plus** a `.control-{size}` utility class per
   size that **embodies the law** (block-size lever, `padding-block: 0`, inline pad = the slotless `h/2`, pill
   radius). The CSS test checks the custom props exist and that `.control-md` carries `block-size:

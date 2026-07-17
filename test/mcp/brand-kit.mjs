@@ -103,7 +103,7 @@ try {
   const ty = await callTool("get_type", {});
   ok(ty && ty.categories && ty.categories.Body, "get_type → the typography scale (Body voice present)");
   const geo = await callTool("get_geometry", {});
-  ok(geo && geo.sizes && geo.sizes.MD && geo.sizes.MD.padding === (geo.sizes.MD.height - geo.sizes.MD.icon) / 2, "get_geometry → the dimensional scale (the centering law holds on the served MD size)");
+  ok(geo && geo.sizes && geo.sizes.MD && geo.sizes.MD.paddingNarrow === (geo.sizes.MD.height - geo.sizes.MD.icon) / 2, "get_geometry → the dimensional scale (the centering law holds on the served MD size)");
   // decoupled end-to-end (2026-07-16): the served geometry's per-step `font` is the control-text ramp,
   // NOT the Label voice — and the retired composition flag is gone
   ok(!("typed" in geo) && geo.sizes.MD.font === 15, `get_geometry font is the decoupled control-text ramp (got ${geo.sizes.MD.font}, want 15)`);

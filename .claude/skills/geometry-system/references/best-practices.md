@@ -20,7 +20,8 @@ composition history.
 ### Density rides the rhythm, ONLY the rhythm
 
 - **`density` multiplies `gap` and nothing else.** It is applied exactly once, inside `buildSize`:
-  `gap = max(1, round((font/2)·density))`. Do **not** thread `density` into `icon`, `padding`, `edgePadding`,
+  `gap = max(1, round(GAP_UNIT[name]·(bh/28)·density))` (TKT-0010 — the calibrated unit, not `font/2`).
+  Do **not** thread `density` into `icon`, `paddingNarrow`, `paddingWide`,
   or `radiusPill` — the frame is geometric and density-invariant. The `two-families` test compares compact vs
   comfortable **at the same height** and asserts `gap` shrinks but `padding` is **identical**. A change that
   makes density move the frame breaks the centering law (the frame would rescale and un-center the glyph) and
@@ -84,10 +85,10 @@ guards):
 1. **Started from the standalone ramp.** `buildSize` derived `font = round(3.16·height^0.45)` — a self-contained
    power law. Good for a geometry-only export, but the control text then ignored the brand's actual typography.
 2. **Added a surgical override, not a rewrite.** `buildSize` grew an optional font param; when present
-   it replaces *only* `font`. `gap = font/2` follows for free (`caret` keeps its OWN power law, `3.5·h^0.39` —
-   never composed). Nothing else in `buildSize` touched — the frame derivations (`icon`, `padding`,
-   `edgePadding`, `radiusPill`, `minWidth`) are computed the same way regardless, so the centering law is
-   preserved by construction.
+   it replaces *only* `font` (`caret` keeps its OWN power law, `3.5·h^0.39` — never composed; `gap` rides
+   its own GAP_UNIT calibration since TKT-0010). Nothing else in `buildSize` touched — the frame
+   derivations (`icon`, `paddingNarrow`, `paddingWide`, `radiusPill`, `minWidth`) are computed the same
+   way regardless, so the centering law is preserved by construction.
 3. **Wired the source in `geomScale`.** `opts.typeScale.categories["UI-control"]` → `uiSteps[name].size` fed
    as the composed size per step (XS→UI-control XS … 2XL→2XL; TKT-0008 rerouted the join off the retired
    UI/Label voice, and the interim `typed` self-report flag was removed with it).
