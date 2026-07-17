@@ -210,7 +210,8 @@ export class DrawerMixinImpl {
         this.inFigma
           ? btn([icon("arrows-clockwise"), "Regroup"], {
               cls: "figma-regroup",
-              title: "Rebuild the Color Semantic variables in grouped order (regular · containers · surfaces · scrims). Re-creates them, so layers bound to them will need reconnecting. Color Primitives are untouched.",
+              title: this._applyBusy ? "Applying…" : "Rebuild the Color Semantic variables in grouped order (regular · containers · surfaces · scrims). Re-creates them, so layers bound to them will need reconnecting. Color Primitives are untouched.",
+              disabled: !!this._applyBusy, // TKT-0004: no double-firing a second apply while one is in flight
               onclick: () => this.requestApplyToFigma(true),
             })
           : false,
@@ -262,7 +263,8 @@ export class DrawerMixinImpl {
           ? btn([icon("flag"), "Apply Variables"], {
               variant: "primary",
               cls: "figma-apply",
-              title: "Create/update the Color Primitives + Color Semantic (Light/Dark) variable collections directly in this Figma file",
+              title: this._applyBusy ? "Applying…" : "Create/update the Color Primitives + Color Semantic (Light/Dark) variable collections directly in this Figma file",
+              disabled: !!this._applyBusy, // TKT-0004: no double-firing a second apply while one is in flight
               onclick: () => this.requestApplyToFigma(),
             })
           : false,

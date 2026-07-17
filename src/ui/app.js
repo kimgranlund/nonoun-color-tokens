@@ -120,6 +120,11 @@ class HctApp extends HTMLElement {
     this.applyGateOpen = false;
     this.applyGateRebuild = false; // the pending action: false = apply, true = regroup
     this.applyGateDontShow = false; // the "don't show again" checkbox (transient, reset on open)
+    // TKT-0004: persistent busy state for the SAME apply — true from the moment "apply" is posted
+    // until apply-done/apply-error replies (see applyToFigma/onApplyDone/onApplyError). Drives the
+    // .apply-busy host class (styles.css — an indeterminate, motion-safe indicator) AND disables the
+    // Apply/Regroup trigger (drawer.js) so a slow apply can't be double-fired.
+    this._applyBusy = false;
     this.settingsOpen = false; // the Settings page (token-mapping + app prefs)
     this.settingsSection = "mapping"; // which Settings nav item is active (left-nav page layout)
     this.geomSpecMode = "controls"; // geometry canvas: controls (live mock controls on the ramp) | tokens (editable token matrix: Base + breakpoints) — geom-section sub-state
@@ -507,6 +512,17 @@ class HctApp extends HTMLElement {
     this.replaceChildren(this.view === "gallery" ? this.renderGallery() : this.renderEditor());
     this.dataset.theme = this.theme;
     this.dataset.motion = this.motion; // styles.css gates transitions/animations on [data-motion]
+    // TKT-0004: the Apply-to-Figma busy indicator — Figma-plugin-embed only (the web-app preview has
+    // no Apply-to-Figma action, so this is never set there even if _applyBusy were somehow true).
+    // ALSO stamped on the open export .drawer <dialog>: it's a native top-layer dialog (showModal()),
+    // which paints above the host's own fixed-position ring regardless of z-index — the Apply/Regroup
+    // triggers live inside it, so the drawer needs its OWN ring to stay visible while it's open
+    // (styles.css's dialog.drawer.apply-busy::after). Harmless no-op while the drawer is closed
+    // (querySelector finds nothing to mark).
+    const applyBusyNow = !!(this.inFigma && this._applyBusy);
+    this.classList.toggle("apply-busy", applyBusyNow);
+    const drawerEl = this.querySelector(".drawer");
+    if (drawerEl) drawerEl.classList.toggle("apply-busy", applyBusyNow);
     // The app-footer renders an empty shell with stable hooks; paint its dynamic
     // readouts now (the same path liveRefresh uses during a drag).
     if (this.view === "editor") this.paintAppFooter(this._view);

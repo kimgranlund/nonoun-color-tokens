@@ -774,7 +774,7 @@ ok(posted.pluginMessage.collections && posted.pluginMessage.collections.raw === 
   `(x) the apply message carries the default collection names (got ${JSON.stringify(posted.pluginMessage.collections)})`);
 // with a doc override, the message AND the bundle's aliasData follow the custom raw name.
 app.commit((d) => { d.figmaCollections = { raw: "Brand Primitives", semantic: "Brand Modes" }; }); flushRaf();
-posted = null; app.applyToFigma();
+posted = null; app._applyBusy = false; app.applyToFigma(); // TKT-0004: reset busy between direct calls in this fixture (no onApplyDone/onApplyError between them)
 ok(posted.pluginMessage.collections.raw === "Brand Primitives" && posted.pluginMessage.collections.semantic === "Brand Modes",
   "(x) a doc figmaCollections override rides the apply message");
 {
@@ -794,7 +794,7 @@ ok(posted.pluginMessage.collections.raw === "Brand Primitives" && posted.pluginM
   ok(!("figmaCollections" in hyd(ser(app.doc))), "(x) a default-named doc hydrates with NO figmaCollections key");
 }
 // the opt-in Regroup path posts rebuildSemantic:true so code.js re-creates Color Modes in grouped order
-posted = null;
+posted = null; app._applyBusy = false; // TKT-0004: reset busy again (see note above)
 const realConfirm = globalThis.confirm;
 globalThis.confirm = () => true; // accept the destructive-rebuild warning
 app.applyToFigma(true);
@@ -813,7 +813,7 @@ app.exportOpen = false; app.render(); flushRaf();
 
 // ── (xg) apply gate: requestApplyToFigma road-blocks with a backup-consent modal before posting ──
 try { localStorage.removeItem("ultimate-tokens-apply-consent-v1"); } catch {}
-app.applyGateOpen = false; posted = null;
+app.applyGateOpen = false; app._applyBusy = false; posted = null; // TKT-0004: the (x) section above called applyToFigma directly, without a matching onApplyDone/onApplyError — reset busy before the gate flow
 app.requestApplyToFigma(false);
 // TKT-0020: opening the gate now ALSO kicks off a read-float-variables request for the gate's
 // changed-value diff — "does not post yet" means the real "apply" write, not this read-only probe.
@@ -836,9 +836,9 @@ posted = null; app.requestApplyToFigma(false);
 ok(app.applyGateOpen === true, "(xg) still gated on the next apply until consented");
 app.applyGateDontShow = true; app.confirmApplyGate();
 ok(app._applyConsented() === true && posted && posted.pluginMessage.type === "apply", "(xg) 'don't show again' persists consent + posts");
-app.applyGateOpen = false; posted = null; app.requestApplyToFigma(false);
+app.applyGateOpen = false; app._applyBusy = false; posted = null; app.requestApplyToFigma(false); // TKT-0004: reset busy — a real apply-done would have fired between these two cycles
 ok(app.applyGateOpen === false && posted && posted.pluginMessage.type === "apply", "(xg) once consented, a normal apply skips the gate (posts directly)");
-posted = null; app.requestApplyToFigma(true);
+app._applyBusy = false; posted = null; app.requestApplyToFigma(true); // TKT-0004: reset busy (see above)
 ok(app.applyGateOpen === true && posted && posted.pluginMessage.type === "read-float-variables", "(xg) the destructive Regroup ALWAYS re-shows the gate (posting only the read-float-variables probe), even when consented");
 posted = null;
 app.confirmApplyGate();
@@ -848,7 +848,7 @@ try { localStorage.removeItem("ultimate-tokens-apply-consent-v1"); } catch {}
 
 // ── (xg) TKT-0020: the changed-value diff — receiveLiveFloatVariables + _figmaChangedCount + the
 // gate's rendered count, over the app's OWN real next-apply plan (not a synthetic fixture) ──
-app.applyGateOpen = false; posted = null;
+app.applyGateOpen = false; app._applyBusy = false; posted = null; // TKT-0004: reset busy — the Regroup confirm above never got a matching onApplyDone/onApplyError
 app.requestApplyToFigma(false);
 {
   const bpPlan = app._figmaFloatPlans().find((p) => p.collection === "Breakpoints");
@@ -870,6 +870,44 @@ app.requestApplyToFigma(false);
   }
 }
 app.closeApplyGate();
+try { localStorage.removeItem("ultimate-tokens-apply-consent-v1"); } catch {}
+
+// ── (xg) TKT-0004: the persistent busy state — set the moment "apply" is posted, disables the
+// Apply/Regroup trigger (closing the double-submit gap), clears on either apply-done or apply-error ──
+app.applyGateOpen = false; app._applyBusy = false; posted = null;
+app.exportOpen = true; app.exportTab = "figma"; app.render(); flushRaf();
+ok(!app.classList.contains("apply-busy"), "(xg) not busy before any apply");
+app.requestApplyToFigma(false);
+ok(app._applyBusy === false, "(xg) opening the gate alone does not set the busy state yet (only the real apply post does)");
+app.confirmApplyGate();
+ok(app._applyBusy === true, "(xg) confirming the gate sets the persistent busy state");
+ok(app.classList.contains("apply-busy"), "(xg) the host element carries the apply-busy class while an apply is in flight");
+ok(!!app.querySelector(".drawer") && app.querySelector(".drawer").classList.contains("apply-busy"), "(xg) the OPEN export drawer <dialog> ALSO carries apply-busy (a top-layer dialog would otherwise hide the host-level ring)");
+{
+  const applyBtn = app.querySelector(".figma-apply");
+  const regroupBtn = app.querySelector(".figma-regroup");
+  ok(!!applyBtn && applyBtn.disabled === true, "(xg) the Apply Variables trigger is disabled while busy (no double-submit)");
+  ok(!!regroupBtn && regroupBtn.disabled === true, "(xg) the Regroup trigger is ALSO disabled while busy");
+}
+// re-entry guard: neither entry point can fire a SECOND concurrent apply while busy — not just the
+// (already disabled) buttons, any direct call is a no-op too.
+posted = null;
+app.requestApplyToFigma(false);
+ok(posted === null && app.applyGateOpen === false, "(xg) requestApplyToFigma is a no-op while busy (does not re-open the gate or post)");
+app.applyToFigma(false);
+ok(posted === null, "(xg) applyToFigma itself refuses to post a second apply while busy");
+app.onApplyDone({ raw: 1, semantic: 1, floatVars: 0, floatCollections: 0 });
+ok(app._applyBusy === false, "(xg) onApplyDone clears the persistent busy state");
+ok(!app.classList.contains("apply-busy"), "(xg) the host element drops apply-busy once the apply completes");
+ok(!!app.querySelector(".figma-apply") && app.querySelector(".figma-apply").disabled !== true, "(xg) the Apply Variables trigger re-enables once busy clears");
+// the error path clears busy too — a failed apply must never leave the trigger stuck disabled.
+app.requestApplyToFigma(false);
+app.confirmApplyGate();
+ok(app._applyBusy === true, "(xg) fixture: a fresh apply sets busy again");
+app.onApplyError();
+ok(app._applyBusy === false, "(xg) onApplyError ALSO clears the busy state");
+ok(!app.classList.contains("apply-busy"), "(xg) apply-busy is dropped after an error too");
+app.exportOpen = false; app.render(); flushRaf();
 try { localStorage.removeItem("ultimate-tokens-apply-consent-v1"); } catch {}
 
 globalThis.parent = realParent;
