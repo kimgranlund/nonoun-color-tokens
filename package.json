@@ -6,7 +6,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "gen:figma-assets": "node scripts/gen-figma-assets.mjs",
+    "gen:figma-binder-code": "node scripts/gen-figma-binder-code.mjs",
+    "gen:figma-assets": "node scripts/gen-figma-binder-code.mjs && node scripts/gen-figma-assets.mjs",
     "bundle": "node scripts/bundle.mjs",
     "gen:figma-ui": "node scripts/gen-figma-ui.mjs",
     "gen:preview": "node scripts/gen-preview.mjs",
