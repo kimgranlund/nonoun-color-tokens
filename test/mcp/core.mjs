@@ -48,7 +48,7 @@ ok(callTool("nearest_token", { hex: exact }).distance === 0, "nearest_token of a
 ok(typeof callTool("get_semantic", { scheme: "dark" })["primary/surface"] === "string", "get_semantic flattens to palette/role hexes");
 const ty = callTool("get_type", {});
 const geo = callTool("get_geometry", {});
-ok(ty.categories && ty.categories.Body && geo.sizes && geo.sizes.MD.padding === (geo.sizes.MD.height - geo.sizes.MD.icon) / 2, "get_type + get_geometry serve the scales (the centering law holds)");
+ok(ty.categories && ty.categories.Body && geo.sizes && geo.sizes.MD.paddingNarrow === (geo.sizes.MD.height - geo.sizes.MD.icon) / 2, "get_type + get_geometry serve the scales (the centering law holds)");
 ok(geo.sizes.MD.font !== ty.categories.Label.MD.size && geo.sizes.MD.font === 15, `the served geometry font is the DECOUPLED control-text ramp (15 at bh28, 2026-07-16 — not the Label size ${ty.categories.Label.MD.size})`);
 
 // resources/read + prompts/get

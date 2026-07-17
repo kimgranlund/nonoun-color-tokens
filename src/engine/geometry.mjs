@@ -9,7 +9,8 @@
 //
 //   THE TWO FAMILIES —
 //     • Frame  ∝ height : icon, slot, inline-pad, min-inline-size, pill radius (= height/2).
-//     • Rhythm ∝ font   : gap = font/2. Density multiplies the RHYTHM only (never the frame — scaling
+//     • Rhythm          : gap = the hand-CALIBRATED GAP_UNIT per size × baseHeight/28 (TKT-0010 — was
+//       font/2). Density multiplies the RHYTHM only (never the frame — scaling
 //       the frame un-centers the glyph and breaks the square).
 //
 // The six-size ramp (XS·SM·MD·LG·XL·2XL) is two bands that change gear at the MD|LG seam (compact +4
@@ -78,11 +79,23 @@ const RADIUS_DEFAULT = { sharp: "sm", soft: "md", round: "lg", pill: "full" };
 // roughly-geometric ladder of `spaceBase` multiples (0·1·2·3·4·6·8·12·16·24).
 const SPACE_STEPS = [0, 1, 2, 3, 4, 6, 8, 12, 16, 24];
 
+// GAP_UNIT — the hand-CALIBRATED icon↔label gap per size at the canonical baseHeight (TKT-0010,
+// 2026-07-16, reporter table — retired the old `font/2` rhythm law): the gap reads as a fixed unit
+// per step, scaled by baseHeight/28 and multiplied by density (still the only thing density touches).
+// Like CONTROL_FONT, hand-authored IS the law; per-breakpoint hand columns ride opts.gapOverrides.
+const GAP_UNIT = { XS: 3, SM: 3, MD: 4, LG: 6, XL: 6, "2XL": 8 };
+
 // buildSize — derive the full geometry of one size row from its (scaled) control height + the density.
 // Everything below the height is DERIVED — icon/caret by their power laws, the pads by the centering law.
-// `font` arrives PRE-RESOLVED from geomScale (a per-mode override, the composed UI-control voice size,
-// or the fixed CONTROL_FONT ramp × factor — in that precedence; TKT-0008).
-function buildSize(rawHeight, density, font) {
+// `font` and `gap` arrive PRE-RESOLVED from geomScale (per-mode override → composition/calibration →
+// law-fallback precedence; TKT-0008/TKT-0010).
+// THE FOUR PADS (TKT-0010 — renamed + reformulated from padding/edgePadding; EXACT halves ratified,
+// never rounded — 7.5px is a real CSS/Figma value and the law stays pure):
+//   paddingNarrow        = (h − icon)/2         — the centering law, a SLOT edge (icon side)
+//   paddingWide          = (h − caret)/2        — the caret/bare edge (was edgePadding = h/2)
+//   paddingNarrowCompact = (h − gap − icon)/2   — the slot edge, gap absorbed (dense layouts)
+//   paddingWideCompact   = (h − gap − caret)/2  — the caret edge, gap absorbed
+function buildSize(rawHeight, density, font, gap) {
   const height = roundEven(rawHeight);
   const icon = roundEven(2.49 * height ** 0.58); // frame family — the leading content-icon / slot side
   // caret has its OWN power law off height (2026-07-15) — independent of the text size.
@@ -92,9 +105,11 @@ function buildSize(rawHeight, density, font) {
     icon,
     caret,
     font,
-    gap: Math.max(1, round((font / 2) * density)), // rhythm — font/2, density rides HERE (and only here)
-    padding: (height - icon) / 2, // the centering law: a SLOT edge — ½(height − icon); icon centers in a height² cell
-    edgePadding: round(height / 2), // a SLOTLESS edge (bare label) — h/2 (text pad ½(h−font) + the absent slot's gap ½·font)
+    gap,
+    paddingNarrow: (height - icon) / 2,
+    paddingWide: (height - caret) / 2,
+    paddingNarrowCompact: (height - gap - icon) / 2,
+    paddingWideCompact: (height - gap - caret) / 2,
     radiusPill: round(height / 2), // the one size-linked radius — a fully-round control is a pill
     minWidth: height, // the 1:1 floor — an icon-only control is at least square
   };
@@ -117,8 +132,10 @@ function buildSize(rawHeight, density, font) {
 // is byte-identical (the identity gate).
 // `opts.fontOverrides` (optional) — the same shape for the per-size CONTROL TEXT size; wins over the
 // composition. Absent ⇒ the UI-control composition (all steps), then the CONTROL_FONT×factor law
-// for a step the voice lacks. gap re-derives from the
-// resolved font either way (gap = font/2 · density).
+// for a step the voice lacks.
+// `opts.gapOverrides` (optional) — the same shape for the per-size GAP (the breakpoint tiers' ratified
+// hand columns, TKT-0010); a valid override is the FINAL gap (density already baked into the hand
+// value). Absent ⇒ the GAP_UNIT calibration × factor × density.
 // `config.rampContrast` (optional, 0…1, default 1) — the RESPONSIVE ramp knob: how hard the expressive
 // band (LG·XL·2XL) changes gear at the MD|LG seam. At 1 (or absent — the identity gate) the band is
 // today's ×4/3 geometric ramp. At 0 the gear change disappears: the band continues the compact band's
@@ -134,6 +151,7 @@ export function geomScale(config = {}, opts = {}) {
   const rampContrast = Number.isFinite(c) ? Math.max(0, Math.min(1, c)) : 1;
   const overrides = opts.overrides && typeof opts.overrides === "object" ? opts.overrides : null;
   const fontOverrides = opts.fontOverrides && typeof opts.fontOverrides === "object" ? opts.fontOverrides : null;
+  const gapOverrides = opts.gapOverrides && typeof opts.gapOverrides === "object" ? opts.gapOverrides : null;
   const uiSteps = opts.typeScale && opts.typeScale.categories && opts.typeScale.categories["UI-control"];
   const sizes = {};
   let expr = 0; // 0 for the compact band, then 1·2·3 across LG·XL·2XL (the expressive band)
@@ -147,7 +165,9 @@ export function geomScale(config = {}, opts = {}) {
     const ovF = fontOverrides && fontOverrides[name];
     const composed = uiSteps && uiSteps[name] ? uiSteps[name].size : null;
     const font = (typeof ovF === "number" && Number.isFinite(ovF) && ovF > 0) ? round(ovF) : (composed != null ? composed : round(CONTROL_FONT[name] * factor));
-    sizes[name] = buildSize(rawHeight, t.density, font);
+    const ovG = gapOverrides && gapOverrides[name];
+    const gap = (typeof ovG === "number" && Number.isFinite(ovG) && ovG > 0) ? round(ovG) : Math.max(1, round(GAP_UNIT[name] * factor * t.density));
+    sizes[name] = buildSize(rawHeight, t.density, font, gap);
   }
   const radii = { ...M3_CORNERS }; // the fixed M3 shape-corner scale (treatment-independent)
   const radiusDefault = RADIUS_DEFAULT[t.radiusStyle] || "md"; // the treatment's favoured corner level
@@ -156,8 +176,8 @@ export function geomScale(config = {}, opts = {}) {
   // The CONTAINER tier — semantic names over the space ladder, so a consumer never guesses a raw
   // `--space-N` rung. Insets pad INSIDE a container; gaps separate SIBLINGS within one. Each is a
   // named SPACE_STEPS rung × spaceBase (derived, not hand-picked), so the whole tier follows the
-  // treatment's rhythm and stays mode-independent like `space`. Control-INTERNAL geometry (pad,
-  // pad-edge, the icon↔label gap) lives on the size rows above — a different law (centering).
+  // treatment's rhythm and stays mode-independent like `space`. Control-INTERNAL geometry (the four
+  // pads, the icon↔label gap) lives on the size rows above — a different law (centering).
   const insets = { controlGroup: space[2], card: space[4], panel: space[5], dialog: space[6], page: space[7] };
   const gaps = { cluster: space[2], stackTight: space[3], stack: space[4], stackLoose: space[5], grid: space[4], section: space[7] };
   // Strokes — constants, not rhythm: borders don't scale with spacing (a hairline is a hairline at
@@ -171,9 +191,11 @@ export function geomScale(config = {}, opts = {}) {
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
 const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
-// geomTokensCSS — CSS custom properties (per-size height/icon/caret/font/gap/padding/radius, the radius
-// ladder, the space scale, the density) plus a `.control-{size}` utility class that EMBODIES the law:
-// block-size off the ramp, padding-block 0, inline padding = the slotless h/2, the pill radius.
+// geomTokensCSS — CSS custom properties (per-size height/icon/caret/font/gap + the FOUR pads
+// [-padding-narrow/-padding-wide/-padding-narrow-compact/-padding-wide-compact, TKT-0010] + radius,
+// the radius ladder, the space scale, the density) plus a `.control-{size}` utility class that
+// EMBODIES the law: block-size off the ramp, padding-block 0, inline padding = the wide (caret/bare)
+// edge, the pill radius.
 // the per-size `--size-*` custom-property lines (no :root) — shared by the base export + the @media
 // overrides; only these scale with baseHeight (density/radii/space are treatment-derived, mode-independent).
 // dimUnit(px, unit) — a px dimension in the chosen CSS export unit. rem/em = px÷16 (root-relative), stripped
@@ -189,7 +211,7 @@ function geomSizeVarLines(scale, indent = "  ", unit = "px", pfx = "") {
   const size = ns(pfx, "size");
   return Object.entries(scale.sizes).map(([name, s]) => {
     const p = `--${size}-${kebab(name)}`;
-    return `${indent}${p}-height: ${dimUnit(s.height, unit)}; ${p}-icon: ${dimUnit(s.icon, unit)}; ${p}-caret: ${dimUnit(s.caret, unit)}; ${p}-font: ${dimUnit(s.font, unit)}; ${p}-gap: ${dimUnit(s.gap, unit)}; ${p}-pad: ${dimUnit(s.padding, unit)}; ${p}-pad-edge: ${dimUnit(s.edgePadding, unit)}; ${p}-radius: ${dimUnit(s.radiusPill, unit)}; ${p}-min: ${dimUnit(s.minWidth, unit)};`;
+    return `${indent}${p}-height: ${dimUnit(s.height, unit)}; ${p}-icon: ${dimUnit(s.icon, unit)}; ${p}-caret: ${dimUnit(s.caret, unit)}; ${p}-font: ${dimUnit(s.font, unit)}; ${p}-gap: ${dimUnit(s.gap, unit)}; ${p}-padding-narrow: ${dimUnit(s.paddingNarrow, unit)}; ${p}-padding-wide: ${dimUnit(s.paddingWide, unit)}; ${p}-padding-narrow-compact: ${dimUnit(s.paddingNarrowCompact, unit)}; ${p}-padding-wide-compact: ${dimUnit(s.paddingWideCompact, unit)}; ${p}-radius: ${dimUnit(s.radiusPill, unit)}; ${p}-min: ${dimUnit(s.minWidth, unit)};`;
   }).join("\n");
 }
 
@@ -213,7 +235,7 @@ export function geomTokensCSS(scale, { unit = "px", prefix = "" } = {}) {
   const size = ns(p, "size"), control = ns(p, "control");
   for (const name of Object.keys(scale.sizes)) {
     const s = kebab(name);
-    lines.push(`.${control}-${s} { box-sizing: border-box; block-size: var(--${size}-${s}-height); min-inline-size: var(--${size}-${s}-min); font-size: var(--${size}-${s}-font); padding-inline: var(--${size}-${s}-pad-edge); padding-block: 0; gap: var(--${size}-${s}-gap); border-radius: var(--${size}-${s}-radius); }`);
+    lines.push(`.${control}-${s} { box-sizing: border-box; block-size: var(--${size}-${s}-height); min-inline-size: var(--${size}-${s}-min); font-size: var(--${size}-${s}-font); padding-inline: var(--${size}-${s}-padding-wide); padding-block: 0; gap: var(--${size}-${s}-gap); border-radius: var(--${size}-${s}-radius); }`);
   }
   return lines.join("\n") + "\n";
 }
@@ -270,7 +292,8 @@ export function geomTokensDTCG(scale, { unit = "px" } = {}) {
   for (const [name, s] of Object.entries(scale.sizes)) {
     size[name] = {
       height: dim(s.height), icon: dim(s.icon), caret: dim(s.caret), font: dim(s.font),
-      gap: dim(s.gap), padding: dim(s.padding), edgePadding: dim(s.edgePadding),
+      gap: dim(s.gap), paddingNarrow: dim(s.paddingNarrow), paddingWide: dim(s.paddingWide),
+      paddingNarrowCompact: dim(s.paddingNarrowCompact), paddingWideCompact: dim(s.paddingWideCompact),
       radius: dim(s.radiusPill), minWidth: dim(s.minWidth),
     };
   }
@@ -285,7 +308,7 @@ export function geomTokensDTCG(scale, { unit = "px" } = {}) {
 // geomTokensFigma — the geometry as DTCG `number` tokens (UNITLESS values), the shape a Figma variable
 // importer turns into **FLOAT (number) variables** — a "Geometry" collection with size/radius/space groups
 // (px is 1:1 with Figma's unitless floats). Same numbers as the DTCG dimension export, minus the `px`
-// suffix, so height/icon/gap/padding/radius/space land as native number variables you can bind to
+// suffix, so height/icon/gap/pads/radius/space land as native number variables you can bind to
 // auto-layout, corner radius, gaps, and sizing. NO `font` rows (2026-07-16): control-text sizes moved to
 // the TYPOGRAPHY collection as UI-widget/UI-control size variables (typeTokensFigmaModes controlFonts) —
 // the Geometry collection is box geometry only.
@@ -295,7 +318,8 @@ export function geomTokensFigma(scale) {
   for (const [name, s] of Object.entries(scale.sizes)) {
     size[name] = {
       height: num(s.height), icon: num(s.icon), caret: num(s.caret),
-      gap: num(s.gap), padding: num(s.padding), edgePadding: num(s.edgePadding),
+      gap: num(s.gap), paddingNarrow: num(s.paddingNarrow), paddingWide: num(s.paddingWide),
+      paddingNarrowCompact: num(s.paddingNarrowCompact), paddingWideCompact: num(s.paddingWideCompact),
       radius: num(s.radiusPill), minWidth: num(s.minWidth),
     };
   }
@@ -312,13 +336,13 @@ export function geomTokensFigma(scale) {
 // (`exportUI3`): `{ collections: { "Geometry": { modes:[…], variables: { "size/<NAME>/<field>": {
 // type:"FLOAT", values:{ Base:…, <modeName>:… } }, "radius/<k>", "space/<k>" } } } }`. So a Figma user
 // imports ONE breakpoint-moded collection instead of N separate per-width files. The size fields mirror
-// `geomTokensFigma` (height/icon/caret/gap/padding/edgePadding/radius/minWidth — NO font, 2026-07-16:
+// `geomTokensFigma` (height/icon/caret/gap/the four pads/radius/minWidth — NO font, 2026-07-16:
 // control text lives in the Typography collection as UI-widget/UI-control size vars). `modes` = the SAME
 // shape `_geomModeScales()` returns: [{ name, scale }] (minWidth, if present, is ignored — Figma modes are
 // named, not media-queried). IDENTITY: `modes = []` ⇒ a single base mode whose values equal the base.
 // `opts.baseName` (default "Base") NAMES the synthetic base layer (e.g. "Mobile" — the standard set);
 // `opts.baseLast` (default false) places it AFTER the breakpoints (Figma's default mode = the FIRST mode).
-const GEOM_SIZE_FIELDS = [["height", "height"], ["icon", "icon"], ["caret", "caret"], ["gap", "gap"], ["padding", "padding"], ["edgePadding", "edgePadding"], ["radius", "radiusPill"], ["minWidth", "minWidth"]];
+const GEOM_SIZE_FIELDS = [["height", "height"], ["icon", "icon"], ["caret", "caret"], ["gap", "gap"], ["paddingNarrow", "paddingNarrow"], ["paddingWide", "paddingWide"], ["paddingNarrowCompact", "paddingNarrowCompact"], ["paddingWideCompact", "paddingWideCompact"], ["radius", "radiusPill"], ["minWidth", "minWidth"]];
 // Figma requires DISTINCT mode names per collection; the synthetic base layer (`baseName`) is reserved +
 // de-dup (case-insensitively) so a breakpoint sharing its name / two same-named modes can't collide on import.
 function disambiguateModeNames(names, baseName = "Base") {

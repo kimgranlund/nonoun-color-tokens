@@ -17,7 +17,7 @@ const { geomScale } = await import(ENGINE);
 const s = geomScale({ baseHeight: 28 });
 const camel = (k) => k.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 const STEPS = new Set(Object.keys(s.sizes).map((x) => x.toLowerCase())); // xs..2xl
-const SIZE_FIELDS = new Set(["height", "icon", "caret", "font", "gap", "pad", "pad-edge", "radius", "min"]); // the CSS field names
+const SIZE_FIELDS = new Set(["height", "icon", "caret", "font", "gap", "padding-narrow", "padding-wide", "padding-narrow-compact", "padding-wide-compact", "radius", "min"]); // the CSS field names (TKT-0010)
 const RADII = new Set(Object.keys(s.radii)); // none sm md lg full
 const SPACE = new Set(Object.keys(s.space)); // 0..9
 const INSETS = new Set(Object.keys(s.insets).map(camel));

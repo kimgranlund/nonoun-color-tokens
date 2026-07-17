@@ -3626,7 +3626,7 @@ class HctApp extends HTMLElement {
           }),
           overridden ? btn(icon("arrow-counter-clockwise", { size: 12 }), { variant: "bare", cls: "tok-reset", title: "Reset to derived height", ariaLabel: `Reset ${name} · ${col.name} to the derived height`, onclick: () => this.clearGeomTokenOverride(name, col.modeKey) }) : false,
         ),
-        h("span", { class: "tok-sub" }, `i${s.icon} · f${s.font} · p${s.padding} · r${s.radiusPill}`),
+        h("span", { class: "tok-sub" }, `i${s.icon} · f${s.font} · p${s.paddingNarrow} · r${s.radiusPill}`),
       );
     };
     const headCells = cols.map((c) =>
@@ -6808,12 +6808,15 @@ class HctApp extends HTMLElement {
     // full XS..2XL ramp since 2026-07-16, with its _modeTierNudge hand columns) — no per-step
     // fontOverrides needed anymore; one source of truth.
     const tierType = (mult, mf) => typeScale({ ...t, bodyBase: bb * mult, modeFactor: mf, overrides: { ...(t.overrides || {}), ...this._modeTierNudge(mf) } });
-    const synth = (delta, mult, mf, overrides) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: tierType(mult, mf), overrides });
+    // per-tier GAP hand columns (the ratified gap-unit matrix, TKT-0010) — final values at the canonical
+    // baseHeight, scaled by bh/28 like the height ramps. Tablet is FROZEN at the Desktop column (the
+    // GAP_UNIT law at Tablet's smaller baseHeight would under-shoot its 2XL); Desktop itself IS the law.
+    const synth = (delta, mult, mf, overrides, gaps) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: tierType(mult, mf), overrides, gapOverrides: gaps });
     return [
-      { name: "Desktop Lg", minWidth: 1728, scale: synth(4, 1.125, 0.89, ramp([24, 28, 32, 40, 56, 72])) },
-      { name: "Desktop Xl", minWidth: 2560, scale: synth(28, 1.375, 0.80, ramp([40, 48, 56, 64, 72, 80])) },
-      { name: "Tablet", minWidth: 992, scale: synth(-2, 1, 5 / 6) },
-      { name: "Mobile", minWidth: 476, scale: synth(-4, 1, 2 / 3, ramp([16, 20, 24, 32, 40, 56])) },
+      { name: "Desktop Lg", minWidth: 1728, scale: synth(4, 1.125, 0.89, ramp([24, 28, 32, 40, 56, 72]), ramp([4, 4, 5, 7, 7, 9])) },
+      { name: "Desktop Xl", minWidth: 2560, scale: synth(28, 1.375, 0.80, ramp([40, 48, 56, 64, 72, 80]), ramp([4, 5, 6, 8, 8, 10])) },
+      { name: "Tablet", minWidth: 992, scale: synth(-2, 1, 5 / 6, undefined, ramp([3, 3, 4, 6, 6, 8])) },
+      { name: "Mobile", minWidth: 476, scale: synth(-4, 1, 2 / 3, ramp([16, 20, 24, 32, 40, 56]), ramp([3, 3, 4, 5, 5, 6])) },
     ];
   }
   // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The
@@ -7088,8 +7091,8 @@ class HctApp extends HTMLElement {
         "div",
         {
           class: "geom-ctl",
-          style: `height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline-start:${s.padding}px;padding-inline-end:${s.padding}px;border-radius:${s.radiusPill}px`,
-          title: `height ${s.height} · icon ${s.icon} · font ${s.font} · pad ${s.padding} · gap ${s.gap} · radius ${s.radiusPill}`,
+          style: `height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline-start:${s.paddingNarrow}px;padding-inline-end:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
+          title: `height ${s.height} · icon ${s.icon} · font ${s.font} · pad ${s.paddingNarrow} · gap ${s.gap} · radius ${s.radiusPill}`,
         },
         h("span", { class: "geom-glyph", style: `width:${s.icon}px;height:${s.icon}px` }, icon("calendar-blank", { size: s.icon })),
         h("span", { class: "geom-ctl-label" }, "Button"),
@@ -7105,7 +7108,7 @@ class HctApp extends HTMLElement {
           h("span", { class: "geom-spec-dims" }, `${s.height}h`),
           h("span", { class: "geom-spec-dims" }, `icon ${s.icon}`),
           h("span", { class: "geom-spec-dims" }, `font ${s.font}`),
-          h("span", { class: "geom-spec-dims" }, `pad ${s.padding}`),
+          h("span", { class: "geom-spec-dims" }, `pad ${s.paddingNarrow}`),
           h("span", { class: "geom-spec-dims" }, `r ${s.radiusPill}`),
         ),
         h("div", { class: "geom-spec-render" }, box),
@@ -7313,7 +7316,7 @@ class HctApp extends HTMLElement {
             { class: "tyi-voice-stats" },
             h("div", {}, h("dt", {}, "Icon"), h("dd", {}, `${s.icon}`)),
             h("div", {}, h("dt", {}, "Font"), h("dd", {}, `${s.font}`)),
-            h("div", {}, h("dt", {}, "Pad"), h("dd", {}, `${s.padding}`)),
+            h("div", {}, h("dt", {}, "Pad"), h("dd", {}, `${s.paddingNarrow}`)),
             h("div", {}, h("dt", {}, "Gap"), h("dd", {}, `${s.gap}`)),
             h("div", {}, h("dt", {}, "Radius"), h("dd", {}, `${s.radiusPill}`)),
           );
@@ -7420,7 +7423,7 @@ class HctApp extends HTMLElement {
         {
           class: "geom-ex-ctl",
           tabindex: "-1",
-          style: `background:${pick(main)};color:${pick(onMain)};height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline:${s.padding}px;border-radius:${s.radiusPill}px`,
+          style: `background:${pick(main)};color:${pick(onMain)};height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
         },
         h("span", { class: "geom-ex-glyph", style: `width:${s.icon}px;height:${s.icon}px` }),
         "Button",

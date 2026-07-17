@@ -811,7 +811,7 @@ function dsSemanticLayer(state) {
   return { semantic, semanticDark };
 }
 // dsGeometryLayer — the FULL geometry system (the control size ramp + composition ladders), beyond the
-// bare `spacing`/`radii` arrays: sizes (per-size height/icon/caret/font/gap/padding/edgePadding/
+// bare `spacing`/`radii` arrays: sizes (per-size height/icon/caret/font/gap/the four pads/
 // radiusPill/minWidth), insets, gaps, borders, focus ring, density. All px numbers (unit stated in $note).
 function dsGeometryLayer(geomSc) {
   if (!geomSc) return null;
@@ -1862,7 +1862,7 @@ export function dsFullLayersCss(state, typeSc, geomSc) {
     dims.push(`  --${basePfx}-density: ${geomSc.density};`);
     if (geomSc.sizes) for (const [sz, s] of Object.entries(geomSc.sizes)) {
       const z = sz.toLowerCase();
-      dims.push(`  --${basePfx}-size-${z}-height: ${s.height}px; --${basePfx}-size-${z}-icon: ${s.icon}px; --${basePfx}-size-${z}-caret: ${s.caret}px; --${basePfx}-size-${z}-font: ${s.font}px; --${basePfx}-size-${z}-gap: ${s.gap}px; --${basePfx}-size-${z}-pad: ${s.padding}px; --${basePfx}-size-${z}-pad-edge: ${s.edgePadding}px; --${basePfx}-size-${z}-radius: ${s.radiusPill}px; --${basePfx}-size-${z}-min: ${s.minWidth}px;`);
+      dims.push(`  --${basePfx}-size-${z}-height: ${s.height}px; --${basePfx}-size-${z}-icon: ${s.icon}px; --${basePfx}-size-${z}-caret: ${s.caret}px; --${basePfx}-size-${z}-font: ${s.font}px; --${basePfx}-size-${z}-gap: ${s.gap}px; --${basePfx}-size-${z}-padding-narrow: ${s.paddingNarrow}px; --${basePfx}-size-${z}-padding-wide: ${s.paddingWide}px; --${basePfx}-size-${z}-padding-narrow-compact: ${s.paddingNarrowCompact}px; --${basePfx}-size-${z}-padding-wide-compact: ${s.paddingWideCompact}px; --${basePfx}-size-${z}-radius: ${s.radiusPill}px; --${basePfx}-size-${z}-min: ${s.minWidth}px;`);
     }
     if (geomSc.radii) for (const [k, v] of Object.entries(geomSc.radii)) dims.push(`  --${basePfx}-radius-${k}: ${v}px;`);
     if (geomSc.radiusDefault != null) dims.push(`  --${basePfx}-radius-default: ${geomSc.radiusDefault}px;`);

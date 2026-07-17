@@ -30,8 +30,10 @@ ok(["comfortable", "compact", "spacious", "touch", "pill"].every((id) => G.GEOME
 {
   const s = G.geomScale({ treatment: "comfortable" });
   for (const [name, sz] of Object.entries(s.sizes)) {
-    ok(sz.padding === (sz.height - sz.icon) / 2, `${name}: padding = (h−icon)/2 (got ${sz.padding}, want ${(sz.height - sz.icon) / 2})`);
-    ok(sz.edgePadding === Math.round(sz.height / 2), `${name}: slotless edge = h/2 (got ${sz.edgePadding})`);
+    ok(sz.paddingNarrow === (sz.height - sz.icon) / 2, `${name}: paddingNarrow = (h−icon)/2 (got ${sz.paddingNarrow}, want ${(sz.height - sz.icon) / 2})`);
+    ok(sz.paddingWide === (sz.height - sz.caret) / 2, `${name}: paddingWide = (h−caret)/2 — EXACT, halves allowed (got ${sz.paddingWide})`);
+    ok(sz.paddingNarrowCompact === (sz.height - sz.gap - sz.icon) / 2, `${name}: paddingNarrowCompact = (h−gap−icon)/2 (got ${sz.paddingNarrowCompact})`);
+    ok(sz.paddingWideCompact === (sz.height - sz.gap - sz.caret) / 2, `${name}: paddingWideCompact = (h−gap−caret)/2 (got ${sz.paddingWideCompact})`);
     ok(sz.radiusPill === Math.round(sz.height / 2), `${name}: pill radius = h/2 (got ${sz.radiusPill})`);
     ok(sz.minWidth === sz.height, `${name}: min-width = height (the square floor)`);
     ok(sz.icon > 0 && sz.icon <= sz.height, `${name}: 0 < icon ≤ height`);
@@ -54,7 +56,7 @@ ok(["comfortable", "compact", "spacious", "touch", "pill"].every((id) => G.GEOME
   const a = G.geomScale({ treatment: "comfortable", baseHeight: 28 }).sizes.MD;
   const b = G.geomScale({ treatment: "compact", baseHeight: 28 }).sizes.MD;
   ok(b.gap < a.gap, `compact gap < comfortable gap at same height (got ${b.gap} vs ${a.gap})`);
-  ok(b.padding === a.padding, `density does NOT change the frame padding (got ${b.padding} vs ${a.padding})`);
+  ok(b.paddingNarrow === a.paddingNarrow, `density does NOT change the frame padding (got ${b.paddingNarrow} vs ${a.paddingNarrow})`);
   void comp;
 }
 
@@ -135,7 +137,7 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   const d = G.geomTokensDTCG(G.geomScale({ treatment: "spacious" }));
   ok(d.size && d.radius && d.space, "DTCG has size/radius/space groups");
   ok(d.size.MD.height.$type === "dimension" && /px$/.test(d.size.MD.height.$value), "DTCG dimension token (px value)");
-  ok(d.size.MD.padding.$type === "dimension" && d.radius.full.$type === "dimension", "DTCG padding + radius are dimension tokens");
+  ok(d.size.MD.paddingNarrow.$type === "dimension" && d.size.MD.paddingWideCompact.$type === "dimension" && d.radius.full.$type === "dimension", "DTCG pads (incl. compacts) + radius are dimension tokens");
 }
 
 // ── CONTROL TEXT (2026-07-16): the per-step `font` is the fixed CONTROL_FONT ramp (12·13·15·16·18·20 at
@@ -159,12 +161,27 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   const flows = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { typeScale: tuned });
   ok(flows.sizes.MD.font === 17 && flows.sizes.LG.font === base.sizes.LG.font, `a UI-control voice override flows into the composed control text (MD ${flows.sizes.MD.font})`);
   ok(G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { typeScale: ts, fontOverrides: { MD: 19 } }).sizes.MD.font === 19, "fontOverrides wins over the composition (the tier-column escape hatch)");
-  // fontOverrides: a per-size hand column replaces the law for JUST that size; gap re-derives from it
+  // fontOverrides: a per-size hand column replaces the law for JUST that size; gap does NOT track the
+  // font anymore (TKT-0010 — the calibrated GAP_UNIT is height/step-keyed, not font/2)
   const ov = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { fontOverrides: { MD: 17 } });
-  ok(ov.sizes.MD.font === 17 && ov.sizes.MD.gap === Math.round((17 / 2) * 1), `fontOverrides replaces the ramp for that size + gap re-derives (font ${ov.sizes.MD.font}, gap ${ov.sizes.MD.gap})`);
+  ok(ov.sizes.MD.font === 17 && ov.sizes.MD.gap === base.sizes.MD.gap, `fontOverrides replaces the ramp for that size; gap stays on its own calibration (font ${ov.sizes.MD.font}, gap ${ov.sizes.MD.gap})`);
   ok(ov.sizes.LG.font === base.sizes.LG.font, "a font override touches only its size, no others");
   ok(ov.sizes.MD.height === base.sizes.MD.height && ov.sizes.MD.icon === base.sizes.MD.icon && ov.sizes.MD.caret === base.sizes.MD.caret, "the FRAME (height/icon) + caret are untouched by a font override");
   ok(JSON.stringify(G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { fontOverrides: { MD: 0, LG: NaN } })) === JSON.stringify(base), "non-positive / NaN font overrides are ignored (identity gate)");
+}
+
+// ── GAP calibration (TKT-0010): the hand GAP_UNIT table (3·3·4·6·6·8 at the canonical baseHeight),
+// scaled by bh/28 × density; opts.gapOverrides (a per-mode hand column) is the FINAL value ──
+{
+  const base = G.geomScale({ treatment: "comfortable", baseHeight: 28 });
+  ok(["XS", "SM", "MD", "LG", "XL", "2XL"].map((k) => base.sizes[k].gap).join() === "3,3,4,6,6,8", `the calibrated gap column at baseHeight 28 (got ${["XS", "SM", "MD", "LG", "XL", "2XL"].map((k) => base.sizes[k].gap)})`);
+  ok(G.geomScale({ treatment: "comfortable", baseHeight: 56 }).sizes.MD.gap === 8, "the gap unit scales by baseHeight/28 (MD at bh56 = 4×2)");
+  const dense = G.geomScale({ treatment: "compact", baseHeight: 28 });
+  ok(dense.sizes["2XL"].gap === Math.max(1, Math.round(8 * 0.75)), `density still multiplies the gap (compact 2XL = round(8×0.75) = ${dense.sizes["2XL"].gap})`);
+  const gov = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { gapOverrides: { MD: 9 } });
+  ok(gov.sizes.MD.gap === 9 && gov.sizes.LG.gap === base.sizes.LG.gap, "gapOverrides is the FINAL per-size gap and touches only its size");
+  ok(gov.sizes.MD.paddingNarrowCompact === (gov.sizes.MD.height - 9 - gov.sizes.MD.icon) / 2, "the compact pads re-derive from the overridden gap");
+  ok(JSON.stringify(G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { gapOverrides: { MD: 0, LG: NaN } })) === JSON.stringify(base), "non-positive / NaN gap overrides are ignored (identity gate)");
 }
 
 // ── per-cell HEIGHT overrides (Tokens-matrix Phase 3): the height lever; icon/font/pad/radius all re-derive ──
@@ -179,9 +196,9 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   const ov = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { overrides: { MD: ovH } }).sizes.MD;
   ok(ov.height === ref.height, `override height drives buildSize (got ${ov.height}, want ${ref.height})`);
   // font does NOT track the height override — the control-text ramp is per-STEP (fixed table), not per-height (2026-07-16)
-  ok(ov.icon === ref.icon && ov.padding === ref.padding && ov.radiusPill === ref.radiusPill && ov.caret === ref.caret, "icon/pad/radius/caret ALL re-derive from the override via the laws");
+  ok(ov.icon === ref.icon && ov.paddingNarrow === ref.paddingNarrow && ov.radiusPill === ref.radiusPill && ov.caret === ref.caret, "icon/pad/radius/caret ALL re-derive from the override via the laws");
   ok(ov.font === baseline.sizes.MD.font, `font stays on the per-step control ramp under a height override (got ${ov.font})`);
-  ok(ov.padding === (ov.height - ov.icon) / 2, "the centering law still holds on the overridden cell");
+  ok(ov.paddingNarrow === (ov.height - ov.icon) / 2, "the centering law still holds on the overridden cell");
   // only the targeted size changes — every other size stays at the baseline.
   const ovScale = G.geomScale({ treatment: "comfortable", baseHeight: 28 }, { overrides: { MD: ovH } });
   ok(ovScale.sizes.LG.height === baseline.sizes.LG.height && ovScale.sizes.XS.height === baseline.sizes.XS.height, "an override touches only its size, no others");
@@ -209,7 +226,7 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(col && JSON.stringify(col.modes) === JSON.stringify(["Base", "Desktop"]), `modes = [Base, Desktop] (got ${JSON.stringify(col && col.modes)})`);
   const v = col.variables["size/MD/height"];
   ok(v && v.type === "FLOAT" && typeof v.values.Base === "number" && typeof v.values.Desktop === "number", "size/MD/height is a FLOAT variable with Base + Desktop values");
-  ok(["height", "icon", "padding", "radius", "gap"].every((f) => col.variables[`size/MD/${f}`]) && !col.variables["size/MD/font"], "size emits height/icon/padding/radius/gap and NO font row (control text lives in the Typography collection, 2026-07-16)");
+  ok(["height", "icon", "paddingNarrow", "paddingWide", "paddingNarrowCompact", "paddingWideCompact", "radius", "gap"].every((f) => col.variables[`size/MD/${f}`]) && !col.variables["size/MD/font"] && !col.variables["size/MD/padding"] && !col.variables["size/MD/edgePadding"], "size emits height/icon/the four pads/radius/gap and NO font/padding/edgePadding rows (TKT-0010 rename)");
   ok(col.variables["radius/full"] && col.variables["radius/full"].type === "FLOAT" && col.variables["space/4"], "radius + space land as FLOAT variables too");
   // per-mode values DIFFER for a breakpoint with a different baseHeight (40 vs 28) — the Desktop height is taller.
   ok(v.values.Base === base.sizes.MD.height && v.values.Desktop === wide.sizes.MD.height, "Base value = base scale; Desktop value = that mode's scale");
