@@ -46,525 +46,13 @@ import { COLLECTIONS } from "../engine/collections.js";
 import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
 import { ICON_SYSTEMS, iconSystem, iconSystemById, iconSystemLabel } from "../engine/icon-systems.mjs";
 import { icon } from "./icons.js";
-
-// ── Multi-set storage ─────────────────────────────────────────────────────────
-// persist.js owns ONE document's serialize/hydrate. The gallery needs many sets,
-// so we keep an index of sets under a sibling key; each set's doc is hydrated
-// through persist.hydrate so every field is domain-clamped on load.
-const SETS_KEY = STORAGE_KEY + "-sets";
-// The single "source of truth" config slot. In the browser it's a localStorage key; in a Figma
-// plugin the config lives IN the file on the document's root pluginData (round-tripped over the bridge).
-const PROJECT_KEY = STORAGE_KEY + "-project";
-// The per-MACHINE user profile (item 7, Layer 1) — tier + dev flag overrides. NOT per-doc (a license/tier
-// isn't a property of a brand kit), so it lives in its own storage slot alongside sets, never in the doc.
-const PROFILE_KEY = STORAGE_KEY + "-profile";
-
-// The Lemon Squeezy storefront — where a Free user buys a Pro license; the key then activates through the
-// web license SEAM (src/main.ts → Lemon Squeezy validate API). An outward LINK only (no network from this
-// file, so the offline Figma bundle stays network-free); the Account panel surfaces it in the WEB build only.
-// Deep-link to each plan's hosted checkout by VARIANT id (Pro 1849393 · Studio 1849376) — the storefront
-// root still lists both, but the CTAs land the buyer straight on the right plan.
-const CHECKOUT_STORE = "https://ultimate-tokens.lemonsqueezy.com";
-const PRO_CHECKOUT_URL = CHECKOUT_STORE + "/checkout/buy/1849393";    // Pro (single-user)
-const STUDIO_CHECKOUT_URL = CHECKOUT_STORE + "/checkout/buy/1849376"; // Studio (teams · 5 seats)
-
-// Outbound links. The product has no domain of its own: support is the repo's issue tracker, the docs are
-// the repo README, and billing is Lemon Squeezy's own customer portal. Every one of these RESOLVES today —
-// prefer a real link over a branded one that 404s.
-const REPO_URL = "https://github.com/kimgranlund/ultimate-tokens";
-const SUPPORT_URL = REPO_URL + "/issues";
-const DOCS_URL = REPO_URL + "#readme";
-const ACCOUNT_URL = "https://app.lemonsqueezy.com/my-orders";
-
-// Pro-gated export formats (the proExport flag). Free = CSS (css/oklch) + the Figma/JSON interchange; Pro =
-// DTCG + the framework configs. flagOf("proExport") is true (unlocked) while TIERS_ENFORCED is off, so these
-// only actually gate after go-live. The single-format preview shows an upsell; Download-All omits them.
-const PRO_EXPORT_FORMATS = new Set(["dtcg", "tailwind", "shadcn"]);
-
-// README shipped inside the Download-All zip's experimental figma-aliased/ folder (OD-004).
-const ALIASED_README = `figma-aliased/ — EXPERIMENTAL plugin-free cascade (OD-004)
-==========================================================
-Same tokens as ../figma/, but the Light/Dark variables carry com.figma.aliasData so they
-ALIAS the raw primitives instead of embedding resolved colors — i.e. editing a Color
-Primitive cascades to every semantic role, WITHOUT the Ultimate Tokens plugin.
-
-This native-import path is UNVERIFIED end-to-end. The ../figma/ (resolved) files always
-import cleanly; the Ultimate Tokens Figma plugin is the reliable cascade. Use this only to test
-native import, and import the primitives FIRST.
-
-To test (Figma → Local variables → Import):
-  1. Import palette.tokens.json   → creates the "Color Primitives" collection.
-  2. Import Light_tokens.json then Dark_tokens.json → creates "Color Semantic".
-  3. Open a semantic variable (e.g. primary). It should show as an ALIAS to a
-     Color Primitives variable (not a flat color), and editing that primitive should
-     update it. If it imports as resolved colors (no alias) or errors on import, the
-     cascade did not resolve — use the plugin instead.
-`;
-
-// One-time storage-key migration across the FULL rename chain:
-//   "hct-palette-state-v1-*"  ->  "nonoun-color-tokens-*"  ->  "ultimate-tokens-*"
-// A user last seen on ANY prior prefix keeps their work, so the legacy prefixes are tried
-// NEWEST-FIRST (a user who already migrated once must not have older, staler data win).
-// Idempotent (only ever fills an ABSENT new key) and tolerates a throwing localStorage
-// (the Figma sandboxed iframe) exactly the way save() does.
-const LEGACY_STORAGE_PREFIXES = ["nonoun-color-tokens", "hct-palette-state-v1"]; // newest first
-function migrateStorageKeys() {
-  try {
-    for (const [suffix, newK] of [["-sets", SETS_KEY], ["-project", PROJECT_KEY], ["-profile", PROFILE_KEY]]) {
-      if (localStorage.getItem(newK) != null) continue; // already migrated / already present
-      for (const prefix of LEGACY_STORAGE_PREFIXES) {
-        const old = localStorage.getItem(prefix + suffix);
-        if (old != null) { localStorage.setItem(newK, old); break; } // newest legacy wins
-      }
-    }
-  } catch (e) { /* storage unavailable (sandboxed iframe) — nothing to migrate */ }
-}
-
-function loadSets() {
-  let raw = null;
-  try {
-    raw = JSON.parse(localStorage.getItem(SETS_KEY) || "null");
-  } catch {
-    raw = null;
-  }
-  if (!raw || !Array.isArray(raw.sets) || raw.sets.length === 0) {
-    // Seed one "Default" set on first run.
-    const seed = defaultDocument();
-    const id = "set-" + Date.now().toString(36);
-    const sets = [{ id, name: "Default", doc: serialize(seed), updated: Date.now() }];
-    saveSets(sets);
-    return sets;
-  }
-  return raw.sets;
-}
-
-function saveSets(sets) {
-  // A sandboxed iframe (e.g. a Figma plugin UI) blocks localStorage — accessing it
-  // throws a SecurityError. Persistence is best-effort: degrade to no-persistence
-  // rather than crash the whole app on boot (loadSets's read is guarded too).
-  try {
-    localStorage.setItem(SETS_KEY, JSON.stringify({ sets }));
-  } catch {
-    /* no persistence available — run in-memory */
-  }
-}
-
-// loadProfile/saveProfile — the per-machine profile, best-effort like sets (a sandboxed Figma iframe blocks
-// localStorage). clampProfile sanitizes whatever was stored; a fresh machine → { tier:"free" }.
-function loadProfile() {
-  let raw = null;
-  try { raw = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null"); } catch { raw = null; }
-  return clampProfile(raw);
-}
-function saveProfile(profile) {
-  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(clampProfile(profile))); } catch { /* in-memory */ }
-}
-
-// defaultLicenseService — the OFFLINE default for the pluggable license SEAM (this._licenseService), item 7.
-// PURE + OFFLINE (no network): a dev/QA "manual entitlement" path so activate/validate/deactivate + the tier
-// flip + seat handling are real and testable without a server. A key shaped "PRO-XXXX" activates (a fake
-// instance id + an active entitlement); anything else is a friendly rejection. The WEB build (src/main.ts)
-// REPLACES this with a Lemon-Squeezy-backed service that talks to the public License API — those fetches are
-// WEB-ONLY and deliberately NOT written in this file, so app.js (and the offline Figma plugin bundle it
-// becomes, manifest networkAccess:"none") stays network-free. Methods may be async (the web ones are);
-// enterLicense/clearLicense await them. activate→{ ok, entitlement?, instanceId?, error? }; deactivate→{ ok }.
-const PRO_KEY_RE = /^PRO-[A-Za-z0-9]{4,}(?:-[A-Za-z0-9]+)*$/;
-const defaultLicenseService = {
-  activate(key) {
-    const k = String(key || "").trim();
-    if (PRO_KEY_RE.test(k)) return { ok: true, entitlement: { status: "active" }, instanceId: "dev-" + k.slice(-4) };
-    return { ok: false, error: "We couldn't validate that license key. Check it and try again." };
-  },
-  validate(key) {
-    const k = String(key || "").trim();
-    if (PRO_KEY_RE.test(k)) return { ok: true, entitlement: { status: "active" } };
-    return { ok: false, error: "We couldn't validate that license key. Check it and try again." };
-  },
-  deactivate() { return { ok: true }; },
-};
-
-// A human-readable label for this device's activation INSTANCE (shown in the Lemon-Squeezy dashboard; the
-// returned instance id is what actually holds the seat). Best-effort — platform if the UA exposes it.
-function licenseInstanceName() {
-  let plat = "web";
-  try { plat = (typeof navigator !== "undefined" && navigator.platform) || "web"; } catch { /* no navigator */ }
-  return "Ultimate Tokens · " + plat;
-}
-
-// The boolean capability flags exposed as dev/QA override toggles in Settings › Account (maxSets is VALUED,
-// so it's not a toggle). Each writes profile.flagOverrides via setProfile — handy for exercising a gate.
-const DEV_FLAG_TOGGLES = [
-  { key: "proExport", label: "Pro export formats", desc: "Force the Pro-only export formats on or off." },
-  { key: "advancedTreatments", label: "Advanced treatments", desc: "Force the advanced type/geometry treatments." },
-  { key: "hostedMcp", label: "Hosted MCP", desc: "Force the hosted Brand-Kit MCP capability." },
-];
-
-function newSet(name) {
-  const doc = serialize(defaultDocument());
-  return { id: "set-" + Math.random().toString(36).slice(2, 9), name, doc, updated: Date.now() };
-}
-
-// hydrateStoredDoc — hydrate a doc read from PERSISTENT storage (a saved set record). The OKLCH-native
-// default flip means an ABSENT hueSpace now hydrates to "oklch" — correct for a brand-new doc, but a
-// STORED set that predates the hueSpace field was authored under cam16 and must KEEP rendering in cam16.
-// So we stamp "cam16" on a stored doc that lacks the field BEFORE hydrate (legacy preservation). A doc
-// saved with hueSpace already set (every doc since the field landed) round-trips through untouched.
-function hydrateStoredDoc(stored) {
-  const d = stored && typeof stored === "object" && stored.hueSpace == null ? { ...stored, hueSpace: "cam16" } : stored;
-  return hydrate(d);
-}
-
-// ── app-theme injection (dogfooding) ────────────────────────────────────────────
-// The chrome themes itself with the tokens the tool generates. On boot we run the
-// tool's own `exportCSS` over the FIXED 8 default palettes (appThemeCSS) and inject
-// the result once as <style id="ultimate-tokens-theme"> into <head>, so every --c-* role and
-// raw var is available globally for styles.css to consume. We use the FIXED default
-// set (not the user's edited doc) so the chrome stays stable while a doc is edited.
-const APP_THEME_STYLE_ID = "ultimate-tokens-theme";
-function ensureAppTheme() {
-  if (typeof document === "undefined" || !document.head) return;
-  if (document.getElementById(APP_THEME_STYLE_ID)) return; // inject exactly once
-  const style = document.createElement("style");
-  style.id = APP_THEME_STYLE_ID;
-  style.textContent = appThemeCSS();
-  document.head.appendChild(style);
-}
-
-// ── typography web fonts (lazy) ─────────────────────────────────────────────────
-// FONT LOADING runs in two tiers.
-// TIER 1 — SELF-HOSTED (always): the five base treatments name four free Google Fonts — Inter, Inter Tight
-// (geometric sans), Source Serif 4 (high-contrast serif), JetBrains Mono. Their Latin subset is inlined as
-// base64 @font-face (src/ui/type-fonts.js, ~230KB), injected lazily (ensureTypeFonts, first Typography open).
-// `data:` URIs are inline, not network requests, so these render EVERYWHERE — online, offline, and inside
-// the Figma plugin (manifest networkAccess:"none", where any CDN is hard-blocked): offline-proof, privacy-
-// clean, store-compliant.
-// TIER 2 — WEB-APP ONLY (lazy CDN): per-palette typography draws on ~200 further faces, far too heavy to
-// embed. In the WEB app they are lazy-loaded from the Google Fonts CSS API on demand (ensureWebFonts) so the
-// live specimen renders the REAL face when you click between palette families. This tier IS a runtime CDN
-// request, so it is GATED OFF in the Figma plugin (this.inFigma) — there (and offline) an unbundled face
-// falls back to the generic. Every EXPORT carries the real family name regardless of what the preview loads.
-const TYPE_FONTS_LINK_ID = "ultimate-tokens-type-fonts";
-function ensureTypeFonts() {
-  if (typeof document === "undefined" || !document.head) return;
-  if (document.getElementById(TYPE_FONTS_LINK_ID)) return; // inject exactly once
-  // Inject the declarative @font-face <style> (the CSS path) …
-  const style = document.createElement("style");
-  style.id = TYPE_FONTS_LINK_ID;
-  style.textContent = TYPE_FONTS_CSS;
-  document.head.appendChild(style);
-  // … AND eagerly register + load each face via the FontFace API. The <style> @font-face path is LAZY —
-  // Chromium only activates a face the first time an element uses it, so a font not in the current
-  // treatment (e.g. Source Serif 4 while on a sans treatment) stays inactive and its first use flashes the
-  // fallback. document.fonts.add + load() activates ALL four up front (data: URIs, so still offline-safe).
-  if (document.fonts && typeof FontFace === "function") {
-    for (const m of TYPE_FONTS_CSS.matchAll(/font-family:'([^']+)';font-style:normal;font-weight:([^;]+);font-display:swap;src:url\((data:[^)]+)\)/g)) {
-      try {
-        const ff = new FontFace(m[1], `url(${m[3]})`, { weight: m[2].trim(), style: "normal", display: "swap" });
-        document.fonts.add(ff);
-        ff.load().catch(() => { /* offline/blocked — the generic fallback holds */ });
-      } catch { /* ignore a malformed face */ }
-    }
-  }
-}
-
-// ensureWebFonts (TIER 2, web-app only) — lazily load the per-palette faces that are NOT self-hosted from
-// the Google Fonts CSS API, one <link> per family (idempotent by id). GATED OFF in the Figma plugin
-// (networkAccess:"none") — call with this.inFigma. A family's config weight is served by requesting the full
-// variable range; a static/single-master face 400s that request, so we retry the default instance (the
-// typeface still renders; the browser synthesises the weight). A non-Google family 404s harmlessly and the
-// generic fallback holds.
-const SELF_HOSTED_FONTS = new Set(["Inter", "Inter Tight", "Source Serif 4", "JetBrains Mono"]);
-const GENERIC_FONTS = new Set(["serif", "sans-serif", "monospace", "system-ui", "ui-serif", "ui-sans-serif", "ui-monospace", "cursive", "fantasy", "inherit", "initial", "—"]);
-function ensureWebFont(fam) {
-  const id = "ultimate-tokens-wf-" + fam.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  if (document.getElementById(id)) return; // load each family exactly once
-  const base = "https://fonts.googleapis.com/css2?family=" + encodeURIComponent(fam).replace(/%20/g, "+");
-  const add = (href, onFail) => {
-    const link = document.createElement("link");
-    link.id = id; link.rel = "stylesheet"; link.href = href;
-    if (onFail) link.onerror = () => { link.remove(); onFail(); };
-    document.head.appendChild(link);
-  };
-  add(base + ":wght@100..900&display=swap", () => add(base + "&display=swap")); // full range → default instance on 400
-}
-function ensureWebFontPreconnect() {
-  if (document.getElementById("ultimate-tokens-wf-pc-gstatic")) return; // once (gstatic is appended last)
-  for (const [host, id, cors] of [["https://fonts.googleapis.com", "ultimate-tokens-wf-pc-gapis", false], ["https://fonts.gstatic.com", "ultimate-tokens-wf-pc-gstatic", true]]) {
-    const l = document.createElement("link"); // preconnect links must be direct <head> children
-    l.id = id; l.rel = "preconnect"; l.href = host;
-    if (cors) l.crossOrigin = "anonymous";
-    document.head.appendChild(l);
-  }
-}
-function ensureWebFonts(fonts, inFigma) {
-  if (inFigma) return; // TIER 2 is web-app only — the Figma plugin stays on the self-hosted subset
-  if (typeof document === "undefined" || !document.head || !document.createElement) return;
-  const need = Object.values(fonts || {})
-    .map((r) => (r || "").trim())
-    .filter((fam) => fam && !SELF_HOSTED_FONTS.has(fam) && !GENERIC_FONTS.has(fam.toLowerCase()));
-  if (!need.length) return; // a purely self-hosted config makes ZERO CDN contact (not even a preconnect)
-  ensureWebFontPreconnect(); // warm the Google Fonts connections only when we're actually loading a face
-  for (const fam of need) ensureWebFont(fam);
-}
-
-// setColorScheme — flip the document's color-scheme so EVERY light-dark() token —
-// the generated --c-* chrome tokens included — resolves to the chosen mode. "system" maps to
-// "light dark" so the browser follows the OS prefers-color-scheme.
-function setColorScheme(theme) {
-  if (typeof document === "undefined") return;
-  const root = document.documentElement;
-  if (root) root.style.colorScheme = theme === "system" ? "light dark" : theme; // "light" | "dark" | "light dark"
-}
-
-// ── tiny helpers ───────────────────────────────────────────────────────────────
-const h = (tag, attrs = {}, ...kids) => {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (v == null || v === false) continue;
-    if (k === "class") el.className = v;
-    else if (k === "html") el.innerHTML = v;
-    else if (k.startsWith("on") && typeof v === "function") el.addEventListener(k.slice(2), v);
-    else if (k === "style") el.setAttribute("style", v);
-    else el.setAttribute(k, v === true ? "" : v);
-  }
-  for (const kid of kids.flat()) {
-    if (kid == null || kid === false) continue;
-    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
-  }
-  return el;
-};
-const fmt = (x, d = 0) => Number(x).toFixed(d);
-const ago = (ts) => {
-  const s = (Date.now() - ts) / 1000;
-  if (s < 60) return "just now";
-  if (s < 3600) return Math.floor(s / 60) + "m ago";
-  if (s < 86400) return Math.floor(s / 3600) + "h ago";
-  return Math.floor(s / 86400) + "d ago";
-};
-
-const CURVES = ["linear", "sine", "cubic", "logistic", "exp"];
-
-// Damping presets — named one-click setups for the four differential-damping knobs
-// (damp · dampCurve · dampAmp · dampBias), so the curve is discoverable without
-// hand-tuning. "Default" is the legacy edge-damp (backward-compatible).
-const DAMP_PRESETS = [
-  { name: "Default", damp: 80, dampCurve: 1.5, dampAmp: 0, dampBias: 0 },
-  { name: "Calm ends", damp: 92, dampCurve: 2.6, dampAmp: 0, dampBias: 0 },
-  { name: "Vivid mids", damp: 70, dampCurve: 1.5, dampAmp: 55, dampBias: 0 },
-  { name: "Shade-heavy", damp: 84, dampCurve: 1.5, dampAmp: 12, dampBias: 55 },
-  { name: "Tint-heavy", damp: 84, dampCurve: 1.5, dampAmp: 12, dampBias: -55 },
-  { name: "Flat", damp: 35, dampCurve: 1, dampAmp: 0, dampBias: 0 },
-];
-
-// ── primitive factories ─────────────────────────────────────────────────────────
-// Small, presentational builders shared across the render methods so a control's
-// contract (markup + a11y) lives in ONE place instead of being re-typed inline.
-// Pure builders take their handlers as arguments and live here; the one stateful,
-// focus-managing control (segmented) is a class method below (it needs `this` to
-// re-focus after a render). See docs/reference/references/component-inventory.md.
-
-// switchControl — an accessible on/off (or either/or) switch. Replaces the old
-// `<div class=toggle onclick>` which had no role, no tab focus, and no keyboard. A
-// real <button role=switch> gets :focus-visible + Enter/Space toggling from the
-// platform; aria-checked carries the state to assistive tech. `label` is the visible
-// value (Enabled / oklch / gamut …); `ariaLabel` is the stable purpose, since the
-// sibling <label> (when present) is not programmatically associated.
-const switchControl = ({ on, onToggle, label, ariaLabel }) =>
-  h(
-    "button",
-    {
-      type: "button",
-      class: "toggle" + (on ? " on" : ""),
-      role: "switch",
-      "aria-checked": on ? "true" : "false",
-      "aria-label": ariaLabel,
-      onclick: onToggle,
-    },
-    h("span", { class: "track", "aria-hidden": "true" }),
-    h("span", { class: "toggle-label" }, label),
-  );
-
-// swatch — a fixed-size color chip, the single source for the app's many little color
-// squares (inspector dot, role refs, …). `alpha:true` lays the fill over the shared
-// checkerboard (.swatch.alpha, defined once in CSS) so translucent colors read as
-// translucent. `size` drives the --sw custom property; decorative, so aria-hidden.
-const swatch = (hex, { size = 16, alpha = false, cls = "", title, onClick } = {}) =>
-  h(
-    "span",
-    {
-      class: "swatch" + (alpha ? " alpha" : "") + (cls ? " " + cls : "") + (onClick ? " swatch-btn" : ""),
-      style: `--sw:${size}px` + (alpha ? "" : `;background:${hex}`),
-      title,
-      // opt-in interactive (e.g. the Roles inspector click-to-copy): a keyboard-accessible role=button.
-      ...(onClick
-        ? { role: "button", tabindex: "0", "aria-label": title || `Copy ${hex}`,
-            onclick: onClick,
-            onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e); } } }
-        : { "aria-hidden": "true" }),
-    },
-    alpha ? h("span", { class: "swatch-fill", style: `background:${hex}` }) : false,
-  );
-
-// btn — the app's button with a small, orthogonal variant vocabulary: ghost (default,
-// bordered), primary (accent fill), danger (ghost + danger hover), bare (no chrome — for
-// buttons that bring their own, e.g. copy-float / map-reset). Anything position- or
-// layout-specific (add-pal-btn, figma-plugin-btn, …) is an extra `cls`, NOT a variant —
-// that separation is the whole point (it un-pollutes the variant axis). Icon-only buttons
-// MUST pass `ariaLabel`. `children` is a node or an array of nodes.
-const BTN_VARIANT = { ghost: "ghost", primary: "primary", danger: "ghost danger", bare: "" };
-const btn = (children, { variant = "ghost", cls = "", title, ariaLabel, ariaPressed, onclick, type = "button", disabled } = {}) =>
-  h(
-    "button",
-    {
-      type,
-      class: [BTN_VARIANT[variant] ?? "ghost", cls].filter(Boolean).join(" "),
-      title,
-      "aria-label": ariaLabel,
-      "aria-pressed": ariaPressed,
-      disabled: disabled ? true : undefined,
-      onclick,
-    },
-    ...(Array.isArray(children) ? children : [children]),
-  );
-
-// color-scheme toggles (app chrome + canvas preview): a 3-state cycle rendered icon-only.
-// sun = light, moon = dark, the split-circle "theme" glyph = system (follow the OS).
-const SCHEME_ICON = { system: "theme", light: "sun", dark: "moon" };
-const SCHEME_NEXT = { system: "light", light: "dark", dark: "system" };
-
-// Per-treatment specimen copy — each treatment carries BESPOKE placeholder text aligned to its concept
-// (lifestyle app · luxury maison · long-form journalism · ops dashboard · gig poster), so the type
-// previews read like the world they're for instead of one shared sports demo. `para` is the Body-LG
-// long-form filler (2026-07-13: every voice is now a fixed 3-step SM/MD/LG ramp, LG is Body's largest
-// step, replacing the old Body-XL). Sub-heading/Kicker render uppercase via the engine's textTransform;
-// strings stay title-case here (except Brutalist's already-shouting label line). Voice taxonomy renamed
-// 2026-07-13: Heading→Headline, UI→Label; Quote folded into Lead, Legal folded into Body, Caption's copy
-// moved to the new Tiny voice; Title/Sub-title are new.
-const TYPE_SPECIMENS = {
-  product: {
-    "Display": "Make today count",
-    "Headline": "Your week, at a glance",
-    "Sub-heading": "This Morning",
-    "Title": "This week's habits",
-    "Sub-title": "Updated 2m ago",
-    "Body": "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go.",
-    "Lead": "The small stuff has a way of piling up. Here's a calmer place to set it down and start the day with a clear head.",
-    "Label": "Today · 4 of 6 done · 2 left",
-    "Body-mono": "GET /v1/habits/today → 200",
-    "Label-mono": "v2.4.1 · build 1197",
-    "Kicker": "Daily Brief",
-    "Tiny": "Your streak keeps itself — no daily check-in required.",
-    "Tiny-mono": "sha256:a1b2c3d4 verified locally.",
-    "UI-control": "Add habit",
-    "UI-widget": "4 left",
-    para: "A calmer way to plan your day. Set the intentions that matter, check off what you finish, and let the small stuff go — your streak keeps itself, so you can stay present for the part that actually counts.",
-  },
-  luxury: {
-    "Display": "The Maison Collection",
-    "Headline": "An invitation to slow down",
-    "Sub-heading": "The Atelier",
-    "Title": "Autumn Selections",
-    "Sub-title": "Est. 1998",
-    "Body": "Crafted in limited number, each piece is finished by hand in our atelier and made to be kept for a lifetime.",
-    "Lead": "A collection made in limited number, for those who measure luxury in decades rather than seasons.",
-    "Label": "Reserve · Suite 9 · 2 nights",
-    "Body-mono": "RES · 2026-09-14 · SUITE-09",
-    "Label-mono": "REF 09-14 · LOT 003",
-    "Kicker": "Private Reserve",
-    "Tiny": "Finished entirely by hand in the atelier, Florence.",
-    "Tiny-mono": "Serial no. MB-2026-0417.",
-    "UI-control": "Request an appointment",
-    "UI-widget": "New",
-    para: "Crafted in limited number and finished entirely by hand, every piece leaves our atelier with the quiet confidence of something built to outlast its season — and to be passed, one day, to someone you love.",
-  },
-  editorial: {
-    "Display": "The long road back",
-    "Headline": "Notes from a vanishing coastline",
-    "Sub-heading": "Field Report",
-    "Title": "The vanishing coastline",
-    "Sub-title": "Vol. 12 · No. 47",
-    "Body": "For thirty years she walked these shores at dawn. What she saw — and what she could no longer find — became the story.",
-    "Lead": "For thirty years she walked the shore at dawn — until the birds she counted began, quietly, to disappear.",
-    "Label": "Issue 47 · 12 min read · Share",
-    "Body-mono": "By J. Okonkwo · Oct 2026",
-    "Label-mono": "ISSN 2049-3630 · No. 47",
-    "Kicker": "Dispatch",
-    "Tiny": "Above: the north cove at first light, September.",
-    "Tiny-mono": "Archived at doi.org/10.1234/vc47.",
-    "UI-control": "Read the story",
-    "UI-widget": "12 min",
-    para: "For thirty years she walked these shores at dawn, counting the birds the way her mother had taught her. What she saw over those decades, and what she slowly stopped finding, is the story we set out to tell.",
-  },
-  technical: {
-    "Display": "99.98% uptime",
-    "Headline": "Cluster health overview",
-    "Sub-heading": "Live Metrics",
-    "Title": "Region-by-region breakdown",
-    "Sub-title": "us-east-1 · v2.4.1",
-    "Body": "All regions reporting nominal. Latency held under 80ms across the last 24 hours of production traffic.",
-    "Lead": "Every region reporting nominal — a look at the last 24 hours of production traffic, node by node.",
-    "Label": "p99 78ms · 1.2k rps · 0 err",
-    "Body-mono": "$ kubectl get pods -n prod",
-    "Label-mono": "v2.4.1 · commit 9f3a21c",
-    "Kicker": "System Status",
-    "Tiny": "Fig. 3 — p99 latency, rolling 24-hour window.",
-    "Tiny-mono": "trace-id: 7e2f9a1c-40b2-4e91.",
-    "UI-control": "Acknowledge all",
-    "UI-widget": "OK",
-    para: "All regions are reporting nominal: latency held under 80ms across the last 24 hours, the error budget is untouched for the quarter, and the autoscaler released eleven nodes overnight without a single dropped request.",
-  },
-  statement: {
-    "Display": "After Hours",
-    "Headline": "Three nights only",
-    "Sub-heading": "Main Stage",
-    "Title": "Main stage lineup",
-    "Sub-title": "18+ · GA + VIP",
-    "Body": "No openers. No encore. One set, start to finish, loud enough to feel in your chest.",
-    "Lead": "One set, start to finish, three nights only — loud enough to feel in your chest and gone before the city wakes.",
-    "Label": "SOLD OUT · WAITLIST OPEN",
-    "Body-mono": "FRI 02 · WAREHOUSE 9 · DTLA",
-    "Label-mono": "TICKET #04821 · GA",
-    "Kicker": "Doors 9PM",
-    "Tiny": "Warehouse 9, DTLA — doors at nine.",
-    "Tiny-mono": "Presented by NOCTURNE — est. 2019.",
-    "UI-control": "Get tickets",
-    "UI-widget": "Sold out",
-    para: "No openers, no encore, no second chances: one set from start to finish, three nights only, loud enough to feel in your chest and gone before the city wakes up. Doors at nine — don't be the one telling it secondhand.",
-  },
-};
-const TYPE_SAMPLE = (cat, t = "product") => (TYPE_SPECIMENS[t] || TYPE_SPECIMENS.product)[cat] || "The quick brown fox";
-const TYPE_PARA = (t = "product") => (TYPE_SPECIMENS[t] || TYPE_SPECIMENS.product).para;
-
-// chip — a small pill. mode "interactive" (a <button>, `on` = active/pressed) or "status"
-// (a non-interactive <span> badge, optional `tone`). Folds the in-flow pill stylings
-// (damp-presets, map-drift-sum) onto one .chip primitive. The absolutely-positioned
-// tile-tag overlay badge stays separate — it is an overlay, not an in-flow chip.
-const chip = (label, { mode = "status", on = false, tone = "", cls = "", title, onclick } = {}) => {
-  const klass = ["chip", on ? "on" : "", tone, cls].filter(Boolean).join(" ");
-  return mode === "interactive"
-    ? h("button", { type: "button", class: klass, "aria-pressed": on ? "true" : "false", title, onclick }, label)
-    : h("span", { class: klass, title }, label);
-};
-
-// the common responsive breakpoint widths offered as one-click quick-picks beside the breakpoint-mode
-// min-width field (Phase 2 — chips, not a native <datalist>: the app owns its UI + Safari's datalist on
-// number inputs is unreliable). The number field stays for any custom width.
-const MODE_WIDTH_PRESETS = [476, 768, 992, 1280, 1540];
-
-// field — a labeled control row. ASSOCIATES the <label> with the control (label[for] +
-// control[id]) so the visible label IS the control's accessible name and clicking it
-// focuses the control — the association the inline .field rows lacked (Name / Distribution
-// / Curve were screen-reader-nameless). The caller builds the control; field() stamps the
-// id and a fallback aria-label (left intact if the control already carries one, e.g. a
-// switchControl). NB: sliders carry their own label+readout, so they are not field()s.
-const field = (labelText, control, { labelTitle } = {}) => {
-  const id = "fld-" + String(labelText).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  if (control && control.setAttribute) {
-    control.setAttribute("id", id);
-    if (!control.getAttribute("aria-label")) control.setAttribute("aria-label", labelText);
-  }
-  return h("div", { class: "field" }, h("label", { for: id, title: labelTitle }, labelText), control);
-};
+import { MODE_WIDTH_PRESETS, PROJECT_KEY, PRO_EXPORT_FORMATS, SCHEME_ICON, SCHEME_NEXT, ago, btn, chip, defaultLicenseService, ensureAppTheme, ensureTypeFonts, field, fmt, h, hydrateStoredDoc, licenseInstanceName, loadProfile, loadSets, migrateStorageKeys, newSet, saveProfile, saveSets, setColorScheme, swatch } from "./app-helpers.mjs";
+import { ColorSection } from "./sections/color.js";
+import { TypeSection } from "./sections/typography.js";
+import { GeomSection } from "./sections/geometry.js";
+import { DrawerMixin } from "./overlays/drawer.js";
+import { ApplyGateMixin } from "./overlays/apply-gate.js";
+import { SettingsMixin } from "./overlays/settings.js";
 
 class HctApp extends HTMLElement {
   connectedCallback() {
@@ -668,10 +156,12 @@ class HctApp extends HTMLElement {
     this.render();
   }
 
+
   disconnectedCallback() {
     if (this._onKeyDown) document.removeEventListener("keydown", this._onKeyDown);
     if (this._mqlScheme && this._onSchemeChange) this._mqlScheme.removeEventListener("change", this._onSchemeChange);
   }
+
 
   // ── doc lifecycle ──────────────────────────────────────────────────────────
   openSet(id) {
@@ -693,9 +183,11 @@ class HctApp extends HTMLElement {
     this.render();
   }
 
+
   isDirty() {
     return this.savedSnapshot !== JSON.stringify(serialize(this.doc));
   }
+
 
   save() {
     const rec = this.sets.find((s) => s.id === this.activeId);
@@ -706,6 +198,7 @@ class HctApp extends HTMLElement {
     this.savedSnapshot = JSON.stringify(rec.doc);
     this.persistSets();
   }
+
 
   // mutate the document, autosave, and re-project. NOTE: this is the raw mutate
   // path; it does NOT snapshot history. Discrete edits go through commit() (one
@@ -725,6 +218,7 @@ class HctApp extends HTMLElement {
     if (opts.live) this.liveRefresh();
     else this.render();
   }
+
 
   // liveRefresh — a PARTIAL, in-place update of just the live-preview surfaces,
   // used during a slider drag / name-input typing so the active control's DOM
@@ -748,6 +242,7 @@ class HctApp extends HTMLElement {
       this._liveRefreshNow();
     });
   }
+
 
   _liveRefreshNow() {
     if (this.section !== "color") return; // type/geom have no live color-drag; their panes refresh on full render()
@@ -786,12 +281,14 @@ class HctApp extends HTMLElement {
     this.paintAppFooter(view);
   }
 
+
   // ── undo / redo ────────────────────────────────────────────────────────────
   // snapshot — the exact bytes persist.js stores (deep, plain, domain-clamped on
   // hydrate). Stacks hold these so undo/redo restore a WHOLE document.
   snapshot() {
     return JSON.stringify(serialize(this.doc));
   }
+
 
   // pushHistory — record the CURRENT (pre-mutation) doc as an undo point and
   // truncate the redo branch (editing after undo discards what was undone).
@@ -802,12 +299,14 @@ class HctApp extends HTMLElement {
     this.future.length = 0; // a new committed edit kills the redo branch
   }
 
+
   // commit — a COMMITTED discrete edit = ONE undo step: snapshot the pre-edit
   // doc, then mutate/save/render. (add/delete/rename/enable/global/reorder.)
   commit(fn) {
     this.pushHistory();
     this.edit(fn);
   }
+
 
   // editDrag — a continuous control (slider) edit. The FIRST input of a drag
   // captures the pre-drag snapshot once; every input mutates live; a ~250ms
@@ -818,6 +317,7 @@ class HctApp extends HTMLElement {
     if (this._dragTimer) clearTimeout(this._dragTimer);
     this._dragTimer = setTimeout(() => this.commitDrag(), 250);
   }
+
 
   // commitDrag — flush a settled drag's single pre-drag snapshot onto history.
   // Called by the debounce AND eagerly on slider 'change' (pointer release).
@@ -830,8 +330,11 @@ class HctApp extends HTMLElement {
     this._dragSnap = null;
   }
 
+
   canUndo() { return this.history.length > 0; }
+
   canRedo() { return this.future.length > 0; }
+
 
   undo() {
     this.commitDrag(); // flush any in-flight drag so it's a distinct step first
@@ -840,12 +343,14 @@ class HctApp extends HTMLElement {
     this._restore(this.history.pop());
   }
 
+
   redo() {
     this.commitDrag();
     if (!this.future.length) return;
     this.history.push(this.snapshot()); // current state becomes an undo point
     this._restore(this.future.pop());
   }
+
 
   // _restore — load a snapshot as the live doc, re-project, re-persist, and keep
   // the selection in range. Goes through hydrate so every field is domain-clamped.
@@ -861,6 +366,7 @@ class HctApp extends HTMLElement {
     this.render();
   }
 
+
   // ── keyboard shortcuts ───────────────────────────────────────────────────────
   // Installed once on the document. Undo/redo work editor-wide; the nav keys
   // (↑↓ 1/2/3 Esc f +/-) fire ONLY when the editor is shown and focus is NOT in a
@@ -870,6 +376,7 @@ class HctApp extends HTMLElement {
     this._onKeyDown = (e) => this._handleKey(e);
     document.addEventListener("keydown", this._onKeyDown);
   }
+
 
   // _isTextTarget — true when focus is in a text input / textarea / contenteditable,
   // where the bare nav keys must yield to the field (only undo/redo still apply).
@@ -886,6 +393,7 @@ class HctApp extends HTMLElement {
     }
     return false;
   }
+
 
   _handleKey(e) {
     if (this.view !== "editor") return;
@@ -961,6 +469,7 @@ class HctApp extends HTMLElement {
     }
   }
 
+
   // _selectRelative — move the selection by ±1 with WRAP across all palettes.
   _selectRelative(dir) {
     const n = this.doc.palettes.length;
@@ -970,6 +479,7 @@ class HctApp extends HTMLElement {
     this.selectPalette(next);
   }
 
+
   // _deselect — Esc with no drawer open: clear the right-pane/graph selection.
   // selectedIndex() clamps, so the panes fall back to palette 0; we mark the
   // session as having no explicit pick (kind:"none") so nothing renders 'sel'.
@@ -978,10 +488,12 @@ class HctApp extends HTMLElement {
     this.render();
   }
 
+
   fit() {
     // Recenter to origin (0,0) at the default zoom (no pan, 100%).
     this.viewport = { panX: 0, panY: 0, zoom: 1 };
   }
+
 
   // ── render dispatch ──────────────────────────────────────────────────────────
   render() {
@@ -1005,6 +517,7 @@ class HctApp extends HTMLElement {
     this._syncSettings(); // same, for the Settings modal
   }
 
+
   // _syncDrawer — reconcile the native export <dialog> with this.exportOpen AFTER each render.
   // render() rebuilds the whole subtree (a fresh, closed <dialog> each time), so an open drawer
   // must be re-promoted to the top layer via showModal(). Guarded so the headless DOM shim (no
@@ -1015,6 +528,7 @@ class HctApp extends HTMLElement {
     if (this.exportOpen && !d.open) { try { d.showModal(); } catch { /* not attached yet */ } }
     else if (!this.exportOpen && d.open) { try { d.close(); } catch { /* already closed */ } }
   }
+
 
   // _walkFind — first element in this subtree matching pred (works in the browser
   // AND the headless DOM shim; avoids attribute-selector support in querySelector).
@@ -1029,6 +543,7 @@ class HctApp extends HTMLElement {
     };
     return walk(this);
   }
+
 
   // _captureFocus — snapshot the focused control (by data-fk), its caret, and the
   // scroll offsets of [data-scroll] regions, BEFORE a render swaps the DOM out.
@@ -1049,6 +564,7 @@ class HctApp extends HTMLElement {
     return snap;
   }
 
+
   // _restoreFocus — after the render, put scroll + focus + caret back where they were.
   _restoreFocus(snap) {
     for (const [key, top, left] of snap.scroll) {
@@ -1064,6 +580,7 @@ class HctApp extends HTMLElement {
       }
     }
   }
+
 
   // ═══════════════════════════ GALLERY ═══════════════════════════
   // buildTiles — the filtered tile list for the current search query. Split out
@@ -1148,6 +665,7 @@ class HctApp extends HTMLElement {
     return [newTile, ...tiles];
   }
 
+
   // buildPresetTiles — the read-only palette shelf for ONE category category (its lazily-loaded
   // { VOLUMES, PRESETS }). Presets ship in code (generated from docs/reference/colors/categories/), never in
   // localStorage; clicking one OPENS AN EDITABLE COPY into the user's sets (openConfigAsSet hydrates +
@@ -1177,6 +695,7 @@ class HctApp extends HTMLElement {
       );
     });
   }
+
 
   // presetTile — one read-only preset card. Clicking opens an editable copy into the user's sets.
   // The strip's per-swatch WIDTH tracks the preset's own authored dominant/supporting/accent hierarchy
@@ -1237,6 +756,7 @@ class HctApp extends HTMLElement {
     );
   }
 
+
   // refreshTiles — re-render ONLY the grid hosts' children. Used on search input so the <input>
   // element is never replaced and keeps focus + caret. On the hub, search filters Your Palettes; inside
   // a category category it filters that category's palette shelf (only one host exists per view).
@@ -1245,6 +765,7 @@ class HctApp extends HTMLElement {
     if (this._presetGridHost && this.category)
       this._presetGridHost.replaceChildren(...this.buildPresetTiles(this._categoryData[this.category]));
   }
+
 
   // openCategory / closeCategory — navigate the gallery hub. Opening a category lazily loads its module
   // (one code-split chunk; cached after first open) and re-renders into the category page; while the
@@ -1258,7 +779,9 @@ class HctApp extends HTMLElement {
       .then((m) => { if (m) this._categoryData[slug] = m; if (this.category === slug) this.render(); return m; })
       .catch(() => { if (this.category === slug) this.render(); return null; });
   }
+
   closeCategory() { this.category = null; this.search = ""; this.render(); }
+
 
   // categoryCard — one category tile on the hub: a color strip sampled from the category + its name,
   // eyebrow, tagline, and palette count. Clicking opens the category page.
@@ -1277,6 +800,7 @@ class HctApp extends HTMLElement {
       ),
     );
   }
+
 
   // ensureSearchInput — the search <input> is created ONCE and reused across renders so typing never
   // loses focus (the BUG: re-render replaced it). On input we only refresh tiles.
@@ -1300,6 +824,7 @@ class HctApp extends HTMLElement {
     return this._searchInput;
   }
 
+
   renderGallery() {
     // In Figma, probe the file ONCE on open: the embedded config (lossless) if present, else the
     // variable structure (lossy fallback). Both reads return async and re-render the gallery here.
@@ -1322,6 +847,7 @@ class HctApp extends HTMLElement {
       this.category ? this.renderCategoryBody() : this.renderHubBody(),
     );
   }
+
 
   // renderHubBody — the gallery home: a STICKY masthead (title + search · description) over the
   // scrolling content — Your Palettes (your saved sets) and the Categories category grid.
@@ -1362,6 +888,7 @@ class HctApp extends HTMLElement {
       ),
     );
   }
+
 
   // renderCategoryBody — one category category page: a STICKY masthead (back-eyebrow + search · title ·
   // description) over the category's 12 volumes × 4 palettes (lazily loaded). The eyebrow row doubles
@@ -1409,6 +936,7 @@ class HctApp extends HTMLElement {
     );
   }
 
+
   // probeFigmaProject — one-shot read of the file on gallery open (Figma only): the embedded config
   // (load-config → config-loaded → applyLoadedConfig records this.fileConfig) AND the raw-colors
   // structure (read-variables → variables-read → receiveLiveVariables). Both replies re-render the
@@ -1423,11 +951,13 @@ class HctApp extends HTMLElement {
     } catch { /* no frame */ }
   }
 
+
   // tier() — the EFFECTIVE tier (item 7, Layer 2): "pro" only when the stored tier is pro AND backed by a
   // currently-active entitlement; else "free". resolveTier takes the clock here (the engine stays clockless).
   tier() {
     return resolveTier(this.profile, Date.now());
   }
+
 
   // flagOf(key) — the SINGLE gate check for a Pro/feature flag (item 7). Resolves from the EFFECTIVE tier
   // (tier(), entitlement-backed — not the raw stored tier) plus the dev overrides; returns a boolean or a
@@ -1439,6 +969,7 @@ class HctApp extends HTMLElement {
     return flagFromFlags(resolveFlags(this.profile, { nowMs: Date.now() }), key);
   }
 
+
   // setProfile(patch) — merge + clamp + persist the profile (used by the license entry + the Settings
   // « Account » dev toggles). Re-renders so any flagOf-gated UI updates.
   setProfile(patch) {
@@ -1446,6 +977,7 @@ class HctApp extends HTMLElement {
     saveProfile(this.profile);
     this.render();
   }
+
 
   // enterLicense(key) — ACTIVATE a license key through the pluggable SEAM (this._licenseService.activate) and,
   // on a currently-active entitlement, flip the profile to Pro (cached on this machine) AND record the
@@ -1492,6 +1024,7 @@ class HctApp extends HTMLElement {
     return true;
   }
 
+
   // _releaseSeat(licenseKey, instanceId) — best-effort, web-only, FIRE-AND-FORGET deactivation that frees the
   // activation seat for a teammate. Never throws, never blocks the UI; a failure (offline / hang) just leaves
   // the seat to lapse server-side. Used by clearLicense AND by enterLicense's bail (don't strand a seat).
@@ -1501,6 +1034,7 @@ class HctApp extends HTMLElement {
     try { Promise.resolve(this._licenseService.deactivate(licenseKey, instanceId)).catch(onErr); }
     catch (e) { onErr(e); }
   }
+
 
   // clearLicense() — drop the license + entitlement and return to Free (keeps any dev flagOverrides). Clears
   // LOCALLY FIRST (instant, never traps the user), THEN fires a best-effort deactivation to free this device's
@@ -1514,6 +1048,7 @@ class HctApp extends HTMLElement {
     this._releaseSeat(licenseKey, instanceId); // best-effort, after the local state is already Free
     this.toast("Switched to Free");
   }
+
 
   // revalidateLicense() — WEB-ONLY, best-effort, fired once on boot for an activated license. Re-checks the
   // key+instance against the service to (a) refresh the cached entitlement + live seat count and (b) downgrade
@@ -1546,6 +1081,7 @@ class HctApp extends HTMLElement {
     // else: ambiguous / transient not-ok → keep the cached license unchanged
   }
 
+
   // setFlagOverride(key, value) — write/clear a single dev flag override (Settings › Account toggles).
   // value === null clears the override (inherit the tier value); a boolean pins it. Persists via setProfile.
   setFlagOverride(key, value) {
@@ -1553,6 +1089,7 @@ class HctApp extends HTMLElement {
     if (value === null) delete next[key]; else next[key] = value;
     this.setProfile({ flagOverrides: next });
   }
+
 
   // persistSets — write the gallery's sets to durable storage. The browser uses localStorage; a Figma
   // plugin iframe can't (opaque origin), so it ALSO posts them to code.js → figma.clientStorage.
@@ -1563,6 +1100,7 @@ class HctApp extends HTMLElement {
     }
   }
 
+
   // receiveStoredSets — the reply to load-sets (Figma): the user's sets from figma.clientStorage.
   // Restore them into the gallery; on first run (none stored) persist the seeded Default so it
   // survives the next open. Ignored once the user has left the gallery (don't clobber a live edit).
@@ -1572,6 +1110,7 @@ class HctApp extends HTMLElement {
     else this.persistSets(); // first run for this user — persist the seeded Default to clientStorage
     this.render();
   }
+
 
   // renderFigmaImportRow — the "read a project" affordance ABOVE "Your Palettes" (Figma only).
   // Prefers the file's embedded config (an EXACT round-trip); falls back to seeding from the raw-colors
@@ -1619,6 +1158,7 @@ class HctApp extends HTMLElement {
     return false;
   }
 
+
   // readFromFigmaVariables — seed a new set from the file's variables (the APPROXIMATE fallback when no
   // config is embedded). configFromVariables recovers each family's 500 hue+chroma; openConfigAsSet then
   // shape-clamps + opens it. The user refines the controls and re-applies (which embeds an exact config).
@@ -1627,6 +1167,7 @@ class HctApp extends HTMLElement {
     if (!config) { this.toast("No readable color families in this file"); return; }
     this.openConfigAsSet(config, "Read approximate palette from variables");
   }
+
 
   // _blockedBySetCap() — true when the plan's maxSets cap is reached; also notifies + routes a web user to
   // the Account upgrade surface. The cap is flagOf("maxSets") — Infinity while TIERS_ENFORCED is off, so this
@@ -1640,11 +1181,13 @@ class HctApp extends HTMLElement {
     return true;
   }
 
+
   // _proExportLocked(id) — true when an export format is Pro-gated AND the plan doesn't unlock it. A NO-OP
   // until go-live (flagOf("proExport") is true while TIERS_ENFORCED is off).
   _proExportLocked(id) {
     return PRO_EXPORT_FORMATS.has(id) && !this.flagOf("proExport");
   }
+
 
   // _proUpsell(message) — a small inline Pro upsell block (web routes to Settings « Account »; Figma, where
   // Pro lives in the web app, just notes it). Reused by the gated export preview + the gated treatments.
@@ -1656,12 +1199,14 @@ class HctApp extends HTMLElement {
         : btn("Get Pro →", { variant: "primary", cls: "pro-upsell-cta", onclick: () => { this.settingsSection = "account"; this.openSettings(); } }));
   }
 
+
   // _treatmentLocked(id, defaultId) — true when a NON-default treatment is Pro-gated and the plan doesn't
   // unlock it (advancedTreatments). Free keeps the default (Product type / Comfortable geometry). NO-OP until
   // go-live (flagOf("advancedTreatments") is unlocked while TIERS_ENFORCED is off).
   _treatmentLocked(id, defaultId) {
     return id !== defaultId && !this.flagOf("advancedTreatments");
   }
+
 
   // _treatmentBlocked(id, defaultId) — if picking `id` is Pro-gated, notify + route to Pro (web) + re-render
   // to REVERT the <select> back to the committed treatment, and return true so the caller skips the commit.
@@ -1672,15 +1217,18 @@ class HctApp extends HTMLElement {
     return true;
   }
 
+
   _pickTypeTreatment(id) {
     if (this._treatmentBlocked(id, "product")) return;
     this.commit((d) => { d.type = { ...(d.type || DEFAULT_TYPE), treatment: id }; });
   }
 
+
   _pickGeomTreatment(id) {
     if (this._treatmentBlocked(id, "comfortable")) return;
     this.commit((d) => { d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), treatment: id, baseHeight: (GEOMETRY_TREATMENTS.find((x) => x.id === id) || GEOMETRY_TREATMENTS[0]).baseHeight }; });
   }
+
 
   createSet() {
     if (this._blockedBySetCap()) return;
@@ -1690,6 +1238,7 @@ class HctApp extends HTMLElement {
     this.persistSets();
     this.openSet(rec.id);
   }
+
 
   // importSet — load a palette config (.json from Export → Config) as a NEW set. The file
   // is UNTRUSTED data: JSON.parse (never eval), require a real palettes[] shape, then
@@ -1724,11 +1273,13 @@ class HctApp extends HTMLElement {
     input.click();
   }
 
+
   deleteSet(id) {
     this.sets = this.sets.filter((s) => s.id !== id);
     this.persistSets();
     this.render();
   }
+
 
   // ═══════════════════════════ EDITOR ═══════════════════════════
   renderEditor() {
@@ -1750,6 +1301,7 @@ class HctApp extends HTMLElement {
       this.toastEl || (this.toastEl = h("div", { class: "toast", role: "status", "aria-live": "polite" })),
     );
   }
+
 
   renderAppHeader() {
     return h(
@@ -1797,6 +1349,7 @@ class HctApp extends HTMLElement {
     );
   }
 
+
   // sectionSwitcher — the persistent editor-section tablist « Color · Typography · Geometry ».
   // Routes the whole editor (each pane branches on this.section); reuses the one segmented control
   // (roving tabindex + Arrow keys baked in). A tablist matching the existing canvas-view switcher.
@@ -1815,6 +1368,7 @@ class HctApp extends HTMLElement {
     );
   }
 
+
   // setSection — switch the active editor section. Color is byte-identical to today; the shared viewport
   // is the one crossover, so we STASH the color pan/zoom on leave and RESTORE it on return (the old modal
   // overlaid color without touching the viewport — this preserves that round-trip). Type/geom scenes
@@ -1829,10 +1383,13 @@ class HctApp extends HTMLElement {
     this.render();
   }
 
+
   // toggleLeftPane / toggleRightPane — collapse/expand a side pane (the .editor grid track → 0).
   // Ephemeral ui-session state (like segment); a full render re-applies the modifier class.
   toggleLeftPane() { this.panesLeft = !this.panesLeft; this.render(); }
+
   toggleRightPane() { this.panesRight = !this.panesRight; this.render(); }
+
 
   // paneToggle — the collapse/expand control for one side pane. The SAME button renders
   // in two places by state: while the pane is OPEN it lives in that pane's own header
@@ -1852,10 +1409,12 @@ class HctApp extends HTMLElement {
     }, icon("sidebar", { cls: left ? "" : "flip-x" }));
   }
 
+
   toGallery() {
     this.view = "gallery";
     this.render();
   }
+
 
   // app-chrome color scheme — icon-only (sun/moon/auto), cycles system → light → dark.
   themeBtn() {
@@ -1875,6 +1434,7 @@ class HctApp extends HTMLElement {
     });
   }
 
+
   // canvas-preview color scheme — icon-only (sun/moon/auto), cycles system → light → dark.
   // "system" follows the OS; INDEPENDENT of the app-chrome theme.
   canvasThemeBtn() {
@@ -1890,6 +1450,7 @@ class HctApp extends HTMLElement {
     });
   }
 
+
   // resolvedCanvasScheme — the concrete light/dark the canvas paints in: "system" maps to the OS
   // preference (prefers-color-scheme), everything else is itself.
   resolvedCanvasScheme() {
@@ -1903,6 +1464,7 @@ class HctApp extends HTMLElement {
     }
     return this.canvasTheme;
   }
+
 
   // ── left pane (ANALYSIS rail) ─────────────────────────────────────────────────
   // Stacked, scrollable analysis graphs for the SELECTED palette + (hue wheel) the
@@ -1931,139 +1493,6 @@ class HctApp extends HTMLElement {
     );
   }
 
-  // analysisCards — the left rail's graph cards for the current view. Shared by
-  // the full render (renderLeftPane) and the in-place liveRefresh, so a drag
-  // updates these graphs without a full re-render.
-  analysisCards(view) {
-    const idx = this.selectedIndex();
-    const card = (label, body) =>
-      h(
-        "div",
-        { class: "an-card" },
-        h("div", { class: "an-label" }, label),
-        body,
-      );
-    return [
-      card("L*×C — applied chroma vs gamut ceiling", this.graphLC(view, idx)),
-      card("Tone curve — L* per stop", this.graphTone(view, idx)),
-      card("Chroma curve — applied vs ceiling", this.graphChroma(view, idx)),
-      card("Contrast — on-colors vs fills (≥4.5:1)", this.graphContrast(view, idx)),
-      card("Hue wheel — all enabled palettes", this.graphHueWheel(view)),
-    ];
-  }
-
-  // ── Typography analysis (left rail, READ-ONLY) ────────────────────────────────────────
-  // The type analog of analysisCards(): cards computed from typeScale(doc.type). No inputs — pure
-  // diagnostics of the resolved scale. `view` is accepted for dispatch parity but unused (typography
-  // is doc-driven, not palette-view-driven). Reuses .an-card / .an-svg / legend().
-  typeAnalysisCards(view) {
-    const scale = this._activeTypeScale();
-    const card = (label, body) => h("div", { class: "an-card" }, h("div", { class: "an-label" }, label), body);
-    const SHORT = { "Display": "Disp", "Headline": "Head", "Sub-heading": "Sub", "Title": "Title", "Sub-title": "Subt", "Lead": "Lead", "Body": "Body", "Body-mono": "BodyM", "Label": "Label", "Label-mono": "LabelM", "Kicker": "Kick", "Tiny": "Tiny", "Tiny-mono": "TinyM", "UI-control": "UICtl", "UI-widget": "UIWdg" };
-    const series = Object.keys(scale.categories)
-      .map((c) => ({ cat: c, short: SHORT[c] || c, steps: Object.entries(scale.categories[c] || {}).map(([name, s]) => ({ name, ...s })) }))
-      .filter((x) => x.steps.length);
-    return [
-      card("Modular scale — size (px) per step", this.graphTypeScale(series)),
-      card("Optical tracking — letter-spacing vs size", this.graphTypeTracking(series)),
-      card("Leading — line-height ÷ size per step", this.graphTypeLeading(series)),
-      card("Font roles — family per voice", this.graphTypeRoles(scale)),
-    ];
-  }
-
-  // four-voice size series, X = step index within the voice (normalized so the geometric growth is
-  // comparable across voices of different length), Y = size px.
-  graphTypeScale(series) {
-    if (!series.length) return h("div", { class: "an-empty" }, "—");
-    const W = 244, H = 132, pad = 24;
-    const maxSize = Math.max(8, ...series.flatMap((g) => g.steps.map((s) => s.size))) * 1.05;
-    const X = (i, n) => pad + (n <= 1 ? 0 : i / (n - 1)) * (W - pad - 8);
-    const Y = (px) => (H - pad + 8) - (px / maxSize) * (H - pad - 8);
-    const paths = series.map((g, gi) => {
-      const n = g.steps.length;
-      const d = "M" + g.steps.map((s, i) => `${X(i, n).toFixed(1)},${Y(s.size).toFixed(1)}`).join(" L");
-      const dots = g.steps.map((s, i) => `<circle class="ty-dot ty-s${gi}" cx="${X(i, n).toFixed(1)}" cy="${Y(s.size).toFixed(1)}" r="1.6"/>`).join("");
-      return `<path class="ty-line ty-s${gi}" d="${d}"/>${dots}`;
-    }).join("");
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
-        <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
-        <text x="2" y="14">px</text>
-        <text x="${W - 40}" y="${H - pad + 18}">SM→LG</text>
-        ${paths}
-      </svg>`;
-    return h("div", {}, h("div", { class: "an-svg", html: svg }), this.legend(series.map((g, gi) => ({ mark: "ty s" + gi, label: g.short || g.cat }))));
-  }
-
-  // letter-spacing (px) vs size (px); a dashed unity line marks tracking = 0.
-  graphTypeTracking(series) {
-    if (!series.length) return h("div", { class: "an-empty" }, "—");
-    const W = 244, H = 124, pad = 26;
-    const all = series.flatMap((g) => g.steps);
-    const maxSize = Math.max(8, ...all.map((s) => s.size)) * 1.05;
-    const tr = all.map((s) => s.letterSpacing);
-    const tMax = Math.max(0.5, ...tr), tMin = Math.min(-0.5, ...tr), tSpan = (tMax - tMin) || 1;
-    const X = (px) => pad + (px / maxSize) * (W - pad - 8);
-    const Y = (t) => 8 + ((tMax - t) / tSpan) * (H - pad - 8);
-    const zeroY = Y(0).toFixed(1);
-    const paths = series.map((g, gi) => {
-      const sorted = [...g.steps].sort((a, b) => a.size - b.size);
-      const d = "M" + sorted.map((s) => `${X(s.size).toFixed(1)},${Y(s.letterSpacing).toFixed(1)}`).join(" L");
-      const dots = sorted.map((s) => `<circle class="ty-dot ty-s${gi}" cx="${X(s.size).toFixed(1)}" cy="${Y(s.letterSpacing).toFixed(1)}" r="1.6"/>`).join("");
-      return `<path class="ty-line ty-s${gi}" d="${d}"/>${dots}`;
-    }).join("");
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
-        <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
-        <line class="dg-unity" x1="${pad}" y1="${zeroY}" x2="${W - 6}" y2="${zeroY}"/>
-        <text x="2" y="${(+zeroY - 3).toFixed(1)}">0</text>
-        <text x="2" y="14">px</text>
-        <text x="${W - 30}" y="${H - pad + 18}">size→</text>
-        ${paths}
-      </svg>`;
-    return h("div", {}, h("div", { class: "an-svg", html: svg }), this.legend(series.map((g, gi) => ({ mark: "ty s" + gi, label: g.short || g.cat }))));
-  }
-
-  // leading ratio = lineHeight ÷ size per step (tight at display, loose at body). X = step index per voice.
-  graphTypeLeading(series) {
-    if (!series.length) return h("div", { class: "an-empty" }, "—");
-    const W = 244, H = 124, pad = 26;
-    const ratios = series.flatMap((g) => g.steps.map((s) => s.lineHeight / s.size));
-    const rMax = Math.max(1.7, ...ratios) * 1.02, rMin = Math.min(0.95, ...ratios), rSpan = (rMax - rMin) || 1;
-    const X = (i, n) => pad + (n <= 1 ? 0 : i / (n - 1)) * (W - pad - 8);
-    const Y = (r) => 8 + ((rMax - r) / rSpan) * (H - pad - 8);
-    const paths = series.map((g, gi) => {
-      const n = g.steps.length;
-      const d = "M" + g.steps.map((s, i) => `${X(i, n).toFixed(1)},${Y(s.lineHeight / s.size).toFixed(1)}`).join(" L");
-      const dots = g.steps.map((s, i) => `<circle class="ty-dot ty-s${gi}" cx="${X(i, n).toFixed(1)}" cy="${Y(s.lineHeight / s.size).toFixed(1)}" r="1.6"/>`).join("");
-      return `<path class="ty-line ty-s${gi}" d="${d}"/>${dots}`;
-    }).join("");
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
-        <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
-        <text x="2" y="14">×</text>
-        <text x="${W - 40}" y="${H - pad + 18}">SM→LG</text>
-        ${paths}
-      </svg>`;
-    return h("div", {}, h("div", { class: "an-svg", html: svg }), this.legend(series.map((g, gi) => ({ mark: "ty s" + gi, label: g.short || g.cat }))));
-  }
-
-  // font-role pairings — the 5 role→family assignments (no SVG; a small key, like the contrast bars).
-  graphTypeRoles(scale) {
-    const ROLES = [["display", "Display"], ["heading", "Heading"], ["body", "Body"], ["ui", "UI"], ["mono", "Mono"]];
-    return h(
-      "div",
-      { class: "ty-roles" },
-      ...ROLES.map(([role, label]) => {
-        const fam = scale.fonts[role] || "—";
-        const generic = genericFor(fam, role);
-        return h("div", { class: "ty-role" }, h("span", { class: "ty-role-k" }, label), h("span", { class: "ty-role-fam", style: `font-family:'${fam}', ${generic}` }, fam));
-      }),
-    );
-  }
 
   // legend — a small key under a multi-series graph (chips match the SVG strokes:
   // `solid` = applied/accent line, `faint` = a dashed reference line, `fill` = the
@@ -2078,6 +1507,7 @@ class HctApp extends HTMLElement {
     );
   }
 
+
   // selectedIndex — the index of the palette driving the right pane + graphs,
   // clamped into range.
   selectedIndex() {
@@ -2086,241 +1516,6 @@ class HctApp extends HTMLElement {
     return Math.max(0, Math.min(i, n - 1));
   }
 
-  // L*×C plot (moved OUT of the canvas) — applied chroma vs gamut ceiling + tone line.
-  graphLC(view, idx) {
-    const target = view.plot[idx] || view.plot[0];
-    if (!target) return h("div", { class: "an-empty" }, "—");
-    const W = 244, H = 168, pad = 26;
-    const pts = target.points;
-    const maxC = Math.max(8, ...pts.map((p) => Math.max(p.ceiling, p.applied))) * 1.05;
-    const X = (c) => pad + (c / maxC) * (W - pad - 8);
-    const Y = (l) => 8 + ((100 - l) / 100) * (H - pad - 8);
-    const ceilPath =
-      "M" + pts.map((p) => `${X(p.ceiling).toFixed(1)},${Y(p.tone).toFixed(1)}`).join(" L") +
-      ` L${X(0)},${Y(pts[pts.length - 1].tone).toFixed(1)} L${X(0)},${Y(pts[0].tone).toFixed(1)} Z`;
-    const appliedPath = "M" + pts.map((p) => `${X(p.applied).toFixed(1)},${Y(p.tone).toFixed(1)}`).join(" L");
-    const tonePath = "M" + pts.map((p) => `${X(0).toFixed(1)},${Y(p.tone).toFixed(1)}`).join(" L");
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
-        <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
-        <text x="2" y="${Y(100) + 3}">100</text>
-        <text x="6" y="${Y(0)}">0</text>
-        <text x="${W - 14}" y="${H - pad + 20}">C→</text>
-        <path class="lc-ceiling" d="${ceilPath}"/>
-        <path class="lc-toneline" d="${tonePath}"/>
-        <path class="lc-applied" d="${appliedPath}"/>
-        ${pts.map((p) => `<circle class="lc-dot" cx="${X(p.applied).toFixed(1)}" cy="${Y(p.tone).toFixed(1)}" r="2"/>`).join("")}
-      </svg>`;
-    return h(
-      "div",
-      {},
-      h("div", { class: "an-svg", html: svg }),
-      this.legend([
-        { mark: "solid", label: "applied C" },
-        { mark: "fill", label: "gamut ceiling" },
-        { mark: "faint", label: "tone L*" },
-      ]),
-    );
-  }
-
-  // Tone curve — L* (tone) per stop across the ramp.
-  graphTone(view, idx) {
-    const vp = view.palettes[idx];
-    if (!vp) return h("div", { class: "an-empty" }, "—");
-    const W = 244, H = 120, pad = 22;
-    const pts = vp.ramp;
-    const X = (i) => pad + (i / (pts.length - 1)) * (W - pad - 8);
-    const Y = (t) => 8 + ((100 - t) / 100) * (H - pad - 8);
-    const line = "M" + pts.map((s, i) => `${X(i).toFixed(1)},${Y(s.tone).toFixed(1)}`).join(" L");
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
-        <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
-        <text x="2" y="${Y(100) + 3}">L*</text>
-        <text x="${W - 26}" y="${H - pad + 18}">stops</text>
-        <path class="lc-applied" d="${line}"/>
-        ${pts.map((s, i) => `<circle class="lc-dot" cx="${X(i).toFixed(1)}" cy="${Y(s.tone).toFixed(1)}" r="1.8"/>`).join("")}
-      </svg>`;
-    return h("div", { class: "an-svg", html: svg });
-  }
-
-  // Chroma curve — applied chroma per stop vs the gamut ceiling (edge damping).
-  graphChroma(view, idx) {
-    const vp = view.palettes[idx];
-    if (!vp) return h("div", { class: "an-empty" }, "—");
-    const W = 244, H = 120, pad = 22;
-    const pts = vp.ramp;
-    const maxC = Math.max(8, ...pts.map((s) => Math.max(s.maxc, s.chroma))) * 1.05;
-    const X = (i) => pad + (i / (pts.length - 1)) * (W - pad - 8);
-    const Y = (c) => (H - pad + 8) - (c / maxC) * (H - pad - 8);
-    const ceil = "M" + pts.map((s, i) => `${X(i).toFixed(1)},${Y(s.maxc).toFixed(1)}`).join(" L");
-    const applied = "M" + pts.map((s, i) => `${X(i).toFixed(1)},${Y(s.chroma).toFixed(1)}`).join(" L");
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
-        <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
-        <text x="2" y="14">C</text>
-        <text x="${W - 26}" y="${H - pad + 18}">stops</text>
-        <path class="lc-toneline" d="${ceil}"/>
-        <path class="lc-applied" d="${applied}"/>
-        ${pts.map((s, i) => `<circle class="lc-dot" cx="${X(i).toFixed(1)}" cy="${Y(s.chroma).toFixed(1)}" r="1.6"/>`).join("")}
-      </svg>`;
-    return h(
-      "div",
-      {},
-      h("div", { class: "an-svg", html: svg }),
-      this.legend([
-        { mark: "solid", label: "applied C" },
-        { mark: "faint", label: "gamut ceiling" },
-      ]),
-    );
-  }
-
-  // Contrast — the selected palette's on-color vs fill ratios; flag <4.5:1.
-  graphContrast(view, idx) {
-    const vp = view.palettes[idx];
-    const cr = vp ? view.contrast.find((c) => c.palette === vp.name) : null;
-    if (!cr) return h("div", { class: "an-empty" }, "—");
-    const bar = (label, ratio) => {
-      const pass = ratio >= 4.5;
-      const pct = Math.min(100, (ratio / 7) * 100);
-      return h(
-        "div",
-        { class: "an-bar" },
-        h("span", { class: "an-bk" }, label),
-        h(
-          "span",
-          { class: "an-track" },
-          // the WCAG 4.5:1 pass line (track spans 0–7:1, so 4.5/7 ≈ 64.3%).
-          h("span", { class: "an-thresh", title: "4.5:1 minimum" }),
-          h("span", { class: "an-fill" + (pass ? "" : " bad"), style: `width:${pct.toFixed(0)}%` }),
-        ),
-        h("b", { class: pass ? "pass" : "fail" }, ratio.toFixed(2) + " ", icon(pass ? "check" : "warning", { size: 12 })),
-      );
-    };
-    return h(
-      "div",
-      { class: "an-contrast" },
-      bar("on/fill", cr.onFill),
-      bar("vs #fff", cr.onWhite),
-      bar("vs #000", cr.onBlack),
-    );
-  }
-
-  // dampPresets — a row of one-click chips that set all four damping knobs together.
-  // The chip matching the current values is highlighted; each is a single undo step.
-  dampPresets() {
-    const d = this.doc;
-    const active = (p) =>
-      d.damp === p.damp && d.dampCurve === p.dampCurve && d.dampAmp === p.dampAmp && d.dampBias === p.dampBias;
-    return h(
-      "div",
-      { class: "damp-presets" },
-      ...DAMP_PRESETS.map((p) =>
-        chip(p.name, {
-          mode: "interactive",
-          on: active(p),
-          title: `damp ${p.damp} · falloff ${p.dampCurve} · amplify ${p.dampAmp} · bias ${p.dampBias}`,
-          onclick: () =>
-            this.commit((doc) => {
-              doc.damp = p.damp;
-              doc.dampCurve = p.dampCurve;
-              doc.dampAmp = p.dampAmp;
-              doc.dampBias = p.dampBias;
-            }),
-        }),
-      ),
-    );
-  }
-
-  // Damping curve — the global chroma multiplier m(stop) the differential damping
-  // produces across the ramp. Crosses the 1× line (unity); dips at the ends (damp),
-  // can bulge in the mids (amplify), and tilts with bias. Palette-independent.
-  graphDamping(doc) {
-    const W = 244, H = 116, pad = 22;
-    const damp = (doc.damp ?? 80) / 100;
-    const gamma = doc.dampCurve ?? 1.5;
-    const amp = (doc.dampAmp ?? 0) / 100;
-    const bias = (doc.dampBias ?? 0) / 100;
-    const M = (stop) => {
-      const s = (stop - 500) / 450;
-      const uG = Math.abs(s) ** gamma;
-      const sideW = Math.max(0, 1 + bias * Math.sign(s));
-      return Math.max(0, 1 + amp * (1 - uG) - damp * sideW * uG);
-    };
-    const ymax = Math.max(1.15, 1 + amp) * 1.05;
-    const X = (i) => pad + (i / (STOPS.length - 1)) * (W - pad - 8);
-    const Y = (m) => H - pad + 8 - (m / ymax) * (H - pad - 8);
-    const line = "M" + STOPS.map((st, i) => `${X(i).toFixed(1)},${Y(M(st)).toFixed(1)}`).join(" L");
-    const y1 = Y(1).toFixed(1);
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
-        <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
-        <line class="dg-unity" x1="${pad}" y1="${y1}" x2="${W - 6}" y2="${y1}"/>
-        <text x="2" y="${(+y1 - 3).toFixed(1)}">1×</text>
-        <text x="${pad}" y="${H - pad + 18}">light</text>
-        <text x="${W - 24}" y="${H - pad + 18}">dark</text>
-        <path class="lc-applied" d="${line}"/>
-        ${STOPS.map((st, i) => `<circle class="lc-dot" cx="${X(i).toFixed(1)}" cy="${Y(M(st)).toFixed(1)}" r="1.6"/>`).join("")}
-      </svg>`;
-    return h("div", { class: "an-svg", html: svg });
-  }
-
-  // Hue wheel — every ENABLED palette's hue plotted around a circle (whole set).
-  graphHueWheel(view) {
-    const W = 200, H = 200, cx = W / 2, cy = H / 2, R = 78;
-    const sel = this.selectedIndex();
-    const dots = this.doc.palettes
-      .map((p, i) => ({ p, i, on: view.palettes[i] && view.palettes[i].on }))
-      .filter((x) => x.on)
-      .map(({ p, i }) => {
-        const vp = view.palettes[i];
-        const mid = vp.ramp.find((s) => s.stop === 550) || vp.ramp[Math.floor(vp.ramp.length / 2)];
-        const a = ((p.hue - 90) * Math.PI) / 180; // 0° at top, clockwise
-        const x = cx + Math.cos(a) * R;
-        const y = cy + Math.sin(a) * R;
-        const r = i === sel ? 7 : 5;
-        const ring = i === sel ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r + 3}" class="hw-ring"/>` : "";
-        return ring + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${mid.hex}" class="hw-dot"/>`;
-      })
-      .join("");
-    const ticks = [0, 90, 180, 270]
-      .map((d) => {
-        const a = ((d - 90) * Math.PI) / 180;
-        return `<text x="${(cx + Math.cos(a) * (R + 14)).toFixed(1)}" y="${(cy + Math.sin(a) * (R + 14) + 3).toFixed(1)}" text-anchor="middle">${d}°</text>`;
-      })
-      .join("");
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="${cx}" cy="${cy}" r="${R}" class="hw-circle"/>
-        ${ticks}
-        ${dots}
-      </svg>`;
-    return h("div", { class: "an-svg hw", html: svg });
-  }
-
-  // selectPalette — pick the palette that drives the right pane + selected graphs.
-  selectPalette(id) {
-    const max = this.doc.palettes.length - 1;
-    this.sel = { kind: "palette", id: Math.max(0, Math.min(id, max)) };
-    this.doc.selected = this.sel.id;
-    this.render();
-  }
-
-  // setSegment — switch the right-pane segmented control (kept in ui-session state).
-  setSegment(seg) {
-    this.segment = seg;
-    this.render();
-  }
-
-  // setCanvasView — switch the canvas between the palette ramps, the scrim overlays, and the
-  // semantic-mapping table (ui-session state, like canvasTheme — never persisted with the doc).
-  setCanvasView(v) {
-    this.canvasView = v;
-    this.render();
-  }
 
   // segmented — the one segmented control for the whole app: a row of buttons where
   // exactly one is active. Bakes in the APG keyboard model the hand-rolled variants
@@ -2371,499 +1566,6 @@ class HctApp extends HTMLElement {
     );
   }
 
-  // setStopsMode — core (19 display stops) vs extended (25 EXPORT_STOPS) for the palette ramps.
-  setStopsMode(v) {
-    this.stopsMode = v;
-    this.render();
-  }
-
-  // _canvasScene — the canvas content for the current view (one place, two call sites).
-  _canvasScene(view) {
-    if (this.canvasView === "scrims") return this.renderScrimsScene(view);
-    if (this.canvasView === "mapping") return this.renderMappingScene(view);
-    return this.renderRampsScene(view);
-  }
-
-  setMapTextMode(v) {
-    this.mapTextMode = v;
-    this.render();
-  }
-
-  // setRoleOverride — re-point a role's raw ref for one mode. Stored as a per-doc override on
-  // top of the canonical role table (doc.roleOverrides); applied in projectView + the exporters.
-  // One undo step; persisted. An empty/whitespace ref is ignored (use the reset ↺ to revert).
-  setRoleOverride(key, mode, ref) {
-    ref = String(ref || "").trim();
-    if (!ref) return;
-    this.commit((d) => {
-      d.roleOverrides = d.roleOverrides || {};
-      d.roleOverrides[key] = { ...(d.roleOverrides[key] || {}), [mode]: ref };
-    });
-  }
-
-  // commitMapRaw — free-text editor: the user typed a full token name ("neutral-600"); strip the
-  // palette prefix to the ref and store it (unknown refs degrade gracefully in resolveRoleHex).
-  commitMapRaw(key, mode, tokenName, n) {
-    const s = String(tokenName || "").trim();
-    const ref = s.startsWith(n + "-") ? s.slice(n.length + 1) : s;
-    this.setRoleOverride(key, mode, ref);
-  }
-
-  // clearRoleOverride — revert one mode of one role to canonical (drop the entry if now empty).
-  clearRoleOverride(key, mode) {
-    this.commit((d) => {
-      const e = d.roleOverrides && d.roleOverrides[key];
-      if (!e) return;
-      delete e[mode];
-      if (Object.keys(e).length === 0) delete d.roleOverrides[key];
-    });
-  }
-
-  clearAllOverrides() {
-    this.commit((d) => (d.roleOverrides = {}));
-  }
-
-  addPalette() {
-    this.commit((d) => {
-      // A new palette starts from clean defaults: every shaping control reset to neutral (skew/lift 0,
-      // edge-hue 0, same-dir off) so it never inherits the previous palette's tweaks — only the
-      // hue/chroma seed defines it. (Global controls are doc-level and shared, so they're untouched.)
-      d.palettes.push({ name: "Palette " + (d.palettes.length + 1), hue: 200, chroma: 60, skew: 0, lift: 0, hueShift: 0, hueSameDir: false, on: true });
-    });
-    this.selectPalette(this.doc.palettes.length - 1);
-  }
-
-  // ── New-Palette modal ──────────────────────────────────────────────────────────
-  // "+ Palette" opens a native <dialog> (top layer, like the export drawer) that DERIVES a
-  // new palette instead of dropping a default. Three modes (segmented tabs):
-  //   • Relative — a color-theory relationship (extend/complete/contrast/bridge/anchor/
-  //     recontextualize) computed from the included palettes' identity colors.
-  //   • Environmental — a neutral/environment tone (chroma-weighted-mean hue + a clamped low
-  //     chroma) per docs/reference/color-neutral-derivation.md.
-  //   • Custom — pick Hue + Chroma directly (parametric, the classic seed).
-  // A/B derive a TARGET OKLCH (engine/derive.mjs), seed hue+chroma from it (seedFromKeyColor),
-  // and retain it as the dominant key color; C sets hue+chroma straight. The "Derive from"
-  // strip toggles which existing palettes feed A/B — system/status palettes start excluded.
-
-  // status palettes (success/warning/error/…) carry meaning, not character — off by default.
-  _isSystemPalette(name) {
-    return /\b(success|positive|warning|error|danger|critical|negative|info)\b/.test(String(name || "").toLowerCase());
-  }
-
-  openNewPalette() {
-    const ps = this.doc.palettes || [];
-    this.newPalCtx = new Set(ps.map((_, i) => i).filter((i) => ps[i].on !== false && !this._isSystemPalette(ps[i].name)));
-    if (!this.newPalCustom) this.newPalCustom = { hue: 210, chroma: 55 };
-    this.newPalDrag = { x: 0, y: 0 }; // reset to centered each open (offset from margin:auto centre)
-    this.newPalOpen = true;
-    this.render();
-  }
-  closeNewPalette() { this.newPalOpen = false; this.render(); }
-
-  _toggleCtx(i) {
-    const ctx = this.newPalCtx || (this.newPalCtx = new Set());
-    if (ctx.has(i)) ctx.delete(i); else ctx.add(i);
-    this.render();
-  }
-
-  // _beginNewPalDrag — drag the modal by its header. The dialog is centered via `inset:0;
-  // margin:auto`, so we offset from centre with a live `transform: translate()` (set in place,
-  // no re-render → smooth) and remember the offset in newPalDrag so the next render re-applies it.
-  // A drag that starts on a header control (the close button) is ignored.
-  _beginNewPalDrag(e) {
-    if (e.target && e.target.closest && e.target.closest("button")) return;
-    const d = this.querySelector(".newpal");
-    if (!d) return;
-    const sx = e.clientX, sy = e.clientY;
-    const base = { ...(this.newPalDrag || { x: 0, y: 0 }) };
-    const move = (ev) => {
-      this.newPalDrag = { x: base.x + (ev.clientX - sx), y: base.y + (ev.clientY - sy) };
-      d.style.transform = `translate(${this.newPalDrag.x}px, ${this.newPalDrag.y}px)`;
-    };
-    const up = () => { document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", up); };
-    document.addEventListener("pointermove", move);
-    document.addEventListener("pointerup", up);
-    if (e.preventDefault) e.preventDefault();
-  }
-
-  // _syncNewPal — mirror _syncDrawer for the New-Palette <dialog>: re-promote to the top layer
-  // after each render (render rebuilds a fresh, closed dialog). Guarded for the headless shim.
-  _syncNewPal() {
-    const d = this.querySelector(".newpal");
-    if (!d || typeof d.showModal !== "function") return;
-    if (this.newPalOpen && !d.open) { try { d.showModal(); } catch { /* not attached yet */ } }
-    else if (!this.newPalOpen && d.open) { try { d.close(); } catch { /* already closed */ } }
-  }
-
-  // a context palette is "neutral" (deprioritized as a derivation primary) if it's named neutral/grey
-  // or its identity is near-grey — so a derived/leading neutral never becomes the Relative primary.
-  _isNeutralPalette(p, vp) {
-    if (/\b(neutral|grey|gray)\b/i.test(String((p && p.name) || ""))) return true;
-    return !!(vp && vp.keyOklch && vp.keyOklch[1] < 0.02);
-  }
-
-  // the included context palette indices in PRIORITY ORDER: non-neutral palettes first (in palette
-  // order — so the first non-neutral is the "primary"), neutrals last. Drives samples[0] = primary.
-  _orderedContext(view) {
-    const ctx = this.newPalCtx || new Set();
-    return [...ctx]
-      .filter((i) => view.palettes[i] && view.palettes[i].key)
-      .sort((a, b) => {
-        const na = this._isNeutralPalette(this.doc.palettes[a], view.palettes[a]) ? 1 : 0;
-        const nb = this._isNeutralPalette(this.doc.palettes[b], view.palettes[b]) ? 1 : 0;
-        return (na - nb) || (a - b); // neutrals last; otherwise palette index order
-      });
-  }
-
-  // samples for A/B = each included palette's vivid identity color as OKLCH [L,C,H], PRIORITY-ORDERED
-  // (samples[0] = the primary, so deriveRelative pivots on it — see derive.mjs).
-  newPalSamples(view) {
-    return this._orderedContext(view).map((i) => view.palettes[i].keyOklch);
-  }
-
-  // the primary context color (the highest-priority, first non-neutral included palette) — the hex
-  // the Relative relationships pivot on, shown as the preview's reference swatch.
-  _primaryContextHex(view) {
-    const o = this._orderedContext(view);
-    return o.length ? view.palettes[o[0]].key : null;
-  }
-
-  // the current tab's target: { oklch } for relative/environmental (null if no context), or
-  // { custom:true } for the parametric tab.
-  newPalTarget(view) {
-    if (this.newPalTab === "custom") return { custom: true };
-    const samples = this.newPalSamples(view);
-    if (!samples.length) return null;
-    return { oklch: this.newPalTab === "environmental" ? deriveNeutral(samples) : deriveRelative(this.newPalRel, samples) };
-  }
-
-  createNewPalette(view) {
-    // the preview IS the source of truth — commit the same palette _newPalProposed projected.
-    const proposed = this._newPalProposed(view);
-    if (!proposed) { this.toast("Pick at least one palette to derive from"); return; }
-    const tab = this.newPalTab;
-    const name = "Palette " + (this.doc.palettes.length + 1);
-    const pal = { name, hue: proposed.pal.hue, chroma: proposed.pal.chroma, skew: 0, lift: 0, hueShift: 0, hueSameDir: false, on: true };
-    if (proposed.pal.keyColors) pal.keyColors = proposed.pal.keyColors; // A/B retain the derived dominant
-    this.newPalOpen = false; // close on the commit's render (newPalOpen drives _syncNewPal)
-    this.commit((d) => d.palettes.push(pal));
-    this.selectPalette(this.doc.palettes.length - 1);
-    this.toast(tab === "environmental" ? "Neutral palette derived" : tab === "custom" ? "Palette created" : "Palette derived");
-  }
-
-  renderNewPalette(view) {
-    const ps = this.doc.palettes || [];
-    const ctx = this.newPalCtx || new Set();
-    const samples = this.newPalSamples(view);
-    const needsCtx = this.newPalTab !== "custom";
-    const blocked = needsCtx && samples.length === 0;
-    const proposed = blocked ? null : this._newPalProposed(view); // the would-be palette (projected, uncommitted)
-    const previewCss = proposed ? proposed.hex : null;
-    const TABS = [
-      { id: "relative", label: "Relative" },
-      { id: "environmental", label: "Environmental" },
-      { id: "custom", label: "Custom" },
-    ];
-    const drag = this.newPalDrag || { x: 0, y: 0 };
-    return h(
-      "dialog",
-      {
-        class: "newpal",
-        "aria-label": "New palette",
-        style: `transform: translate(${drag.x}px, ${drag.y}px)`,
-        onclick: (e) => { if (e.target === e.currentTarget) this.closeNewPalette(); },
-        oncancel: (e) => { e.preventDefault(); this.closeNewPalette(); },
-      },
-      // header doubles as the drag handle (move the whole modal); the close button is excluded.
-      h(
-        "div",
-        { class: "drawer-head newpal-head", onpointerdown: (e) => this._beginNewPalDrag(e) },
-        h("h3", {}, icon("plus"), "New palette"),
-        h("div", { class: "spacer" }),
-        btn(icon("x"), { ariaLabel: "Close", onclick: () => this.closeNewPalette() }),
-      ),
-      // "Derive from" strip — swatch-only chips (name on hover); tap to include/exclude (A/B only).
-      h(
-        "div",
-        { class: "newpal-ctx" + (needsCtx ? "" : " muted") },
-        h("div", { class: "newpal-ctx-head" }, h("b", {}, "Derive from"), h("small", {}, needsCtx ? (samples.length ? samples.length + " selected" : "select at least one") : "not used in Custom")),
-        h(
-          "div",
-          { class: "newpal-chips" },
-          ...ps.map((p, i) => {
-            const vp = view.palettes[i];
-            const on = ctx.has(i);
-            return h("button", {
-              type: "button",
-              class: "newpal-chip" + (on ? " on" : ""),
-              "aria-pressed": on ? "true" : "false",
-              "aria-label": p.name + (on ? " (included)" : " (excluded)"),
-              disabled: needsCtx ? undefined : true,
-              title: p.name, // the palette name on hover (the swatch carries no text)
-              style: `background:${vp ? vp.key : "#888"}`,
-              onclick: () => this._toggleCtx(i),
-            });
-          }),
-        ),
-      ),
-      this.segmented(TABS, this.newPalTab, (id) => { this.newPalTab = id; this.render(); }, { ariaLabel: "Derivation mode", cls: "newpal-seg", role: "group", idPrefix: "npt" }),
-      // body = two columns: LEFT = diagrams (hue×chroma circle + chroma curve), RIGHT = the
-      // segment's selection/picker + the proposed-palette preview (swatches + ramp).
-      h(
-        "div",
-        { class: "newpal-body" },
-        h(
-          "div",
-          { class: "newpal-cols" },
-          h("div", { class: "newpal-col newpal-col-left" }, ...this._newPalDiagrams(view, proposed)),
-          h("div", { class: "newpal-col newpal-col-right" }, ...this._newPalRight(view, samples, blocked, proposed)),
-        ),
-      ),
-      h(
-        "div",
-        { class: "newpal-foot" },
-        h(
-          "div",
-          { class: "newpal-preview" },
-          h("span", { class: "newpal-sw", style: `background:${previewCss || "transparent"}` }),
-          h("small", {}, blocked ? "Select a palette to derive from" : "Proposed"),
-        ),
-        h("div", { class: "spacer" }),
-        btn("Cancel", { onclick: () => this.closeNewPalette() }),
-        btn("Create palette", { variant: "primary", cls: "newpal-create", disabled: blocked, onclick: () => this.createNewPalette(view) }),
-      ),
-    );
-  }
-
-  // _newPalProposed — the would-be palette for the current settings, PROJECTED (not committed):
-  // returns { pal, view, vp, hex, target, pos } or null when A/B has no context. `pal` is the
-  // minimal palette object (hue/chroma + keyColors for A/B); `view` is its throwaway projectView
-  // (palettes[0] = vp, carrying .key + .ramp) so the diagrams + ramp render from real engine output.
-  _newPalProposed(view) {
-    const tab = this.newPalTab;
-    let pal, target = null;
-    if (tab === "custom") {
-      const c = this.newPalCustom || { hue: 210, chroma: 55 };
-      pal = { name: "_probe", hue: Math.round(c.hue), chroma: Math.round(c.chroma), on: true };
-    } else {
-      const samples = this.newPalSamples(view);
-      if (!samples.length) return null;
-      target = tab === "environmental" ? deriveNeutral(samples) : deriveRelative(this.newPalRel, samples);
-      const s = seedFromKeyColor(target, this.doc.hueSpace) || { hue: 200, chroma: 60 };
-      pal = { name: "_probe", hue: s.hue, chroma: s.chroma, on: true, keyColors: [{ role: "dominant", oklch: target.map(Number) }] };
-    }
-    let pv;
-    try { pv = projectView({ ...this.doc, palettes: [pal] }); } catch { return null; }
-    const vp = pv.palettes[0];
-    // the proposed dot's polar position: target hue/chroma for A/B; the rendered identity for Custom.
-    const oklch = target || vp.keyOklch;
-    return { pal, view: pv, vp, hex: vp.key, target, pos: { H: oklch[2], C: oklch[1] } };
-  }
-
-  // LEFT column — the diagrams. The hue×chroma circle places every context color (and the proposed
-  // one) at angle = hue, radius ∝ chroma; the chroma curve reuses the analysis-rail graph.
-  _newPalDiagrams(view, proposed) {
-    return [
-      h(
-        "div",
-        { class: "newpal-diagram" },
-        h("div", { class: "newpal-diagram-title" }, "Hue × chroma — context + proposed"),
-        this._hueCircle(view, proposed),
-      ),
-      h(
-        "div",
-        { class: "newpal-diagram" },
-        h("div", { class: "newpal-diagram-title" }, "Chroma curve — applied vs ceiling"),
-        proposed ? this.graphChroma(proposed.view, 0) : h("div", { class: "an-empty" }, "—"),
-      ),
-    ];
-  }
-
-  // _hueCircle — a polar plot: 0° at top, clockwise (90° right · 180° bottom · 270° left). Each dot
-  // sits at its hue angle; its distance from centre is its chroma normalized to the busiest sample
-  // (greys fall to the middle, vivids to the rim). The proposed color wears an accent ring.
-  _hueCircle(view, proposed) {
-    const ctx = this.newPalCtx || new Set();
-    const dots = [];
-    for (const i of ctx) {
-      const vp = view.palettes[i];
-      if (!vp || !vp.keyOklch) continue;
-      const [, C, H] = vp.keyOklch;
-      dots.push({ H, C, fill: vp.key, on: false });
-    }
-    if (proposed) dots.push({ H: proposed.pos.H, C: proposed.pos.C, fill: proposed.hex, on: true });
-    const SZ = 280, cx = SZ / 2, cy = SZ / 2, R = SZ / 2 - 30;
-    const maxC = Math.max(0.08, ...dots.map((d) => d.C)); // floor so a near-grey-only set still spreads
-    const at = (H, C) => {
-      const rr = R * Math.min(1, C / maxC), a = (H * Math.PI) / 180;
-      return [cx + rr * Math.sin(a), cy - rr * Math.cos(a)];
-    };
-    const dotSvg = dots.map((d) => {
-      const [x, y] = at(d.H, d.C);
-      return d.on
-        ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" class="hc-ring"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" class="hc-dot" fill="${d.fill}"/>`
-        : `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" class="hc-dot" fill="${d.fill}"/>`;
-    }).join("");
-    const svg = `
-      <svg width="${SZ}" height="${SZ}" viewBox="0 0 ${SZ} ${SZ}" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="${cx}" cy="${cy}" r="${R}" class="hc-rim"/>
-        <text x="${cx}" y="13" class="hc-axis" text-anchor="middle">0°</text>
-        <text x="${SZ - 4}" y="${cy + 4}" class="hc-axis" text-anchor="end">90°</text>
-        <text x="${cx}" y="${SZ - 3}" class="hc-axis" text-anchor="middle">180°</text>
-        <text x="4" y="${cy + 4}" class="hc-axis" text-anchor="start">270°</text>
-        ${dotSvg}
-      </svg>`;
-    return h("div", { class: "an-svg newpal-hc", html: svg });
-  }
-
-  // RIGHT column — segment-specific: the selection/picker, then the proposed-palette preview.
-  _newPalRight(view, samples, blocked, proposed) {
-    const pane = h("div", { class: "newpal-pp-host" }, this._newPalPreviewPane(view, proposed));
-    if (this.newPalTab === "relative") return [this._relSelect(), pane];
-    if (this.newPalTab === "environmental") {
-      return [
-        h("p", { class: "newpal-note" }, "A neutral environment tone for backgrounds, surfaces, dividers, and system text. Its hue is the chroma-weighted average of the selected palettes — the saturated members set the temperature — at a chroma low enough to still read as grey."),
-        blocked ? false : h("p", { class: "newpal-readout" }, ...this._envReadout(samples)),
-        pane,
-      ];
-    }
-    return [this._customPicker(proposed), pane];
-  }
-
-  // the relationship radio group (a single column inside the right pane).
-  _relSelect() {
-    return h(
-      "div",
-      { class: "newpal-rels", role: "radiogroup", "aria-label": "Relationship" },
-      ...RELATIONSHIPS.map((r) => {
-        const on = this.newPalRel === r.id;
-        return h(
-          "button",
-          {
-            type: "button",
-            class: "newpal-rel" + (on ? " on" : ""),
-            role: "radio",
-            "aria-checked": on ? "true" : "false",
-            onclick: () => { this.newPalRel = r.id; this.render(); },
-          },
-          h("b", { class: "newpal-rel-label" }, r.label),
-          h("small", { class: "newpal-rel-hint" }, r.hint),
-        );
-      }),
-    );
-  }
-
-  // the Custom picker — a native color picker + parametric Hue/Chroma sliders. Picking a color seeds
-  // hue/chroma from it (CAM16 recovery); the sliders fine-tune. Both touch newPalCustom (not the
-  // doc/undo stack) and refresh the preview + diagrams in place (a full render would recreate the
-  // range input mid-drag / detach the OS color panel) — the sliders re-sync on the picker's `change`.
-  _customPicker(proposed) {
-    const c = this.newPalCustom || (this.newPalCustom = { hue: 210, chroma: 55 });
-    const slider = (label, key, min, max, fmtFn) => {
-      const readout = h("b", {}, fmtFn(c[key]));
-      return h(
-        "div",
-        { class: "field" },
-        h("label", {}, label, readout),
-        h("input", {
-          type: "range",
-          "data-fk": "npc:" + key,
-          "aria-label": label,
-          min, max, step: 1, value: c[key],
-          oninput: (e) => { const v = parseFloat(e.target.value); c[key] = v; readout.textContent = fmtFn(v); this._refreshNewPalPreview(); },
-        }),
-      );
-    };
-    return h(
-      "div",
-      { class: "newpal-custom" },
-      h("p", { class: "newpal-note" }, "Pick a color, or set hue and chroma directly. The ramp builds from these the same way every palette does."),
-      h(
-        "div",
-        { class: "field newpal-color-field" },
-        h("label", {}, "Color"),
-        h("input", {
-          type: "color",
-          class: "newpal-color-input",
-          "data-fk": "npc:color",
-          "aria-label": "Pick a color",
-          value: (proposed && proposed.hex) || "#888888",
-          // live: recover hue/chroma from the picked color + refresh the preview in place (don't
-          // rebuild the input mid-pick — that would detach the OS color panel).
-          oninput: (e) => { const s = seedFromKeyColor(hexToOklch(e.target.value), this.doc.hueSpace); if (s) { c.hue = s.hue; c.chroma = s.chroma; this._refreshNewPalPreview(); } },
-          // settle: full render so the Hue/Chroma sliders move to reflect the picked color.
-          onchange: () => this.render(),
-        }),
-      ),
-      slider("Hue", "hue", 0, 360, (v) => fmt(v) + "°"),
-      slider("Chroma", "chroma", 0, 100, (v) => fmt(v) + "%"),
-    );
-  }
-
-  // the proposed-palette preview: the proposed Dominant swatch, the Primary it's derived relative to
-  // (Relative only — the priority anchor), the priority chain of the remaining context, and the full
-  // generated ramp — the colors before committing.
-  _newPalPreviewPane(view, proposed) {
-    if (!proposed) return h("div", { class: "newpal-preview-pane empty" }, h("small", {}, "Select a palette to derive from"));
-    const isRel = this.newPalTab === "relative";
-    const chain = isRel ? this._orderedContext(view).map((i) => view.palettes[i].key) : [];
-    const ord = ["Primary (anchor)", "Secondary", "Tertiary", "Quaternary"];
-    return h(
-      "div",
-      { class: "newpal-preview-pane" },
-      h("div", { class: "newpal-pp-label" }, "Proposed palette"),
-      h(
-        "div",
-        { class: "newpal-pp-swatches" },
-        this._ppSwatch("Dominant", proposed.hex),
-        chain.length ? this._ppSwatch("Primary", chain[0], "the priority color this relationship pivots on") : false,
-      ),
-      // priority chain (Relative): the ordered context — primary first, then secondary/tertiary — so
-      // the priority order driving the relationship is visible, not just the single anchor.
-      isRel && chain.length > 1
-        ? h(
-            "div",
-            { class: "newpal-pp-chain" },
-            h("small", {}, "Context priority"),
-            h(
-              "div",
-              { class: "newpal-pp-chain-row" },
-              ...chain.map((hex, i) =>
-                h("span", { class: "newpal-pp-chain-sw" + (i === 0 ? " primary" : ""), style: `background:${hex}`, title: ord[i] || `#${i + 1}` }),
-              ),
-            ),
-          )
-        : false,
-      h(
-        "div",
-        { class: "newpal-ramp" },
-        ...proposed.vp.ramp.map((s) => h("i", { class: s.inGamut ? "" : "oog", style: `background:${s.hex}`, title: `${s.stop} · ${s.hex}` })),
-      ),
-    );
-  }
-  _ppSwatch(label, css, title) {
-    return h("div", { class: "newpal-pp-sw-item", title }, h("span", { class: "newpal-pp-sw", style: `background:${css}` }), h("small", {}, label));
-  }
-
-  // _envReadout — the derived neutral's hue + chroma, as a short human line under the description.
-  _envReadout(samples) {
-    const [, C, H] = deriveNeutral(samples);
-    return ["Derived neutral: ", h("b", {}, fmt(H) + "° hue"), ", ", h("b", {}, "chroma " + C.toFixed(3)), " — a tinted grey."];
-  }
-
-  // _refreshNewPalPreview — recompute the diagrams + preview pane IN PLACE (no full render), so the
-  // Custom sliders stay smooth mid-drag (their input nodes, in the right column, are never touched).
-  _refreshNewPalPreview() {
-    const view = this._view || projectView(this.doc);
-    const blocked = this.newPalTab !== "custom" && this.newPalSamples(view).length === 0;
-    const proposed = blocked ? null : this._newPalProposed(view);
-    const left = this.querySelector(".newpal-col-left");
-    if (left) left.replaceChildren(...this._newPalDiagrams(view, proposed));
-    const host = this.querySelector(".newpal-pp-host");
-    if (host) host.replaceChildren(this._newPalPreviewPane(view, proposed));
-    const sw = this.querySelector(".newpal-sw");
-    if (sw) sw.style.background = proposed ? proposed.hex : "transparent";
-  }
 
   // ── center column ────────────────────────────────────────────────────────────
   renderCenter(view) {
@@ -2889,58 +1591,6 @@ class HctApp extends HTMLElement {
     );
   }
 
-  renderCanvasHeader() {
-    return h(
-      "div",
-      { class: "canvas-header" },
-      // when the LEFT pane is collapsed its toggle pops here, at the canvas's left edge.
-      !this.panesLeft ? this.paneToggle("left") : false,
-      // canvas content toggle — palette ramps vs the scrim overlays.
-      this.segmented(
-        [
-          { id: "palettes", label: "Palettes", title: "Palettes — the tonal ramps" },
-          { id: "scrims", label: "Scrims", title: "Scrims — the 7 translucent 500 overlays per palette, over a checkerboard" },
-          { id: "mapping", label: "Mapping", title: "Semantic Mapping — each role's Light/Dark raw token, as a table" },
-        ],
-        this.canvasView,
-        (id) => this.setCanvasView(id),
-        { cls: "canvas-seg", ariaLabel: "Canvas view", idPrefix: "cview" },
-      ),
-      // stops density (Palettes + Scrims ramps): 19 core stops vs the 25 extended set (half-steps).
-      this.canvasView !== "mapping"
-        ? this.segmented(
-            [
-              { id: "core", label: "Core", title: "19 stops · 050/100/150/200/…" },
-              { id: "extended", label: "All", title: "25 stops · adds 075/125/175/825/875/925" },
-            ],
-            this.stopsMode,
-            (id) => this.setStopsMode(id),
-            { cls: "canvas-seg", ariaLabel: "Ramp stops", role: "group", idPrefix: "stops" },
-          )
-        : false,
-      // trailing tool group, right-aligned: fit · scheme · zoom · + Palette.
-      h("div", { class: "spacer" }),
-      // fit/orient — reset the canvas view to centre at 100% (icon-only).
-      btn(icon("crosshair"), {
-        title: "Fit — reset the canvas view to centre at 100%",
-        ariaLabel: "Fit — reset the canvas view to centre at 100%",
-        onclick: () => {
-          this.fit();
-          this.render();
-        },
-      }),
-      // unified Mode control — the Color section's value modes: Light · Dark · Both (Both = the side-by-side
-      // Compare view). Generalizes the old sun/moon/auto scheme toggle (Type/Geom keep canvasThemeBtn until
-      // breakpoints land).
-      this.colorModeControl(),
-      btn(icon("minus"), { ariaLabel: "Zoom out", onclick: () => this.zoomBy(-1) }),
-      h("span", { class: "zoom-readout", role: "status", "aria-live": "polite", "aria-label": "Zoom level" }, Math.round(this.viewport.zoom * 100) + "%"),
-      btn(icon("plus"), { ariaLabel: "Zoom in", onclick: () => this.zoomBy(1) }),
-      btn([icon("plus"), "Palette"], { cls: "add-pal-btn", title: "Create a new palette — derive it from your palette set, or pick one custom", onclick: () => this.openNewPalette() }),
-      // when the RIGHT pane is collapsed its toggle pops here, at the canvas's right edge.
-      !this.panesRight ? this.paneToggle("right") : false,
-    );
-  }
 
   // zoomAround — set the zoom to z1, keeping the content point under (cx, cy)
   // FIXED, where (cx, cy) is a pixel offset from the viewport centre. The scene's
@@ -2962,10 +1612,12 @@ class HctApp extends HTMLElement {
     this.applyTransform();
   }
 
+
   zoomBy(dir) {
     // keyboard / button zoom: about the viewport centre (cx = cy = 0).
     this.zoomAround(this.viewport.zoom * (dir > 0 ? 1.15 : 1 / 1.15));
   }
+
 
   // applyTransform — push the live viewport (panX, panY, zoom) onto the inner
   // content layer as a single CSS transform. The scene is CSS-anchored at the
@@ -2981,6 +1633,7 @@ class HctApp extends HTMLElement {
     if (r) r.textContent = Math.round(this.viewport.zoom * 100) + "%";
     this.paintCanvasFooter();
   }
+
 
   // canvasBg — the canvas backdrop. When a palette is EXPLICITLY selected it's that palette's
   // NEAR-EDGE color: its 125 stop in light preview, its 875 stop in dark (a faintly-hued near-edge
@@ -2999,6 +1652,7 @@ class HctApp extends HTMLElement {
     return "#" + g + g + g;
   }
 
+
   // containerBg — a palette ROW container is tinted with that palette's OWN faintly-hued tone, so
   // each card carries a wash of its palette. It tracks the CANVAS preview scheme (75 in light, 925
   // in dark — symmetric, mirroring canvasBg's 125/875): the row's name text is var(--ink), which
@@ -3012,191 +1666,6 @@ class HctApp extends HTMLElement {
     return s ? s.hex : "";
   }
 
-  // The canvas IS the 2D pannable space; the ramp rows ARE the palette navigator. The Mapping
-  // view is a DATA TABLE, not a visual scene — it scrolls instead of pan/zoom (is-table).
-  renderCanvasArea(view) {
-    const isTable = this.canvasView === "mapping";
-    // Color "Both" mode → the side-by-side Compare (Palettes/Scrims only; the Mapping table already shows
-    // both modes' refs, so it renders normally).
-    if (this.section === "color" && this.colorMode === "both" && !isTable) return this.renderCompareArea(view);
-    const scene = this._canvasScene(view);
-    const area = h(
-      "div",
-      {
-        class: "canvas-area canvas-scheme-" + this.resolvedCanvasScheme() + (isTable ? " is-table" : ""),
-        style: "--canvas-bg:" + this.canvasBg(),
-        role: "group",
-        "aria-label": isTable ? "Semantic mapping table" : "Palette canvas — drag to pan, wheel to zoom, double-click to reset",
-      },
-      h("div", { class: "canvas-scene" }, scene),
-    );
-    if (!isTable) {
-      // shift-drag (or middle-drag) pans · wheel zooms about cursor · click selects.
-      this.wirePanZoom(area);
-      // Apply the live transform after layout so the readout + centering are correct.
-      requestAnimationFrame(() => this.applyTransform());
-    }
-    return area;
-  }
-
-  // colorModeControl — the unified Mode control in the Color canvas header (Light · Dark · Both). It
-  // replaces the old sun/moon/auto scheme toggle: Light/Dark preview a single value mode, Both opens the
-  // side-by-side Compare. (Type/Geom keep canvasThemeBtn until breakpoints add their modes — Phase 5.)
-  colorModeControl() {
-    return this.segmented(
-      [
-        { id: "light", label: "Light", title: "Preview the Light value mode" },
-        { id: "dark", label: "Dark", title: "Preview the Dark value mode" },
-        { id: "both", label: "Both", title: "Compare — Light & Dark side by side" },
-      ],
-      this.colorMode,
-      (id) => this.setColorMode(id),
-      { cls: "canvas-seg", ariaLabel: "Color value mode", role: "group", idPrefix: "cmode" },
-    );
-  }
-  setColorMode(v) { this.colorMode = v; this.render(); }
-
-  // renderCompareArea — the Color "Both" mode: the canvas scene rendered in Light AND Dark, side by side,
-  // inside ONE pannable .canvas-scene (so pan/zoom/fit move both columns together). Each column forces its
-  // own scheme via _schemeOverride, so canvasBg() + every resolvedCanvasScheme() read while the scene
-  // builds resolves per-column.
-  renderCompareArea(view) {
-    const area = h(
-      "div",
-      { class: "canvas-area canvas-compare", role: "group", "aria-label": "Compare — Light and Dark side by side · drag to pan, wheel to zoom" },
-      h("div", { class: "canvas-scene compare" },
-        this._compareColumn(view, "light"),
-        this._compareColumn(view, "dark")),
-    );
-    this.wirePanZoom(area);
-    requestAnimationFrame(() => this.applyTransform());
-    return area;
-  }
-  _compareColumn(view, scheme) {
-    this._schemeOverride = scheme; // force resolvedCanvasScheme() while this column's scene + bg resolve
-    const bg = this.canvasBg();
-    const scene = this._canvasScene(view);
-    this._schemeOverride = null;
-    return h(
-      "div",
-      { class: "compare-col canvas-scheme-" + scheme, style: "--canvas-bg:" + bg },
-      h("div", { class: "compare-col-label" }, scheme === "dark" ? "Dark" : "Light"),
-      scene,
-    );
-  }
-
-  setTypeSpecMode(v) { this.typeSpecMode = v; this.render(); }
-
-  // ── Typography breakpoint modes (Phase 5) — named bodyBase variants layered over doc.type. The ACTIVE
-  // mode drives the canvas preview + the inspector; "base" is doc.type itself. (Per-mode Compare + export
-  // are the follow-up slices.) Modes persist on doc.type.modes = [{ id, name, bodyBase }].
-  // _effTypeMode — the mode the ACTIVE resolvers paint in: a Compare column's _typeModeOverride wins (so its
-  // scene + scale build at THAT breakpoint while it renders, exactly like _schemeOverride), else this.typeMode.
-  // "compare" is not a real mode id, so off-override it falls through _typeScaleFor's unknown-mode → base.
-  _effTypeMode() { return this._typeModeOverride != null ? this._typeModeOverride : this.typeMode; }
-  _activeType() {
-    const t = this.doc.type || DEFAULT_TYPE;
-    const mode = this._effTypeMode();
-    if (mode === "base") return t;
-    const m = (t.modes || []).find((x) => x.id === mode);
-    // a factor mode (the Standard set) keeps the doc bodyBase — the compression lives in the scale, not here.
-    return m ? { ...t, bodyBase: m.bodyBase ?? t.bodyBase } : t; // a deleted/unknown mode (incl. "compare") falls back to base
-  }
-  // the resolved type scale at the ACTIVE mode, WITH that mode's per-cell overrides (so the specimen +
-  // inspector reflect the matrix edits). A deleted/unknown mode resolves through "base" in _typeScaleFor.
-  _activeTypeScale() {
-    const t = this.doc.type || DEFAULT_TYPE;
-    const mode = this._effTypeMode();
-    const key = mode === "base" || !(t.modes || []).some((m) => m.id === mode) ? "base" : mode;
-    return this._typeScaleFor(key);
-  }
-  // the Mode control in the Typography canvas header: the base layer + each breakpoint, plus "+" to add one.
-  // A NAMED base (doc.type.baseName, e.g. "Mobile" — the standard set) renders LAST: the canonical order is
-  // desktop-first (Desktop · Tablet · Mobile), matching the Figma mode-column order the emitters produce.
-  typeModeControl() {
-    const t = this.doc.type || DEFAULT_TYPE;
-    const modes = t.modes || [];
-    const { baseName: bn, baseLast } = this._typeBaseOpts();
-    // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
-    if (this.typeMode !== "base" && this.typeMode !== "compare" && !modes.some((m) => m.id === this.typeMode)) this.typeMode = "base";
-    const baseItem = { id: "base", label: bn, title: `${bn} type scale · ${t.bodyBase ?? DEFAULT_TYPE.bodyBase}px` };
-    const modeItems = modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: m.factor ? `${m.name || "Mode"} · display ×${Math.round(m.factor * 100)}% (body frozen)` : `${m.name || "Mode"} · ${m.bodyBase}px body` }));
-    const items = [
-      ...(baseLast ? [...modeItems, baseItem] : [baseItem, ...modeItems]),
-      // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only the base, so only when ≥1 mode.
-      ...(modes.length ? [{ id: "compare", label: "Compare", title: "All breakpoints side by side" }] : []),
-    ];
-    return h(
-      "div",
-      { class: "mode-control" },
-      this.segmented(items, this.typeMode, (id) => { this.typeMode = id; this.render(); },
-        { cls: "canvas-seg", ariaLabel: "Typography breakpoint mode", role: "group", idPrefix: "tmode" }),
-      btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named scale with its own body size", onclick: () => this.addTypeMode() }),
-      // one-click standard set — only while no modes exist (it would duplicate names otherwise). It
-      // MATERIALIZES the intrinsic synthesized modes as editable doc modes (same values, same law).
-      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Materialize the standard breakpoints for editing — your scale IS Desktop (1280, Figma's default mode); Tablet 992 and Mobile ≤476 derive down with body frozen and display compressed (×83% / ×67% at the top of the ramp).", onclick: () => this.addStandardTypeModes() })] : []),
-    );
-  }
-  // addStandardTypeModes — materialize the intrinsic standard set as editable doc modes (Kim's ratified
-  // desktop-anchored law, 2026-07-10): the designed scale IS Desktop (the base, first, Figma's default
-  // mode — baseName "Desktop"); Tablet (992) and Mobile (≤476, marker minWidth 476) derive DOWN via the
-  // hierarchy-aware `factor` (body frozen, display ×5/6 / ×2/3). Same values the synthesized (no-modes)
-  // shape exports — committing just makes them matrix-editable. The split CSS export (typeTokensCSS for
-  // the unconditional Desktop base + typeTokensBreakpointCSS per mode) reads these directly, no re-anchor.
-  addStandardTypeModes() {
-    const seed = Date.now().toString(36);
-    const rungs = [{ name: "Tablet", w: 992, factor: 5 / 6 }, { name: "Mobile", w: 476, factor: 2 / 3 }];
-    this.typeMode = "base"; // stay on Desktop (the designed scale — nothing about it changed)
-    this.commit((d) => {
-      d.type = { ...(d.type || DEFAULT_TYPE), baseName: "Desktop" };
-      const modes = d.type.modes ? [...d.type.modes] : [];
-      rungs.forEach((r, i) => modes.push({ id: `tm-${seed}-${i}`, name: r.name, factor: r.factor, minWidth: r.w }));
-      d.type.modes = modes;
-    });
-  }
-  addTypeMode() {
-    const id = "tm-" + Date.now().toString(36);
-    this.typeMode = id; // point at the new mode (resolves to base until the commit lands)
-    this.commit((d) => {
-      d.type = { ...(d.type || DEFAULT_TYPE) };
-      const modes = d.type.modes ? [...d.type.modes] : [];
-      modes.push({ id, name: "Mode " + (modes.length + 1), bodyBase: d.type.bodyBase ?? DEFAULT_TYPE.bodyBase });
-      d.type.modes = modes;
-    });
-  }
-  deleteTypeMode(id) {
-    // fall back to Base if we're deleting the active mode, OR if Compare would be left with no modes.
-    const remaining = (this.doc.type && this.doc.type.modes || []).filter((m) => m.id !== id).length;
-    if (this.typeMode === id || (this.typeMode === "compare" && remaining === 0)) this.typeMode = "base";
-    this.commit((d) => {
-      if (!d.type || !Array.isArray(d.type.modes)) return;
-      d.type = { ...d.type, modes: d.type.modes.filter((m) => m.id !== id) };
-      if (d.type.modes.length === 0) delete d.type.modes;
-      // strip this mode's per-cell overrides too — orphaned "...|<id>" keys would otherwise survive
-      // serialize→hydrate forever (a stale-override leak with no UI to reach them).
-      if (d.type.tokenOverrides) {
-        d.type = { ...d.type, tokenOverrides: { ...d.type.tokenOverrides } };
-        for (const k of Object.keys(d.type.tokenOverrides)) if (k.endsWith("|" + id)) delete d.type.tokenOverrides[k];
-        if (!Object.keys(d.type.tokenOverrides).length) delete d.type.tokenOverrides;
-      }
-    });
-  }
-  renameTypeMode(id, name) {
-    this.commit((d) => {
-      if (!d.type || !Array.isArray(d.type.modes)) return;
-      d.type = { ...d.type, modes: d.type.modes.map((m) => (m.id === id ? { ...m, name: name || m.name } : m)) };
-    });
-  }
-  // the Scale-tab body-size slider edits the ACTIVE mode (base → doc.type.bodyBase; a mode → its bodyBase).
-  _setActiveTypeBodyBase(v) {
-    const bb = Math.round(v);
-    this.editDrag((d) => {
-      d.type = { ...(d.type || DEFAULT_TYPE) };
-      // Compare shows the Base scale in the inspector, so its slider edits Base (not a per-mode no-op).
-      if (this.typeMode === "base" || this.typeMode === "compare") d.type.bodyBase = bb;
-      else d.type.modes = (d.type.modes || []).map((m) => (m.id === this.typeMode ? { ...m, bodyBase: bb } : m));
-    });
-  }
   // the Scale-tab editor block: a hint when on Base, or rename + delete for the active breakpoint mode.
   // _modeWidthPresets — the common-breakpoint quick-picks under the min-width field (Phase 2). Each chip
   // sets the active mode's minWidth through the SAME setter as the number field; the matching one is active.
@@ -3210,138 +1679,6 @@ class HctApp extends HTMLElement {
     );
   }
 
-  _typeModeEditor() {
-    const t = this.doc.type || DEFAULT_TYPE;
-    if (this.typeMode === "base") {
-      const n = (t.modes || []).length;
-      return h("p", { class: "insp-sub tyi-future" }, n
-        ? `${n} breakpoint mode${n > 1 ? "s" : ""} — switch them from the canvas header; each carries its own body size (per-mode export is coming).`
-        : "Add a breakpoint (the + in the canvas header) to give this scale a second body size for another screen — e.g. a smaller mobile body.");
-    }
-    const m = (t.modes || []).find((x) => x.id === this.typeMode);
-    if (!m) return false;
-    return h(
-      "div",
-      { class: "mode-editor" },
-      h("label", { class: "mode-editor-label", for: "fld-mode-name" }, "Breakpoint name"),
-      h(
-        "div",
-        { class: "mode-editor-row" },
-        h("input", { id: "fld-mode-name", type: "text", value: m.name, "data-fk": "tmode-name", "aria-label": "Breakpoint mode name",
-          onchange: (e) => this.renameTypeMode(m.id, e.target.value.trim()) }),
-        btn(icon("trash"), { ariaLabel: "Delete this breakpoint", title: "Delete this breakpoint mode", onclick: () => this.deleteTypeMode(m.id) }),
-      ),
-      h("label", { class: "mode-editor-label", for: "fld-mode-mw" }, "Breakpoint width — @media min-width"),
-      h(
-        "div",
-        { class: "mode-editor-row" },
-        h("input", { id: "fld-mode-mw", type: "number", min: 0, max: 3840, step: 1, value: m.minWidth || "", placeholder: "e.g. 768", "data-fk": "tmode-mw", "aria-label": "Breakpoint min-width in px",
-          onchange: (e) => this.setTypeModeMinWidth(m.id, e.target.value) }),
-        h("span", { class: "mode-editor-unit" }, "px"),
-      ),
-      this._modeWidthPresets(m.minWidth, (w) => this.setTypeModeMinWidth(m.id, w)),
-      h("p", { class: "insp-sub tyi-future" }, m.minWidth
-        ? `Exports as @media (min-width: ${m.minWidth}px) — the size vars re-declare at this body size above ${m.minWidth}px.`
-        : "Set a width to emit a CSS @media breakpoint in the export; blank = preview-only."),
-    );
-  }
-  setTypeModeMinWidth(id, v) {
-    const n = Math.round(Number(v));
-    this.commit((d) => {
-      if (!d.type || !Array.isArray(d.type.modes)) return;
-      d.type = { ...d.type, modes: d.type.modes.map((m) => {
-        if (m.id !== id) return m;
-        const mm = { ...m };
-        if (Number.isFinite(n) && n > 0) mm.minWidth = Math.max(1, Math.min(3840, n)); else delete mm.minWidth;
-        return mm;
-      }) };
-    });
-  }
-
-  // renderTypeCanvasHeader — the Typography section's own canvas header: pane toggles + the
-  // Specimen·Tokens mode segment + the reused fit/scheme/zoom controls. It deliberately omits the
-  // color-only Palettes/Scrims/Mapping + stops segments and the "+ Palette" button.
-  renderTypeCanvasHeader() {
-    return h(
-      "div",
-      { class: "canvas-header" },
-      !this.panesLeft ? this.paneToggle("left") : false,
-      this.typeMode === "compare" ? false : this.segmented(
-        [
-          { id: "specimen", label: "Specimen", title: "Live faces — render each step in the real font" },
-          { id: "tokens", label: "Tokens", title: "Editable token matrix — every step × Base + each breakpoint" },
-        ],
-        this.typeSpecMode,
-        (id) => this.setTypeSpecMode(id),
-        { cls: "canvas-seg", ariaLabel: "Type specimen mode", role: "group", idPrefix: "tspec" },
-      ),
-      this.typeModeControl(),
-      h("div", { class: "spacer" }),
-      btn(icon("crosshair"), {
-        title: "Fit — reset the canvas view to centre at 100%",
-        ariaLabel: "Fit — reset the canvas view to centre at 100%",
-        onclick: () => { this.fit(); this.render(); },
-      }),
-      this.canvasThemeBtn(),
-      btn(icon("minus"), { ariaLabel: "Zoom out", onclick: () => this.zoomBy(-1) }),
-      h("span", { class: "zoom-readout", role: "status", "aria-live": "polite", "aria-label": "Zoom level" }, Math.round(this.viewport.zoom * 100) + "%"),
-      btn(icon("plus"), { ariaLabel: "Zoom in", onclick: () => this.zoomBy(1) }),
-      !this.panesRight ? this.paneToggle("right") : false,
-    );
-  }
-
-  // renderTypeCanvas — the Typography center. Specimen mode renders the full live specimen in the same
-  // pannable/zoomable .canvas-area + .canvas-scene shell the color ramps use (wirePanZoom + applyTransform).
-  // Tokens mode renders an EDITABLE token MATRIX (Phase 3 — per-cell size/height overrides + ↺) (rows = steps, cols = Base + each breakpoint) in the
-  // scrolling .is-table shell instead — exactly how Color's Mapping view flips (see renderCanvasArea).
-  renderTypeCanvas(view) {
-    // Compare (Phase 5.3) — all breakpoints side by side. A Specimen/Controls view, so it wins over the tokens
-    // table (mirrors how Color's "Both" wins over a non-table view in renderCanvasArea).
-    if (this.typeMode === "compare") return this.renderTypeCompareArea(view);
-    if (this.typeSpecMode === "tokens") return this._tokensTableArea("Typography tokens — Base + breakpoints", this.renderTypeTokensTable());
-    const area = h(
-      "div",
-      {
-        class: "canvas-area type-canvas canvas-scheme-" + this.resolvedCanvasScheme(),
-        role: "group",
-        "aria-label": "Typography specimen — drag to pan, wheel to zoom, double-click to reset",
-      },
-      h("div", { class: "canvas-scene" }, this.renderTypographyScene(view)),
-    );
-    this.wirePanZoom(area);
-    requestAnimationFrame(() => this.applyTransform());
-    return area;
-  }
-
-  // renderTypeCompareArea — the Typography "Compare" mode: the specimen rendered at Base AND each breakpoint
-  // mode, side by side, inside ONE pannable .canvas-scene (so pan/zoom/fit move all columns together).
-  // Mirrors Color's renderCompareArea; each column forces its breakpoint via _typeModeOverride while it builds.
-  renderTypeCompareArea(view) {
-    const t = this.doc.type || DEFAULT_TYPE;
-    const modes = t.modes || [];
-    const area = h(
-      "div",
-      { class: "canvas-area canvas-compare type-canvas canvas-scheme-" + this.resolvedCanvasScheme(),
-        role: "group", "aria-label": "Compare — every typography breakpoint side by side · drag to pan, wheel to zoom" },
-      h("div", { class: "canvas-scene compare" },
-        this._typeCompareColumn(view, "base", "Base"),
-        ...modes.map((m) => this._typeCompareColumn(view, m.id, m.name || "Mode"))),
-    );
-    this.wirePanZoom(area);
-    requestAnimationFrame(() => this.applyTransform());
-    return area;
-  }
-  _typeCompareColumn(view, modeId, label) {
-    this._typeModeOverride = modeId; // force _activeType()/_activeTypeScale() while this column's scene builds
-    const scene = this.renderTypographyScene(view);
-    this._typeModeOverride = null;
-    return h(
-      "div",
-      { class: "compare-col canvas-scheme-" + this.resolvedCanvasScheme(), style: "--canvas-bg:" + this.canvasBg() },
-      h("div", { class: "compare-col-label" }, label),
-      scene,
-    );
-  }
 
   // _tokensTableArea — the scrolling .is-table canvas shell (no pan/zoom) that hosts a tokens MATRIX,
   // mirroring how renderCanvasArea wraps the Mapping table. One place for both Type + Geom tables.
@@ -3357,6 +1694,7 @@ class HctApp extends HTMLElement {
       h("div", { class: "canvas-scene" }, table),
     );
   }
+
 
   // ── Tokens-matrix per-cell overrides (Phase 3) — the size (type) / height (geom) lever. CENTRALIZED here
   // so every scale materialization (matrix · specimen/controls · exports) reads the SAME overrides. Storage:
@@ -3388,277 +1726,7 @@ class HctApp extends HTMLElement {
     if (near(0.80)) return { ...fam(LABELS, [16, 17, 18]), ...fam(["Tiny", "Tiny-mono"], [12, 13, 14]), ...fam6(["UI-control"], [16, 17, 18, 20, 22, 24]), ...fam6(["UI-widget"], [13, 14, 15, 16, 17, 18]) }; // Desktop Xl
     return null;
   }
-  // _typeOverridesFor(modeKey) — the flat { "<voice>|<step>": size } slice for one mode (the suffix stripped).
-  _typeOverridesFor(modeKey) {
-    const all = (this.doc.type && this.doc.type.tokenOverrides) || null;
-    if (!all) return undefined;
-    const out = {};
-    const suffix = "|" + modeKey;
-    for (const k of Object.keys(all)) {
-      if (!k.endsWith(suffix)) continue;
-      out[k.slice(0, k.length - suffix.length)] = all[k]; // "<voice>|<step>"
-    }
-    return Object.keys(out).length ? out : undefined;
-  }
-  // _typeScaleFor(modeKey) — the resolved typeScale for a mode WITH that mode's per-cell overrides applied.
-  // "base" → doc.type; a mode id → the mode's own levers layered on doc.type: EITHER a bodyBase override
-  // (legacy custom modes) or a hierarchy-aware compression `factor` (the Standard set: Tablet 5/6 ·
-  // Mobile 2/3 — body frozen, display compressed). The single place a type scale is built so overrides
-  // reach the matrix, the specimen, and every export consistently.
-  _typeScaleFor(modeKey) {
-    const t = this.doc.type || DEFAULT_TYPE;
-    const base = modeKey === "base" ? t : (() => { const m = (t.modes || []).find((x) => x.id === modeKey); return m ? { ...t, bodyBase: m.bodyBase ?? t.bodyBase, modeFactor: m.factor ?? 1 } : t; })();
-    const overrides = { ...this._modeTierNudge(base.modeFactor), ...this._typeOverridesFor(modeKey) };
-    return typeScale({ ...base, overrides });
-  }
-  // _geomOverridesFor(modeKey) — the flat { "<size>": height } slice for one mode (the suffix stripped).
-  _geomOverridesFor(modeKey) {
-    const all = (this.doc.geometry && this.doc.geometry.tokenOverrides) || null;
-    if (!all) return undefined;
-    const out = {};
-    const suffix = "|" + modeKey;
-    for (const k of Object.keys(all)) {
-      if (!k.endsWith(suffix)) continue;
-      out[k.slice(0, k.length - suffix.length)] = all[k]; // "<size>"
-    }
-    return Object.keys(out).length ? out : undefined;
-  }
-  // _geomScaleFor(modeKey) — the resolved geometry scale for a mode WITH that mode's per-cell HEIGHT
-  // overrides applied, COMPOSED with the type scale at the SAME mode — a control's text size (SM/MD/LG
-  // `font`) is the UI-CONTROL voice at that mode (TKT-0008; XS/XL/2XL fall back to the engine's fixed
-  // control-text ramp / the tier columns below).
-  _geomScaleFor(modeKey) {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    // a mode's rampContrast: mode-explicit wins; otherwise it INHERITS the doc's (the desktop-anchored
-    // shape — base isn't compressed, so inheritance is natural). Legacy #251 committed sets always carry
-    // explicit per-mode values, so they resolve identically; a legacy compressed base (contrast 0) with a
-    // silent mode keeps the old full-ramp default via the ?? 1 tail.
-    const cfg = modeKey === "base" ? g : (() => { const m = (g.modes || []).find((x) => x.id === modeKey); return m ? { ...g, baseHeight: m.baseHeight, rampContrast: m.rampContrast ?? ((g.baseName || "Base") === "Desktop" ? g.rampContrast : undefined) ?? 1 } : g; })();
-    return geomScale(cfg, { typeScale: this._typeScaleFor(modeKey), overrides: this._geomOverridesFor(modeKey) });
-  }
 
-  // setTypeTokenOverride / clearTypeTokenOverride — write/reset one per-cell SIZE override (one undo step;
-  // persisted). Mirrors setRoleOverride/clearRoleOverride. A non-positive/NaN size is ignored (use ↺ to reset).
-  setTypeTokenOverride(voice, step, modeKey, size) {
-    let n = Math.round(Number(size));
-    if (!Number.isFinite(n) || n <= 0) return;
-    n = Math.max(1, Math.min(512, n)); // clamp to the input min/max + persist's clampTokenOverrides range, so live === persist
-    const key = voice + "|" + step + "|" + modeKey;
-    this.commit((d) => {
-      d.type = { ...(d.type || DEFAULT_TYPE) };
-      d.type.tokenOverrides = { ...(d.type.tokenOverrides || {}), [key]: n };
-    });
-  }
-  clearTypeTokenOverride(voice, step, modeKey) {
-    const key = voice + "|" + step + "|" + modeKey;
-    this.commit((d) => {
-      if (!d.type || !d.type.tokenOverrides || !(key in d.type.tokenOverrides)) return;
-      d.type = { ...d.type, tokenOverrides: { ...d.type.tokenOverrides } };
-      delete d.type.tokenOverrides[key];
-      if (Object.keys(d.type.tokenOverrides).length === 0) delete d.type.tokenOverrides;
-    });
-  }
-  setGeomTokenOverride(size, modeKey, height) {
-    let n = Math.round(Number(height));
-    if (!Number.isFinite(n) || n <= 0) return;
-    n = Math.max(8, Math.min(256, n)); // clamp to the input min/max + persist's clampTokenOverrides range, so live === persist (and a sub-floor height can't yield negative padding)
-    const key = size + "|" + modeKey;
-    this.commit((d) => {
-      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
-      d.geometry.tokenOverrides = { ...(d.geometry.tokenOverrides || {}), [key]: n };
-    });
-  }
-  clearGeomTokenOverride(size, modeKey) {
-    const key = size + "|" + modeKey;
-    this.commit((d) => {
-      if (!d.geometry || !d.geometry.tokenOverrides || !(key in d.geometry.tokenOverrides)) return;
-      d.geometry = { ...d.geometry, tokenOverrides: { ...d.geometry.tokenOverrides } };
-      delete d.geometry.tokenOverrides[key];
-      if (Object.keys(d.geometry.tokenOverrides).length === 0) delete d.geometry.tokenOverrides;
-    });
-  }
-  // _geomActiveModeKey — the tokenOverride mode key for the ramp tab's active breakpoint (Compare shows Base).
-  _geomActiveModeKey() { return this.geomMode === "base" || this.geomMode === "compare" ? "base" : this.geomMode; }
-  // _setGeomSize(size, height) — the LIVE (editDrag) per-size Height override for the active mode. Height is
-  // geometry's ONE authored lever (icon/font/pad/radius derive from it by the centering law), so this is the
-  // geometry analog of _setTypeVoice — and it writes the SAME tokenOverrides store the token matrix uses.
-  _setGeomSize(size, height) {
-    let n = Math.round(Number(height));
-    if (!Number.isFinite(n)) return;
-    n = Math.max(8, Math.min(256, n)); // same clamp as setGeomTokenOverride (live === persist range)
-    const key = size + "|" + this._geomActiveModeKey();
-    this.editDrag((d) => {
-      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
-      d.geometry.tokenOverrides = { ...(d.geometry.tokenOverrides || {}), [key]: n };
-    });
-  }
-
-  // _typeTokenColumns — the ordered column set for the Typography token matrix: Base first, then one
-  // column per breakpoint MODE sorted ascending by minWidth (the responsive cascade). Each entry carries
-  // the resolved (override-aware) typeScale + its real modeKey so a cell can build its override key and read
-  // the value at that step × that mode. Built via _typeScaleFor so overrides match the specimen + exports.
-  _typeTokenColumns() {
-    const t = this.doc.type || DEFAULT_TYPE; // the DOCUMENT base — mode-independent (NOT _activeType, which tracks the header Mode selector)
-    const { baseName: bn, baseLast } = this._typeBaseOpts();
-    const baseCol = { id: "base", modeKey: "base", name: bn, minWidth: null, scale: this._typeScaleFor("base") };
-    const modes = (t.modes || [])
-      .map((m) => ({ id: m.id, modeKey: m.id, name: m.name || "Mode", minWidth: Number(m.minWidth) || 0, scale: this._typeScaleFor(m.id) }))
-      // a named base reads desktop-first (widest first); the legacy "Base" shape stays ascending.
-      .sort((a, b) => (bn === "Base" ? a.minWidth - b.minWidth : b.minWidth - a.minWidth));
-    return baseLast ? [...modes, baseCol] : [baseCol, ...modes];
-  }
-
-  // renderTypeTokensTable — the EDITABLE Typography token MATRIX (Phase 3). Rows = type steps GROUPED by
-  // voice (Display · Headline/Sub-heading/Title · Body/Body-mono/Lead · Label/Label-mono/Kicker ·
-  // Sub-title/Tiny/Tiny-mono) with a group-header row; the first (sticky) column is
-  // the token NAME (--type-{voice}-{step}). Columns = Base + each breakpoint mode (≥{minWidth}px). Each value
-  // cell is a SIZE number input (the lever): editing it writes doc.type.tokenOverrides[<voice>|<step>|<mode>]
-  // and the line/weight/tracking re-derive beneath; an overridden cell gets `.ov` + a ↺ reset. The override
-  // flows to the specimen + every export automatically (the CSS @media + per-mode DTCG build from this scale).
-  renderTypeTokensTable() {
-    const cols = this._typeTokenColumns();
-    const base = cols[0].scale;
-    const ov = (this.doc.type && this.doc.type.tokenOverrides) || {};
-    const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const cats = Object.keys(base.categories); // the eleven named voices, engine order
-    const total = cats.reduce((a, c) => a + Object.keys(base.categories[c]).length, 0);
-    // a single value cell: an editable SIZE input (px), w{weight} · {tracking} · line beneath, ↺ when overridden.
-    const cell = (col, cat, step) => {
-      const s = col.scale.categories[cat] && col.scale.categories[cat][step];
-      if (!s) return h("td", { class: "tok-cell" }, h("span", { class: "tok-na" }, "—"));
-      const tr = `${s.letterSpacing >= 0 ? "+" : ""}${s.letterSpacing}`;
-      const overridden = (cat + "|" + step + "|" + col.modeKey) in ov;
-      return h(
-        "td",
-        { class: "tok-cell" + (overridden ? " tok-cell-ov" : "") },
-        h(
-          "div",
-          { class: "tok-edit" },
-          h("input", {
-            class: "tok-input" + (overridden ? " ov" : ""),
-            type: "number", min: "1", max: "512", step: "1",
-            value: String(s.size),
-            "data-fk": "tytok:" + cat + ":" + step + ":" + col.modeKey,
-            "aria-label": `${cat} ${step} size · ${col.name} (px)`,
-            onchange: (e) => this.setTypeTokenOverride(cat, step, col.modeKey, e.target.value),
-          }),
-          overridden ? btn(icon("arrow-counter-clockwise", { size: 12 }), { variant: "bare", cls: "tok-reset", title: "Reset to derived size", ariaLabel: `Reset ${cat} ${step} · ${col.name} to the derived size`, onclick: () => this.clearTypeTokenOverride(cat, step, col.modeKey) }) : false,
-        ),
-        h("span", { class: "tok-sub" }, `${s.lineHeight} · w${s.weight} · ${tr}`),
-      );
-    };
-    const headCells = cols.map((c) =>
-      h("th", { class: "tok-col" + (c.id === "base" ? " tok-col-base" : ""), scope: "col" },
-        h("span", { class: "tok-col-name" }, c.name),
-        c.minWidth ? h("small", { class: "tok-col-bp" }, `≥${Math.round(c.minWidth)}px`) : false));
-    const rows = [];
-    for (const cat of cats) {
-      const role = base.roleOf[cat] || "body";
-      const steps = Object.keys(base.categories[cat]);
-      // largest → smallest within a group (mirror the specimen order)
-      const ordered = [...steps].sort((a, b) => (base.categories[cat][b]?.size || 0) - (base.categories[cat][a]?.size || 0));
-      rows.push(h("tr", { class: "tok-group" },
-        h("th", { class: "tok-grouphead", colspan: String(cols.length + 1), scope: "colgroup" },
-          h("b", {}, cat), h("small", {}, base.fonts[role]), h("span", { class: "tok-group-count" }, `${steps.length} steps`))));
-      for (const step of ordered) {
-        rows.push(h("tr", { class: "tok-row" },
-          h("th", { class: "tok-name", scope: "row" }, h("code", {}, `--type-${kebab(cat)}-${kebab(step)}`)),
-          ...cols.map((c) => cell(c, cat, step))));
-      }
-    }
-    return h(
-      "div",
-      { class: "tok-wrap" },
-      h("div", { class: "tok-head" },
-        h("b", {}, "Type tokens"),
-        h("small", {}, `${cats.length} groups · ${total} steps · ${cols.length} column${cols.length === 1 ? "" : "s"} (Base${cols.length > 1 ? " + " + (cols.length - 1) + " breakpoint" + (cols.length === 2 ? "" : "s") : ""})`),
-        h("small", { class: "tok-hint" }, "Each edit is per-cell and mode-local — Base does not cascade into breakpoint columns; line-height re-derives, tracking + weight stay.")),
-      h(
-        "table",
-        { class: "map-table tok-table" },
-        h("thead", {}, h("tr", {}, h("th", { class: "tok-name tok-name-head", scope: "col" }, "Token"), ...headCells)),
-        h("tbody", {}, ...rows),
-      ),
-    );
-  }
-
-  // _geomTokenColumns — the ordered column set for the Geometry token matrix: Base first, then one column
-  // per breakpoint MODE sorted ascending by minWidth. Mirrors _typeTokenColumns / _geomModeScales but
-  // prepends Base = the DOCUMENT base composed geometry scale (mode-independent — NOT _activeGeomScale).
-  _geomTokenColumns() {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const { baseName: bn, baseLast } = this._geomBaseOpts();
-    const baseCol = { id: "base", modeKey: "base", name: bn, minWidth: null, scale: this._geomScaleFor("base") };
-    const modes = (g.modes || [])
-      .map((m) => ({ id: m.id, modeKey: m.id, name: m.name || "Mode", minWidth: Number(m.minWidth) || 0, scale: this._geomScaleFor(m.id) }))
-      // a named base reads desktop-first (widest first); the legacy "Base" shape stays ascending.
-      .sort((a, b) => (bn === "Base" ? a.minWidth - b.minWidth : b.minWidth - a.minWidth));
-    return baseLast ? [...modes, baseCol] : [baseCol, ...modes];
-  }
-
-  // renderGeomTokensTable — the EDITABLE Geometry token MATRIX (Phase 3). Rows = the six control sizes
-  // (XS..2XL, largest→smallest) with a group-header row; the first (sticky) column is the token NAME
-  // (--size-{step}). Columns = Base + each breakpoint mode (≥{minWidth}px). Each value cell is a HEIGHT
-  // number input (the lever): editing it writes doc.geometry.tokenOverrides[<size>|<mode>] and
-  // icon/font/pad/radius ALL re-derive via the laws beneath; an overridden cell gets `.ov` + a ↺ reset.
-  renderGeomTokensTable() {
-    const cols = this._geomTokenColumns();
-    const base = cols[0].scale;
-    const ov = (this.doc.geometry && this.doc.geometry.tokenOverrides) || {};
-    const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const SIZE_NAMES = ["2XL", "XL", "LG", "MD", "SM", "XS"]; // largest → smallest
-    const present = SIZE_NAMES.filter((n) => base.sizes[n]);
-    const cell = (col, name) => {
-      const s = col.scale.sizes[name];
-      if (!s) return h("td", { class: "tok-cell" }, h("span", { class: "tok-na" }, "—"));
-      const overridden = (name + "|" + col.modeKey) in ov;
-      return h(
-        "td",
-        { class: "tok-cell" + (overridden ? " tok-cell-ov" : "") },
-        h(
-          "div",
-          { class: "tok-edit" },
-          h("input", {
-            class: "tok-input" + (overridden ? " ov" : ""),
-            type: "number", min: "8", max: "256", step: "1",
-            value: String(s.height),
-            "data-fk": "geotok:" + name + ":" + col.modeKey,
-            "aria-label": `${name} control height · ${col.name} (px)`,
-            onchange: (e) => this.setGeomTokenOverride(name, col.modeKey, e.target.value),
-          }),
-          overridden ? btn(icon("arrow-counter-clockwise", { size: 12 }), { variant: "bare", cls: "tok-reset", title: "Reset to derived height", ariaLabel: `Reset ${name} · ${col.name} to the derived height`, onclick: () => this.clearGeomTokenOverride(name, col.modeKey) }) : false,
-        ),
-        h("span", { class: "tok-sub" }, `i${s.icon} · f${s.font} · p${s.paddingNarrow} · r${s.radiusPill}`),
-      );
-    };
-    const headCells = cols.map((c) =>
-      h("th", { class: "tok-col" + (c.id === "base" ? " tok-col-base" : ""), scope: "col" },
-        h("span", { class: "tok-col-name" }, c.name),
-        c.minWidth ? h("small", { class: "tok-col-bp" }, `≥${Math.round(c.minWidth)}px`) : false));
-    const rows = [];
-    rows.push(h("tr", { class: "tok-group" },
-      h("th", { class: "tok-grouphead", colspan: String(cols.length + 1), scope: "colgroup" },
-        h("b", {}, "Controls"), h("small", {}, "height · icon · font · pad · radius"), h("span", { class: "tok-group-count" }, `${present.length} sizes`))));
-    for (const name of present) {
-      rows.push(h("tr", { class: "tok-row" },
-        h("th", { class: "tok-name", scope: "row" }, h("code", {}, `--size-${kebab(name)}`)),
-        ...cols.map((c) => cell(c, name))));
-    }
-    return h(
-      "div",
-      { class: "tok-wrap" },
-      h("div", { class: "tok-head" },
-        h("b", {}, "Geometry tokens"),
-        h("small", {}, `${base.baseHeight}px base · ${present.length} sizes · ${cols.length} column${cols.length === 1 ? "" : "s"} (Base${cols.length > 1 ? " + " + (cols.length - 1) + " breakpoint" + (cols.length === 2 ? "" : "s") : ""})`),
-        h("small", { class: "tok-hint" }, "Each edit is per-cell and mode-local — Base does not cascade into breakpoint columns; icon, font, padding + radius re-derive from the height.")),
-      h(
-        "table",
-        { class: "map-table tok-table" },
-        h("thead", {}, h("tr", {}, h("th", { class: "tok-name tok-name-head", scope: "col" }, "Token"), ...headCells)),
-        h("tbody", {}, ...rows),
-      ),
-    );
-  }
 
 
   // wirePanZoom — pointer-based pan/zoom on the canvas inner content layer.
@@ -3762,620 +1830,11 @@ class HctApp extends HTMLElement {
     });
   }
 
-  // Ramps scene — each ENABLED palette = a clickable navigator row: name + ●/○
-  // enable toggle + its stop swatches. Click (not drag) selects that palette.
-  renderRampsScene(view) {
-    const rows = this.doc.palettes
-      .map((p, i) => ({ p, i, vp: view.palettes[i] }))
-      .filter((x) => x.vp && x.vp.on)
-      .map(({ p, i, vp }) => {
-        // highlight only when there's an EXPLICIT palette selection (Esc clears it)
-        const selected = this.sel.kind === "palette" && this.selectedIndex() === i;
-        const stops = this.stopsMode === "extended" ? vp.fullRamp : vp.ramp; // 25 vs 19
-        const strip = h(
-          "div",
-          { class: "ramp-strip" },
-          ...stops.map((s) =>
-            h("i", {
-              style: `background:${s.hex}`,
-              class: s.inGamut ? "" : "oog",
-              title: `${vp.name} ${s.stop} · ${s.hex} · tone ${fmt(s.tone)}`,
-              onmouseenter: () => {
-                this.hover = { name: vp.name, stop: s.stop, hex: s.hex, tone: s.tone, inGamut: s.inGamut };
-                this.paintCanvasFooter();
-              },
-              onmouseleave: () => {
-                this.hover = null;
-                this.paintCanvasFooter();
-              },
-            }),
-          ),
-        );
-        return h(
-          "div",
-          {
-            class: "ramp-row" + (selected ? " sel" : ""),
-            style: this.containerBg(vp) ? "background:" + this.containerBg(vp) : null, // tint = palette's 150 stop
-            "data-pi": i, // real index into doc.palettes (for reorder hit-testing)
-            // click selects the palette — but never on a pan-drag OR a handle-drag.
-            onclick: () => {
-              if (this._didDrag || this._reordering) {
-                this._didDrag = false;
-                this._reordering = false; // consume the post-reorder click guard
-                return;
-              }
-              this.selectPalette(i);
-            },
-          },
-          h(
-            "div",
-            { class: "ramp-head" },
-            this.dragHandle(i),
-            h(
-              "span",
-              {
-                class: "enable",
-                title: "Toggle enabled",
-                // a clickable span is invisible to the keyboard — give it button
-                // semantics, focusability, and Enter/Space activation.
-                role: "button",
-                tabindex: "0",
-                "aria-pressed": p.on !== false ? "true" : "false",
-                "aria-label": (p.on !== false ? "Disable " : "Enable ") + vp.name + " palette",
-                onclick: (e) => {
-                  e.stopPropagation();
-                  this.commit((d) => (d.palettes[i].on = !(d.palettes[i].on !== false)));
-                },
-                onkeydown: (e) => {
-                  if (e.key !== "Enter" && e.key !== " ") return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  this.commit((d) => (d.palettes[i].on = !(d.palettes[i].on !== false)));
-                },
-              },
-              icon(p.on !== false ? "dot" : "circle", { size: 13 }),
-            ),
-            h("span", { class: "ramp-name" }, vp.name, h("small", {}, `${stops.length} stops`)),
-          ),
-          // retained key colors (when set): the brand colors, above the generated ramp,
-          // each captioned with its nearest stop (the perceptual placement). Off-ramp by design.
-          this.keyStrip(vp),
-          strip,
-        );
-      });
-    // disabled palettes still appear as ghost rows so they can be re-enabled.
-    const offRows = this.doc.palettes
-      .map((p, i) => ({ p, i }))
-      .filter((x) => x.p.on === false)
-      .map(({ p, i }) =>
-        h(
-          "div",
-          {
-            class: "ramp-row off",
-            "data-pi": i,
-            onclick: () => {
-              if (this._reordering) { this._reordering = false; return; }
-              this.selectPalette(i);
-            },
-          },
-          h(
-            "div",
-            { class: "ramp-head" },
-            this.dragHandle(i),
-            h(
-              "span",
-              {
-                class: "enable",
-                title: "Enable",
-                onclick: (e) => {
-                  e.stopPropagation();
-                  this.commit((d) => (d.palettes[i].on = true));
-                },
-              },
-              icon("circle", { size: 13 }),
-            ),
-            h("span", { class: "ramp-name off" }, p.name || "(unnamed)", h("small", {}, "disabled")),
-          ),
-        ),
-      );
-    if (rows.length === 0 && offRows.length === 0) return h("div", { class: "empty-note" }, "No palettes");
-    const stack = h("div", { class: "ramp-stack" }, ...rows, ...offRows);
-    this._wireReorder(stack); // pointer-drag the ⋮⋮ handle to reorder palettes
-    return stack;
-  }
-
-  // renderTypographyScene — the canvas "Typography" view: the FULL specimen (all 33 steps — 11 named
-  // voices × 3 steps each, SM/MD/LG, since the 2026-07-13 fixed-size-table rewrite), grouped by voice,
-  // each step a live line in the treatment's real face at its size/lineHeight/letterSpacing/weight + a
-  // compact metrics readout. Lives in the same pannable .canvas-scene as the ramps; paints in the canvas
-  // preview scheme (var(--ink*) flips with the area's color-scheme) and the treatment's fonts (ensureTypeFonts).
-  renderTypographyScene(view) {
-    ensureTypeFonts();
-    const cfg = this._activeType();
-    const scale = this._activeTypeScale();
-    ensureWebFonts({ ...scale.fonts, ...(scale.voiceFonts || {}) }, this.inFigma); // TIER 2: lazy-load this palette's non-bundled faces, incl. per-voice overrides (web app only)
-    const t = TYPE_TREATMENTS.find((x) => x.id === cfg.treatment) || TYPE_TREATMENTS[0];
-    const PARA = TYPE_PARA(scale.treatment);
-    const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const line = (cat, step) => {
-      const s = scale.categories[cat] && scale.categories[cat][step];
-      if (!s) return false;
-      const role = scale.roleOf[cat] || "body";
-      const fam = resolvedFontFor(scale, cat) || "Inter";
-      const generic = genericFor(fam, role);
-      const token = `type-${kebab(cat)}-${kebab(step)}`;
-      const tt = s.textTransform && s.textTransform !== "none" ? `text-transform:${s.textTransform};` : "";
-      const faceStyle =
-        `font-family:'${fam}', ${generic};font-size:${s.size}px;line-height:${s.lineHeight}px;` +
-        `letter-spacing:${s.letterSpacing}px;font-weight:${s.weight};${tt}`;
-      const isPara = cat === "Body" && step === "LG"; // Body's largest step (2026-07-13: every voice is now a 3-step SM/MD/LG ramp, no more XL)
-      return h(
-        "div",
-        { class: "type-spec-line" },
-        h(
-          "div",
-          { class: "type-spec-meta" },
-          h("code", { class: "type-spec-token" }, token),
-          h("span", { class: "type-spec-dims" }, `${s.size}/${s.lineHeight}`),
-          h("span", { class: "type-spec-dims" }, `w${s.weight}`),
-          h("span", { class: "type-spec-dims" }, `${s.letterSpacing >= 0 ? "+" : ""}${s.letterSpacing} tr`),
-        ),
-        h("div", { class: "type-spec-render" + (isPara ? " para" : ""), style: faceStyle }, isPara ? PARA : TYPE_SAMPLE(cat, scale.treatment)),
-      );
-    };
-    const cats = Object.keys(scale.categories); // the eleven named voices, in engine order
-    const total = cats.reduce((a, c) => a + Object.keys(scale.categories[c]).length, 0);
-    const groups = cats.map((cat) => {
-      const steps = Object.keys(scale.categories[cat]);
-      // render the specimen LARGEST → smallest (biggest example first) — sort by resolved size descending,
-      // robust to the engine's step-key order. (The `steps.length` count is order-independent.)
-      const ordered = [...steps].sort((a, b) => (scale.categories[cat][b]?.size || 0) - (scale.categories[cat][a]?.size || 0));
-      return h(
-        "div",
-        { class: "type-spec-group" },
-        h("div", { class: "type-spec-grouphead" }, h("b", {}, cat), h("small", {}, resolvedFontFor(scale, cat)), h("span", { class: "type-spec-count" }, `${steps.length} steps`)),
-        ...ordered.map((step) => line(cat, step)),
-      );
-    });
-    return h(
-      "div",
-      { class: "type-spec" },
-      h("div", { class: "type-spec-head" }, h("b", {}, t.label), h("small", {}, `${cfg.bodyBase}px base · ${cats.length} groups · ${total} steps`)),
-      h("p", { class: "type-spec-note" }, t.note + " — fonts are swappable; the size scale, optical tracking, weight, leading, and case are the system."),
-      ...groups,
-    );
-  }
-
-  // renderScrimsScene — the canvas "Scrims" view. Per ENABLED palette, the 7 scrim roles
-  // (scrimWeakest..scrimStrongest = the 500-base color at 10–55% alpha, already resolved in
-  // view.palettes[i].roles as #RRGGBBAA). Each cell paints the translucent color over a
-  // light/dark split so the alpha — and how it reads on light vs dark content — is visible.
-  // Reuses the ramp-row chrome (drag-reorder, enable, selection) so both views feel identical.
-  // scrimAlpha — recover a scrim's alpha % from its #RRGGBBAA byte, so the label always matches
-  // the actual color (never a hardcoded list that can drift from SCRIM_STEPS). Nearest 0.5%.
-  scrimAlpha(hex8) {
-    return Math.round((parseInt(hex8.slice(7, 9), 16) / 255) * 200) / 2;
-  }
-
-  renderScrimsScene(view) {
-    const rows = this.doc.palettes
-      .map((p, i) => ({ p, i, vp: view.palettes[i] }))
-      .filter((x) => x.vp && x.vp.on)
-      .map(({ p, i, vp }) => {
-        const selected = this.sel.kind === "palette" && this.selectedIndex() === i;
-        // The FULL scrim ramp: the palette's 500 color at every stop's alpha (alpha% = stop/10),
-        // one cell per stop, honoring the Core-19 / All-25 toggle — parallel to the palette ramp.
-        const stops = this.stopsMode === "extended" ? vp.fullRamp : vp.ramp;
-        const base = vp.fullRamp.find((s) => s.stop === 500) || vp.ramp[Math.floor(vp.ramp.length / 2)];
-        const hex500 = (base ? base.hex : "#808080").slice(0, 7); // the solid 500 color, opaque
-        const strip = h(
-          "div",
-          { class: "scrim-strip" },
-          ...stops.map((s) => {
-            const aByte = Math.round((s.stop / 1000) * 255).toString(16).padStart(2, "0").toUpperCase();
-            const hex8 = hex500 + aByte;
-            const a = this.scrimAlpha(hex8); // = stop/10, recovered from the byte
-            const pad = String(s.stop).padStart(3, "0");
-            return h(
-              "div",
-              {
-                class: "scrim-cell",
-                title: `${vp.name} · scrim ${pad} · 500 @ ${a}% · ${hex8}`,
-                onmouseenter: () => {
-                  this.hover = { kind: "scrim", name: vp.name, label: pad, alpha: a, hex: hex8 };
-                  this.paintCanvasFooter();
-                },
-                onmouseleave: () => {
-                  this.hover = null;
-                  this.paintCanvasFooter();
-                },
-              },
-              h("i", { class: "scrim-fill", style: `background:${hex8}` }),
-            );
-          }),
-        );
-        return h(
-          "div",
-          {
-            class: "ramp-row scrim-row" + (selected ? " sel" : ""),
-            style: this.containerBg(vp) ? "background:" + this.containerBg(vp) : null, // tint = palette's 150 stop
-            "data-pi": i,
-            onclick: () => {
-              if (this._didDrag || this._reordering) {
-                this._didDrag = false;
-                this._reordering = false;
-                return;
-              }
-              this.selectPalette(i);
-            },
-          },
-          h(
-            "div",
-            { class: "ramp-head" },
-            this.dragHandle(i),
-            h(
-              "span",
-              {
-                class: "enable",
-                title: "Toggle enabled",
-                role: "button",
-                tabindex: "0",
-                "aria-pressed": p.on !== false ? "true" : "false",
-                "aria-label": (p.on !== false ? "Disable " : "Enable ") + vp.name + " palette",
-                onclick: (e) => {
-                  e.stopPropagation();
-                  this.commit((d) => (d.palettes[i].on = !(d.palettes[i].on !== false)));
-                },
-                onkeydown: (e) => {
-                  if (e.key !== "Enter" && e.key !== " ") return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  this.commit((d) => (d.palettes[i].on = !(d.palettes[i].on !== false)));
-                },
-              },
-              icon(p.on !== false ? "dot" : "circle", { size: 13 }),
-            ),
-            h("span", { class: "ramp-name" }, vp.name, h("small", {}, `500 base · ${stops.length} scrims`)),
-          ),
-          strip,
-        );
-      });
-    if (rows.length === 0) return h("div", { class: "empty-note" }, "No enabled palettes — toggle one on to see its scrims");
-    const stack = h("div", { class: "ramp-stack" }, ...rows);
-    this._wireReorder(stack); // reorder works in the scrim view too
-    return stack;
-  }
-
-  // renderMappingScene — the Semantic Mapping table for the SELECTED palette: every role's
-  // chain, one row per mode — [ Mode · swatch · semantic-token · raw-token ]. Read-only for now
-  // (the raw/semantic names are the values from the canonical role table; editing them — a
-  // per-doc remap/rename — and bidirectional load are the next step, pending the data-model call).
-  // keyStrip — the retained key colors row (dominant/supportive) for one palette, captioned with
-  // each color's nearest stop. Shown above the ramp AND atop the mapping table so the brand colors
-  // stay visible across canvas views (not just the Palettes view).
-  keyStrip(vp) {
-    if (!vp || !vp.keyColors || !vp.keyColors.length) return false;
-    return h(
-      "div",
-      { class: "key-strip" },
-      ...vp.keyColors.map((kc) =>
-        h(
-          "div",
-          { class: "key-cell", title: `${kc.role}${kc.name ? " · " + kc.name : ""} · ${kc.css} · ≈ stop ${kc.nearStop} · drift ${kc.drift}` },
-          h("span", { class: "key-fill", style: `background:${kc.css}` }),
-          h("small", {}, kc.role + " ≈" + kc.nearStop),
-        ),
-      ),
-    );
-  }
-
-  renderMappingScene(view) {
-    const vp = view.palettes[this.selectedIndex()];
-    if (!vp) return h("div", { class: "empty-note" }, "Select a palette to see its semantic mapping");
-    const n = slug(vp.name);
-    const ov = this.doc.roleOverrides || {};
-    const ovCount = Object.keys(ov).reduce((a, k) => a + Object.keys(ov[k] || {}).length, 0);
-    // raw refs you can re-point a role to: the 25 solid stops + every scrim ref (base-step), built
-    // from the SAME SCRIM_BASES × SCRIM_STEPS the engine/exporters use — so the scrim roles
-    // (e.g. scrim-weakest → 500-050) always have a matching option instead of falling back to 050.
-    const scrimRefs = SCRIM_BASES.flatMap((b) => SCRIM_STEPS.map((st) => String(b).padStart(3, "0") + "-" + String(st).padStart(3, "0")));
-    const validRefs = [...vp.fullRamp.map((s) => String(s.stop)), ...scrimRefs];
-    const tokenName = (ref) => n + "-" + (ref.includes("-") ? ref : ref.padStart(3, "0")); // the displayed raw-token name
-    const padRef = (ref) => (ref.includes("-") ? ref : ref.padStart(3, "0"));
-    const drift = this.liveVars ? this.driftSummary() : null; // the Figma drift-diff summary, if a live read was done
-    // per-mode drift cell: check = matches the file / ✗ drifted / — not in the file / · not read yet.
-    const driftCell = (ref, hex) => {
-      const st = this.driftStatus(n + "/" + padRef(ref), hex);
-      const title = { match: "Matches the file", drift: "Drifted from the file", absent: "Not in the file" }[st]
-        || "Click Read live to compare with the file";
-      const mark = st === "match" ? icon("check", { size: 12 })
-        : st === "drift" ? icon("x", { size: 12 })
-        : st === "absent" ? "—" : "·";
-      return h("td", { class: "map-file" }, h("span", { class: "map-drift map-drift-" + (st || "none"), title }, mark));
-    };
-
-    const rawEditor = (r, mode, ref, overridden) =>
-      this.mapTextMode
-        ? h("input", {
-            class: "map-raw-input" + (overridden ? " ov" : ""),
-            type: "text",
-            value: tokenName(ref),
-            "data-fk": "map:" + r.key + ":" + mode,
-            "aria-label": r.name + " " + mode + " raw token",
-            onchange: (e) => this.commitMapRaw(r.key, mode, e.target.value, n),
-          })
-        : h(
-            "select",
-            {
-              class: "map-raw-select" + (overridden ? " ov" : ""),
-              "data-fk": "map:" + r.key + ":" + mode,
-              "aria-label": r.name + " " + mode + " raw token",
-              onchange: (e) => this.setRoleOverride(r.key, mode, e.target.value),
-            },
-            ...validRefs.map((vr) => h("option", vr === ref ? { value: vr, selected: "selected" } : { value: vr }, tokenName(vr))),
-          );
-
-    const modeRow = (r, mode, hex, ref) => {
-      const overridden = !!(ov[r.key] && ov[r.key][mode] != null);
-      return h(
-        "tr",
-        { class: "map-row map-" + mode + (mode === "light" ? " map-role-top" : "") + (overridden ? " map-ov" : "") },
-        h("td", { class: "map-mode" }, mode === "light" ? "Light" : "Dark"),
-        h("td", { class: "map-sw" }, h("span", { class: "map-swatch" }, h("span", { class: "map-swatch-fill", style: `background:${hex}` }))),
-        h("td", { class: "map-sem" }, h("code", {}, r.name)),
-        h(
-          "td",
-          { class: "map-raw" },
-          rawEditor(r, mode, ref, overridden),
-          overridden ? btn(icon("arrow-counter-clockwise", { size: 13 }), { variant: "bare", cls: "map-reset", title: "Reset to canonical", ariaLabel: "Reset to canonical", onclick: () => this.clearRoleOverride(r.key, mode) }) : false,
-        ),
-        this.inFigma ? driftCell(ref, hex) : false, // drift vs the live Figma variable (#3)
-      );
-    };
-    const bodyRows = vp.roles.flatMap((r) => [
-      modeRow(r, "light", r.lightHex, r.lightRef),
-      modeRow(r, "dark", r.darkHex, r.darkRef),
-    ]);
-    return h(
-      "div",
-      { class: "map-wrap" },
-      this.keyStrip(vp), // the palette's retained key colors, visible here too (not just the ramps view)
-      h(
-        "div",
-        { class: "map-head" },
-        h("b", {}, "Semantic Mapping"),
-        h("small", {}, `${vp.name} · ${vp.roles.length} roles${ovCount ? " · " + ovCount + " re-pointed" : ""}`),
-        h("div", { class: "spacer" }),
-        // drift summary chip (after a live read) — does the file match what I'd generate now?
-        drift ? chip(drift.drifted ? `${drift.drifted} drifted` : "in sync", { tone: drift.drifted ? "has-drift" : "in-sync" }) : false,
-        // read the live raw-colors variables from the file and diff (Figma only).
-        this.inFigma ? btn([icon("arrows-clockwise"), "Read live"], { title: "Read the live raw-colors variables from this file and compare (drift)", onclick: () => this.readLiveVariables() }) : false,
-        ovCount ? btn("Reset " + ovCount, { title: "Revert all re-points to the canonical mapping", onclick: () => this.clearAllOverrides() }) : false,
-        btn([icon("arrows-left-right"), this.mapTextMode ? "text" : "select"], {
-          ariaPressed: this.mapTextMode ? "true" : "false",
-          title: "Switch the raw-token editor between a select menu and a free text input",
-          onclick: () => this.setMapTextMode(!this.mapTextMode),
-        }),
-      ),
-      h(
-        "table",
-        { class: "map-table" },
-        h("thead", {}, h("tr", {}, h("th", {}, "Mode"), h("th", { class: "map-sw" }, ""), h("th", {}, "Semantic token"), h("th", {}, "Raw token"), this.inFigma ? h("th", {}, "File") : false)),
-        h("tbody", {}, ...bodyRows),
-      ),
-    );
-  }
-
-  // dragHandle — the ⋮⋮ grip that starts a reorder drag. Its pointerdown stops
-  // propagation so it NEVER reaches the canvas pan handler, and the row's onclick
-  // is suppressed during/after a reorder (this._reordering guard), so dragging the
-  // handle neither pans the canvas nor selects the row.
-  dragHandle(i) {
-    return h("span", {
-      class: "drag-handle",
-      title: "Drag to reorder",
-      "data-handle": i,
-      onpointerdown: (e) => this._beginReorder(e, i),
-    });
-  }
-
-  // _wireReorder — keep a handle on the live stack node for hit-testing during a
-  // drag. Rows carry data-pi (their real doc.palettes index); we read the rects
-  // at move-time so the target insertion index is always current.
-  _wireReorder(stack) {
-    this._rampStack = stack;
-  }
-
-  // _rowRects — current [{ pi, top, bottom, mid, el }] for every row in the stack,
-  // top-to-bottom. Recomputed per drag-move (cheap; few rows).
-  _rowRects() {
-    const stack = this._rampStack;
-    if (!stack) return [];
-    return Array.from(stack.querySelectorAll(".ramp-row[data-pi]")).map((el) => {
-      const r = el.getBoundingClientRect();
-      return { pi: Number(el.getAttribute("data-pi")), top: r.top, bottom: r.bottom, mid: (r.top + r.bottom) / 2, el };
-    });
-  }
-
-  // _beginReorder — start a handle-drag. Stops propagation (no canvas pan), sets
-  // the reorder guard, and installs document-level move/up so the drag tracks even
-  // when the pointer leaves the handle. The actual move happens once on release.
-  _beginReorder(e, src) {
-    e.stopPropagation(); // never let the canvas pan-handler see this press
-    e.preventDefault();
-    this._reorder = { src, dropPi: src, before: true, moved: false };
-    this._reordering = false; // becomes true once the pointer actually moves
-    const handle = e.currentTarget;
-    if (handle && handle.setPointerCapture) {
-      try { handle.setPointerCapture(e.pointerId); } catch {}
-    }
-    // find the source ROW for the grabbed handle (parentNode walk — works in the browser AND the
-    // headless DOM shim, which has no Element.closest / attribute selectors).
-    let srcRow = handle;
-    while (srcRow && !(srcRow.classList && srcRow.classList.contains("ramp-row"))) srcRow = srcRow.parentNode;
-    this._reorder.srcRow = srcRow || null;
-    this._buildDragGhost(e, srcRow); // lift a floating clone + drop a placeholder (browser only; no-ops in the shim)
-    this._reorderMove = (ev) => this._onReorderMove(ev);
-    this._reorderUp = (ev) => this._onReorderUp(ev);
-    document.addEventListener("pointermove", this._reorderMove);
-    document.addEventListener("pointerup", this._reorderUp);
-    document.addEventListener("pointercancel", this._reorderUp);
-    this.classList.add("reordering");
-  }
-
-  // _buildDragGhost — the visual lift. Clones the dragged row into a viewport-fixed "ghost" that
-  // tracks the cursor, and replaces the source row with a same-size dashed PLACEHOLDER so the list
-  // visibly parts to show where the drop will land. Appended to the HOST (not the transformed canvas
-  // scene) so `position:fixed` is viewport-relative. Guarded: in the headless DOM shim (no cloneNode /
-  // real layout) it returns early, leaving the reorder LOGIC unchanged.
-  _buildDragGhost(e, srcRow) {
-    const st = this._reorder;
-    if (!srcRow || typeof srcRow.cloneNode !== "function" || typeof srcRow.getBoundingClientRect !== "function") return;
-    const rect = srcRow.getBoundingClientRect();
-    if (!rect || !rect.width) return;
-    st.grabDx = (e.clientX ?? rect.left) - rect.left;
-    st.grabDy = (e.clientY ?? rect.top) - rect.top;
-    const ghost = srcRow.cloneNode(true);
-    ghost.classList.add("drag-ghost");
-    ghost.classList.remove("sel"); // the lifted clone isn't the selection ring
-    // The ghost is re-parented to the HOST (for viewport-fixed positioning), but the row it clones
-    // lives in the CANVAS — whose color-scheme (the ◐ preview toggle) is independent of the app chrome.
-    // Pin the canvas's resolved scheme on the ghost so its light-dark() tokens (--ink, --panel, …)
-    // resolve in the mode it visually belongs to, not the host's (else a light-canvas row dragged while
-    // the chrome is dark renders dark-mode text on the light row).
-    ghost.style.colorScheme = this.resolvedCanvasScheme();
-    ghost.style.width = rect.width + "px";
-    ghost.style.height = rect.height + "px";
-    ghost.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
-    this.appendChild(ghost);
-    st.ghostEl = ghost;
-    const ph = document.createElement("div");
-    ph.className = "drop-ghost";
-    ph.style.height = rect.height + "px";
-    st.placeholderEl = ph;
-    // drop the placeholder into the source's slot, then collapse the source — the lift is immediate.
-    if (srcRow.parentNode) srcRow.parentNode.insertBefore(ph, srcRow);
-    srcRow.style.display = "none";
-  }
-
-  // _syncDropFromPlaceholder — read the committed drop (dropPi/before) from the placeholder's live DOM
-  // position: it drops BEFORE the next real row, or AFTER the previous one if it's at the very end. The
-  // collapsed source row (data-pi === src) is skipped so it never reads as the target.
-  _syncDropFromPlaceholder() {
-    const st = this._reorder;
-    const ph = st && st.placeholderEl;
-    if (!ph || !ph.parentNode) return;
-    const isRow = (n) => n && n.classList && n.classList.contains("ramp-row") && n.getAttribute && n.getAttribute("data-pi") != null && Number(n.getAttribute("data-pi")) !== st.src;
-    let next = ph.nextSibling;
-    while (next && !isRow(next)) next = next.nextSibling;
-    if (next) { st.dropPi = Number(next.getAttribute("data-pi")); st.before = true; return; }
-    let prev = ph.previousSibling;
-    while (prev && !isRow(prev)) prev = prev.previousSibling;
-    if (prev) { st.dropPi = Number(prev.getAttribute("data-pi")); st.before = false; }
-  }
-
-  // _teardownDragGhost — remove the floating clone + placeholder and un-hide the source row. The
-  // subsequent render() rebuilds the stack anyway; this just keeps the frame clean before it.
-  _teardownDragGhost() {
-    const st = this._reorder;
-    if (!st) return;
-    if (st.ghostEl && st.ghostEl.parentNode) st.ghostEl.parentNode.removeChild(st.ghostEl);
-    if (st.placeholderEl && st.placeholderEl.parentNode) st.placeholderEl.parentNode.removeChild(st.placeholderEl);
-    if (st.srcRow && st.srcRow.style) st.srcRow.style.display = "";
-    st.ghostEl = null; st.placeholderEl = null;
-  }
-
-  // _onReorderMove — the floating clone tracks the cursor 1:1; the DROP slot is decided relative to
-  // the PLACEHOLDER's own position (the proposed placement) with a 10px deadzone, so it only reslots
-  // when the cursor moves clearly past the placeholder's edge — stable, never jittering from the
-  // reflow. Headless (no placeholder) falls back to the row-midpoint hit-test so the verifier holds.
-  _onReorderMove(ev) {
-    const st = this._reorder;
-    if (!st) return;
-    this._reordering = true;
-    st.moved = true;
-    if (ev.preventDefault) ev.preventDefault();
-    const y = ev.clientY;
-    // the floating clone follows the cursor (anchored under the original grab point).
-    if (st.ghostEl) st.ghostEl.style.transform = `translate(${(ev.clientX ?? 0) - (st.grabDx || 0)}px, ${(y ?? 0) - (st.grabDy || 0)}px)`;
-
-    // Browser path — the hit area is the placeholder (proposed placement) ± SENS px. Step the
-    // placeholder one row toward the cursor while it's past the deadzone (bounded, to keep up with a
-    // fast flick), re-reading rects each step since each move reflows the list.
-    const SENS = 10; // px the cursor must pass the placeholder edge before the drop reslots
-    if (st.placeholderEl && typeof st.placeholderEl.getBoundingClientRect === "function") {
-      for (let guard = 0; guard < 64; guard++) {
-        const ph = st.placeholderEl.getBoundingClientRect();
-        const rows = this._rowRects().filter((r) => r.bottom - r.top > 1); // visible rows (not the collapsed source)
-        const above = rows.filter((r) => r.bottom <= ph.top + 2).pop();    // row immediately above the placeholder
-        const below = rows.find((r) => r.top >= ph.bottom - 2);            // row immediately below it
-        if (above && y < ph.top - SENS) { st.placeholderEl.parentNode.insertBefore(st.placeholderEl, above.el); continue; }
-        if (below && y > ph.bottom + SENS) { st.placeholderEl.parentNode.insertBefore(st.placeholderEl, below.el.nextSibling); continue; }
-        break; // cursor is within the proposed slot's hit area — stable
-      }
-      this._syncDropFromPlaceholder();
-      return;
-    }
-
-    // Headless / no placeholder — row-midpoint hit-test (unchanged) so the reorder verifier still works.
-    const rects = this._rowRects().filter((r) => r.bottom - r.top > 1);
-    if (!rects.length) return;
-    let target = null;
-    for (const r of rects) {
-      if (y < r.mid) { target = { pi: r.pi, before: true }; break; }
-      target = { pi: r.pi, before: false };
-    }
-    if (!target) target = { pi: rects[rects.length - 1].pi, before: false };
-    st.dropPi = target.pi;
-    st.before = target.before;
-  }
-
-  // _onReorderUp — finalize. Translate (dropPi, before) into a destination index in
-  // doc.palettes, splice the source there as ONE undo step, and keep `selected` on
-  // the SAME palette object (track it by identity across the move).
-  _onReorderUp() {
-    const st = this._reorder;
-    document.removeEventListener("pointermove", this._reorderMove);
-    document.removeEventListener("pointerup", this._reorderUp);
-    document.removeEventListener("pointercancel", this._reorderUp);
-    this.classList.remove("reordering");
-    this._teardownDragGhost(); // remove the floating clone + placeholder, un-hide the source row
-    this._reorder = null;
-    // NOTE: leave this._reordering TRUE if a move happened — the row's onclick
-    // fires right after this pointerup and must be suppressed; it (or the next
-    // _beginReorder / pointerdown) clears the flag.
-    if (!st || !st.moved) { this._reordering = false; this.render(); return; }
-
-    const pals = this.doc.palettes;
-    const from = st.src;
-    // destination index BEFORE removal: index of dropPi, +1 if dropping "after".
-    let to = pals.findIndex((_, idx) => idx === st.dropPi);
-    if (st.before === false) to += 1;
-    // adjust for the slice-out of `from` when from precedes the insertion point.
-    if (from < to) to -= 1;
-    to = Math.max(0, Math.min(to, pals.length - 1));
-    if (to === from) { this._reordering = false; this.render(); return; }
-
-    // Track the currently-selected palette by identity so selection follows it.
-    const selPal = this.doc.palettes[this.selectedIndex()];
-    this.pushHistory(); // ONE undo step for the whole reorder
-    const [moved] = pals.splice(from, 1);
-    pals.splice(to, 0, moved);
-    // keep `selected` on the SAME palette object (now at its new index)
-    const newSel = this.doc.palettes.indexOf(selPal);
-    if (newSel >= 0) {
-      this.sel = { kind: "palette", id: newSel };
-      this.doc.selected = newSel;
-    }
-    this.save(); // persist the reordered doc + corrected selection in one shot
-    this.render();
-    // safety net: if no stray click consumes the guard, clear it next tick.
-    setTimeout(() => { this._reordering = false; }, 0);
-  }
 
   renderCanvasFooter() {
     return h("div", { class: "canvas-footer" }, h("span", { class: "cf-body" }, "drag to pan · wheel to zoom · double-click to reset"));
   }
+
 
   paintCanvasFooter() {
     const el = this.querySelector(".canvas-footer .cf-body");
@@ -4400,6 +1859,7 @@ class HctApp extends HTMLElement {
       el.textContent = `x:${xy.x} y:${xy.y} · ${z}% · drag pan · wheel zoom · dbl-click reset`;
     }
   }
+
 
   // ── right pane (segmented inspector) ──────────────────────────────────────────
   // [ Palette | Global | Roles ] — three panels over the SELECTED palette. The
@@ -4433,483 +1893,6 @@ class HctApp extends HTMLElement {
     );
   }
 
-  // ── Typography inspector (right pane) ─────────────────────────────────────────
-  // The type analog of renderRightPane: a .pane-head segmented tablist + a scrollable .seg-body + a
-  // pinned .seg-example live specimen. Binds ONLY to doc.type = {treatment, bodyBase} (the only type
-  // fields the engine + persist carry today). Per-voice tuning (ratio/leading/weight/tracking) is shown
-  // READ-ONLY from the treatment — editing it needs new doc.type fields in the engine AND the persist
-  // fuzz generator, so it is FLAGGED out-of-scope, not faked.
-  renderTypeInspector(view) {
-    ensureTypeFonts();
-    { const s = this._activeTypeScale(); ensureWebFonts({ ...s.fonts, ...(s.voiceFonts || {}) }, this.inFigma); } // TIER 2: the inspector specimen + examples render the real faces, incl. per-voice overrides
-    const seg = this.typeSegment === "fonts" || this.typeSegment === "specimen" ? this.typeSegment : "scale";
-    const body = seg === "fonts" ? this.typeFontsTab() : seg === "specimen" ? this.typeSpecimenTab(view) : this.typeScaleTab();
-    const tabs = [{ id: "scale", label: "Scale" }, { id: "fonts", label: "Fonts" }, { id: "specimen", label: "Specimen" }];
-    return h(
-      "aside",
-      { class: "right-pane" },
-      h("div", { class: "pane-head" },
-        this.panesRight ? this.paneToggle("right") : false,
-        this.segmented(tabs, seg, (id) => { this.typeSegment = id; this.render(); }, { ariaLabel: "Typography inspector", idPrefix: "tytab", controls: "tyi-panel" })),
-      h("div", { class: "seg-body", role: "tabpanel", id: "tyi-panel", "aria-labelledby": "tytab-" + seg }, body),
-      h("div", { class: "seg-example" }, this.typeExampleCard(view)),
-    );
-  }
-
-  // typeScaleTab — the only WRITABLE controls (treatment + body-base), then a READ-ONLY per-voice
-  // summary of what the treatment yields (ratio · leading · weight · tracking).
-  typeScaleTab() {
-    const cfg = this._activeType();
-    const t = TYPE_TREATMENTS.find((x) => x.id === cfg.treatment) || TYPE_TREATMENTS[0];
-    const scale = this._activeTypeScale();
-    return h(
-      "div",
-      { class: "insp-body" },
-      h("h3", { class: "insp-title" }, icon("type"), "Type scale"),
-      h("div", { class: "insp-sub" }, "Choose a treatment + body size — fonts, tracking, weight & leading follow."),
-      field(
-        "Treatment",
-        h(
-          "select",
-          { "data-fk": "tyi:treatment", onchange: (e) => this._pickTypeTreatment(e.target.value) },
-          ...TYPE_TREATMENTS.map((x) => h("option", { value: x.id, selected: cfg.treatment === x.id ? true : undefined }, this._treatmentLocked(x.id, "product") ? x.label + " · Pro" : x.label)),
-        ),
-      ),
-      this.slider(this.typeMode === "base" || this.typeMode === "compare" ? "Body base" : "Body base · this breakpoint", cfg.bodyBase, 12, 22, 1, (v) => fmt(v) + "px", (v) => this._setActiveTypeBodyBase(v)),
-      this._typeModeEditor(),
-      h("p", { class: "insp-sub tyi-note" }, t.note),
-      h(
-        "div",
-        { class: "tyi-voices" },
-        h("div", { class: "tyi-voices-head" }, h("b", {}, "Per-voice"), h("small", {}, "select a voice to tune")),
-        ...Object.keys(scale.categories).map((cName) => {
-          const p = t.categories[cName];
-          const md = scale.categories[cName] && scale.categories[cName].MD;
-          const sel = this.typeVoice === cName;
-          const vp = (cfg.voices && cfg.voices[cName]) || {};
-          const tuned = Object.keys(vp).length > 0;
-          const val = (param, def) => (Number.isFinite(vp[param]) ? vp[param] : def);
-          return h(
-            "div",
-            { class: "tyi-voice" + (sel ? " is-sel" : "") + (tuned ? " is-tuned" : "") },
-            h(
-              "button",
-              { type: "button", class: "tyi-voice-name", "data-fk": "tyvoice:" + cName, "aria-expanded": sel ? "true" : "false",
-                onclick: () => { this.typeVoice = sel ? null : cName; this.render(); } },
-              h("span", { class: "tyi-voice-label" }, cName, tuned ? h("span", { class: "tyi-voice-dot", title: "Tuned off the treatment" }, " ●") : false),
-              h("span", { class: "tyi-voice-font" }, resolvedFontFor(scale, cName)),
-            ),
-            sel
-              ? h(
-                  "div",
-                  { class: "tyi-voice-edit" },
-                  this.slider("Weight", val("weight", p.weight), 100, 900, 10, (v) => String(v), (v) => this._setTypeVoice(cName, "weight", v)),
-                  this.slider("Tracking", val("tracking", p.trackingEm), -0.05, 0.3, 0.001, (v) => (v >= 0 ? "+" : "") + fmt(v, 3) + "em", (v) => this._setTypeVoice(cName, "tracking", v)),
-                  this.slider("Leading", val("leading", p.leading), 0.9, 2, 0.01, (v) => fmt(v, 2), (v) => this._setTypeVoice(cName, "leading", v)),
-                  // no Ratio control — size is a fixed table since 2026-07-13, not base×ratio^n; a
-                  // per-cell override (Global tab) is now the lever for moving an individual step's size.
-                  // the per-voice font override (TKT-0002) is set on the Fonts tab (all 11 voices live
-                  // there, one editing surface) — this panel shows the resolved family read-only, in the
-                  // collapsed row's tyi-voice-font span, so it's not duplicated/editable in two places.
-                  // the Figma weight-STYLE name — only meaningful for non-variable families (GT America
-                  // "Condensed Black Italic"), where a numeric weight can't name the face. Exported into
-                  // the Font Primitives collection as weight-style/<voice>; empty = none.
-                  h("label", { class: "mode-editor-label", for: "fld-voice-style-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-") }, "Figma style name"),
-                  h("input", { id: "fld-voice-style-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-"), type: "text", value: vp.styleName || "", placeholder: "e.g. Condensed Bold (non-variable fonts)", "data-fk": "tyvoice-style:" + cName,
-                    "aria-label": "Figma weight style name for " + cName, onchange: (e) => this._setTypeVoiceStyleName(cName, e.target.value) }),
-                  // SIBLING WEIGHTS — named weight variants around the core. Each becomes a Figma text
-                  // style (`Voice/step/Name`), a Font Primitives pair, a CSS custom prop, and a DTCG
-                  // fontWeight token. Suggest seeds the ratified defaults from the CORE weight; the
-                  // list is user-owned after (add/remove/rename — never silently regenerated).
-                  h("label", { class: "mode-editor-label" }, "Weight siblings", h("small", { class: "tyi-weights-core" }, ` core ${val("weight", p.weight)}`)),
-                  h(
-                    "div",
-                    { class: "tyi-weights" },
-                    ...(vp.weights || []).map((wv, i) =>
-                      h(
-                        "div",
-                        { class: "tyi-weight-row" },
-                        h("input", { type: "text", class: "tyi-weight-name", value: wv.name, "aria-label": `Sibling ${i + 1} name for ${cName}`, "data-fk": `tyweight-name:${cName}:${i}`,
-                          onchange: (e) => { const list = (vp.weights || []).slice(); list[i] = { ...list[i], name: e.target.value }; this._setVoiceWeights(cName, list); } }),
-                        h("input", { type: "number", class: "tyi-weight-num", value: String(wv.weight), min: "100", max: "1000", step: "100", "aria-label": `Sibling ${i + 1} weight for ${cName}`, "data-fk": `tyweight-num:${cName}:${i}`,
-                          onchange: (e) => { const list = (vp.weights || []).slice(); list[i] = { ...list[i], weight: Number(e.target.value) }; this._setVoiceWeights(cName, list); } }),
-                        btn(icon("x"), { variant: "bare", cls: "tyi-weight-del", ariaLabel: `Remove sibling ${wv.name}`, title: "Remove this weight",
-                          onclick: () => { const list = (vp.weights || []).slice(); list.splice(i, 1); this._setVoiceWeights(cName, list); } }),
-                      ),
-                    ),
-                    h(
-                      "div",
-                      { class: "tyi-weights-actions" },
-                      !(vp.weights || []).length
-                        ? btn("Suggest", { variant: "ghost", cls: "tyi-weights-suggest", title: "Seed the standard siblings around the core weight", "data-fk": "tyweights-suggest:" + cName,
-                            onclick: () => this._setVoiceWeights(cName, siblingWeightDefaults(val("weight", p.weight))) })
-                        : false,
-                      btn("+ Weight", { variant: "ghost", cls: "tyi-weights-add", title: "Add a named weight variant", "data-fk": "tyweights-add:" + cName,
-                        onclick: () => {
-                          const list = (vp.weights || []).slice();
-                          const used = new Set(list.map((x) => x.weight).concat([val("weight", p.weight)]));
-                          const free = [500, 700, 300, 600, 400, 800, 200, 900, 100].find((w) => !used.has(w));
-                          if (free == null) { this.toast("All ladder weights are in use"); return; }
-                          list.push({ name: WEIGHT_NAMES[free] || String(free), weight: free });
-                          this._setVoiceWeights(cName, list);
-                        } }),
-                    ),
-                  ),
-                  tuned ? btn("Reset voice", { variant: "ghost", cls: "tyi-voice-reset", onclick: () => this._resetTypeVoice(cName) }) : false,
-                )
-              : h(
-                  "dl",
-                  { class: "tyi-voice-stats" },
-                  h("div", {}, h("dt", {}, "Leading"), h("dd", {}, fmt(val("leading", p.leading), 2))),
-                  h("div", {}, h("dt", {}, "Weight"), h("dd", {}, String(val("weight", p.weight)))),
-                  h("div", {}, h("dt", {}, "Tracking"), h("dd", {}, (val("tracking", p.trackingEm) > 0 ? "+" : "") + fmt(val("tracking", p.trackingEm), 3) + "em")),
-                  md ? h("div", {}, h("dt", {}, "MD"), h("dd", {}, `${md.size}/${md.lineHeight}`)) : false,
-                ),
-          );
-        }),
-      ),
-    );
-  }
-
-  // typeFontsTab — an editable combobox per VOICE, all 11, matching 1:1 what every export actually emits
-  // (font/<voice> in Figma Primitives, --font-voice-<kebab> in CSS, fontFamily in DTCG) — so what's
-  // editable here never diverges from what ships. A voice with no override shows its role's shared
-  // default (from the treatment) as its live value; editing always writes a per-voice override
-  // (_setTypeVoiceFont, TKT-0002) — there is no separate role-level row, and no second place to edit a
-  // voice's font (the Scale tab's per-voice panel shows the resolved family read-only, not editable).
-  typeFontsTab() {
-    const cfg = this._activeType();
-    const scale = this._activeTypeScale();
-    const treatment = TYPE_TREATMENTS.find((t) => t.id === cfg.treatment) || TYPE_TREATMENTS[0];
-    const opts = [...BUNDLED_FONTS, "system-ui", "Georgia", "Arial"]; // bundled families + a few common system ones
-    // seenStates feeds the legend below — a dot's title tooltip carries the full explanation per row, so
-    // the legend only needs to spell out the states actually present this render (an all-"ok" scale, the
-    // common case for a bundled treatment, shows no legend at all).
-    const seenStates = new Map();
-    const rows = Object.keys(scale.categories).map((cName) => {
-      const role = scale.roleOf[cName];
-      const family = resolvedFontFor(scale, cName);
-      const generic = genericFor(family, role);
-      const custom = !!(cfg.voices && cfg.voices[cName] && cfg.voices[cName].font);
-      const id = "tyfont-" + cName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      const st = this._fontStatus(family);
-      if (st.state !== "ok" && !seenStates.has(st.state)) seenStates.set(st.state, st);
-      return h(
-        "div",
-        { class: "tyi-font-row" },
-        h("label", { class: "tyi-font-role", for: id }, cName),
-        h("input", {
-          id,
-          class: "tyi-font-input",
-          type: "text",
-          list: id + "-list",
-          value: family,
-          placeholder: treatment.fonts[role],
-          "aria-label": cName + " font family",
-          "data-fk": "tyfont:" + cName,
-          title: custom ? "Custom family — exports as-is; the web-app specimen loads it from Google Fonts (falls back if it isn't a Google font)" : "From the " + treatment.label + " treatment",
-          style: `font-family:'${family}', ${generic}`,
-          onchange: (e) => this._setTypeVoiceFont(cName, e.target.value),
-        }),
-        h("datalist", { id: id + "-list" }, ...opts.map((f) => h("option", { value: f }))),
-        h("i", { class: "tyi-font-dot is-" + st.state, title: st.title, "aria-label": st.label, "data-fk": "tyfontbadge:" + cName }),
-      );
-    });
-    return h(
-      "div",
-      { class: "insp-body" },
-      h("h3", { class: "insp-title" }, icon("type"), "Fonts"),
-      h("div", { class: "insp-sub" }, "Pick a bundled font or type any family for each voice."),
-      this._fontsPanelSideEffects(),
-      h("div", { class: "tyi-fonts" }, ...rows),
-      seenStates.size
-        ? h(
-            "div",
-            { class: "tyi-font-legend" },
-            ...[...seenStates.values()].map((st) => h("span", { class: "tyi-font-legend-item", title: st.title }, h("i", { class: "tyi-font-dot is-" + st.state }), st.label)),
-          )
-        : false,
-      h("p", { class: "insp-sub tyi-future" }, "Custom families export in the CSS / DTCG / Figma tokens. In the web app the specimen loads each face from Google Fonts on demand; a face that isn't a Google font (or the Figma plugin, which stays offline) falls back to the closest generic."),
-    );
-  }
-
-  // ── font availability ────────────────────────────────────────────────────────────────────────
-  // TWO different truths, never conflated:
-  //   inFigma → can Figma USE this family? (its own font list; a miss means text styles get a
-  //             placeholder face, family still variable-bound — see applyStylePlans' scaffold path)
-  //   web     → does the face actually RENDER here? (bundled offline, or loaded from Google Fonts)
-  // Ask Figma once; the sandbox answers with `fonts-listed`.
-  _requestFigmaFonts() {
-    if (!this.inFigma || this._figmaFontsRequested) return;
-    this._figmaFontsRequested = true;
-    try { parent.postMessage({ pluginMessage: { type: "list-fonts" } }, "*"); } catch (e) { /* not in a frame */ }
-  }
-  receiveFigmaFonts(families) {
-    this._figmaFonts = new Set(Array.isArray(families) ? families : []);
-    this.render();
-  }
-
-  // _faceRenders(fam) — does this family actually paint, or is the browser silently substituting a
-  // generic? `document.fonts.check` FALSE-NEGATIVES on variable fonts, so measure DOM width instead:
-  // a family that is applied renders at a different width than the bare generic it falls back to.
-  // Unmeasurable (no DOM / headless shim) ⇒ assume it renders — never cry wolf.
-  _faceRenders(fam) {
-    if (!fam) return true;
-    if (SELF_HOSTED_FONTS.has(fam) || GENERIC_FONTS.has(fam.toLowerCase())) return true;
-    if (this._faceCache.has(fam)) return this._faceCache.get(fam);
-    let out = true;
-    if (typeof document !== "undefined" && document.body && document.createElement) {
-      try {
-        const width = (stack) => {
-          const el = document.createElement("span");
-          el.textContent = "mmmmmmmmmmlliWWWW0O";
-          el.style.cssText = "position:absolute;left:-9999px;top:-9999px;white-space:nowrap;font-size:72px;font-family:" + stack;
-          document.body.appendChild(el);
-          const w = el.offsetWidth;
-          el.remove();
-          return w;
-        };
-        // quote the family — an unquoted name with a digit/space is invalid in a strict parser (Safari)
-        const gens = ["monospace", "serif", "sans-serif"];
-        const pairs = gens.map((gen) => [width(gen), width(`'${fam}', ${gen}`)]);
-        // NOT measurable (headless shim / display:none / layout not yet flushed → every width 0)?
-        // Assume it renders. A "falls back" badge must be EARNED by a real measurement, never by a
-        // silent zero — the false negative this guard exists to prevent.
-        out = pairs.every(([base]) => !(base > 0))
-          ? true
-          : pairs.some(([base, test]) => base > 0 && test > 0 && Math.abs(test - base) > 0.5);
-      } catch (e) { out = true; }
-    }
-    this._faceCache.set(fam, out);
-    return out;
-  }
-
-  // _fontsPanelSideEffects — ask Figma for its font list (once), and in the web app re-render once the
-  // lazily-injected Google faces settle, so a badge flips "falls back" → "loaded" rather than lying.
-  _fontsPanelSideEffects() {
-    this._requestFigmaFonts();
-    if (!this.inFigma && !this._fontsReadyHooked && typeof document !== "undefined" && document.fonts && document.fonts.ready) {
-      this._fontsReadyHooked = true;
-      document.fonts.ready.then(() => { this._faceCache.clear(); this.render(); }).catch(() => {});
-    }
-    return false; // renders nothing
-  }
-
-  // _fontStatus(family) → the badge for one role: { state, label, title }.
-  _fontStatus(family) {
-    if (this.inFigma) {
-      if (!this._figmaFonts) return { state: "unknown", label: "checking…", title: "Asking Figma which font families it can use." };
-      if (this._figmaFonts.has(family)) return { state: "ok", label: "in Figma", title: "Figma has this family — its text styles render in the real face." };
-      return { state: "sub", label: "not in Figma", title: "Figma doesn't have this family. Its text styles are built on a placeholder face, but the family stays bound to the font variable — install the font and they adopt it, no re-apply." };
-    }
-    if (SELF_HOSTED_FONTS.has(family)) return { state: "ok", label: "bundled", title: "Embedded in the app — renders offline, and inside the Figma plugin." };
-    if (GENERIC_FONTS.has(String(family).toLowerCase())) return { state: "ok", label: "generic", title: "A CSS generic family." };
-    return this._faceRenders(family)
-      ? { state: "ok", label: "loaded", title: "Loaded from Google Fonts — the specimen renders the real face." }
-      : { state: "fallback", label: "falls back", title: "Not loaded (not a Google font, or still loading) — the specimen renders the closest generic. Exports still carry the exact family name." };
-  }
-
-  // _setTypeFont(role, value) — set/clear a per-role custom font on doc.type.fonts. Empty OR the treatment
-  // default clears the override (so a default round-trips clean). Fonts are mode-independent → always the base.
-  _setTypeFont(role, value) {
-    this._faceCache.clear(); this._fontsReadyHooked = false; // a new family must be re-probed
-    this.commit((doc) => {
-      const t = doc.type || { ...DEFAULT_TYPE };
-      const treatment = TYPE_TREATMENTS.find((x) => x.id === t.treatment) || TYPE_TREATMENTS[0];
-      const v = String(value || "").trim();
-      const fonts = { ...(t.fonts || {}) };
-      if (!v || v === treatment.fonts[role]) delete fonts[role]; else fonts[role] = v;
-      const next = { ...t };
-      if (Object.keys(fonts).length) next.fonts = fonts; else delete next.fonts;
-      doc.type = next;
-    });
-  }
-
-  // _setTypeVoice(voice, param, value) — per-VOICE shaping override on doc.type.voices (weight·tracking·
-  // leading·ratio). Live via editDrag (coalesces a slider drag into one undo step). A value equal to the
-  // treatment default clears that param; an emptied voice / voices map is removed (so a default round-trips).
-  // Voices are mode-independent → always written to the base doc.type.
-  _setTypeVoice(voice, param, value) {
-    this.editDrag((doc) => {
-      const t = { ...(doc.type || DEFAULT_TYPE) };
-      const treatment = TYPE_TREATMENTS.find((x) => x.id === t.treatment) || TYPE_TREATMENTS[0];
-      const pCat = treatment.categories[voice];
-      if (!pCat) return;
-      const defaults = { weight: pCat.weight, tracking: pCat.trackingEm, leading: pCat.leading };
-      const num = param === "weight" ? Math.round(value) : value;
-      const voices = { ...(t.voices || {}) };
-      const v = { ...(voices[voice] || {}) };
-      if (!Number.isFinite(num) || num === defaults[param]) delete v[param]; else v[param] = num;
-      if (Object.keys(v).length) voices[voice] = v; else delete voices[voice];
-      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
-      doc.type = t;
-    });
-  }
-
-  // _setTypeVoiceStyleName(voice, value) — the STRING sibling of _setTypeVoice: the Figma weight-style
-  // name for non-variable families. Empty/whitespace clears (so a default round-trips); one undo step.
-  _setTypeVoiceStyleName(voice, value) {
-    const sn = String(value || "").trim().slice(0, 60);
-    this.commit((doc) => {
-      const t = { ...(doc.type || DEFAULT_TYPE) };
-      const voices = { ...(t.voices || {}) };
-      const v = { ...(voices[voice] || {}) };
-      if (sn) v.styleName = sn; else delete v.styleName;
-      if (Object.keys(v).length) voices[voice] = v; else delete voices[voice];
-      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
-      doc.type = t;
-    });
-  }
-
-  // _setTypeVoiceFont(voice, value) — the FONT sibling of _setTypeVoiceStyleName (TKT-0002): a per-voice
-  // family override, instead of sharing the voice's role default. Empty/whitespace clears (falls back to
-  // scale.fonts[roleOf[voice]] via resolvedFontFor); one undo step. A new family must be re-probed (the
-  // fonts-availability cache + web-font loader), same as _setTypeFont.
-  _setTypeVoiceFont(voice, value) {
-    this._faceCache.clear(); this._fontsReadyHooked = false;
-    const fam = String(value || "").trim().slice(0, 60);
-    this.commit((doc) => {
-      const t = { ...(doc.type || DEFAULT_TYPE) };
-      const voices = { ...(t.voices || {}) };
-      const v = { ...(voices[voice] || {}) };
-      if (fam) v.font = fam; else delete v.font;
-      if (Object.keys(v).length) voices[voice] = v; else delete voices[voice];
-      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
-      doc.type = t;
-    });
-  }
-
-  // _setVoiceWeights(voice, list) — write a voice's SIBLING weight variants ([{name, weight}]) onto
-  // doc.type.voices, normalized (name trimmed/capped, weight clamped 100..1000, invalid dropped); an
-  // empty list clears the key so a sibling-free voice round-trips identically. One undo step.
-  _setVoiceWeights(voice, list) {
-    const norm = (Array.isArray(list) ? list : [])
-      .map((e) => ({ name: String((e && e.name) || "").trim().slice(0, 40), weight: Math.round(Number(e && e.weight)) }))
-      .filter((e) => e.name && Number.isFinite(e.weight) && e.weight >= 100 && e.weight <= 1000)
-      .slice(0, 8);
-    this.commit((doc) => {
-      const t = { ...(doc.type || DEFAULT_TYPE) };
-      const voices = { ...(t.voices || {}) };
-      const v = { ...(voices[voice] || {}) };
-      if (norm.length) v.weights = norm; else delete v.weights;
-      if (Object.keys(v).length) voices[voice] = v; else delete voices[voice];
-      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
-      doc.type = t;
-    });
-  }
-
-  // _resetTypeVoice(voice) — drop all per-voice overrides for one voice (back to the treatment).
-  _resetTypeVoice(voice) {
-    this.commit((doc) => {
-      const t = { ...(doc.type || DEFAULT_TYPE) };
-      if (!t.voices || !t.voices[voice]) return;
-      const voices = { ...t.voices };
-      delete voices[voice];
-      if (Object.keys(voices).length) t.voices = voices; else delete t.voices;
-      doc.type = t;
-    });
-  }
-
-  // typeSpecimenTab — a compact in-pane specimen: each of the eleven voices at its MD step. The full
-  // scale (all 53 steps across the 11 voices) lives on the canvas.
-  typeSpecimenTab(view) {
-    const scale = this._activeTypeScale();
-    const cats = Object.keys(scale.categories);
-    const repStep = (cat) => { const ks = Object.keys(scale.categories[cat]); return ks.includes("MD") ? "MD" : ks[Math.floor(ks.length / 2)]; };
-    return h(
-      "div",
-      { class: "insp-body" },
-      h("h3", { class: "insp-title" }, icon("type"), "Specimen"),
-      h("div", { class: "insp-sub" }, "Each of the eleven voices at MD. The full scale is on the canvas."),
-      h(
-        "div",
-        { class: "tyi-specimen" },
-        ...cats.map((cat) =>
-          h(
-            "div",
-            { class: "typo-cat" },
-            h("div", { class: "typo-cat-head" }, h("b", {}, cat), h("small", {}, resolvedFontFor(scale, cat))),
-            this._typeSample(scale, cat, repStep(cat), TYPE_SAMPLE(cat, scale.treatment)),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // typeExampleCard — the pinned live card: a heading + paragraph in the brand fonts AND the selected
-  // palette's canvas colors (surface / onSurface / primary). Mirrors exampleCard's color resolution.
-  typeExampleCard(view) {
-    const scale = this._activeTypeScale();
-    const p = view.palettes[this.selectedIndex()];
-    const roles = (p && p.roles) || [];
-    const dark = this.resolvedCanvasScheme() === "dark";
-    const sl = slug((p && p.name) || "");
-    const byKey = {};
-    for (const r of roles) byKey[r.key] = r;
-    const pick = (role) => (role ? (dark ? role.darkHex : role.lightHex) : "transparent");
-    const main = roles.find((r) => r.suffix === "");
-    const onMain = roles.find((r) => r.suffix === "-on-" + sl);
-    const hStep = scale.categories["Headline"].MD, bStep = scale.categories.Body.MD;
-    const fam = (cat) => { const role = scale.roleOf[cat]; const fm = resolvedFontFor(scale, cat) || "Inter"; return `'${fm}', ${genericFor(fm, role)}`; };
-    return h(
-      "div",
-      { class: "example-card tyi-example", style: "background:" + pick(byKey.surface) },
-      h("div", { class: "tyi-ex-head", style: `color:${pick(byKey.onSurface)};font-family:${fam("Headline")};font-size:${hStep.size}px;line-height:${hStep.lineHeight}px;letter-spacing:${hStep.letterSpacing}px;font-weight:${hStep.weight}` }, TYPE_SAMPLE("Headline", scale.treatment)),
-      h("p", { class: "tyi-ex-body", style: `color:${pick(byKey.onSurfaceVariant)};font-family:${fam("Body")};font-size:${bStep.size}px;line-height:${bStep.lineHeight}px;letter-spacing:${bStep.letterSpacing}px;font-weight:${bStep.weight}` }, TYPE_SAMPLE("Body", scale.treatment)),
-      h("button", { class: "ex-btn", tabindex: "-1", style: "background:" + pick(main) + ";color:" + pick(onMain) }, "Read more"),
-    );
-  }
-
-  // renderStoryInspector — the holistic "Story" tab: the set's concept narrative + the curated
-  // colors (name · role · description) + the 60/30/10 groups + what the palette refuses. Mirrors the
-  // source's cover layout. Present only for sets that carry a story (the curated travel volumes).
-  renderStoryInspector(view) {
-    const s = view.story;
-    if (!s) return h("div", { class: "empty-note" }, "No story for this palette set.");
-    const HIER = { d: "Dominant", s: "Supporting", a: "Accent" };
-    const cols = view.palettes.filter((p) => p.colorName); // the curated colors carry the story
-    return h(
-      "div",
-      { class: "story-pane" },
-      s.kicker ? h("div", { class: "story-kicker" }, s.kicker) : false,
-      s.title ? h("h3", { class: "story-title" }, s.title) : false,
-      s.narrative ? h("p", { class: "story-narrative" }, s.narrative) : false,
-      cols.length
-        ? h(
-            "div",
-            { class: "story-colors" },
-            ...cols.map((p) =>
-              h(
-                "div",
-                { class: "story-color" },
-                h("span", { class: "story-swatch", style: `background:${p.key}` }),
-                h(
-                  "div",
-                  { class: "story-color-meta" },
-                  h("div", { class: "story-color-name" }, p.colorRole ? h("span", { class: "color-role" }, p.colorRole) : false, p.colorName),
-                  p.description ? h("p", { class: "story-color-note" }, p.description) : false,
-                ),
-              ),
-            ),
-          )
-        : false,
-      s.groups && s.groups.length
-        ? h(
-            "div",
-            { class: "story-groups" },
-            ...s.groups.map((g) =>
-              h(
-                "div",
-                { class: "story-group" },
-                h("div", { class: "story-group-head" }, h("b", {}, HIER[g.hier] || g.hier), h("span", { class: "story-group-pct" }, g.pct + "%")),
-                g.note ? h("p", {}, g.note) : false,
-              ),
-            ),
-          )
-        : false,
-      s.refuses ? h("div", { class: "story-refuses" }, h("b", {}, "Refuses"), h("p", {}, s.refuses)) : false,
-    );
-  }
 
   // exampleCard — a tiny real component (a surface with text + a primary button)
   // painted from the SELECTED palette's semantic roles, in the canvas light/dark
@@ -4927,6 +1910,7 @@ class HctApp extends HTMLElement {
     const pick = (role) => (role ? (dark ? role.darkHex : role.lightHex) : "transparent");
     return { byKey, pick, sl, main: roles.find((r) => r.suffix === ""), onMain: roles.find((r) => r.suffix === "-on-" + sl) };
   }
+
 
   exampleCard(view) {
     const { byKey, pick, main, onMain } = this._exampleRoles(view);
@@ -4951,6 +1935,7 @@ class HctApp extends HTMLElement {
     );
   }
 
+
   // exampleSlider — a native <input type=range> themed by the tokens via CSS accent-color (the prime
   // accent fills the track + thumb). A static demo (tabindex -1, aria-hidden) so liveRefresh can repaint it.
   exampleSlider(view) {
@@ -4965,6 +1950,7 @@ class HctApp extends HTMLElement {
       }),
     );
   }
+
 
   // exampleForm — native form controls themed by the tokens: a text field (surface/onSurface/outline) +
   // checkbox · radio · select with accent-color = the prime accent. Static demos (tabindex -1, aria-hidden).
@@ -4987,6 +1973,7 @@ class HctApp extends HTMLElement {
     );
   }
 
+
   // exampleArtifacts — the pinned preview gallery: the role card + the native slider + the native form set,
   // each painted from the selected palette's roles. All input-free demos, so liveRefresh can replaceChildren.
   // Collapsed to the FIRST artifact (the role card) until expanded — the slider + form are revealed by the
@@ -5005,6 +1992,7 @@ class HctApp extends HTMLElement {
     );
     return [this.exampleCard(view), ...(this.examplesExpanded ? rest : []), toggle];
   }
+
 
   // slider — a range control. `onInput(v)` mutates live (through editDrag, which
   // does a PARTIAL liveRefresh — it never replaces this <input>, so the native
@@ -5041,6 +2029,7 @@ class HctApp extends HTMLElement {
     );
   }
 
+
   // _snapRange(frac, min, max, step) — map a 0..1 track fraction to a stepped, clamped slider value. PURE
   // (testable) — the sensitivity fix: value is a linear function of the MEASURED track position, nothing else.
   _snapRange(frac, min, max, step) {
@@ -5049,6 +2038,7 @@ class HctApp extends HTMLElement {
     if (step > 0) v = Math.round((v - min) / step) * step + min;
     return Math.min(max, Math.max(min, v));
   }
+
   // _bindRangeDrag — a DELEGATED pointer-capture drag for every <input type=range>. Figma's plugin iframe
   // breaks the native range drag two ways: it loses the implicit pointer capture (the drag dies the instant
   // the pointer leaves the thumb) and mis-maps pointer→value (over-sensitive). We drive it ourselves — capture
@@ -5095,354 +2085,6 @@ class HctApp extends HTMLElement {
     });
   }
 
-  // scrimContext — the sub-variant preview shown atop the Palette inspector while the canvas is
-  // in the Scrims view. Scrims have NO independent controls — they ARE this palette's 500 stop at
-  // fixed alpha — so the panel shows the 7 swatches and makes the shared-edit relationship explicit:
-  // editing Hue / Chroma / Skew / Lift below moves the palette and its scrims together.
-  scrimContext(view) {
-    const vp = view.palettes[this.selectedIndex()];
-    if (!vp) return false;
-    const KEYS = ["scrimWeakest", "scrimWeaker", "scrimWeak", "scrim", "scrimStrong", "scrimStronger", "scrimStrongest"];
-    const byKey = {};
-    for (const r of vp.roles) byKey[r.key] = r;
-    return h(
-      "div",
-      { class: "scrim-context" },
-      h("div", { class: "scrim-ctx-head" }, h("b", {}, "Scrims"), h("small", {}, "500 base · 10–55% alpha")),
-      h(
-        "div",
-        { class: "scrim-ctx-strip" },
-        ...KEYS.map((k) => {
-          const hex8 = (byKey[k] && byKey[k].lightHex) || "#00000000";
-          return h("div", { class: "scrim-cell sm", title: `${this.scrimAlpha(hex8)}% · ${hex8}` }, h("i", { class: "scrim-fill", style: `background:${hex8}` }));
-        }),
-      ),
-      h("p", { class: "scrim-ctx-note" }, "A scrim is a sub-variant of this palette — its 500 stop at a fixed alpha. Edit Hue · Chroma · Skew · Lift below and the palette and its scrims move together."),
-    );
-  }
-
-  renderPaletteInspector(view) {
-    const i = this.selectedIndex();
-    const p = this.doc.palettes[i];
-    if (!p) return h("div", {}, "No palette selected");
-    const vp = view.palettes[i];
-    // skew + lift shape the CIELAB tone curve (toneAt) — they have NO effect in the OKHSL distribution
-    // modes (perceptual/peak step lightness directly), so hide them there, matching the Global controls.
-    const isEven = this.doc.toneMode === "even";
-
-    return h(
-      "div",
-      { class: "insp-body" },
-      h("h3", { class: "insp-title" }, swatch((vp.ramp.find((s) => s.stop === 550) || vp.ramp[9]).hex, { size: 16 }), "Palette"),
-      h("div", { class: "insp-sub" }, isEven ? "Tune hue · chroma · skew · lift — live" : (this.doc.toneMode === "perceptual" ? "Tune hue · chroma · cusp pull — live" : "Tune hue · chroma — live")),
-      // curated story for this color (preset palettes): its evocative name, role, and description.
-      vp.colorName
-        ? h(
-            "div",
-            { class: "color-story" },
-            h("div", { class: "color-story-name" }, vp.colorRole ? h("span", { class: "color-role" }, vp.colorRole) : false, vp.colorName),
-            vp.description ? h("p", { class: "color-story-note" }, vp.description) : false,
-          )
-        : false,
-      // In the Scrims view, surface the sub-variant relationship at the top of the inspector.
-      this.canvasView === "scrims" ? this.scrimContext(view) : false,
-      field(
-        "Name",
-        h("input", {
-          type: "text",
-          "data-fk": "pname",
-          value: p.name,
-          // typing coalesces into one undo step (editDrag debounce). editDrag does
-          // a PARTIAL liveRefresh — it never replaces this <input> (the right pane
-          // is left alone), so focus + caret survive mid-word. The canvas row name
-          // + analysis header update live. blur/Enter ('change') settles + renders.
-          oninput: (e) => this.editDrag((d) => (d.palettes[i].name = e.target.value)),
-          onchange: () => {
-            this.commitDrag();
-            this.render(); // settle: reconcile the right pane + rails post-edit
-          },
-        }),
-      ),
-      h(
-        "div",
-        { class: "field" },
-        switchControl({
-          on: p.on !== false,
-          ariaLabel: "Palette enabled",
-          label: p.on !== false ? "Enabled" : "Disabled",
-          onToggle: () => this.commit((d) => (d.palettes[i].on = !(d.palettes[i].on !== false))),
-        }),
-      ),
-      this.slider("Hue", p.hue, 0, 360, 1, (v) => fmt(v) + "°", (v) => this.editDrag((d) => (d.palettes[i].hue = v))),
-      this.slider("Chroma", p.chroma, 0, 100, 1, (v) => fmt(v) + "%", (v) => this.editDrag((d) => (d.palettes[i].chroma = v))),
-      isEven ? this.slider("Skew", p.skew, -100, 100, 1, (v) => fmt(v), (v) => this.editDrag((d) => (d.palettes[i].skew = v))) : false,
-      isEven ? this.slider("Lift", p.lift, -40, 40, 1, (v) => fmt(v), (v) => this.editDrag((d) => (d.palettes[i].lift = v))) : false,
-      // Cusp pull (perceptual only) — this palette's override of the global Vibrancy: how far its
-      // richest stop is nudged toward 500. Starts at the inherited global value; the peak mode pins it.
-      this.doc.toneMode === "perceptual"
-        ? this.slider("Cusp pull", p.cuspPull ?? (this.doc.vibrancy ?? 0), 0, 100, 1, (v) => fmt(v), (v) => this.editDrag((d) => (d.palettes[i].cuspPull = v)))
-        : false,
-      // Edge hue rotation — bipolar, centre 0. The readout shows the light/dark torsion:
-      // left = light + / dark −, right = light − / dark + (the slider value = the dark edge).
-      this.slider(
-        "Edge hue",
-        p.hueShift ?? 0,
-        -60,
-        60,
-        1,
-        (v) => {
-          if (v === 0) return "0°";
-          const light = -v; // light-end rotation; dark = +v (opposite) or = light (same-direction)
-          const dark = p.hueSameDir ? light : v;
-          const sgn = (x) => (x > 0 ? "+" : "−") + Math.abs(x);
-          return `${sgn(light)}/${sgn(dark)}°`;
-        },
-        (v) => this.editDrag((d) => (d.palettes[i].hueShift = v)),
-      ),
-      // mini-checkbox: bend both ends the SAME direction (|s|) instead of opposite torsion (s)
-      h(
-        "label",
-        { class: "mini-check", title: "Bend both ends the same direction (instead of opposite torsion)" },
-        h("input", {
-          type: "checkbox",
-          checked: p.hueSameDir === true,
-          onchange: (e) => this.commit((d) => (d.palettes[i].hueSameDir = e.target.checked)),
-        }),
-        "ends bend same way",
-      ),
-      this.keyColorsEditor(i, vp),
-      h(
-        "div",
-        { class: "insp-actions" },
-        btn([icon("copy"), "Duplicate"], { onclick: () => this.duplicatePalette(i) }),
-        btn([icon("trash"), "Delete"], { variant: "danger", onclick: () => this.deletePalette(i) }),
-      ),
-    );
-  }
-
-  // keyColorsEditor — the palette's retained brand colors as two EXPRESSIONS: `dominant`
-  // (the main color) and `supportive` (optional). Each is a big swatch (≈ half width) with
-  // its ramp placement (≈ stop + drift), a "seed" (align the family to it), and remove. An
-  // empty slot captures the palette's current identity color in one click. Values are OKLCH.
-  keyColorsEditor(i, vp) {
-    const placed = vp.keyColors || []; // [{role, css, nearStop, drift, ...}]
-    const slot = (role) => {
-      const pl = placed.find((p) => p.role === role);
-      if (pl) {
-        return h(
-          "div",
-          { class: "key-slot filled" },
-          h("span", { class: "key-fill", style: `background:${pl.css}` }),
-          h(
-            "div",
-            { class: "key-meta" },
-            h("span", { class: "key-role" }, role),
-            h("span", { class: "key-place", title: `drift ${pl.drift} — perceptual distance to that stop` }, "≈ " + pl.nearStop),
-          ),
-          h(
-            "div",
-            { class: "key-acts" },
-            btn(icon("arrows-clockwise"), { variant: "bare", cls: "key-act", title: "Seed the palette's hue + chroma from this color", ariaLabel: `Seed palette from ${role} key color`, onclick: () => this.seedFromKey(i, role) }),
-            btn(icon("trash"), { variant: "bare", cls: "key-act", title: "Remove", ariaLabel: `Remove ${role} key color`, onclick: () => this.commit((d) => { d.palettes[i].keyColors = (d.palettes[i].keyColors || []).filter((k) => k.role !== role); }) }),
-          ),
-        );
-      }
-      return h(
-        "button",
-        { type: "button", class: "key-slot empty", title: `Add a ${role} key color (captures this palette's current color; edit by seeding)`, "aria-label": `Add ${role} key color`, onclick: () => this.addKeyColor(i, role) },
-        icon("plus"), h("span", {}, "Add " + role),
-      );
-    };
-    return h(
-      "div",
-      { class: "field key-colors" },
-      h("label", {}, "Key colors", h("small", {}, "dominant · supportive")),
-      h("div", { class: "key-slots" }, slot("dominant"), slot("supportive")),
-    );
-  }
-
-  // addKeyColor — capture the palette's current identity color (its vivid `key`) as a key
-  // color in OKLCH, tagged with the role. One undo step.
-  addKeyColor(i, role) {
-    const vp = (this._view || projectView(this.doc)).palettes[i];
-    if (!vp) return;
-    const oklch = vp.keyOklch; // store the HIGH-RES key OKLCH, not a re-measured 8-bit hex
-    this.commit((d) => { (d.palettes[i].keyColors = (d.palettes[i].keyColors || []).filter((k) => k.role !== role)).push({ role, oklch }); });
-  }
-
-  // seedFromKey — set the palette's hue + chroma from a key color, in the ACTIVE doc's hue space
-  // (OKLCH for new docs, CAM16 for a preserved legacy doc), so the generated ramp's family matches the
-  // brand color. One undo step.
-  seedFromKey(i, role) {
-    const kc = (this.doc.palettes[i].keyColors || []).find((k) => k.role === role);
-    const s = kc && seedFromKeyColor(kc.oklch, this.doc.hueSpace);
-    if (!s) return;
-    this.commit((d) => { d.palettes[i].hue = s.hue; d.palettes[i].chroma = s.chroma; });
-  }
-
-  duplicatePalette(i) {
-    this.commit((d) => {
-      const src = d.palettes[i];
-      d.palettes.splice(i + 1, 0, { ...src, name: src.name + " copy" });
-    });
-    this.selectPalette(i + 1);
-  }
-
-  deletePalette(i) {
-    if (this.doc.palettes.length <= 1) {
-      this.toast("Can't delete the last palette");
-      return;
-    }
-    this.commit((d) => d.palettes.splice(i, 1));
-    this.selectPalette(Math.max(0, i - 1));
-  }
-
-  renderGlobalInspector() {
-    const d = this.doc;
-    return h(
-      "div",
-      { class: "insp-body" },
-      h("h3", { class: "insp-title" }, icon("gear"), "Global controls"),
-      h("div", { class: "insp-sub" }, "Tone curve shared by every palette"),
-      field(
-        "Distribution",
-        h(
-          "select",
-          { onchange: (e) => this.commit((doc) => (doc.toneMode = e.target.value)) },
-          ...["perceptual", "even", "peak"].map((m) => h("option", { value: m, selected: d.toneMode === m }, m)),
-        ),
-        { labelTitle: "perceptual: even OKHSL-lightness steps + gamut chroma (no near-white dead zone). even: the classic CIELAB curve (tone-aligned across hues; Curve/Tension/Chroma-basis apply). peak: cusp anchored at stop 500." },
-      ),
-      // Vibrancy (perceptual only): pulls the ramp's center toward the hue's chroma cusp, so the mid
-      // stops read vibrant — the fix for hues whose vivid expression is off-center (e.g. yellow). At
-      // 100 it equals "peak" mode. Hidden in even (CIELAB) + peak (already pinned at the cusp).
-      d.toneMode === "perceptual"
-        ? this.slider("Vibrancy", d.vibrancy, 0, 100, 1, (v) => fmt(v), (v) => this.editDrag((doc) => (doc.vibrancy = v)))
-        : false,
-      // Curve · Tension · Chroma-basis shape the CIELAB "even" path ONLY — hide them in the OKHSL modes.
-      d.toneMode === "even"
-        ? field(
-            "Curve",
-            h(
-              "select",
-              { onchange: (e) => this.commit((doc) => (doc.curve = e.target.value)) },
-              ...CURVES.map((c) => h("option", { value: c, selected: d.curve === c }, c)),
-            ),
-          )
-        : false,
-      d.toneMode === "even"
-        ? this.slider("Tension", d.tension, 0, 100, 1, (v) => fmt(v), (v) => this.editDrag((doc) => (doc.tension = v)))
-        : false,
-      this.slider("L* min", d.lmin, 0, 40, 1, (v) => fmt(v), (v) => this.editDrag((doc) => (doc.lmin = v))),
-      this.slider("L* max", d.lmax, 60, 100, 1, (v) => fmt(v), (v) => this.editDrag((doc) => (doc.lmax = v))),
-      this.slider("Damp", d.damp, 0, 100, 1, (v) => fmt(v), (v) => this.editDrag((doc) => (doc.damp = v))),
-      // chroma floor (even mode only): lifts the damped light/dark ends back toward the palette's
-      // intended chroma so low-chroma ramps don't dead-zone to near-white; never over-saturates.
-      d.toneMode === "even"
-        ? this.slider("Chroma floor", d.chromaFloor, 0, 100, 1, (v) => fmt(v), (v) => this.editDrag((doc) => (doc.chromaFloor = v)))
-        : false,
-      // differential damping curve — falloff (shape) · amplify (mid boost) · bias (L↔D)
-      h("div", { class: "sub-head" }, "Differential curve"),
-      this.dampPresets(),
-      this.slider("Falloff", d.dampCurve, 0.5, 4, 0.1, (v) => fmt(v, 1), (v) => this.editDrag((doc) => (doc.dampCurve = v))),
-      this.slider("Amplify", d.dampAmp, 0, 100, 1, (v) => fmt(v), (v) => this.editDrag((doc) => (doc.dampAmp = v))),
-      this.slider(
-        "Bias",
-        d.dampBias,
-        -100,
-        100,
-        1,
-        (v) => (v === 0 ? "0" : (v > 0 ? "dark " : "light ") + fmt(Math.abs(v))),
-        (v) => this.editDrag((doc) => (doc.dampBias = v)),
-      ),
-      h("div", { class: "damp-graph" }, this.graphDamping(d)),
-      // Hue space + On-color policy — two 2-option choices as side-by-side segmented controls (both
-      // options visible, vs a toggle that hid the OFF label). On-colors: "fixed" = the light tint in both
-      // modes (ADR-003); "contrast" flips on{N}/on{N}Variant to the better-contrasting end vs the accent fill.
-      h(
-        "div",
-        { class: "global-seg-row" },
-        h(
-          "div",
-          { class: "field" },
-          h("label", { title: "OKLCH: perceptual hue (the default). CAM16: the legacy hue model." }, "Hue space"),
-          this.segmented(
-            [{ id: "oklch", label: "OKLCH" }, { id: "cam16", label: "CAM16" }],
-            d.hueSpace === "oklch" ? "oklch" : "cam16",
-            (id) => this.commit((doc) => (doc.hueSpace = id)),
-            { ariaLabel: "Hue space", role: "group", idPrefix: "huespace", cls: "seg-sm" },
-          ),
-        ),
-        h(
-          "div",
-          { class: "field" },
-          h("label", { title: "Fixed: on-colors are the light tint in both modes (ADR-003). Contrast: on{N}/on{N}Variant flip to the end with the best WCAG contrast vs the accent fill, per mode — accessible, but no longer uniform." }, "On-colors"),
-          this.segmented(
-            [{ id: "fixed", label: "Fixed" }, { id: "contrast", label: "Contrast" }],
-            d.onColorMode === "contrast" ? "contrast" : "fixed",
-            (id) => this.commit((doc) => (doc.onColorMode = id)),
-            { ariaLabel: "On-colors", role: "group", idPrefix: "oncolor", cls: "seg-sm" },
-          ),
-        ),
-      ),
-      d.toneMode === "even"
-        ? field(
-            "Chroma basis",
-            switchControl({
-              on: d.relChroma,
-              ariaLabel: "Chroma basis — gamut when on, peak when off",
-              label: d.relChroma ? "gamut" : "peak",
-              onToggle: () => this.commit((doc) => (doc.relChroma = !doc.relChroma)),
-            }),
-            { labelTitle: "peak: chroma is % of each hue's own peak. gamut: % of every stop's gamut ceiling — palettes harmonize across hue." },
-          )
-        : false,
-    );
-  }
-
-  // Roles panel — the 53-role table for the selected palette: key · suffix · the
-  // light ref swatch + the dark ref swatch · plus a small live semantic preview.
-  renderRolesInspector(view) {
-    const idx = this.selectedIndex();
-    const p = view.palettes[idx] || view.palettes[0];
-    const ns = p ? slug(p.name) : "";
-    return h(
-      "div",
-      {},
-      h("h3", { class: "insp-title" }, icon("roles"), "Roles"),
-      h("div", { class: "insp-sub" }, `${p ? p.name : ""} — 53 semantic roles · light / dark refs`),
-      // (the live component preview is pinned at the bottom of the pane on every
-      // tab — see .seg-example / exampleCard — so the Roles panel no longer repeats
-      // it here at the top.)
-      h(
-        "div",
-        { class: "roles-table" },
-        h(
-          "div",
-          { class: "rrow rhead" },
-          h("span", { class: "k" }, "key"),
-          h("span", { class: "suf" }, "suffix"),
-          h("span", { class: "sw-pair" }, h("span", {}, "L"), h("span", {}, "D")),
-        ),
-        ...(p
-          ? p.roles.map((r) =>
-              h(
-                "div",
-                { class: "rrow" },
-                h("span", { class: "k", title: "--c-" + ns + r.suffix }, r.key),
-                h("span", { class: "suf" }, r.suffix || "—"),
-                h(
-                  "span",
-                  { class: "sw-pair" },
-                  swatch(r.lightHex, { size: 16, title: "light ref " + r.lightHex, onClick: () => this.copy(r.lightHex, "Copied " + r.lightHex) }),
-                  swatch(r.darkHex, { size: 16, title: "dark ref " + r.darkHex, onClick: () => this.copy(r.darkHex, "Copied " + r.darkHex) }),
-                ),
-              ),
-            )
-          : []),
-      ),
-    );
-  }
 
   // ── app footer ────────────────────────────────────────────────────────────────
   // Static structure (the · separators, theme, spacer) is built once; the dynamic
@@ -5464,6 +2106,7 @@ class HctApp extends HTMLElement {
       h("span", { class: "af-warn" }),
     );
   }
+
 
   // paintAppFooter — fill / reconcile the app-footer's dynamic readouts in place.
   // Called by the full render (after renderAppFooter builds the shell) and by
@@ -5493,432 +2136,6 @@ class HctApp extends HTMLElement {
     }
   }
 
-  // ── export drawer ────────────────────────────────────────────────────────────
-  toggleDrawer(open) {
-    this.exportOpen = open;
-    this.render(); // render() → _syncDrawer() promotes/dismisses the native <dialog> in the top layer
-    // showModal() moves focus INTO the dialog on open and the browser traps Tab there; on close
-    // we return focus to the opener. Guarded to a no-op in the headless DOM (no real focus).
-    if (!open) {
-      const opener = this.querySelector(".export-open-btn");
-      if (opener && opener.focus) opener.focus();
-    }
-  }
-
-  renderDrawer(view) {
-    // Export formats grouped by SYSTEM — the three brand-kit systems (Colors · Typography · Geometry) each
-    // get their own group, then Project. Within Colors the order runs CSS → frameworks → design tools. The
-    // item names disambiguate where a format spans systems (Type · DTCG vs the colour DTCG). Internal ids
-    // (css/oklch/tailwind/…) are unchanged — only the display grouping + labels.
-    const FORMAT_GROUPS = [
-      ["Colors", [["css", "Hex"], ["oklch", "OKLCH"], ["tailwind", "Tailwind v4"], ["shadcn", "shadcn/ui"], ["figma", "Figma"], ["ui3", "Figma UI3"], ["dtcg", "DTCG"], ["json", "JSON"]]],
-      ["Typography", [["type-css", "Type · CSS"], ["type-dtcg", "Type · DTCG"]]],
-      ["Geometry", [["geom-css", "Geometry · CSS"], ["geom-dtcg", "Geometry · DTCG"]]],
-      ["Design System", [["ds-tokens", "tokens.json"], ["ds-spine", "DESIGN.md"]]],
-      ["Project", [["config", "Config"]]],
-    ];
-    // the per-system token output for the Typography / Geometry format tabs (the colour formats live on
-    // view.exports). Computed from the same engines the modals + the Brand-Kit MCP use.
-    const typeSc = this._typeScaleFor("base"); // override-aware base scale (Phase 3) — same as the matrix Base column
-    const geomSc = this._geomScaleFor("base");
-    const u = { unit: this._exportUnit() }; // the CSS unit preference (Settings › Export); Figma stays px
-    const ut = { ...u, prefix: this._typePrefix() }; // + the naming-scheme prefix for the type CSS
-    const ug = { ...u, prefix: this._geomPrefix() }; // + the naming-scheme prefix for the geometry CSS
-    // splitCssPreview — a single-pane, read-only preview of the SEPARATE files Download-All actually
-    // zips (base + one file per breakpoint), each fenced with its real filename so "one tab" still shows
-    // the true multi-file shape: add just the base file, or additionally the breakpoint file(s) below it.
-    const splitCssPreview = (baseCss, files, baseFilename) => {
-      const parts = [`/* ${baseFilename} — the only file most sites need */\n${baseCss}`];
-      for (const f of files) parts.push(`/* ${baseFilename.replace(/\.css$/, "")}-${slug(f.name)}.css — optional, add for the ${f.name} breakpoint */\n${f.css}`);
-      return parts.join("\n");
-    };
-    const SYSTEM_CODE = {
-      "type-css": () => splitCssPreview(typeTokensCSS(typeSc, ut), typeTokensBreakpointCSS(this._typeModeScales(), ut), "type.css"),
-      "type-dtcg": () => JSON.stringify(typeTokensDTCG(typeSc, u), null, 2),
-      "geom-css": () => splitCssPreview(geomTokensCSS(geomSc, ug), geomTokensBreakpointCSS(this._geomModeScales(), ug), "geometry.css"),
-      "geom-dtcg": () => JSON.stringify(geomTokensDTCG(geomSc, u), null, 2),
-      // the Design System export — the universal-dialect DESIGN.md core + tokens.json (the LLM generation
-      // system); the component previews ride the Download-All bundle only (a folder, not a single preview).
-      "ds-tokens": () => exportDesignSystemTokens(this.doc, typeSc, geomSc),
-      "ds-spine": () => exportDesignSystemSpine(this.doc, typeSc, geomSc),
-    };
-    const SYSTEM_LABEL = { "type-css": "Typography · CSS", "type-dtcg": "Typography · DTCG", "geom-css": "Geometry · CSS", "geom-dtcg": "Geometry · DTCG", "ds-tokens": "Design System · tokens.json", "ds-spine": "Design System · DESIGN.md" };
-    // the systems currently opted into the Download-All + MCP bundle (for the footer summary).
-    const SYS_LABEL = { color: "Color", type: "Typography", geometry: "Geometry" };
-    const included = ["color", "type", "geometry"].filter((k) => this.exportSystems[k] !== false).map((k) => SYS_LABEL[k]).join(" · ");
-    // The three Figma mode files: [stateKey, label, real filename to import as].
-    const FIGMA = [
-      ["light", "Light", "Light_tokens.json"],
-      ["dark", "Dark", "Dark_tokens.json"],
-      ["raw", "Raw values", "palette.tokens.json"],
-    ];
-    const isFigma = this.exportTab === "figma";
-    const isConfig = this.exportTab === "config";
-    const figCur = FIGMA.find((f) => f[0] === this.figmaFile) || FIGMA[0];
-    // proExport gate: a Pro format the plan doesn't unlock shows an upsell instead of its code (NO-OP until
-    // go-live). PRO_LABEL names the upsell; the format <select> tags the option " · Pro".
-    const proLocked = this._proExportLocked(this.exportTab);
-    const PRO_LABEL = { dtcg: "DTCG", tailwind: "Tailwind v4", shadcn: "shadcn/ui" };
-    const code = proLocked
-      ? ""
-      : isConfig
-        ? JSON.stringify(serialize(this.doc), null, 2) // the parametric doc — re-importable via the gallery's ⬆ Import
-        : isFigma
-          ? view.exports.figma[this.figmaFile]
-          : SYSTEM_CODE[this.exportTab]
-            ? SYSTEM_CODE[this.exportTab]()
-            : view.exports[this.exportTab];
-    const bytes = new Blob([code]).size;
-
-    // A native <dialog>: showModal() (see _syncDrawer) promotes it to the browser TOP LAYER —
-    // above every stacking context with no z-index race — and gives ::backdrop, focus trapping,
-    // background inert, and Esc for free. open/close is driven by exportOpen via _syncDrawer.
-    return h(
-      "dialog",
-      {
-        class: "drawer",
-        "aria-label": "Export",
-        // a click that lands on the dialog box itself (i.e. the ::backdrop) closes it; clicks on
-        // the content hit child nodes, so they don't.
-        onclick: (e) => { if (e.target === e.currentTarget) this.toggleDrawer(false); },
-        // Esc → native 'cancel'. Keep exportOpen the single source of truth: cancel the default
-        // close and route through toggleDrawer so the state + the dialog stay in lockstep.
-        oncancel: (e) => { e.preventDefault(); this.toggleDrawer(false); },
-      },
-      h(
-        "div",
-        { class: "drawer-head" },
-        h("h3", {}, icon("export"), "Export"),
-        h("div", { class: "spacer" }),
-        btn(icon("x"), { ariaLabel: "Close export drawer", onclick: () => this.toggleDrawer(false) }),
-      ),
-        // Systems opt-in: which token systems the Download-All .zip + the Brand-Kit MCP bundle. Color
-        // gates every colour format + the palettes/roles; Type/Geometry add their CSS + DTCG. The
-        // single-format preview below is unaffected (pick any format to inspect/copy it directly).
-        h(
-          "div",
-          { class: "drawer-systems" },
-          h("span", { class: "drawer-systems-label" }, "Include"),
-          ...[["color", "Color"], ["type", "Typography"], ["geometry", "Geometry"], ["styles", "Styles"]].map(([k, label]) =>
-            chip(label, {
-              mode: "interactive",
-              on: this.exportSystems[k] !== false,
-              cls: "sys-chip",
-              title: k === "styles"
-                ? "Create Figma STYLE swatches (paint + text styles) bound to the variables on Apply — one per semantic role and type step"
-                : `Include the ${label} system in Download-All & the Brand-Kit MCP`,
-              onclick: () => this.toggleExportSystem(k),
-            }),
-          ),
-          h("span", { class: "drawer-systems-note" }, "in Download-All & MCP"),
-        ),
-        h(
-          "div",
-          { class: "drawer-format" },
-          h("label", { for: "export-format" }, "Format"),
-          h(
-            "select",
-            {
-              id: "export-format",
-              "aria-label": "Export format",
-              onchange: (e) => {
-                this.exportTab = e.target.value;
-                this.render();
-              },
-            },
-            ...FORMAT_GROUPS.map(([label, items]) =>
-              h(
-                "optgroup",
-                { label },
-                ...items.map(([id, lab]) =>
-                  h("option", id === this.exportTab ? { value: id, selected: "selected" } : { value: id }, this._proExportLocked(id) ? lab + " · Pro" : lab),
-                ),
-              ),
-            ),
-          ),
-        ),
-        // Figma sub-bar: the import note on its own row, then [mode-file segmented | Binder plugin].
-        isFigma
-          ? h(
-              "div",
-              { class: "figma-bar" },
-              h("span", { class: "figma-note" }, "One file per Figma variable-mode — import Light & Dark into the two modes of one collection, then run the Binder plugin for the live raw→semantic cascade."),
-              h(
-                "div",
-                { class: "figma-bar-row" },
-                this.segmented(
-                  FIGMA.map(([id, label]) => ({ id, label })),
-                  this.figmaFile,
-                  (id) => {
-                    this.figmaFile = id;
-                    this.render();
-                  },
-                  { baseClass: "figma-files", ariaLabel: "Figma mode file", role: "group", idPrefix: "ffile" },
-                ),
-                btn([icon("download"), "Binder plugin"], {
-                  cls: "figma-plugin-btn",
-                  title: "Download the Color Tokens Semantic Binder plugin (manifest.json + code.js). In Figma: Plugins → Development → Import plugin from manifest — it aliases each semantic role to its raw variable so editing a raw color cascades.",
-                  onclick: () => this.downloadFigmaPlugin(),
-                }),
-                // Opt-in (inside Figma only): re-create Color Semantic so it adopts the grouped order
-                // (Figma won't reorder existing variables on a normal apply). Lives here, beside the
-                // Binder plugin, because it's a Figma-tab action — re-creates vars, so bound layers
-                // need reconnecting.
-                this.inFigma
-                  ? btn([icon("arrows-clockwise"), "Regroup"], {
-                      cls: "figma-regroup",
-                      title: "Rebuild the Color Semantic variables in grouped order (regular · containers · surfaces · scrims). Re-creates them, so layers bound to them will need reconnecting. Color Primitives are untouched.",
-                      onclick: () => this.requestApplyToFigma(true),
-                    })
-                  : false,
-              ),
-            )
-          : false,
-        // Config sub-bar: the project source-of-truth actions live ABOVE the code, not in the footer.
-        isConfig
-          ? h(
-              "div",
-              { class: "config-bar" },
-              btn([icon("upload"), "Save to project"], { title: this.inFigma ? "Save this config into this Figma file (travels with the file)" : "Save this config to the project (localStorage)", onclick: () => this.saveToProject() }),
-              btn([icon("download"), "Load from project"], { title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project", onclick: () => this.loadFromProject() }),
-              btn([icon("download"), "Brand-Kit MCP"], { title: "Download a ready-to-run MCP server (your tokens, for Claude Code / Cursor / any agent) — a .zip with the zero-dep server + your brand-kit.json + setup README", onclick: () => this.downloadBrandKitMcp() }),
-              h("span", { class: "config-note" }, this.inFigma ? "Source of truth: this Figma file (travels with the file)" : "Source of truth: your browser (localStorage)"),
-            )
-          : false,
-        // The code block carries its OWN floating copy affordance (top-right), so the footer stays a
-        // single download action instead of a row of competing buttons.
-        h(
-          "div",
-          // the output for the format chosen in the drawer-format <select> above.
-          { class: "drawer-code", role: "region", "aria-label": "Export output" },
-          ...(proLocked
-            ? [this._proUpsell(`${PRO_LABEL[this.exportTab] || "This"} export is a Pro format — upgrade to export it.`)]
-            : [
-                btn([icon("copy"), "Copy"], { variant: "bare", cls: "copy-float", title: "Copy to clipboard", ariaLabel: "Copy", onclick: () => this.copy(code) }),
-                h("pre", { class: "drawer-pre" }, code),
-              ]),
-        ),
-        h(
-          "div",
-          { class: "drawer-foot" },
-          h("span", { class: "meta" }, proLocked ? `${PRO_LABEL[this.exportTab] || "Pro"} · Pro format · Download-All: ${included}` : `${(bytes / 1024).toFixed(1)} KB · ${isFigma ? figCur[2] : isConfig ? "re-importable config" : SYSTEM_LABEL[this.exportTab] || tokenCount(this.doc) + " tokens"} · Download-All: ${included}`),
-          // Footer actions kept in ONE group so they never split across rows: the foot is
-          // flex-wrap and .meta has flex:1, so as separate children Download all wrapped below
-          // Apply. As a single .foot-actions child they stay together (Apply left, Download right).
-          h(
-            "div",
-            { class: "foot-actions" },
-            // Inside Figma, applying variables directly is the point — primary action, on the LEFT.
-            this.inFigma
-              ? btn([icon("flag"), "Apply Variables"], {
-                  variant: "primary",
-                  cls: "figma-apply",
-                  title: "Create/update the Color Primitives + Color Semantic (Light/Dark) variable collections directly in this Figma file",
-                  onclick: () => this.requestApplyToFigma(),
-                })
-              : false,
-            // (Regroup moved to the Figma tab's sub-bar, beside the Binder plugin button.)
-            // ONE download action — every format in its own folder + the config, as a single .zip.
-            btn([icon("download"), "Download All"], { variant: "primary", title: `Download the selected systems (${included}) — each format in its own folder + the re-importable config, as one .zip`, onclick: () => this.downloadAllZip(view) }),
-          ),
-        ),
-    );
-  }
-
-  // toggleExportSystem — flip one token system (color/type/geometry) in the Download-All + MCP opt-in.
-  // Keeps at least one system selected (an all-off bundle is degenerate).
-  toggleExportSystem(k) {
-    const on = this.exportSystems[k] !== false;
-    // `styles` is an overlay on the selected systems (the Figma swatches opt-out), not a token system —
-    // the keep-one-system guard applies only to the three real systems.
-    if (k !== "styles" && on && ["color", "type", "geometry"].filter((s) => this.exportSystems[s] !== false).length <= 1) {
-      this.toast("Keep at least one system selected");
-      return;
-    }
-    this.exportSystems = { ...this.exportSystems, [k]: !on };
-    this.render();
-  }
-
-  // downloadAllZip — ONE archive with every SELECTED system's formats in its own folder + the
-  // re-importable config at the root. Built with the dependency-free store-only ZIP writer (zip.mjs) so
-  // it works offline / in the Figma sandbox. Colour folders (css-hex / css-oklch / json / dtcg / figma /
-  // ui3 / tailwind / shadcn) ride `systems.color`; `typography/` + `geometry/` ride their toggles; the
-  // figma/ folder also gets the type + dimension token files (importable as Figma variables/styles).
-  downloadAllZip(view) {
-    const s = slug(this.doc.name || "palette");
-    const sys = this.exportSystems;
-    const u = { unit: this._exportUnit() }; // the CSS unit preference; the figma/ folder stays px (Figma is numeric)
-    const ex = view.exports;
-    const files = [];
-    if (sys.color) {
-      files.push(
-        // BOTH raw-colour CSS variants — hex and oklch are two co-equal formats (like tailwind + shadcn),
-        // and this is the comprehensive bundle. The export drawer's Hex/OKLCH tabs pick one individually.
-        { name: `css-hex/${s}.css`, data: ex.css },
-        { name: `css-oklch/${s}.css`, data: ex.oklch },
-        { name: `json/${s}.json`, data: ex.json },
-        { name: "figma/Light_tokens.json", data: ex.figma.light },
-        { name: "figma/Dark_tokens.json", data: ex.figma.dark },
-        { name: "figma/palette.tokens.json", data: ex.figma.raw },
-        { name: `ui3/${s}.json`, data: ex.ui3 },
-      );
-      // proExport-gated formats (DTCG + the framework configs) — omitted from the bundle until the plan
-      // unlocks them (NO-OP while TIERS_ENFORCED is off; flagOf("proExport") is true).
-      if (this.flagOf("proExport")) files.push(
-        { name: `dtcg/${s}.tokens.json`, data: ex.dtcg },
-        { name: `tailwind/${s}.css`, data: ex.tailwind },
-        { name: `shadcn/${s}.css`, data: ex.shadcn },
-      );
-      // figma-aliased/ — the SAME tokens, but the Light/Dark leaves carry com.figma.aliasData targeting
-      // the "Color Primitives" collection (figmaBundle). For TESTING plugin-free import / the live cascade
-      // (OD-004, unverified end-to-end). The default figma/ files (resolved) always import; the plugin is
-      // the reliable cascade. See figma-aliased/README.txt.
-      const aliased = this.figmaBundle();
-      files.push(
-        { name: "figma-aliased/palette.tokens.json", data: JSON.stringify(aliased["palette.tokens.json"], null, 2) },
-        { name: "figma-aliased/Light_tokens.json", data: JSON.stringify(aliased["Light_tokens.json"], null, 2) },
-        { name: "figma-aliased/Dark_tokens.json", data: JSON.stringify(aliased["Dark_tokens.json"], null, 2) },
-        { name: "figma-aliased/README.txt", data: ALIASED_README },
-      );
-      // design-system-for-claude-code/ — the LLM design-system bundle: DESIGN.md (the universal-dialect
-      // core — Stitch-canonical sections + Responsive + Agent Prompt Guide) + tokens.json (hex colors/
-      // colorsDark + the type/spacing/radii ladders) + components/*.html (self-contained @dsCard previews)
-      // + README.md (the profile receipt). One shared colour source (dsColorRoles) keeps every carrier
-      // value-equal by construction. Rides `systems.color`. A vision-capable Claude reads the folder to
-      // generate on-brand screens; the measured-reduction on-colors hold WCAG AA in both schemes.
-      const dsDate = new Date().toISOString().slice(0, 10);
-      files.push(...exportDesignSystemBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"), { date: dsDate })
-        .map((f) => ({ name: `design-system-for-claude-code/${f.name}`, data: f.data })));
-      // design-system-for-google-stitch/ — the SAME canonical DESIGN.md (Stitch consumes one file,
-      // byte-identical to the Claude Code spine) + a Stitch-profile README receipt. One core, two uploads.
-      files.push(...exportDesignSystemStitchBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"), { date: dsDate })
-        .map((f) => ({ name: `design-system-for-google-stitch/${f.name}`, data: f.data })));
-      // design-system-for-figma-make/ — a routed guidelines/ tree Figma Make reads directly (no
-      // linter/schema of its own — make_guidelines_check.py is the gate of record) + a profile README.
-      files.push(...exportDesignSystemMakeBundle(this.doc, this._typeScaleFor("base"), this._geomScaleFor("base"), { date: dsDate })
-        .map((f) => ({ name: `design-system-for-figma-make/${f.name}`, data: f.data })));
-    }
-    // the two halves of the merged breakpoint-moded "Geometry" collection (TKT-0009) — filled by the
-    // type/geometry blocks below, merged + pushed as ONE figma/tokens.modes.variables.json after both.
-    const modesHalves = [];
-    if (sys.type) {
-      const tsc = this._typeScaleFor("base"); // override-aware base scale (Phase 3)
-      const tDtcg = JSON.stringify(typeTokensDTCG(tsc, u), null, 2); // the chosen unit — for the typography/ folder
-      const tCssOpts = { ...u, prefix: this._typePrefix() };
-      files.push(
-        // SEPARATE files, not one @media-embedded stylesheet: type.css alone is a complete, valid,
-        // Desktop-anchored stylesheet (drop it in and you're done); type-tablet.css / type-mobile.css are
-        // optional, self-contained bolt-ons (each internally bounded — add any subset, any load order).
-        { name: "typography/type.css", data: typeTokensCSS(tsc, tCssOpts) },
-        ...typeTokensBreakpointCSS(this._typeModeScales(), tCssOpts).map((f) => ({ name: `typography/type-${slug(f.name)}.css`, data: f.css })),
-        { name: "typography/type.tokens.json", data: tDtcg },
-        ...this._typeModeDTCGFiles("typography/type", u),
-        { name: "figma/type.tokens.json", data: JSON.stringify(typeTokensDTCG(tsc), null, 2) }, // ALWAYS px — Figma import (a tokens plugin)
-        // the companion "Font Primitives" collection — deduped family STRING primitives + per-voice
-        // font aliases + per-voice weight primitives (import artifact; never enters the apply path).
-        { name: "figma/typography.primitives.variables.json", data: JSON.stringify(typeTokensFigmaPrimitives(tsc), null, 2) },
-      );
-      // the type HALF of the merged breakpoint-moded collection (pushed after the geometry block below).
-      modesHalves.push(typeTokensFigmaModes(tsc, this._typeModeScales(), this._typeBaseOpts()));
-    }
-    if (sys.geometry) {
-      const gsc = this._geomScaleFor("base"); // composed with the type scale (the per-step `font` is shared); override-aware (Phase 3)
-      const gDtcg = JSON.stringify(geomTokensDTCG(gsc, u), null, 2); // the chosen unit — for the geometry/ folder
-      const gCssOpts = { ...u, prefix: this._geomPrefix() };
-      files.push(
-        // SEPARATE files (mirrors typography/ above): geometry.css alone is a complete, Desktop-anchored
-        // stylesheet; geometry-tablet.css / geometry-mobile.css are optional bolt-ons.
-        { name: "geometry/geometry.css", data: geomTokensCSS(gsc, gCssOpts) },
-        ...geomTokensBreakpointCSS(this._geomModeScales(), gCssOpts).map((f) => ({ name: `geometry/geometry-${slug(f.name)}.css`, data: f.css })),
-        { name: "geometry/geometry.tokens.json", data: gDtcg },
-        ...this._geomModeDTCGFiles("geometry/geometry", u),
-        { name: "figma/dimension.variables.json", data: JSON.stringify(geomTokensFigma(gsc), null, 2) }, // a "Geometry" collection of Figma NUMBER (FLOAT) variables
-      );
-      modesHalves.push(geomTokensFigmaModes(gsc, this._geomModeScales(), this._geomBaseOpts()));
-    }
-    // ONE breakpoint-moded Figma-variable file — the merged "Geometry" collection (type/ + box-geometry
-    // halves, TKT-0009) with a MODE per breakpoint (Base + each), instead of the pre-merge
-    // typography.modes/dimension.modes pair: the plugin executor prunes variables per collection, so the
-    // halves must land as one interchange. Emitted whenever either system is on (Base-only, no breakpoints ok).
-    {
-      const modesIx = mergeModeInterchanges(...modesHalves);
-      if (modesIx) files.push({ name: "figma/tokens.modes.variables.json", data: JSON.stringify(modesIx, null, 2) });
-    }
-    // figma/styles.plan.json — the plugin-free STYLES import artifact (rides the Styles opt-out chip,
-    // compositional with the system toggles like the apply path): the same pure plans the in-Figma
-    // apply executes, so external tooling (or a later plugin-free import) can create the bound
-    // swatches without re-deriving anything. paints → Color Semantic bindings; texts → Breakpoints (type/)/Font
-    // Primitives bindings + literal fallbacks; fontPrimitives → the ordered ensure-plan.
-    if (sys.styles !== false && (sys.color || sys.type)) {
-      const stScale = sys.type ? this._typeScaleFor("base") : null;
-      let stFamilies = [];
-      if (sys.color) {
-        const tree = this.figmaBundle()["Light_tokens.json"];
-        const enabled = (this.doc.palettes || []).filter((p) => p && p.on !== false);
-        stFamilies = Object.keys(tree).filter((k) => k[0] !== "$").map((n, i) => ({ n, name: (enabled[i] && enabled[i].name) || n }));
-      }
-      const stPlans = stylePlans({ families: stFamilies, scale: stScale, include: { color: !!sys.color, type: !!sys.type } });
-      if (stPlans.paints.length || stPlans.texts.length) {
-        const artifact = { $schema: "ultimate-tokens-figma-styles.plan.v1", ...stPlans, ...(stPlans.texts.length && stScale ? { fontPrimitives: primitivesApplyPlan(typeTokensFigmaPrimitives(stScale)) } : {}) };
-        files.push({ name: "figma/styles.plan.json", data: JSON.stringify(artifact, null, 2) });
-      }
-    }
-    // the re-importable parametric config — ALWAYS (it carries the colour + type + geometry params).
-    files.push({ name: `ultimate-tokens-${s}-config.json`, data: JSON.stringify(serialize(this.doc), null, 2) });
-    // the root README — the zip is self-describing: what each included folder is, plus the two
-    // companion channels this archive does NOT carry (the consumption plugin + the Brand-Kit MCP).
-    files.push({ name: "README.md", data: this._zipReadme(s, sys) });
-    const bytes = zipStore(files);
-    this.downloadBytes(bytes, `ultimate-tokens-${s}.zip`, "application/zip");
-  }
-
-  // _zipReadme — the Download-All root README. Reflects the ACTUAL toggles (a folder absent from the
-  // zip is absent from the map) and points at the consumption plugin — the skills/agent layer is
-  // deliberately NOT bundled (it updates centrally via the marketplace; a copy here would go stale).
-  _zipReadme(s, sys) {
-    const name = this.doc.name || "Brand kit";
-    const rows = [];
-    if (sys.color) {
-      rows.push(
-        "| `css-hex/` · `css-oklch/` | The palette + 53 semantic roles per palette, plus fixed system constants (e.g. `--dialog-backdrop`), as CSS custom properties (two co-equal color formats) |",
-        "| `json/` | The raw palette data as JSON |",
-      );
-      // the Pro-gated folders appear in the map only when they are actually IN the archive.
-      if (this.flagOf("proExport")) rows.push(
-        "| `dtcg/` | W3C-DTCG design tokens |",
-        "| `tailwind/` · `shadcn/` | Framework presets |",
-      );
-      const collNames = figmaCollectionNames(this.doc);
-      const customColl = collNames.raw !== COLLECTIONS.colorRaw || collNames.semantic !== COLLECTIONS.colorSemantic;
-      rows.push(
-        "| `figma/` | Importable Figma variable files (Light/Dark semantic + primitives" + (sys.type !== false || sys.geometry !== false ? " + the breakpoint-moded Typography/Geometry collections" : "") + ") |",
-        "| `figma-aliased/` | The raw→semantic aliased variant (plugin-free import path)" + (customColl ? ` — targets collections named \`${collNames.raw}\` / \`${collNames.semantic}\` (renamed in Settings › Token mapping)` : "") + " |",
-        "| `design-system-for-claude-code/` | The full agent-facing design system: `DESIGN.md` + `tokens.json` + self-contained component previews |",
-        "| `design-system-for-google-stitch/` | The single-file `DESIGN.md` upload for Google Stitch |",
-        "| `design-system-for-figma-make/` | The routed `guidelines/` tree for Figma Make (paste-ready `styles.css`) |",
-      );
-    }
-    if (sys.type) rows.push("| `typography/` | The eleven-voice type scale — `type.css` (Desktop, complete on its own) + optional `type-tablet.css` / `type-mobile.css` bolt-ons + DTCG, incl. per-breakpoint files |");
-    if (sys.geometry) rows.push("| `geometry/` | The dimensional system — control ramp, radii, spacing, container tier — `geometry.css` (Desktop) + optional `geometry-tablet.css` / `geometry-mobile.css` + DTCG |");
-    rows.push(`| \`ultimate-tokens-${s}-config.json\` | The re-importable parametric config — open it in Ultimate Tokens to edit this kit |`);
-    return [
-      `# ${name} — Ultimate Tokens export`, "",
-      `Design tokens generated by [Ultimate Tokens](${REPO_URL}).`,
-      "Every value derives from a small parametric config (bottom of this table) — edit the config, not the outputs.", "",
-      "| Folder / file | What it is |", "|---|---|", ...rows, "",
-      "## Consuming this kit with a coding agent", "",
-      "The **Ultimate Tokens Claude plugin** (free, MIT) teaches a coding agent to bind these tokens",
-      "correctly — the right semantic role per surface, the right voice/step per text, the right size per",
-      "control — instead of guessing values. It is deliberately not bundled here (it updates centrally):", "",
-      "```", "/plugin marketplace add https://unpkg.com/@ultimate-tokens/claude/marketplace.json", "/plugin install ultimate-tokens", "```", "",
-      "For AI agents that speak MCP, the app's **Download Brand-Kit MCP** produces a zero-dependency",
-      "offline server wrapping this same kit (palettes · roles · type · geometry) as queryable tools.", "",
-      "## Notes", "",
-      "- Colors are high-resolution OKLCH at the source; hex files are derived for consumption.",
-      "- The CSS is Desktop-anchored and split into separate files, matching the Figma collections (Desktop as the default mode): add just `type.css`/`geometry.css` for a non-responsive site, or additionally drop in `-tablet`/`-mobile` — each is a self-contained, bounded `@media` override, so any subset in any load order resolves correctly. Body-class type is frozen across breakpoints while display-class compresses — that asymmetry is the system.",
-      "- Include the text-rendering baseline from the design-system `DESIGN.md` Typography section in your global CSS — it is part of the system.",
-    ].join("\n") + "\n";
-  }
 
   // _saveBlob — save a Blob to disk. PREFERS the File System Access API (showSaveFilePicker): an
   // explicit save dialog that writes the file directly, so it works in embedded/sandboxed webviews
@@ -5963,16 +2180,19 @@ class HctApp extends HTMLElement {
     }
   }
 
+
   // downloadBytes — save raw bytes (the binary sibling of download()); e.g. the Download-All .zip.
   downloadBytes(bytes, filename, type) {
     this._saveBlob(new Blob([bytes], { type: type || "application/octet-stream" }), filename);
   }
+
 
   // figmaBundle — public accessor: the DTCG (raw + Light/Dark, aliased) for the
   // CURRENT doc, the payload the Figma-plugin bridge posts to its code.js sandbox.
   figmaBundle() {
     return figmaBundle(this.doc);
   }
+
 
   // setInFigma — the Figma bridge (gen-ui.mjs) calls this on figma-init so the app knows
   // it runs inside Figma and can reveal the "Add Variables → Figma" action in the drawer.
@@ -5985,23 +2205,11 @@ class HctApp extends HTMLElement {
     this.render();
   }
 
-  // applyToFigma — post the current DTCG bundle to the plugin sandbox (code.js), which
-  // creates/updates the raw-colors + Light/Dark variable collections. A safe no-op outside
-  // a Figma plugin: parent === window and nothing listens for the pluginMessage envelope.
-  // requestApplyToFigma — the GATED entry the Apply / Regroup buttons call. Shows a "back up your
-  // variables first" road-block (explicit consent + destructive-overwrite warning) before touching
-  // the file. Normal apply is cookieable ("don't show again"); the destructive Regroup ALWAYS warns.
-  requestApplyToFigma(rebuild = false) {
-    if (!rebuild && this._applyConsented()) { this.applyToFigma(false); return; }
-    this.applyGateRebuild = !!rebuild;
-    this.applyGateDontShow = false;
-    this.applyGateOpen = true;
-    this.render();
-  }
   // ── persisted APP prefs (theme · canvas preview · motion) — per-USER, not doc-bound → localStorage,
   // versioned like the apply consent. Absent/invalid keys keep the constructor defaults, so a fresh
   // profile (or Figma's session-scoped iframe storage) boots identically to pre-prefs builds.
   _appPrefsKey() { return "ultimate-tokens-app-prefs-v1"; }
+
   _loadAppPrefs() {
     try {
       const raw = localStorage.getItem(this._appPrefsKey());
@@ -6013,9 +2221,11 @@ class HctApp extends HTMLElement {
       if (p.motion === "reduced" || p.motion === "system") this.motion = p.motion;
     } catch { /* storage unavailable / corrupt record → defaults */ }
   }
+
   _saveAppPrefs() {
     try { localStorage.setItem(this._appPrefsKey(), JSON.stringify({ theme: this.theme, canvasTheme: this.canvasTheme, motion: this.motion })); } catch { /* storage unavailable */ }
   }
+
   _resetAppPrefs() {
     this.theme = "system";
     this.canvasTheme = "system";
@@ -6025,1423 +2235,7 @@ class HctApp extends HTMLElement {
     setColorScheme(this.theme);
     this.render();
   }
-  closeApplyGate() { this.applyGateOpen = false; this.render(); }
-  // confirm the gate: persist consent (normal apply only) + run the real apply.
-  confirmApplyGate() {
-    const rebuild = this.applyGateRebuild;
-    if (!rebuild && this.applyGateDontShow) this._setApplyConsent();
-    this.applyGateOpen = false;
-    this.render(); // CLOSE the gate <dialog> (via _syncApplyGate) + rebuild toastEl — toast() alone never renders
-    this.applyToFigma(rebuild);
-  }
-  // consent is a per-USER preference (not doc-bound) → localStorage, versioned so a material change to
-  // apply-behavior can re-surface the warning by bumping the key. (Figma's iframe localStorage may be
-  // session-scoped — re-warning once per session for a destructive action is acceptable / safe.)
-  _applyConsentKey() { return "ultimate-tokens-apply-consent-v1"; } // renamed: re-shows the back-up warning once (a safety prompt, not data)
-  _applyConsented() { try { return localStorage.getItem(this._applyConsentKey()) === "1"; } catch { return false; } }
-  _setApplyConsent() { try { localStorage.setItem(this._applyConsentKey(), "1"); } catch { /* storage blocked */ } }
 
-  applyToFigma(rebuild = false) {
-    // rebuild = the opt-in "Regroup" path: re-create the Color Semantic collection so it adopts the
-    // canonical grouped order (Figma keeps existing variables' positions on a normal update). It
-    // re-creates the semantic variables — bound layers detach (warned in the apply gate).
-    try {
-      // Apply respects the SAME export-system opt-in as Download-All (this.exportSystems): a toggled-off
-      // system is NOT written to the file. Color omits `dtcg` (code.js then skips the color collections);
-      // Type/Geometry are filtered out of floatPlans below. The config embed travels regardless.
-      const sys = this.exportSystems || {};
-      const _colorSlugs = sys.color !== false ? (this.doc.palettes || []).filter((p) => p && p.on !== false).map((p) => slug(p.name)) : [];
-      const msg = { type: "apply", config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans(), collections: figmaCollectionNames(this.doc), renames: { color: { ...kebabWaveColorRenames(_colorSlugs), collections: FIGMA_MIGRATIONS.color.collections } } };
-      if (sys.color !== false) msg.dtcg = this.figmaBundle();
-      // STYLES (opt-out): the swatch layer bound to the variables — paint styles per semantic role
-      // (color on), text styles per voice×step×weight (type on). Pure plans (style-plan.mjs); the
-      // sandbox executes them verbatim after the variables land, so bindings always resolve.
-      if (sys.styles !== false && (sys.color !== false || sys.type !== false)) {
-        const scale = sys.type !== false ? this._typeScaleFor("base") : null;
-        let families = [];
-        if (sys.color !== false && msg.dtcg && msg.dtcg["Light_tokens.json"]) {
-          // the semantic tree keys ARE the variable-name family slugs, in enabled-palette order —
-          // pair each with its palette's display name for the style folder segment.
-          const enabled = (this.doc.palettes || []).filter((p) => p && p.on !== false);
-          families = Object.keys(msg.dtcg["Light_tokens.json"]).filter((k) => k[0] !== "$")
-            .map((n, i) => ({ n, name: (enabled[i] && enabled[i].name) || n }));
-        }
-        const plans = stylePlans({ families, scale, include: { color: sys.color !== false, type: sys.type !== false } });
-        if (plans.paints.length || plans.texts.length) {
-          plans.renames = FIGMA_MIGRATIONS.styles; // TKT-0012: id-preserving style renames (empty = no-op)
-          msg.stylePlans = plans;
-          if (plans.texts.length) msg.fontPrimitives = primitivesApplyPlan(typeTokensFigmaPrimitives(scale));
-        }
-      }
-      parent.postMessage({ pluginMessage: msg }, "*");
-      // Optimistic "in progress" toast; the sandbox posts {apply-done} back when the write actually completes
-      // (→ onApplyDone → a "done" toast), or {apply-error} on failure (→ onApplyError). See the ui.html bridge.
-      this.toast(rebuild ? "Regrouping Color Semantic…" : "Applying to Figma…");
-    } catch {
-      /* not in a frame / blocked — nothing to apply to */
-    }
-  }
-
-  // onApplyDone / onApplyError — the sandbox's completion callbacks (relayed by the ui.html bridge). The apply
-  // is async in the plugin VM, so THIS is the real "done" signal (the applyToFigma toast is only optimistic).
-  onApplyDone(m) {
-    const n = (m && (Number(m.raw) || 0) + (Number(m.semantic) || 0) + (Number(m.floatVars) || 0)) || 0;
-    const st = (m && (Number(m.paintStyles) || 0) + (Number(m.textStyles) || 0)) || 0;
-    this.applyGateOpen = false; // defensive: never leave the gate open past completion
-    const varsPart = n ? `${n} variable${n === 1 ? "" : "s"}` : "";
-    const stylesPart = st ? `${st} style swatch${st === 1 ? "" : "es"}` : "";
-    const what = [varsPart, stylesPart].filter(Boolean).join(" + ");
-    const missing = m && Array.isArray(m.missingFonts) ? m.missingFonts : [];
-    const subbed = m && Array.isArray(m.substitutedFonts) ? m.substitutedFonts : [];
-    this.toast(what ? `Applied ${what} to Figma — check the Variables & Styles panels` : "Applied to Figma — check the Variables panel");
-    // SECOND toast — the font reality. A substituted family means the style EXISTS with its family
-    // still bound to the Font Primitives variable: installing the font adopts it, no re-apply needed.
-    // (The sandbox's own notify races the apply-done toast and gets lost, so the UI says it too.)
-    if (subbed.length) this.toast(`${m.substituted || subbed.length} text style${(m.substituted || 0) === 1 ? "" : "s"} use a placeholder face — install to see them as designed: ${subbed.slice(0, 4).join(", ")}${subbed.length > 4 ? "…" : ""}. The family stays variable-bound.`);
-    if (missing.length) this.toast(`Text styles skipped — no usable font for: ${missing.slice(0, 4).join(", ")}${missing.length > 4 ? "…" : ""}`);
-  }
-  onApplyError() {
-    this.toast("Couldn't apply to Figma — please try again.");
-  }
-
-  // ── legacy-style sweep (Settings › Cleanup, Figma-only) — find real Figma styles that look like ours
-  // (their top "/" segment matches a namespace we still use) but aren't anything the CURRENT plan would
-  // produce: leftovers from an older naming generation that predate this plugin's own per-style registry,
-  // so no ordinary apply/prune can ever reach them. Scan-then-confirm: nothing is ever deleted without the
-  // user checking it first (sweepCandidates in code.js is itself read-only; only sweep-delete mutates,
-  // and only the exact ids sent).
-  _sweepNames() {
-    // the SAME resolution applyToFigma uses for its own plan — so "current" here means exactly what the
-    // next real apply would produce, never a stale or hypothetical shape.
-    const sys = this.exportSystems || {};
-    const scale = sys.type !== false ? this._typeScaleFor("base") : null;
-    let families = [];
-    if (sys.color !== false) {
-      const bundle = this.figmaBundle();
-      if (bundle && bundle["Light_tokens.json"]) {
-        const enabled = (this.doc.palettes || []).filter((p) => p && p.on !== false);
-        families = Object.keys(bundle["Light_tokens.json"]).filter((k) => k[0] !== "$")
-          .map((n, i) => ({ n, name: (enabled[i] && enabled[i].name) || n }));
-      }
-    }
-    const plans = stylePlans({ families, scale, include: { color: sys.color !== false, type: sys.type !== false } });
-    return { textNames: plans.texts.map((t) => t.name), paintNames: plans.paints.map((p) => p.name) };
-  }
-  scanForLegacyStyles() {
-    if (!this.inFigma || this.sweepBusy) return;
-    try {
-      const { textNames, paintNames } = this._sweepNames();
-      this.sweepBusy = true; this.render();
-      parent.postMessage({ pluginMessage: { type: "sweep-scan", textNames, paintNames } }, "*");
-    } catch { this.sweepBusy = false; this.toast("Couldn't scan — please try again."); }
-  }
-  receiveSweepScan(m) {
-    this.sweepResults = { texts: (m && m.texts) || [], paints: (m && m.paints) || [] };
-    this.sweepSelected = new Set();
-    this.sweepBusy = false;
-    this.render();
-  }
-  toggleSweepSelect(id) {
-    const s = new Set(this.sweepSelected);
-    if (s.has(id)) s.delete(id); else s.add(id);
-    this.sweepSelected = s;
-    this.render();
-  }
-  toggleSweepSelectAll() {
-    const all = this.sweepResults ? [...this.sweepResults.texts, ...this.sweepResults.paints].map((x) => x.id) : [];
-    this.sweepSelected = this.sweepSelected.size === all.length ? new Set() : new Set(all);
-    this.render();
-  }
-  deleteSelectedSweep() {
-    if (!this.inFigma || this.sweepBusy || !this.sweepSelected.size) return;
-    this.sweepBusy = true; this.render();
-    try { parent.postMessage({ pluginMessage: { type: "sweep-delete", ids: [...this.sweepSelected] } }, "*"); }
-    catch { this.sweepBusy = false; this.toast("Couldn't delete — please try again."); }
-  }
-  onSweepDone(m) {
-    const n = (m && Number(m.removed)) || 0;
-    this.sweepBusy = false;
-    this.sweepResults = null;
-    this.sweepSelected = new Set();
-    this.toast(n ? `Removed ${n} legacy style${n === 1 ? "" : "s"}` : "Nothing removed");
-    this.render();
-  }
-
-  // _figmaFloatPlans — the Type + Geometry halves of the single breakpoint-moded "Geometry" collection
-  // (typeTokensFigmaModes / geomTokensFigmaModes over the override-aware base + per-breakpoint mode
-  // scales, TKT-0009), MERGED into one interchange and turned into the pure apply PLANS code.js executes
-  // (figma/binder/mode-apply-plan.mjs) — one plan per collection is load-bearing: the executor prunes
-  // variables per collection against ITS plan, so two plans on "Geometry" would delete each other's
-  // halves. Only the systems toggled ON in this.exportSystems are included (a toggled-off system is
-  // never applied). Each HALF is validated separately first — a malformed one (the half-bound-import
-  // failure) is dropped rather than half-applied; an engine error on one system never blocks the other
-  // (or the color apply) — and the merged interchange is validated again (a mode-list mismatch between
-  // halves surfaces as missing values there, never as a half-applied file).
-  _figmaFloatPlans() {
-    const sys = this.exportSystems || {};
-    const halves = [];
-    const add = (make) => { try { const ix = make(); if (ix && validateModeInterchange(ix).length === 0) halves.push(ix); } catch { /* skip a malformed system */ } };
-    if (sys.type !== false) add(() => typeTokensFigmaModes(this._typeScaleFor("base"), this._typeModeScales(), this._typeBaseOpts()));
-    if (sys.geometry !== false) add(() => geomTokensFigmaModes(this._geomScaleFor("base"), this._geomModeScales(), this._geomBaseOpts()));
-    const ix = mergeModeInterchanges(...halves);
-    if (!ix) return [];
-    try {
-      if (validateModeInterchange(ix).length) return [];
-      // TKT-0012: stamp the active rename maps (id-preserving; empty maps = byte-identical no-op).
-      // The ADR-016 var map derives from the LIVE plan's names (kebabWaveVarRenames reverses each to
-      // its frozen pre-wave form), so custom voices/steps are covered without a hand list.
-      const plans = applyRenameMigrations(modeApplyPlan(ix), FIGMA_MIGRATIONS.floats);
-      for (const p of plans) {
-        const waveVars = kebabWaveVarRenames(p.variables.map((v) => v.name));
-        if (Object.keys(waveVars).length) p.renames = { ...waveVars, ...(p.renames || {}) };
-      }
-      // the merged shape supersedes the two-collection era's moded "Typography" collection — mark it for
-      // executor retirement (registry-tracked only) whenever this apply actually lands type/ variables.
-      for (const p of plans) {
-        if (p.collection === COLLECTIONS.breakpoints && p.variables.some((v) => typeof v.name === "string" && v.name.startsWith("type/"))) p.retire = ["Typography"];
-      }
-      return plans;
-    } catch { return []; }
-  }
-
-  // _syncApplyGate — reconcile the gate <dialog> with applyGateOpen (mirrors _syncDrawer/_syncNewPal).
-  _syncApplyGate() {
-    const d = this.querySelector(".apply-gate");
-    if (!d || typeof d.showModal !== "function") return;
-    if (this.applyGateOpen && !d.open) { try { d.showModal(); } catch { /* not attached */ } }
-    else if (!this.applyGateOpen && d.open) { try { d.close(); } catch { /* already closed */ } }
-  }
-
-  // renderApplyGate — the "back up your variables first" consent road-block shown before Apply/Regroup.
-  // A Figma review gate (explicit awareness before modifying the file) AND destructive-overwrite
-  // protection (Apply can overwrite same-named variables that components are bound to).
-  renderApplyGate() {
-    const rebuild = this.applyGateRebuild;
-    const MAPPINGS_DOC = REPO_URL + "#figma-plugin";
-    return h(
-      "dialog",
-      {
-        class: "apply-gate",
-        "aria-label": rebuild ? "Regroup Color Semantic" : "Apply variables to Figma",
-        onclick: (e) => { if (e.target === e.currentTarget) this.closeApplyGate(); },
-        oncancel: (e) => { e.preventDefault(); this.closeApplyGate(); },
-      },
-      h(
-        "div",
-        { class: "drawer-head" },
-        h("h3", {}, icon("warning"), rebuild ? "Regroup Color Semantic" : "Apply variables to this file"),
-        h("div", { class: "spacer" }),
-        btn(icon("x"), { ariaLabel: "Close", onclick: () => this.closeApplyGate() }),
-      ),
-      h(
-        "div",
-        { class: "apply-gate-body" },
-        h("p", { class: "apply-gate-lede" }, rebuild
-          ? "Regroup deletes and re-creates the Color Semantic variables so they adopt the grouped order. Any layers or styles bound to them will detach and need reconnecting — the Ultimate Tokens style swatches are re-bound automatically on this same apply. (Color Primitives are untouched.)"
-          : (this.exportSystems && this.exportSystems.styles === false
-              ? "This creates or updates the Color Primitives + Color Semantic variable collections in this file. Variables with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want)."
-              : "This creates or updates the Color Primitives + Color Semantic variable collections in this file, plus the STYLE swatches bound to them (paint styles per semantic role, text styles per type step — toggle \u201CStyles\u201D in the drawer to opt out). Variables and Ultimate Tokens styles with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want).")),
-        h(
-          "div",
-          { class: "apply-gate-warn" },
-          icon("warning", { size: 16 }),
-          h("div", {}, h("b", {}, "Back up your file first."), " Duplicate the file (or the collections) before applying, so you can roll back if a mapping overwrites something you meant to keep."),
-        ),
-        h("p", { class: "apply-gate-learn" },
-          "Re-routing semantic tokens onto existing variables? ",
-          h("button", { type: "button", class: "linklike", onclick: () => { try { window.open(MAPPINGS_DOC, "_blank", "noopener"); } catch {} } }, "Learn how mappings work →"),
-        ),
-        // "Don't show again" — normal apply only; the destructive Regroup always warns.
-        rebuild ? false : h(
-          "label",
-          { class: "apply-gate-dontshow" },
-          h("input", {
-            type: "checkbox",
-            checked: this.applyGateDontShow ? true : undefined,
-            onchange: (e) => { this.applyGateDontShow = !!e.target.checked; },
-          }),
-          h("span", {}, "Don't show this again"),
-        ),
-      ),
-      h(
-        "div",
-        { class: "apply-gate-foot" },
-        h("div", { class: "spacer" }),
-        btn("Cancel", { onclick: () => this.closeApplyGate() }),
-        btn(rebuild ? "Regroup variables" : "Apply variables", { variant: "primary", cls: "apply-gate-go", onclick: () => this.confirmApplyGate() }),
-      ),
-    );
-  }
-
-  // ── Settings modal (token mapping + preferences) ──────────────────────────────────────
-  openSettings() { this.settingsOpen = true; this.render(); }
-  closeSettings() { this.settingsOpen = false; this.render(); }
-  _syncSettings() {
-    const d = this.querySelector(".settings");
-    if (!d || typeof d.showModal !== "function") return;
-    if (this.settingsOpen && !d.open) { try { d.showModal(); } catch { /* not attached */ } }
-    else if (!this.settingsOpen && d.open) { try { d.close(); } catch { /* already closed */ } }
-  }
-
-  // a labeled setting row: a title + description on the left, a segmented control on the right.
-  _settingRow(title, desc, items, value, onSelect, idPrefix) {
-    return h(
-      "div",
-      { class: "settings-row" },
-      h("div", { class: "settings-row-text" }, h("b", {}, title), h("small", {}, desc)),
-      this.segmented(items, value, onSelect, { ariaLabel: title, role: "group", cls: "settings-seg", idPrefix }),
-    );
-  }
-  // a titled group of setting rows (a sub-section of a Settings page).
-  _settingsGroup(title, rows) {
-    return h("div", { class: "settings-group" }, title ? h("div", { class: "settings-group-title" }, title) : false, ...rows.filter(Boolean));
-  }
-  // _openCheckout(url) — open a Lemon Squeezy hosted-checkout deep-link in a new tab (web only; the outward
-  // link keeps this file network-free). noopener/noreferrer; a blocked popup fails silently.
-  _openCheckout(url) { try { window.open(url, "_blank", "noopener,noreferrer"); } catch (e) { /* popup blocked */ } }
-
-  // The Settings nav model: grouped, labeled sections (the left rail). Each item id → a panel.
-  _settingsNav() {
-    return [
-      { group: "Tokens", items: [{ id: "mapping", label: "Mapping" }, { id: "icons", label: "Icons" }, { id: "export", label: "Export" }] },
-      { group: "App", items: [{ id: "appearance", label: "Appearance" }] },
-      // Figma-only: a real Figma file, not this generator's own state, is what a sweep inspects.
-      ...(this.inFigma ? [{ group: "Figma", items: [{ id: "cleanup", label: "Cleanup" }] }] : []),
-      { group: "Account", items: [{ id: "account", label: "Account" }] },
-      { group: "About", items: [{ id: "about", label: "About" }] },
-    ];
-  }
-  // _iconSystem() — the RESOLVED icon system for this kit ({id,name,variant,license,url,note}). Absent
-  // doc.icons ⇒ the default (Phosphor · regular). The icon system is a brand facet like a font family;
-  // icon SIZES come from the geometry ramp (sizes.<size>.icon), never from here.
-  _iconSystem() { return iconSystem(this.doc.icons || {}); }
-  // _setIconSystem(id) — pick a library; seeds its default variant. Custom keeps/needs a typed name.
-  _setIconSystem(id) {
-    const sys = iconSystemById(id);
-    if (!sys) return;
-    this.commit((d) => {
-      if (sys.id === "custom") { d.icons = { id: "custom", name: (d.icons && d.icons.name) || "" }; return; }
-      d.icons = { id: sys.id, ...(sys.defaultVariant ? { variant: sys.defaultVariant } : {}) };
-    });
-  }
-  // _setIconVariant(v) — the library's own style name (thin/bold/fill…, outlined/rounded/sharp…).
-  _setIconVariant(v) { this.commit((d) => { d.icons = { ...(d.icons || {}), variant: v }; }); }
-  // _setIconCustom(field, value) — the Custom escape hatch: any set name + an optional variant string.
-  _setIconCustom(field, value) {
-    const v = String(value || "").trim().slice(0, field === "name" ? 60 : 40);
-    this.commit((d) => { d.icons = { ...(d.icons || {}), id: "custom", [field]: v }; });
-  }
-
-  // _exportUnit — the CSS unit for the type/geometry exports (Settings › Export). Doc-bound + persisted so it
-  // travels with the kit; defaults to "px" (the pre-setting output). Figma exports ignore it (they're numeric).
-  _exportUnit() { return this.doc.export && ["px", "rem", "em"].includes(this.doc.export.unit) ? this.doc.export.unit : "px"; }
-  _setExportUnit(unit) { this.commit((d) => { d.export = { ...(d.export || {}), unit }; }); }
-
-  // _colorPrefix — the CSS custom-property prefix core for the colour export (the `c` in `--c-*`).
-  // Default "c" (the historical Ultimate naming); a user may set "md-sys-color" (Material-flavoured)
-  // or any custom namespace, extended with our roles. Sanitized so the preview matches the export.
-  _colorPrefix() {
-    const raw = this.doc.export && typeof this.doc.export.colorPrefix === "string" ? this.doc.export.colorPrefix : "";
-    const clean = raw.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "c$1");
-    return clean || "c";
-  }
-  // _typePrefix / _geomPrefix — the naming-scheme prefixes for the type + geometry CSS exports.
-  // Type default "type" (--type-*); geometry default "" (native --size-/--radius-/…). A Material scheme
-  // sets them to "md-sys-typescale" and "md-sys" so the whole system exports under one root.
-  _typePrefix() { const p = this.doc.export && typeof this.doc.export.typePrefix === "string" ? this.doc.export.typePrefix.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "t$1") : ""; return p || "type"; }
-  _geomPrefix() { const p = this.doc.export && typeof this.doc.export.geomPrefix === "string" ? this.doc.export.geomPrefix.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "g$1") : ""; return p; }
-
-  // _namingScheme — the coherent naming convention across all three systems (colour · type · geometry).
-  // "ultimate" = the native names (--c-* · --type-* · --size-*); "material" = one --md-sys-* root
-  // (--md-sys-color-* · --md-sys-typescale-* · --md-sys-*); "custom" = a --{brand}-* root the user types.
-  _namingScheme() {
-    const cp = this._colorPrefix();
-    if (cp === "c" && this._typePrefix() === "type" && !this._geomPrefix()) return "ultimate";
-    if (cp === "md-sys-color" && this._typePrefix() === "md-sys-typescale" && this._geomPrefix() === "md-sys") return "material";
-    return "custom";
-  }
-  // set all three prefixes coherently. id "ultimate"|"material" use the presets; else a custom root brand.
-  _setNamingScheme(idOrBrand) {
-    let color, type, geom;
-    if (idOrBrand === "ultimate") { color = ""; type = ""; geom = ""; } // "" ⇒ defaults drop (identity)
-    else if (idOrBrand === "material") { color = "md-sys-color"; type = "md-sys-typescale"; geom = "md-sys"; }
-    else {
-      const brand = String(idOrBrand || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").replace(/^(\d)/, "b$1").slice(0, 24);
-      if (!brand) { color = ""; type = ""; geom = ""; } else { color = `${brand}-color`; type = `${brand}-type`; geom = brand; }
-    }
-    this.commit((d) => {
-      const ex = { ...(d.export || {}) };
-      if (!color || color === "c") delete ex.colorPrefix; else ex.colorPrefix = color;
-      if (!type || type === "type") delete ex.typePrefix; else ex.typePrefix = type;
-      if (!geom) delete ex.geomPrefix; else ex.geomPrefix = geom;
-      if (Object.keys(ex).length) d.export = ex; else delete d.export;
-    });
-  }
-  // the current custom brand root (strip the -color/-type suffixes back to the brand stem), for the field.
-  _customBrand() { const c = this._colorPrefix(); return c.endsWith("-color") ? c.slice(0, -6) : c === "c" ? "" : c; }
-
-  // _settingsPanel — the right-content for a nav section: { title, desc, body[] }.
-  _settingsPanel(sec) {
-    const d = this.doc;
-    if (sec === "appearance") {
-      const schemes = [{ id: "system", label: "System" }, { id: "light", label: "Light" }, { id: "dark", label: "Dark" }];
-      return {
-        title: "Appearance", desc: "How the editor chrome and the canvas preview render. These preferences are remembered on this device.",
-        body: [this._settingsGroup(null, [
-          this._settingRow("App theme", "The editor chrome. System follows your OS.", schemes, this.theme,
-            (id) => { this.theme = id; this.dataset.theme = id; setColorScheme(id); this._saveAppPrefs(); this.render(); }, "setapptheme"),
-          this._settingRow("Canvas preview", "The scheme the canvas previews in — independent of the chrome.", schemes, this.canvasTheme,
-            (id) => { this.canvasTheme = id; this._saveAppPrefs(); this.render(); }, "setcanvastheme"),
-          this._settingRow("Motion", "Editor animations and transitions. System respects your OS reduce-motion setting; Reduced keeps them minimal always.",
-            [{ id: "system", label: "System" }, { id: "reduced", label: "Reduced" }], this.motion,
-            (id) => { this.motion = id; this._saveAppPrefs(); this.render(); }, "setmotion"),
-          h("div", { class: "settings-row" },
-            h("div", { class: "settings-row-text" }, h("b", {}, "Reset app preferences"),
-              h("small", {}, "Theme, canvas preview, and motion return to System; the saved record is cleared. Documents are untouched.")),
-            btn("Reset to defaults", { cls: "settings-reset", ariaLabel: "Reset app preferences to defaults", onclick: () => this._resetAppPrefs() })),
-        ])],
-      };
-    }
-    if (sec === "icons") {
-      const cur = this._iconSystem();
-      const sel = (d.icons && d.icons.id) || cur.id;
-      const sys = iconSystemById(sel);
-      const isCustom = sel === "custom";
-      // the GRID — one tile per library; the tile carries the name, its licence/shape note, and the
-      // selected state. We can't render another library's glyphs offline (the app inlines Phosphor only),
-      // so a tile states its character in words rather than faking a preview.
-      const grid = h(
-        "div",
-        { class: "icon-grid", role: "radiogroup", "aria-label": "Icon system" },
-        ...ICON_SYSTEMS.map((x) =>
-          h(
-            "button",
-            { type: "button", class: "icon-tile" + (sel === x.id ? " on" : ""), role: "radio",
-              "aria-checked": sel === x.id ? "true" : "false", "data-fk": "iconsys:" + x.id,
-              title: x.url || "Name any icon set",
-              onclick: () => this._setIconSystem(x.id) },
-            h("b", {}, x.name),
-            h("small", {}, x.note || ""),
-            x.license ? h("small", { class: "icon-tile-lic" }, x.license) : false,
-          ),
-        ),
-      );
-      const rows = [grid];
-      // variant control — only for libraries that HAVE style variants (Lucide/Feather/Bootstrap don't).
-      if (!isCustom && sys && sys.variants.length) {
-        rows.push(this._settingRow(
-          "Style", `${sys.name}'s own weight/fill names. This is the stroke character an agent binds to.`,
-          sys.variants.map((v) => ({ id: v, label: v })), cur.variant, (v) => this._setIconVariant(v), "iconvariant"));
-      }
-      if (isCustom) {
-        rows.push(h("div", { class: "settings-row" },
-          h("div", { class: "settings-row-text" }, h("b", {}, "Set name"), h("small", {}, "Any icon library — it ships in the kit verbatim.")),
-          h("input", { type: "text", class: "icon-custom-name", value: (d.icons && d.icons.name) || "", placeholder: "e.g. Streamline",
-            "data-fk": "iconcustom:name", "aria-label": "Custom icon set name", onchange: (e) => this._setIconCustom("name", e.target.value) })));
-        rows.push(h("div", { class: "settings-row" },
-          h("div", { class: "settings-row-text" }, h("b", {}, "Style"), h("small", {}, "Optional — the set's own weight/fill name.")),
-          h("input", { type: "text", class: "icon-custom-variant", value: (d.icons && d.icons.variantName) || "", placeholder: "e.g. Core",
-            "data-fk": "iconcustom:variant", "aria-label": "Custom icon style name", onchange: (e) => this._setIconCustom("variantName", e.target.value) })));
-      }
-      return {
-        title: "Icons", desc: "The icon system this kit binds to. Sizes come from the Geometry ramp — this names the library and its stroke character.",
-        body: [
-          this._settingsGroup(null, rows),
-          h("p", { class: "settings-note" }, `This kit specifies ${iconSystemLabel(cur)}. It ships in the design-system exports (DESIGN.md · tokens.json) and the Brand-Kit MCP, so a consuming agent binds to it instead of picking its own. Icon sizes stay geometry's job (the control ramp's icon step).`),
-        ],
-      };
-    }
-    if (sec === "export") {
-      const units = [{ id: "px", label: "px" }, { id: "rem", label: "rem" }, { id: "em", label: "em" }];
-      const schemePresets = [{ id: "ultimate", label: "Ultimate" }, { id: "material", label: "Material" }, { id: "custom", label: "Custom" }];
-      const scheme = this._namingScheme();
-      const brand = this._customBrand();
-      // the resolved example var names under the current scheme (colour · type · geometry).
-      const exColor = `--${this._colorPrefix()}-primary-on-surface`;
-      const exType = `--${this._typePrefix()}-body-md-size`;
-      const exGeom = `--${this._geomPrefix() ? this._geomPrefix() + "-radius" : "radius"}-md`;
-      return {
-        title: "Export", desc: "How the CSS + DTCG exports render. Figma variables are always numeric (px).",
-        body: [this._settingsGroup(null, [
-          this._settingRow("CSS units", "The unit the Typography + Geometry CSS/DTCG use. rem = px ÷ 16 (clean, thanks to the nice-number sizes). Figma stays px.", units, this._exportUnit(),
-            (id) => this._setExportUnit(id), "setexportunit"),
-          // Naming convention — one coherent scheme across colour · type · geometry. Ultimate = native
-          // names; Material = the --md-sys-* root; Custom = a --{brand}-* root. The app chrome is
-          // unaffected (it dogfoods a fixed --c-* theme); only the CSS EXPORT names change.
-          this._settingRow("Naming convention", "The naming of the CSS variables the export emits, across colour, type, and geometry. Material uses M3-style --md-sys-* naming, extended with our roles. The app's own UI is unaffected.", schemePresets, scheme,
-            (id) => this._setNamingScheme(id === "custom" ? (brand || "brand") : id), "setnaming"),
-          h("div", { class: "settings-row" },
-            h("div", { class: "settings-row-text" }, h("b", {}, "Custom brand root"),
-              h("small", {}, ["e.g. ", h("code", {}, exColor), " · ", h("code", {}, exType), " · ", h("code", {}, exGeom)])),
-            h("input", { class: "settings-input", type: "text", value: scheme === "custom" ? brand : "", placeholder: "brand", "aria-label": "Custom naming brand root",
-              onchange: (e) => this._setNamingScheme(e.target.value || "ultimate") })),
-        ])],
-      };
-    }
-    if (sec === "cleanup") return this._cleanupPanel();
-    if (sec === "account") return this._accountPanel();
-    if (sec === "about") {
-      return {
-        title: "About", desc: "Ultimate Tokens.",
-        body: [h("div", { class: "settings-about" },
-          h("p", {}, "Generate perceptual color palettes, a systematic type scale, and a dimensional geometry system — exported as CSS, DTCG, Tailwind, shadcn, Figma variables, and a downloadable Brand-Kit MCP."),
-          this._settingsGroup(null, [
-            h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("b", {}, "Support"), h("small", {}, "Questions, bugs, or feedback.")), h("a", { class: "settings-meta", href: SUPPORT_URL, target: "_blank", rel: "noopener noreferrer" }, "GitHub Issues")),
-            h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("b", {}, "Documentation"), h("small", {}, "Guides and the token-mapping reference.")), h("a", { class: "settings-meta", href: DOCS_URL, target: "_blank", rel: "noopener noreferrer" }, "Read the docs")),
-          ]),
-        )],
-      };
-    }
-    // mapping (default)
-    const accentRef = d.accentRef === "single" ? "single" : "mode";
-    const onColorMode = d.onColorMode === "contrast" ? "contrast" : "fixed";
-    const collNames = figmaCollectionNames(d);
-    const collInput = (key, label, dflt) =>
-      h("div", { class: "settings-row" },
-        h("div", { class: "settings-row-text" }, h("b", {}, label),
-          h("small", {}, key === "raw" ? "The raw stop/scrim variables (one Value mode)." : "The semantic role variables (Light / Dark modes), aliased to the primitives.")),
-        h("input", {
-          class: "settings-input", type: "text", placeholder: dflt, "aria-label": label,
-          value: (d.figmaCollections && d.figmaCollections[key]) || "",
-          onchange: (e) => this._setFigmaCollection(key, e.target.value),
-        }));
-    return {
-      title: "Token mapping", desc: "How semantic roles resolve and export. These choices travel with the set.",
-      body: [
-        this._settingsGroup("Accent", [
-          this._settingRow(
-            "Primary accent",
-            "How the prime accent role exports. Mode picks the better-contrast stop per scheme (550 light / 450 dark); Single uses one mode-agnostic token (500).",
-            [{ id: "mode", label: "Mode" }, { id: "single", label: "Single" }],
-            accentRef, (id) => this.commit((doc) => { doc.accentRef = id; }), "setaccent",
-          ),
-          this._settingRow(
-            "On-colors",
-            "Text/icon colors on accent fills. Fixed pins the light tint (050 / 200); Contrast flips to the WCAG-safer end per mode.",
-            [{ id: "fixed", label: "Fixed" }, { id: "contrast", label: "Contrast" }],
-            onColorMode, (id) => this.commit((doc) => { doc.onColorMode = id; }), "setoncolor",
-          ),
-        ]),
-        // Figma collection names — per-doc overrides for the two color collections the plugin
-        // creates. Empty = the defaults. An override applies from the NEXT apply; collections already
-        // in the file keep their name (the apply-gate warning covers the overwrite semantics).
-        this._settingsGroup("Figma collections", [
-          collInput("raw", "Primitives collection", "Color Primitives"),
-          collInput("semantic", "Semantic collection", "Color Semantic"),
-          ...(collNames.raw.toLowerCase() === collNames.semantic.toLowerCase()
-            ? [h("p", { class: "settings-note settings-warn" }, "The two collections need distinct names — identical names would merge the primitives and roles into one collection on apply.")]
-            : []),
-        ]),
-        h("p", { class: "settings-note" }, "These are resolution-layer mapping choices — they re-point how roles resolve, not the ramps, and apply to every export."),
-      ],
-    };
-  }
-  // _setFigmaCollection(key, value) — write one collection-name override ("raw" | "semantic"). Empty
-  // clears back to the default; the record is dropped entirely when both are default (identity gate).
-  _setFigmaCollection(key, value) {
-    const v = String(value || "").trim().slice(0, 60);
-    this.commit((d) => {
-      const fc = { ...(d.figmaCollections || {}) };
-      if (v) fc[key] = v; else delete fc[key];
-      if (Object.keys(fc).length) d.figmaCollections = fc; else delete d.figmaCollections;
-    });
-  }
-
-  // _cleanupPanel — Settings › Figma › Cleanup: scan this file for real styles that look like ours but
-  // don't match anything the CURRENT apply plan would produce (leftovers from an older naming generation
-  // that predate this plugin's own registry, so a normal apply can never find or prune them), then let
-  // the user pick exactly which ones to remove. Confirm-before-delete throughout: a scan never mutates
-  // anything, and delete only ever touches the ids explicitly checked.
-  _cleanupPanel() {
-    const r = this.sweepResults;
-    const busy = this.sweepBusy;
-    const body = [];
-    body.push(h("div", { class: "settings-row" },
-      h("div", { class: "settings-row-text" }, h("b", {}, "Scan for legacy styles"),
-        h("small", {}, "Looks for real Figma styles whose name starts with a voice/palette this kit still uses, but that no current apply would ever produce — usually leftovers from an older naming convention. Nothing is deleted by scanning.")),
-      btn(busy && !r ? "Scanning…" : "Scan this file", { variant: "primary", cls: "cleanup-scan", disabled: busy, onclick: () => this.scanForLegacyStyles() })));
-    if (r) {
-      const items = [...r.texts.map((x) => ({ ...x, kind: "Text style" })), ...r.paints.map((x) => ({ ...x, kind: "Paint style" }))];
-      if (!items.length) {
-        body.push(h("p", { class: "settings-note" }, "No legacy styles found — this file is clean."));
-      } else {
-        const allChecked = this.sweepSelected.size === items.length;
-        body.push(h("div", { class: "cleanup-list-head" },
-          h("small", {}, `${items.length} candidate${items.length === 1 ? "" : "s"} found`),
-          h("button", { type: "button", class: "linklike", onclick: () => this.toggleSweepSelectAll() }, allChecked ? "Deselect all" : "Select all")));
-        body.push(h("ul", { class: "cleanup-list", role: "list" }, ...items.map((it) =>
-          h("li", { class: "cleanup-item" },
-            h("label", { class: "cleanup-item-label" },
-              h("input", { type: "checkbox", checked: this.sweepSelected.has(it.id) ? "" : undefined, onchange: () => this.toggleSweepSelect(it.id) }),
-              h("code", {}, it.name), h("small", {}, it.kind))))));
-        body.push(btn(busy ? "Removing…" : `Delete ${this.sweepSelected.size} selected`, {
-          cls: "cleanup-delete", disabled: busy || !this.sweepSelected.size,
-          onclick: () => this.deleteSelectedSweep(),
-        }));
-      }
-    }
-    return {
-      title: "Cleanup", desc: "Find and remove real Figma styles left over from an older naming convention — nothing is ever removed without your confirmation.",
-      body: [this._settingsGroup(null, body)],
-    };
-  }
-
-  // _accountPanel — the Settings « Account » home (item 7, Layer 3): the effective plan (Free/Pro badge),
-  // the license-key entry (Validate/Remove — WEB only; hidden/disabled in the offline Figma plugin), a
-  // Manage-subscription link, and the dev/QA flag-override toggles. No payment UI beyond the seam.
-  _accountPanel() {
-    const isPro = this.tier() === "pro";
-    const ent = this.profile.entitlement;
-    const web = !this.inFigma;
-    const expText = ent && ent.expiresAt ? (() => { try { return new Date(ent.expiresAt).toLocaleDateString(); } catch (e) { return null; } })() : null;
-    const body = [];
-
-    // Plan: the effective tier as a badge, plus a buy-Pro CTA for a Free web user (the Figma plugin is free).
-    const planRows = [
-      h("div", { class: "settings-row" },
-        h("div", { class: "settings-row-text" },
-          h("b", {}, "Current plan"),
-          h("small", {}, isPro ? "Pro — every feature unlocked." : "Free — the core generator. A Pro license unlocks the rest.")),
-        h("span", { class: "account-tier acct-badge " + (isPro ? "is-pro" : "is-free") }, isPro ? "Pro" : "Free")),
-    ];
-    if (web && !isPro) {
-      planRows.push(h("div", { class: "settings-row" },
-        h("div", { class: "settings-row-text" },
-          h("b", {}, "Upgrade to Pro"),
-          h("small", {}, "Unlimited brand kits, the Pro export formats, advanced treatments, and hosted MCP. ",
-            h("button", { type: "button", class: "linklike account-studio-link", onclick: () => this._openCheckout(STUDIO_CHECKOUT_URL) }, "Studio for teams →"))),
-        btn("Get Pro →", { variant: "primary", cls: "account-upgrade", title: "Buy a Pro license", onclick: () => this._openCheckout(PRO_CHECKOUT_URL) })));
-    }
-    body.push(this._settingsGroup("Plan", planRows));
-
-    // License: the key entry / status. WEB only — the offline Figma plugin stays free, so it shows a note
-    // instead of the entry (no localStorage/network there to validate against).
-    if (web) {
-      const rows = [];
-      if (isPro) {
-        const seats = this.profile.seats;
-        const seatText = seats && Number.isFinite(seats.limit)
-          ? ` · ${seats.usage} of ${seats.limit} seat${seats.limit === 1 ? "" : "s"} in use`
-          : "";
-        rows.push(h("div", { class: "settings-row" },
-          h("div", { class: "settings-row-text" },
-            h("b", {}, "License"),
-            h("small", { class: "account-license-status" }, "Active on this device." + (expText ? " Valid until " + expText + "." : "") + seatText)),
-          btn("Release seat", { cls: "account-remove", title: "Deactivate this device and free its seat", onclick: () => this.clearLicense() })));
-      } else {
-        rows.push(h("div", { class: "settings-row" },
-          h("div", { class: "settings-row-text" },
-            h("b", {}, "License key"),
-            h("small", {}, "Paste the key from your purchase email to unlock Pro.")),
-          h("div", { class: "account-license-entry" },
-            h("input", {
-              type: "text", class: "account-license-input", placeholder: "Your license key", "aria-label": "License key",
-              value: this._licenseDraft || "",
-              oninput: (e) => { this._licenseDraft = e.target.value; },
-              onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); this.enterLicense(e.target.value); } },
-            }),
-            btn("Validate", { variant: "primary", cls: "account-validate", onclick: () => this.enterLicense((this.querySelector(".account-license-input") || {}).value ?? this._licenseDraft) }))));
-        rows.push(h("p", { class: "settings-note account-buy-note" }, "Don't have a key? ",
-          h("button", { type: "button", class: "linklike", onclick: () => this._openCheckout(PRO_CHECKOUT_URL) }, "Get a Pro license →")));
-      }
-      if (this._licenseError) rows.push(h("p", { class: "account-error settings-note" }, this._licenseError));
-      body.push(this._settingsGroup("License", rows));
-    } else {
-      body.push(this._settingsGroup("License", [
-        h("div", { class: "settings-row" },
-          h("div", { class: "settings-row-text" },
-            h("b", {}, "License"),
-            h("small", {}, "Activate a Pro license in the web app — the Figma plugin is free and runs fully offline.")),
-          h("span", { class: "settings-meta" }, "Web only")),
-      ]));
-    }
-
-    // Manage subscription — a placeholder account portal link.
-    body.push(this._settingsGroup(null, [
-      h("div", { class: "settings-row" },
-        h("div", { class: "settings-row-text" },
-          h("b", {}, "Manage subscription"),
-          h("small", {}, "Invoices, payment method, and cancellation.")),
-        h("a", { class: "account-manage settings-meta", href: ACCOUNT_URL, target: "_blank", rel: "noopener noreferrer" }, "Manage on Lemon Squeezy")),
-    ]));
-
-    // Developer · flag overrides — three-state (Default / On / Off) per boolean capability flag, written to
-    // profile.flagOverrides. "Default" inherits the tier value; On/Off pin it. Handy for QA-ing a gate.
-    const fo = this.profile.flagOverrides || {};
-    const triItems = [{ id: "default", label: "Default" }, { id: "on", label: "On" }, { id: "off", label: "Off" }];
-    const overrideRows = DEV_FLAG_TOGGLES.map((f) => {
-      const cur = f.key in fo ? (fo[f.key] ? "on" : "off") : "default";
-      return this._settingRow(f.label, f.desc, triItems, cur,
-        (id) => this.setFlagOverride(f.key, id === "default" ? null : id === "on"), "fovr-" + f.key);
-    });
-    body.push(this._settingsGroup("Developer · flag overrides", overrideRows));
-    body.push(h("p", { class: "settings-note" }, "Overrides win over your plan everywhere a gate reads flagOf() — for testing only; they live on this machine and never travel with a set."));
-
-    return { title: "Account", desc: "Your plan, license, and developer flag overrides.", body };
-  }
-
-  renderSettings() {
-    const sec = this.settingsSection || "mapping";
-    const nav = this._settingsNav();
-    const panel = this._settingsPanel(sec);
-    return h(
-      "dialog",
-      {
-        class: "settings",
-        "aria-label": "Settings",
-        onclick: (e) => { if (e.target === e.currentTarget) this.closeSettings(); },
-        oncancel: (e) => { e.preventDefault(); this.closeSettings(); },
-      },
-      // left rail: grouped, labeled section nav
-      h(
-        "nav",
-        { class: "settings-nav", "aria-label": "Settings sections" },
-        h("div", { class: "settings-nav-head" }, icon("gear"), h("b", {}, "Settings")),
-        ...nav.map((g) =>
-          h(
-            "div",
-            { class: "settings-nav-group" },
-            h("div", { class: "settings-nav-grouplabel" }, g.group),
-            ...g.items.map((it) =>
-              h("button", {
-                type: "button",
-                class: "settings-nav-item" + (sec === it.id ? " on" : ""),
-                "aria-current": sec === it.id ? "page" : undefined,
-                onclick: () => { this.settingsSection = it.id; this.render(); },
-              }, it.label),
-            ),
-          ),
-        ),
-      ),
-      // right content: page header + sections
-      h(
-        "div",
-        { class: "settings-content" },
-        btn(icon("x"), { cls: "settings-close", ariaLabel: "Close settings", onclick: () => this.closeSettings() }),
-        h("div", { class: "settings-pagehead" }, h("h3", {}, panel.title), h("p", {}, panel.desc)),
-        h("div", { class: "settings-sections", role: "region", "aria-label": panel.title }, ...panel.body),
-      ),
-    );
-  }
-
-  // ── Typography token helpers (the section lives in renderTypeInspector / renderTypographyScene) ──
-  // a sample line rendered in the resolved style for one category/step (font falls back gracefully).
-  _typeSample(scale, cat, step, text) {
-    const s = scale.categories[cat] && scale.categories[cat][step];
-    if (!s) return false;
-    const role = scale.roleOf[cat] || "body";
-    const fam = resolvedFontFor(scale, cat) || "Inter";
-    const generic = genericFor(fam, role);
-    const tt = s.textTransform && s.textTransform !== "none" ? `text-transform:${s.textTransform};` : "";
-    return h(
-      "div",
-      { class: "typo-line" },
-      h("span", { class: "typo-step" }, `${step} · ${s.size}/${s.lineHeight}`),
-      h("div", { class: "typo-sample", style: `font-family:'${fam}', ${generic};font-size:${s.size}px;line-height:${s.lineHeight}px;letter-spacing:${s.letterSpacing}px;font-weight:${s.weight};${tt}` }, text),
-    );
-  }
-  // ── Geometry section — the dimensional system as a full editor section (canvas + analysis rail +
-  // inspector), the spatial analog of the Color and Typography sections. Phase 3 retired the Geometry
-  // modal: all geometry comes from geometryScale(doc), COMPOSED with the type UI scale (a control's text
-  // `font` per step is the brand's Typography UI size). Binds to doc.geometry = { treatment, baseHeight };
-  // density / radius style / spacing come from the treatment (shown read-only). ──────────────────
-  setGeomSpecMode(v) { this.geomSpecMode = v; this.render(); }
-
-  // ── Geometry breakpoint modes (Phase 5) — named baseHeight variants over doc.geometry. Mirrors the
-  // Typography mode helpers; the ACTIVE mode drives the canvas preview + the inspector. Export stays on Base.
-  // _effGeomMode — the mode the ACTIVE resolvers paint in: a Compare column's _geomModeOverride wins (so its
-  // scene + scale build at THAT breakpoint while it renders, like _schemeOverride), else this.geomMode.
-  _effGeomMode() { return this._geomModeOverride != null ? this._geomModeOverride : this.geomMode; }
-  _activeGeometry() {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const mode = this._effGeomMode();
-    if (mode === "base") return g;
-    const m = (g.modes || []).find((x) => x.id === mode);
-    return m ? { ...g, baseHeight: m.baseHeight } : g;
-  }
-  // the resolved scale at the active mode — composes geometry with the type scale at the SAME mode AND
-  // applies that mode's per-cell height overrides (so the canvas/inspector reflect the matrix). Routed
-  // through _geomScaleFor so overrides are consistent with the matrix + every export.
-  _activeGeomScale() {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const mode = this._effGeomMode();
-    const key = mode === "base" || !(g.modes || []).some((m) => m.id === mode) ? "base" : mode;
-    return this._geomScaleFor(key);
-  }
-  // the breakpoint-mode scales for the Figma exports — [{ name, minWidth, scale }]. Size modes are
-  // INTRINSIC, the same technique as Color's Light/Dark — and DESKTOP-ANCHORED (Kim's ratified law,
-  // 2026-07-10): the scale you design IS Desktop; Tablet/Mobile derive DOWN via the hierarchy-aware
-  // modeFactor curve (body frozen, Display fully compressed — 5/6 at Tablet, 2/3 at Mobile). When the
-  // doc carries configured modes they resolve override-aware (via _typeScaleFor, incl. factor modes);
-  // when it carries NONE the pair is synthesized — so every export/apply carries the full intrinsic set
-  // with zero setup. Configuring your own modes (＋) takes full manual control.
-  //
-  // Desktop Lg/Xl (2026-07-15, retuned to the ratified magnitude table 2026-07-16 — Xl is the TV tier,
-  // at request: "Desktop XL will be used for TV") — the INVERSE curve, same `modeFactor` knob: `bodyBase`
-  // scales UP (×1.125/×1.375 of the doc's own bodyBase → body 16→18→22 at the default) while `modeFactor`
-  // (0.89/0.80) pulls the ceiling back down toward its ORIGINAL Desktop value instead of letting it scale
-  // proportionally — body grows, Display barely moves. The ratio-based recipe (not an absolute px target)
-  // means it generalizes to any doc bodyBase, not just the 16 default. Ordered BEFORE Tablet/Mobile so
-  // the Figma mode order reads Desktop · Desktop Lg · Desktop Xl · Tablet · Mobile (`_typeBaseOpts`
-  // prepends "Desktop" itself).
-  //
-  // The per-tier Label/Tiny cells that the frozen-body law can't produce ride `_modeTierNudge` (the
-  // magnitude table's ladders — Label steps DOWN on Tablet/Mobile and lands off-ladder values on Lg/Xl;
-  // 2026-07-16 removed 2026-07-13's Body Mobile nudge: Body is frozen across Desktop/Tablet/Mobile).
-  _typeModeScales() {
-    const t = this.doc.type || DEFAULT_TYPE;
-    if ((t.modes || []).length) return t.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._typeScaleFor(m.id) }));
-    const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
-    // each tier layers its _modeTierNudge cells (the ratified magnitude table's Label/Tiny ladders) over
-    // the doc's own per-cell overrides. Desktop Xl is ×1.375 (not ×1.25): the table's Body 20/22/24 IS
-    // bodyBase 22 at the default 16 — the ratio keeps it true at any doc bodyBase.
-    const tier = (mult, mf) => typeScale({ ...t, bodyBase: bb * mult, modeFactor: mf, overrides: { ...(t.overrides || {}), ...this._modeTierNudge(mf) } });
-    return [
-      { name: "Desktop Lg", minWidth: 1728, scale: tier(1.125, 0.89) },
-      { name: "Desktop Xl", minWidth: 2560, scale: tier(1.375, 0.80) },
-      { name: "Tablet", minWidth: 992, scale: tier(1, 5 / 6) },
-      { name: "Mobile", minWidth: 476, scale: tier(1, 2 / 3) },
-    ];
-  }
-  _geomModeScales() {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    if ((g.modes || []).length) return g.modes.map((m) => ({ name: m.name, minWidth: m.minWidth, scale: this._geomScaleFor(m.id) }));
-    // synthesized, Desktop-anchored: the doc ramp IS Desktop; the other tiers carry the ratified magnitude
-    // table's height ramps (2026-07-16, at request) as per-size overrides scaled by bh/28, so they hold
-    // their shape at any baseHeight. Tablet needs none — the lawful −2 derivation already lands the
-    // table's exact heights. Control text is the geometry engine's OWN ramp now (the type composition is
-    // retired); each tier passes its `controls` column as fontOverrides below.
-    const t = this.doc.type || DEFAULT_TYPE;
-    const bb = Number(t.bodyBase) || DEFAULT_TYPE.bodyBase;
-    const bh = g.baseHeight ?? 28;
-    const ramp = (arr) => { const f = bh / 28; const out = {}; ["XS", "SM", "MD", "LG", "XL", "2XL"].forEach((k, i) => { if (arr[i] != null) out[k] = arr[i] * f; }); return out; };
-    // control text composes from the tier's own UI-control voice at EVERY step (the voice rides the
-    // full XS..2XL ramp since 2026-07-16, with its _modeTierNudge hand columns) — no per-step
-    // fontOverrides needed anymore; one source of truth.
-    const tierType = (mult, mf) => typeScale({ ...t, bodyBase: bb * mult, modeFactor: mf, overrides: { ...(t.overrides || {}), ...this._modeTierNudge(mf) } });
-    // per-tier GAP hand columns (the ratified gap-unit matrix, TKT-0010) — final values at the canonical
-    // baseHeight, scaled by bh/28 like the height ramps. Tablet is FROZEN at the Desktop column (the
-    // GAP_UNIT law at Tablet's smaller baseHeight would under-shoot its 2XL); Desktop itself IS the law.
-    const synth = (delta, mult, mf, overrides, gaps) => geomScale({ ...g, baseHeight: Math.max(20, bh + delta) }, { typeScale: tierType(mult, mf), overrides, gapOverrides: gaps });
-    return [
-      { name: "Desktop Lg", minWidth: 1728, scale: synth(4, 1.125, 0.89, ramp([24, 28, 32, 40, 56, 72]), ramp([4, 4, 5, 7, 7, 9])) },
-      { name: "Desktop Xl", minWidth: 2560, scale: synth(28, 1.375, 0.80, ramp([40, 48, 56, 64, 72, 80]), ramp([4, 5, 6, 8, 8, 10])) },
-      { name: "Tablet", minWidth: 992, scale: synth(-2, 1, 5 / 6, undefined, ramp([3, 3, 4, 6, 6, 8])) },
-      { name: "Mobile", minWidth: 476, scale: synth(-4, 1, 2 / 3, ramp([16, 20, 24, 32, 40, 56]), ramp([3, 3, 4, 5, 5, 6])) },
-    ];
-  }
-  // _typeBaseOpts/_geomBaseOpts — the base-layer identity for the Figma emitters + the mode UI. The
-  // desktop-first canon: Figma's default mode is the FIRST mode, so the DESIGNED scale leads as
-  // "Desktop" (synthesized shape and the factor-committed Standard set both), and only a base named
-  // "Mobile" (the legacy #251 committed-geometry shape) rides LAST. A doc with its OWN configured
-  // modes and no baseName keeps the legacy "Base"-first shape (full manual control).
-  _typeBaseOpts() {
-    const t = this.doc.type || DEFAULT_TYPE;
-    const synthesized = !(t.modes || []).length; // the intrinsic set ⇒ the designed scale IS Desktop
-    const n = (t.baseName || (synthesized ? "Desktop" : "Base")).trim() || "Base";
-    return { baseName: n, baseLast: n.toLowerCase() === "mobile" };
-  }
-  _geomBaseOpts() {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const synthesized = !(g.modes || []).length;
-    const n = (g.baseName || (synthesized ? "Desktop" : "Base")).trim() || "Base";
-    return { baseName: n, baseLast: n.toLowerCase() === "mobile" };
-  }
-  // per-breakpoint DTCG files — one valid standalone DTCG per mode that has a minWidth, keyed by the width
-  // (self-documenting + collision-free). No-width modes are preview-only, so they don't export (mirrors CSS).
-  _typeModeDTCGFiles(prefix = "type", opts = {}) {
-    return this._typeModeScales().filter((m) => Number(m.minWidth) > 0)
-      .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(typeTokensDTCG(m.scale, opts), null, 2) }));
-  }
-  _geomModeDTCGFiles(prefix = "geometry", opts = {}) {
-    return this._geomModeScales().filter((m) => Number(m.minWidth) > 0)
-      .map((m) => ({ name: `${prefix}.${Math.round(m.minWidth)}.tokens.json`, data: JSON.stringify(geomTokensDTCG(m.scale, opts), null, 2) }));
-  }
-  // Mirrors typeModeControl: a NAMED base (doc.geometry.baseName, e.g. "Mobile") renders LAST — the
-  // canonical desktop-first order (Desktop · Tablet · Mobile), matching the Figma mode-column order.
-  geomModeControl() {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const modes = g.modes || [];
-    const { baseName: bn, baseLast } = this._geomBaseOpts();
-    // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
-    if (this.geomMode !== "base" && this.geomMode !== "compare" && !modes.some((m) => m.id === this.geomMode)) this.geomMode = "base";
-    const baseItem = { id: "base", label: bn, title: `${bn} size ramp · ${g.baseHeight ?? 28}px` };
-    const modeItems = modes.map((m) => ({ id: m.id, label: m.name || "Mode", title: `${m.name || "Mode"} · ${m.baseHeight}px base height` }));
-    const items = [
-      ...(baseLast ? [...modeItems, baseItem] : [baseItem, ...modeItems]),
-      // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only the base, so only when ≥1 mode.
-      ...(modes.length ? [{ id: "compare", label: "Compare", title: "All breakpoints side by side" }] : []),
-    ];
-    return h(
-      "div",
-      { class: "mode-control" },
-      this.segmented(items, this.geomMode, (id) => { this.geomMode = id; this.render(); },
-        { cls: "canvas-seg", ariaLabel: "Geometry breakpoint mode", role: "group", idPrefix: "gmode" }),
-      btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named ramp with its own base control height", onclick: () => this.addGeomMode() }),
-      // one-click standard set — only while no modes exist (mirrors the Typography control). It
-      // MATERIALIZES the intrinsic synthesized modes as editable doc modes (same values, same law).
-      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Materialize the standard breakpoints for editing — your ramp IS Desktop (1280, Figma's default mode); Tablet 992 (heights −2) and Mobile ≤476 (heights −4) derive down. One undo step.", onclick: () => this.addStandardGeomModes() })] : []),
-    );
-  }
-  // addStandardGeomModes — materialize the intrinsic standard set as editable doc modes (the ratified
-  // desktop-anchored law): the designed ramp IS Desktop (the base, first, Figma's default mode —
-  // baseName "Desktop", nothing about it changes); Tablet (992, heights −2) and Mobile (≤476, marker
-  // minWidth 476, heights −4, floor 20) derive DOWN — the same values the synthesized (no-modes) shape
-  // exports; committing just makes them matrix-editable. The split CSS export (geomTokensCSS for the
-  // unconditional Desktop base + geomTokensBreakpointCSS per mode) reads these directly, no re-anchor.
-  // One commit = one undo step.
-  addStandardGeomModes() {
-    const bh = (this.doc.geometry && this.doc.geometry.baseHeight) ?? 28;
-    const seed = Date.now().toString(36);
-    const rungs = [{ name: "Tablet", w: 992, drop: 2 }, { name: "Mobile", w: 476, drop: 4 }];
-    this.geomMode = "base"; // stay on Desktop (the designed ramp — nothing about it changed)
-    this.commit((d) => {
-      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), baseName: "Desktop" };
-      const modes = d.geometry.modes ? [...d.geometry.modes] : [];
-      rungs.forEach((r, i) => modes.push({ id: `gm-${seed}-${i}`, name: r.name, baseHeight: Math.max(20, bh - r.drop), minWidth: r.w }));
-      d.geometry.modes = modes;
-    });
-  }
-  addGeomMode() {
-    const id = "gm-" + Date.now().toString(36);
-    this.geomMode = id;
-    this.commit((d) => {
-      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
-      const modes = d.geometry.modes ? [...d.geometry.modes] : [];
-      modes.push({ id, name: "Mode " + (modes.length + 1), baseHeight: d.geometry.baseHeight ?? 28 });
-      d.geometry.modes = modes;
-    });
-  }
-  deleteGeomMode(id) {
-    const remaining = (this.doc.geometry && this.doc.geometry.modes || []).filter((m) => m.id !== id).length;
-    if (this.geomMode === id || (this.geomMode === "compare" && remaining === 0)) this.geomMode = "base";
-    this.commit((d) => {
-      if (!d.geometry || !Array.isArray(d.geometry.modes)) return;
-      d.geometry = { ...d.geometry, modes: d.geometry.modes.filter((m) => m.id !== id) };
-      if (d.geometry.modes.length === 0) delete d.geometry.modes;
-      // strip this mode's per-cell overrides too — orphaned "...|<id>" keys would otherwise survive
-      // serialize→hydrate forever (a stale-override leak with no UI to reach them).
-      if (d.geometry.tokenOverrides) {
-        d.geometry = { ...d.geometry, tokenOverrides: { ...d.geometry.tokenOverrides } };
-        for (const k of Object.keys(d.geometry.tokenOverrides)) if (k.endsWith("|" + id)) delete d.geometry.tokenOverrides[k];
-        if (!Object.keys(d.geometry.tokenOverrides).length) delete d.geometry.tokenOverrides;
-      }
-    });
-  }
-  renameGeomMode(id, name) {
-    this.commit((d) => {
-      if (!d.geometry || !Array.isArray(d.geometry.modes)) return;
-      d.geometry = { ...d.geometry, modes: d.geometry.modes.map((m) => (m.id === id ? { ...m, name: name || m.name } : m)) };
-    });
-  }
-  _setActiveGeomBaseHeight(v) {
-    const bh = Math.round(v);
-    this.editDrag((d) => {
-      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
-      // Compare shows the Base scale in the inspector, so its slider edits Base (not a per-mode no-op).
-      if (this.geomMode === "base" || this.geomMode === "compare") d.geometry.baseHeight = bh;
-      else d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, baseHeight: bh } : m));
-    });
-  }
-  // the Ramp-contrast slider edits the ACTIVE mode, exactly like the base-height slider above.
-  _setActiveGeomRampContrast(v) {
-    const c = Math.max(0, Math.min(1, Math.round(Number(v) * 20) / 20)); // 5% steps
-    this.editDrag((d) => {
-      d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
-      if (this.geomMode === "base" || this.geomMode === "compare") d.geometry.rampContrast = c;
-      else d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, rampContrast: c } : m));
-    });
-  }
-  _geomModeEditor() {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    if (this.geomMode === "base") {
-      const n = (g.modes || []).length;
-      return h("p", { class: "insp-sub tyi-future" }, n
-        ? `${n} breakpoint mode${n > 1 ? "s" : ""} — switch them from the canvas header; each carries its own base control height (per-mode export is coming).`
-        : "Add a breakpoint (the + in the canvas header) to give this ramp a second base height for another screen — e.g. taller touch targets on mobile.");
-    }
-    const m = (g.modes || []).find((x) => x.id === this.geomMode);
-    if (!m) return false;
-    return h(
-      "div",
-      { class: "mode-editor" },
-      h("label", { class: "mode-editor-label", for: "fld-gmode-name" }, "Breakpoint name"),
-      h(
-        "div",
-        { class: "mode-editor-row" },
-        h("input", { id: "fld-gmode-name", type: "text", value: m.name, "data-fk": "gmode-name", "aria-label": "Breakpoint mode name",
-          onchange: (e) => this.renameGeomMode(m.id, e.target.value.trim()) }),
-        btn(icon("trash"), { ariaLabel: "Delete this breakpoint", title: "Delete this breakpoint mode", onclick: () => this.deleteGeomMode(m.id) }),
-      ),
-      h("label", { class: "mode-editor-label", for: "fld-gmode-mw" }, "Breakpoint width — @media min-width"),
-      h(
-        "div",
-        { class: "mode-editor-row" },
-        h("input", { id: "fld-gmode-mw", type: "number", min: 0, max: 3840, step: 1, value: m.minWidth || "", placeholder: "e.g. 768", "data-fk": "gmode-mw", "aria-label": "Breakpoint min-width in px",
-          onchange: (e) => this.setGeomModeMinWidth(m.id, e.target.value) }),
-        h("span", { class: "mode-editor-unit" }, "px"),
-      ),
-      this._modeWidthPresets(m.minWidth, (w) => this.setGeomModeMinWidth(m.id, w)),
-      h("p", { class: "insp-sub tyi-future" }, m.minWidth
-        ? `Exports as @media (min-width: ${m.minWidth}px) — the size vars re-declare at this base height above ${m.minWidth}px.`
-        : "Set a width to emit a CSS @media breakpoint in the export; blank = preview-only."),
-    );
-  }
-  setGeomModeMinWidth(id, v) {
-    const n = Math.round(Number(v));
-    this.commit((d) => {
-      if (!d.geometry || !Array.isArray(d.geometry.modes)) return;
-      d.geometry = { ...d.geometry, modes: d.geometry.modes.map((m) => {
-        if (m.id !== id) return m;
-        const mm = { ...m };
-        if (Number.isFinite(n) && n > 0) mm.minWidth = Math.max(1, Math.min(3840, n)); else delete mm.minWidth;
-        return mm;
-      }) };
-    });
-  }
-  // renderGeomCanvasHeader — the Geometry section's canvas header: pane toggles + the Controls·Tokens mode
-  // segment + the reused fit/scheme/zoom controls (mirrors renderTypeCanvasHeader).
-  renderGeomCanvasHeader() {
-    return h(
-      "div",
-      { class: "canvas-header" },
-      !this.panesLeft ? this.paneToggle("left") : false,
-      this.geomMode === "compare" ? false : this.segmented(
-        [
-          { id: "controls", label: "Controls", title: "Live mock controls — render each ramp step as a real box" },
-          { id: "tokens", label: "Tokens", title: "Editable token matrix — every size × Base + each breakpoint" },
-        ],
-        this.geomSpecMode,
-        (id) => this.setGeomSpecMode(id),
-        { cls: "canvas-seg", ariaLabel: "Geometry specimen mode", role: "group", idPrefix: "gspec" },
-      ),
-      this.geomModeControl(),
-      h("div", { class: "spacer" }),
-      btn(icon("crosshair"), {
-        title: "Fit — reset the canvas view to centre at 100%",
-        ariaLabel: "Fit — reset the canvas view to centre at 100%",
-        onclick: () => { this.fit(); this.render(); },
-      }),
-      this.canvasThemeBtn(),
-      btn(icon("minus"), { ariaLabel: "Zoom out", onclick: () => this.zoomBy(-1) }),
-      h("span", { class: "zoom-readout", role: "status", "aria-live": "polite", "aria-label": "Zoom level" }, Math.round(this.viewport.zoom * 100) + "%"),
-      btn(icon("plus"), { ariaLabel: "Zoom in", onclick: () => this.zoomBy(1) }),
-      !this.panesRight ? this.paneToggle("right") : false,
-    );
-  }
-
-  // renderGeomCanvas — the Geometry center. Controls mode renders the full dimensional dataset (the 6-size
-  // control ramp + radius + space) in the pannable/zoomable .canvas-area + .canvas-scene shell. Tokens mode
-  // renders an EDITABLE token MATRIX (Phase 3 — per-cell size/height overrides + ↺) (rows = sizes, cols = Base + each breakpoint) in the scrolling
-  // .is-table shell instead — mirrors renderTypeCanvas / Color's Mapping flip.
-  renderGeomCanvas(view) {
-    // Compare (Phase 5.3) — all breakpoints side by side. A Controls view, so it wins over the tokens table.
-    if (this.geomMode === "compare") return this.renderGeomCompareArea(view);
-    if (this.geomSpecMode === "tokens") return this._tokensTableArea("Geometry tokens — Base + breakpoints", this.renderGeomTokensTable());
-    const area = h(
-      "div",
-      {
-        class: "canvas-area geom-canvas canvas-scheme-" + this.resolvedCanvasScheme(),
-        role: "group",
-        "aria-label": "Geometry specimen — drag to pan, wheel to zoom, double-click to reset",
-      },
-      h("div", { class: "canvas-scene" }, this.renderGeometryScene(view)),
-    );
-    this.wirePanZoom(area);
-    requestAnimationFrame(() => this.applyTransform());
-    return area;
-  }
-
-  // renderGeomCompareArea — the Geometry "Compare" mode: the control ramp rendered at Base AND each breakpoint
-  // mode, side by side, in ONE pannable .canvas-scene. Mirrors renderTypeCompareArea / Color's renderCompareArea;
-  // each column forces its breakpoint via _geomModeOverride while it builds.
-  renderGeomCompareArea(view) {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const modes = g.modes || [];
-    const area = h(
-      "div",
-      { class: "canvas-area canvas-compare geom-canvas canvas-scheme-" + this.resolvedCanvasScheme(),
-        role: "group", "aria-label": "Compare — every geometry breakpoint side by side · drag to pan, wheel to zoom" },
-      h("div", { class: "canvas-scene compare" },
-        this._geomCompareColumn(view, "base", "Base"),
-        ...modes.map((m) => this._geomCompareColumn(view, m.id, m.name || "Mode"))),
-    );
-    this.wirePanZoom(area);
-    requestAnimationFrame(() => this.applyTransform());
-    return area;
-  }
-  _geomCompareColumn(view, modeId, label) {
-    this._geomModeOverride = modeId; // force _activeGeometry()/_activeGeomScale() while this column's scene builds
-    const scene = this.renderGeometryScene(view);
-    this._geomModeOverride = null;
-    return h(
-      "div",
-      { class: "compare-col canvas-scheme-" + this.resolvedCanvasScheme(), style: "--canvas-bg:" + this.canvasBg() },
-      h("div", { class: "compare-col-label" }, label),
-      scene,
-    );
-  }
-
-  // renderGeometryScene — the canvas "Geometry" view: the FULL dataset. (1) the 6-size CONTROL ramp, each
-  // step a live mock control (leading glyph · label · caret) at its real height/icon/font/pad/radius with a
-  // metrics readout; (2) the RADIUS ladder; (3) the SPACE scale. Tokens mode drops the live boxes for
-  // metrics only. The control text size (font) comes from the type UI scale (the composition), so
-  // ensureTypeFonts() makes that font real; paints in the canvas preview scheme (var(--ink*) flips).
-  renderGeometryScene(view) {
-    ensureTypeFonts();
-    const cfg = this.doc.geometry || DEFAULT_GEOMETRY;
-    const scale = this._activeGeomScale(); // composed with the type scale — per-step `font` is the brand UI size
-    const t = GEOMETRY_TREATMENTS.find((x) => x.id === cfg.treatment) || GEOMETRY_TREATMENTS[0];
-    const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    // the control ramp renders LARGEST → smallest (biggest example first); heights are monotonic by step.
-    const SIZE_NAMES = ["2XL", "XL", "LG", "MD", "SM", "XS"];
-    const ctlLine = (name) => {
-      const s = scale.sizes[name];
-      if (!s) return false;
-      const box = h(
-        "div",
-        {
-          class: "geom-ctl",
-          style: `height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline-start:${s.paddingNarrow}px;padding-inline-end:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
-          title: `height ${s.height} · icon ${s.icon} · font ${s.font} · pad ${s.paddingNarrow} · gap ${s.gap} · radius ${s.radiusPill}`,
-        },
-        h("span", { class: "geom-glyph", style: `width:${s.icon}px;height:${s.icon}px` }, icon("calendar-blank", { size: s.icon })),
-        h("span", { class: "geom-ctl-label" }, "Button"),
-        h("span", { class: "geom-caret", style: `width:${s.caret}px;height:${s.caret}px` }, icon("caret-left")),
-      );
-      return h(
-        "div",
-        { class: "geom-spec-line" },
-        h(
-          "div",
-          { class: "geom-spec-meta" },
-          h("code", { class: "geom-spec-token" }, `--size-${kebab(name)}`),
-          h("span", { class: "geom-spec-dims" }, `${s.height}h`),
-          h("span", { class: "geom-spec-dims" }, `icon ${s.icon}`),
-          h("span", { class: "geom-spec-dims" }, `font ${s.font}`),
-          h("span", { class: "geom-spec-dims" }, `pad ${s.paddingNarrow}`),
-          h("span", { class: "geom-spec-dims" }, `r ${s.radiusPill}`),
-        ),
-        h("div", { class: "geom-spec-render" }, box),
-      );
-    };
-    const ladderRow = (entries, swatch) =>
-      h("div", { class: "geom-scale-row" }, ...entries.map(swatch));
-    return h(
-      "div",
-      { class: "geom-spec" },
-      h("div", { class: "geom-spec-head" }, h("b", {}, t.label), h("small", {}, `${scale.baseHeight}px base · 6 sizes · ${scale.density}× density`)),
-      h("p", { class: "geom-spec-note" }, t.note + " — every glyph centers in a square cell of side = the control height, so edge padding = (height − glyph)/2. The ramp + paddings are computed, not authored."),
-      h("p", { class: "geom-shared-note" }, icon("type"), h("span", {}, "Text size (", h("b", {}, "font"), ") per step is the control-text ramp — its own fixed table (12·13·15·16·18·20 at base 28), deliberately decoupled from the Label voice; it surfaces in Figma as the Typography collection's UI-widget/UI-control size variables.")),
-      h(
-        "div",
-        { class: "geom-spec-group" },
-        h("div", { class: "geom-spec-grouphead" }, h("b", {}, "Controls"), h("small", {}, "height · icon · font · pad · radius"), h("span", { class: "geom-spec-count" }, "6 sizes")),
-        ...SIZE_NAMES.map(ctlLine),
-      ),
-      h(
-        "div",
-        { class: "geom-spec-group" },
-        h("div", { class: "geom-spec-grouphead" }, h("b", {}, "Radius"), h("small", {}, t.radiusStyle), h("span", { class: "geom-spec-count" }, `${Object.keys(scale.radii).length} steps`)),
-        ladderRow(Object.entries(scale.radii), ([k, v]) =>
-          h("span", { class: "geom-chip" }, h("span", { class: "geom-radius-swatch", style: `border-radius:${Math.min(v, 24)}px` }), `${k} ${v === 9999 ? "pill" : v}`)),
-      ),
-      h(
-        "div",
-        { class: "geom-spec-group" },
-        h("div", { class: "geom-spec-grouphead" }, h("b", {}, "Space"), h("small", {}, `${t.spaceBase}px base`), h("span", { class: "geom-spec-count" }, `${Object.keys(scale.space).length} steps`)),
-        ladderRow(Object.entries(scale.space), ([k, v]) =>
-          h("span", { class: "geom-chip", title: `--space-${k}: ${v}px` }, h("span", { class: "geom-space-bar", style: `width:${Math.max(1, v)}px` }), `${v}`)),
-      ),
-    );
-  }
-
-  // ── Geometry analysis (left rail, READ-ONLY) ──────────────────────────────────────────
-  // The geometry analog of analysisCards(): diagrams of the resolved dimensional system — pure functions
-  // of geometryScale(doc), no inputs. Reuses .an-card / .an-svg / legend(). `view` is accepted for dispatch
-  // parity but unused (geometry is doc-driven, not palette-view-driven).
-  geomAnalysisCards(view) {
-    const scale = this._activeGeomScale();
-    const card = (label, body) => h("div", { class: "an-card" }, h("div", { class: "an-label" }, label), body);
-    return [
-      card("Centering law — pad = ½(height − glyph)", this.graphGeomCentering(scale)),
-      card("Power-law ramp — icon & font vs height", this.graphGeomPower(scale)),
-      card("Two-band ramp — height per step", this.graphGeomBands(scale)),
-      card("Font ← Typography UI — shared text size", this.graphGeomComposition(scale)),
-    ];
-  }
-
-  // the centering law, drawn: a square CELL (side = control height) with the glyph centred in it; the equal
-  // gaps either side ARE the derived edge padding ½(height − glyph). Numbers are the LG size's real px.
-  graphGeomCentering(scale) {
-    const s = scale.sizes.LG || Object.values(scale.sizes)[0];
-    if (!s) return h("div", { class: "an-empty" }, "—");
-    const W = 244, H = 116, side = 80;
-    const x0 = (W - side) / 2, y0 = (H - side) / 2;
-    const g = side * (s.icon / s.height); // glyph drawn proportional to icon/height
-    const gx = x0 + (side - g) / 2, gy = y0 + (side - g) / 2;
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <rect class="gc-cell" x="${x0}" y="${y0}" width="${side}" height="${side}" rx="2"/>
-        <rect class="gc-glyph" x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" width="${g.toFixed(1)}" height="${g.toFixed(1)}" rx="2"/>
-        <line class="gc-pad" x1="${x0}" y1="${gy.toFixed(1)}" x2="${gx.toFixed(1)}" y2="${gy.toFixed(1)}"/>
-        <line class="gc-pad" x1="${(gx + g).toFixed(1)}" y1="${(gy + g).toFixed(1)}" x2="${(x0 + side).toFixed(1)}" y2="${(gy + g).toFixed(1)}"/>
-      </svg>`;
-    return h(
-      "div",
-      {},
-      h("div", { class: "an-svg", html: svg }),
-      h("div", { class: "geom-an-cap" }, `LG · cell ${s.height} · glyph ${s.icon} · pad ½(${s.height}−${s.icon}) = ${(s.height - s.icon) / 2}`),
-    );
-  }
-
-  // icon & font vs control height across the six sizes — both glyphs scale SUBLINEARLY (a power law of
-  // height, exponent < 1), so the curves bend below the faint height diagonal. fill:none on the lines.
-  graphGeomPower(scale) {
-    const rows = ["XS", "SM", "MD", "LG", "XL", "2XL"].map((n) => scale.sizes[n]).filter(Boolean);
-    if (!rows.length) return h("div", { class: "an-empty" }, "—");
-    const W = 244, H = 132, pad = 26;
-    const maxH = Math.max(...rows.map((s) => s.height)) * 1.05;
-    const maxV = Math.max(...rows.map((s) => Math.max(s.icon, s.font, s.height))) * 1.05;
-    const X = (hh) => pad + (hh / maxH) * (W - pad - 8);
-    const Y = (v) => (H - pad + 8) - (v / maxV) * (H - pad - 8);
-    const path = (key) => "M" + rows.map((s) => `${X(s.height).toFixed(1)},${Y(s[key]).toFixed(1)}`).join(" L");
-    const dots = (key, cls) => rows.map((s) => `<circle class="${cls}" cx="${X(s.height).toFixed(1)}" cy="${Y(s[key]).toFixed(1)}" r="1.8"/>`).join("");
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
-        <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
-        <path class="gp-ref" d="${path("height")}"/>
-        <path class="gp-icon" d="${path("icon")}"/>${dots("icon", "gp-dot gp-dot-icon")}
-        <path class="gp-font" d="${path("font")}"/>${dots("font", "gp-dot gp-dot-font")}
-        <text x="2" y="14">px</text>
-        <text x="${W - 44}" y="${H - pad + 18}">height→</text>
-      </svg>`;
-    return h(
-      "div",
-      {},
-      h("div", { class: "an-svg", html: svg }),
-      this.legend([{ mark: "gp ref", label: "height" }, { mark: "gp icon", label: "icon 2.49·h^.58" }, { mark: "gp font", label: "font ≈ √h" }]),
-    );
-  }
-
-  // control height per step index — the two-band ramp (compact +4 linear below MD, expressive ×4/3
-  // geometric above LG), with a marker at the MD|LG seam where the ramp changes gear.
-  graphGeomBands(scale) {
-    const rows = ["XS", "SM", "MD", "LG", "XL", "2XL"].map((n) => ({ n, hh: scale.sizes[n] && scale.sizes[n].height })).filter((r) => r.hh);
-    if (rows.length < 2) return h("div", { class: "an-empty" }, "—");
-    const W = 244, H = 124, pad = 26;
-    const maxH = Math.max(...rows.map((r) => r.hh)) * 1.05;
-    const X = (i) => pad + (i / (rows.length - 1)) * (W - pad - 8);
-    const Y = (hh) => (H - pad + 8) - (hh / maxH) * (H - pad - 8);
-    const d = "M" + rows.map((r, i) => `${X(i).toFixed(1)},${Y(r.hh).toFixed(1)}`).join(" L");
-    const dots = rows.map((r, i) => `<circle class="gp-dot gp-dot-font" cx="${X(i).toFixed(1)}" cy="${Y(r.hh).toFixed(1)}" r="1.9"/>`).join("");
-    const seamX = ((X(2) + X(3)) / 2).toFixed(1);
-    const svg = `
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <line class="lc-axis" x1="${pad}" y1="8" x2="${pad}" y2="${H - pad + 8}"/>
-        <line class="lc-axis" x1="${pad}" y1="${H - pad + 8}" x2="${W - 6}" y2="${H - pad + 8}"/>
-        <line class="dg-unity" x1="${seamX}" y1="8" x2="${seamX}" y2="${H - pad + 8}"/>
-        <text x="${(+seamX + 3).toFixed(1)}" y="15">MD|LG seam</text>
-        <path class="gp-font" d="${d}"/>${dots}
-        <text x="2" y="14">px</text>
-        <text x="${W - 48}" y="${H - pad + 18}">XS→2XL</text>
-      </svg>`;
-    return h("div", { class: "an-svg", html: svg });
-  }
-
-  // the composition link — when the geometry is composed with a type scale, each control's text size
-  // (font) IS the Typography UI voice at the matching step. Lists the six steps + their derived rhythm.
-  graphGeomComposition(scale) {
-    return h(
-      "div",
-      { class: "geom-comp" },
-      h("p", { class: "geom-comp-note" }, "Each control's text size is the fixed control-text ramp (its own hand-ratified table, decoupled from the Label voice); gap = font/2, caret has its own power law."),
-      h(
-        "div",
-        { class: "geom-comp-rows" },
-        ...["XS", "SM", "MD", "LG", "XL", "2XL"].map((n) => {
-          const s = scale.sizes[n];
-          return s ? h("div", { class: "geom-comp-row" }, h("span", { class: "geom-comp-k" }, n), h("span", { class: "geom-comp-v" }, `font ${s.font}`), h("span", { class: "geom-comp-v dim" }, `caret ${s.caret} · gap ${s.gap}`)) : false;
-        }),
-      ),
-    );
-  }
-
-  // ── Geometry inspector (right pane) ───────────────────────────────────────────
-  // The geometry analog of renderTypeInspector: a .pane-head segmented tablist + a scrollable .seg-body + a
-  // pinned .seg-example live control. Binds ONLY to doc.geometry = { treatment, baseHeight } (the two fields
-  // the engine + persist carry). Density / radius style / spacing come from the treatment, shown READ-ONLY,
-  // exactly as the Typography inspector shows per-voice params read-only.
-  renderGeomInspector(view) {
-    const seg = this.geomSegment === "radius" || this.geomSegment === "space" ? this.geomSegment : "ramp";
-    const body = seg === "radius" ? this.geomRadiusTab() : seg === "space" ? this.geomSpaceTab() : this.geomRampTab();
-    const tabs = [{ id: "ramp", label: "Ramp" }, { id: "radius", label: "Radius" }, { id: "space", label: "Space" }];
-    return h(
-      "aside",
-      { class: "right-pane" },
-      h("div", { class: "pane-head" },
-        this.panesRight ? this.paneToggle("right") : false,
-        this.segmented(tabs, seg, (id) => { this.geomSegment = id; this.render(); }, { ariaLabel: "Geometry inspector", idPrefix: "gtab", controls: "gi-panel" })),
-      h("div", { class: "seg-body", role: "tabpanel", id: "gi-panel", "aria-labelledby": "gtab-" + seg }, body),
-      h("div", { class: "seg-example" }, this.geomExampleCard(view)),
-    );
-  }
-
-  // geomRampTab — the WRITABLE controls (treatment + base height), then a READ-ONLY per-size summary of
-  // what the centering law yields (icon · font · pad · gap · radius), + the composition note + download.
-  geomRampTab() {
-    const cfg = this.doc.geometry || DEFAULT_GEOMETRY;
-    const t = GEOMETRY_TREATMENTS.find((x) => x.id === cfg.treatment) || GEOMETRY_TREATMENTS[0];
-    const scale = this._activeGeomScale();
-    return h(
-      "div",
-      { class: "insp-body" },
-      h("h3", { class: "insp-title" }, icon("ruler"), "Size ramp"),
-      h("div", { class: "insp-sub" }, "Choose a treatment + base height — icon, font, padding, gap & radius follow by the centering law."),
-      field(
-        "Treatment",
-        h(
-          "select",
-          { "data-fk": "gi:treatment", onchange: (e) => this._pickGeomTreatment(e.target.value) },
-          ...GEOMETRY_TREATMENTS.map((x) => h("option", { value: x.id, selected: cfg.treatment === x.id ? true : undefined }, this._treatmentLocked(x.id, "comfortable") ? x.label + " · Pro" : x.label)),
-        ),
-      ),
-      this.slider(this.geomMode === "base" || this.geomMode === "compare" ? "Base height" : "Base height · this breakpoint", scale.baseHeight, 20, 48, 2, (v) => fmt(v) + "px", (v) => this._setActiveGeomBaseHeight(v)),
-      // the responsive-ramp knob: 100% = the full ×4/3 expressive gear; 0% = the band goes linear
-      // (+4 past MD) — the compressed ramp small screens want. Per-mode, like the height slider.
-      this.slider(this.geomMode === "base" || this.geomMode === "compare" ? "Ramp contrast" : "Ramp contrast · this breakpoint", scale.rampContrast ?? 1, 0, 1, 0.05, (v) => Math.round(v * 100) + "%", (v) => this._setActiveGeomRampContrast(v)),
-      this._geomModeEditor(),
-      h("p", { class: "insp-sub tyi-note" }, t.note),
-      h(
-        "div",
-        { class: "tyi-voices" },
-        h("div", { class: "tyi-voices-head" }, h("b", {}, "Per-size"), h("small", {}, "select a size to tune its height")),
-        ...["XS", "SM", "MD", "LG", "XL", "2XL"].map((n) => {
-          const s = scale.sizes[n];
-          if (!s) return false;
-          const sel = this.geomSize === n;
-          const tuned = Number.isFinite((cfg.tokenOverrides || {})[n + "|" + this._geomActiveModeKey()]);
-          const stats = h(
-            "dl",
-            { class: "tyi-voice-stats" },
-            h("div", {}, h("dt", {}, "Icon"), h("dd", {}, `${s.icon}`)),
-            h("div", {}, h("dt", {}, "Font"), h("dd", {}, `${s.font}`)),
-            h("div", {}, h("dt", {}, "Pad"), h("dd", {}, `${s.paddingNarrow}`)),
-            h("div", {}, h("dt", {}, "Gap"), h("dd", {}, `${s.gap}`)),
-            h("div", {}, h("dt", {}, "Radius"), h("dd", {}, `${s.radiusPill}`)),
-          );
-          return h(
-            "div",
-            { class: "tyi-voice" + (sel ? " is-sel" : "") + (tuned ? " is-tuned" : "") },
-            h(
-              "button",
-              { type: "button", class: "tyi-voice-name", "data-fk": "gsize:" + n, "aria-expanded": sel ? "true" : "false",
-                onclick: () => { this.geomSize = sel ? null : n; this.render(); } },
-              h("span", { class: "tyi-voice-label" }, n, tuned ? h("span", { class: "tyi-voice-dot", title: "Height tuned off the ramp" }, " ●") : false),
-              h("span", { class: "tyi-voice-font" }, `${s.height}px`),
-            ),
-            sel
-              ? h(
-                  "div",
-                  { class: "tyi-voice-edit" },
-                  this.slider("Height", s.height, 16, 96, 1, (v) => fmt(v) + "px", (v) => this._setGeomSize(n, v)),
-                  stats,
-                  tuned ? btn("Reset size", { variant: "ghost", cls: "tyi-voice-reset", onclick: () => this.clearGeomTokenOverride(n, this._geomActiveModeKey()) }) : false,
-                )
-              : stats,
-          );
-        }),
-      ),
-      h("p", { class: "insp-sub tyi-future" }, "Text size (font) per step is the control-text ramp — decoupled from the type scale; in Figma it lives in the Typography collection as UI-widget/UI-control sizes."),    );
-  }
-
-  // geomRadiusTab — the corner ladder the treatment resolves to (none·sm·md·lg·full). The radius STYLE is
-  // set by the treatment (read-only here, like the type fonts).
-  geomRadiusTab() {
-    const cfg = this.doc.geometry || DEFAULT_GEOMETRY;
-    const t = GEOMETRY_TREATMENTS.find((x) => x.id === cfg.treatment) || GEOMETRY_TREATMENTS[0];
-    const scale = this._activeGeomScale();
-    return h(
-      "div",
-      { class: "insp-body" },
-      h("h3", { class: "insp-title" }, icon("ruler"), "Radius ladder"),
-      h("div", { class: "insp-sub" }, `The ${t.radiusStyle} corner ladder for the ${t.label} treatment. A fully-round control is a pill (radius = height/2).`),
-      h(
-        "div",
-        { class: "geom-lad" },
-        ...Object.entries(scale.radii).map(([k, v]) =>
-          h(
-            "div",
-            { class: "geom-lad-row" },
-            h("span", { class: "geom-radius-swatch", style: `border-radius:${v === 9999 ? 18 : Math.min(v, 18)}px` }),
-            h("span", { class: "geom-lad-k" }, k),
-            h("span", { class: "geom-lad-v" }, v === 9999 ? "pill" : `${v}px`),
-          ),
-        ),
-      ),
-      h("p", { class: "insp-sub tyi-future" }, "The radius style is set by the treatment. Per-token radius overrides are a future step."),    );
-  }
-
-  // geomSpaceTab — the layout-spacing scale (--space-*): the rhythm BETWEEN components (gutters, gaps,
-  // section rhythm), a separate concern from the in-control padding the centering law governs.
-  geomSpaceTab() {
-    const cfg = this.doc.geometry || DEFAULT_GEOMETRY;
-    const t = GEOMETRY_TREATMENTS.find((x) => x.id === cfg.treatment) || GEOMETRY_TREATMENTS[0];
-    const scale = this._activeGeomScale();
-    const maxV = Math.max(1, ...Object.values(scale.space));
-    return h(
-      "div",
-      { class: "insp-body" },
-      h("h3", { class: "insp-title" }, icon("ruler"), "Space scale"),
-      h("div", { class: "insp-sub" }, `Layout rhythm in ${t.spaceBase}px multiples — the space between components, not the padding inside one.`),
-      h(
-        "div",
-        { class: "geom-lad" },
-        ...Object.entries(scale.space).map(([k, v]) =>
-          h(
-            "div",
-            { class: "geom-lad-row" },
-            h("span", { class: "geom-lad-k" }, `--space-${k}`),
-            h("span", { class: "geom-space-track" }, h("span", { class: "geom-space-fill", style: `width:${Math.round((v / maxV) * 100)}%` })),
-            h("span", { class: "geom-lad-v" }, `${v}px`),
-          ),
-        ),
-      ),    );
-  }
-
-  // geomExampleCard — the pinned live card: a real MD control built from the resolved geometry AND painted
-  // in the SELECTED palette's roles (surface / onSurface + primary). Mirrors typeExampleCard's resolution.
-  geomExampleCard(view) {
-    const scale = this._activeGeomScale();
-    const s = scale.sizes.MD || Object.values(scale.sizes)[0];
-    if (!s) return h("div", { class: "example-card" });
-    const p = view.palettes[this.selectedIndex()];
-    const roles = (p && p.roles) || [];
-    const dark = this.resolvedCanvasScheme() === "dark";
-    const sl = slug((p && p.name) || "");
-    const byKey = {};
-    for (const r of roles) byKey[r.key] = r;
-    const pick = (role) => (role ? (dark ? role.darkHex : role.lightHex) : "transparent");
-    const main = roles.find((r) => r.suffix === "");
-    const onMain = roles.find((r) => r.suffix === "-on-" + sl);
-    return h(
-      "div",
-      { class: "example-card geom-example", style: "background:" + pick(byKey.surface) },
-      h("div", { class: "geom-ex-title", style: "color:" + pick(byKey.onSurface) }, `MD · ${s.height}px control`),
-      h(
-        "button",
-        {
-          class: "geom-ex-ctl",
-          tabindex: "-1",
-          style: `background:${pick(main)};color:${pick(onMain)};height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
-        },
-        h("span", { class: "geom-ex-glyph", style: `width:${s.icon}px;height:${s.icon}px` }),
-        "Button",
-        h("span", { class: "geom-ex-caret", style: `width:${s.caret}px;height:${s.caret}px` }, icon("caret-left")),
-      ),
-    );
-  }
 
   // ── project source of truth (config round-trip I/O) ───────────────────────────────────
   // The "config" is the PARAMETRIC doc (serialize) — palettes' hue/chroma/skew/lift, the global
@@ -7459,6 +2253,7 @@ class HctApp extends HTMLElement {
     catch { this.toast("Save failed — no storage available"); }
   }
 
+
   // loadFromProject — restore the config. Figma posts {load-config} and the answer arrives async
   // as {config-loaded} (relayed to applyLoadedConfig by the bridge); browser reads localStorage now.
   loadFromProject() {
@@ -7472,6 +2267,7 @@ class HctApp extends HTMLElement {
     if (!raw) { this._loadRequested = false; this.toast("No saved project config"); return; }
     try { this.applyLoadedConfig(JSON.parse(raw)); } catch { this._loadRequested = false; this.toast("Project config is corrupt"); }
   }
+
 
   // applyLoadedConfig — the answer to a load-config request: UNTRUSTED config in (a stored slot or a
   // Figma {config-loaded} message). On the gallery AUTO-PROBE (no explicit load in flight) it only
@@ -7489,6 +2285,7 @@ class HctApp extends HTMLElement {
     this.openConfigAsSet(config, "Loaded from project");
   }
 
+
   // openConfigAsSet — shape-clamp an (untrusted) config and open it as a new set. hydrateStoredDoc()
   // domain-clamps every field AND applies the legacy stamp (a config lacking hueSpace was authored under
   // cam16 — keep it cam16, consistent with openSet), so a junk/partial config is sanitized + preserved.
@@ -7503,6 +2300,7 @@ class HctApp extends HTMLElement {
     if (toastMsg) this.toast(toastMsg);
   }
 
+
   // ── read-only Figma-variables reference + drift diff (#3) ──────────────────────────────
   // Read the live raw-colors variables from the FILE and compare to what the generator would emit
   // now → per-token drift in the Mapping table (✓ match / ✗ drifted / — absent). Read-only: it never
@@ -7511,6 +2309,7 @@ class HctApp extends HTMLElement {
     if (!this.inFigma) { this.toast("Reading live variables is a Figma-plugin feature"); return; }
     try { parent.postMessage({ pluginMessage: { type: "read-variables" } }, "*"); } catch { /* no frame */ }
   }
+
 
   receiveLiveVariables(payload) {
     this.liveVars = (payload && payload.raw) || {};
@@ -7524,6 +2323,7 @@ class HctApp extends HTMLElement {
     this.toast(d.drifted ? `${d.drifted} of ${d.total} tokens drifted from the file` : `In sync — all ${d.total} match the file`);
   }
 
+
   // driftStatus — generated raw var "{n}/{key}" + its generated hex vs the live read.
   // null = no read yet; "absent" = not in the file; "match" / "drift".
   driftStatus(varName, genHex) {
@@ -7532,6 +2332,7 @@ class HctApp extends HTMLElement {
     if (live == null) return "absent";
     return live.toUpperCase() === String(genHex).toUpperCase() ? "match" : "drift";
   }
+
 
   driftSummary() {
     const rawTree = this.figmaBundle()["palette.tokens.json"] || {};
@@ -7549,6 +2350,7 @@ class HctApp extends HTMLElement {
     }
     return { total, drifted, absent };
   }
+
 
   // downloadFigmaPlugin — the Color Tokens Semantic Binder plugin's two files (manifest.json +
   // code.js). Drop both into one folder, then Figma → Plugins → Development → Import
@@ -7568,6 +2370,7 @@ class HctApp extends HTMLElement {
     this.download(FIGMA_PLUGIN.manifest, "manifest.json");
     setTimeout(() => this.download(injected, "code.js"), 150);
   }
+
 
   // downloadBrandKitMcp — hand the user a ready-to-run Brand-Kit MCP package as one .zip: the zero-dep
   // server (inlined from mcp/), THEIR resolved tokens (brandKit), a setup README, and a package.json.
@@ -7590,6 +2393,7 @@ class HctApp extends HTMLElement {
     this.toast("Brand-Kit MCP downloaded — `node brand-kit-server.mjs`");
   }
 
+
   copy(text, msg) {
     const done = () => this.toast(msg || "Copied to clipboard");
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -7598,6 +2402,7 @@ class HctApp extends HTMLElement {
       this.fallbackCopy(text, done);
     }
   }
+
   fallbackCopy(text, done) {
     const ta = h("textarea", { style: "position:fixed;opacity:0" });
     ta.value = text;
@@ -7612,11 +2417,13 @@ class HctApp extends HTMLElement {
     ta.remove();
   }
 
+
   // download — save text (CSS/JSON/etc.). Routes through _saveBlob, so it benefits from the same
   // File System Access save dialog (and anchor fallback) the .zip uses.
   download(text, filename) {
     this._saveBlob(new Blob([text], { type: "text/plain" }), filename);
   }
+
 
   toast(msg) {
     if (!this.toastEl) return;
@@ -7625,7 +2432,28 @@ class HctApp extends HTMLElement {
     clearTimeout(this._toastT);
     this._toastT = setTimeout(() => this.toastEl.classList.remove("show"), 1800);
   }
+
 }
+
+// mixinInto — copy every own prototype method/getter/setter from each mixin class onto Target's
+// prototype (skipping "constructor"). Plain data-preserving prototype composition — no framework,
+// no subclassing chain, no Proxy: the section/overlay classes above exist ONLY as a comma-free
+// syntax carrier for their methods and are never instantiated. Property descriptors (not bare
+// assignment) so any getter/setter method survives the copy unchanged.
+function mixinInto(Target, ...Sources) {
+  for (const Source of Sources) {
+    for (const name of Object.getOwnPropertyNames(Source.prototype)) {
+      if (name === "constructor") continue;
+      Object.defineProperty(Target.prototype, name, Object.getOwnPropertyDescriptor(Source.prototype, name));
+    }
+  }
+}
+// The section seam (this.section: color|typography|geometry) is a real module boundary: each
+// section's render tree lives in its own prototype-mixin file (src/ui/sections/*.js), plus three
+// cross-section overlay mixins (the export drawer, the Figma apply-consent gate, Settings) under
+// src/ui/overlays/*.js (TKT-0023: app.js is now a bootstrap + shared core; sections/overlays live
+// in per-file mixins, flattened onto ONE prototype — every call site still just reads 'this.<name>()').
+mixinInto(HctApp, ColorSection, TypeSection, GeomSection, DrawerMixin, ApplyGateMixin, SettingsMixin);
 
 // The one tag. The pre-rename alias was retired with the maker brand (ADR-015): an embed on the old tag
 // now renders nothing, which is the intended, visible failure — a silently-styled ghost element would be

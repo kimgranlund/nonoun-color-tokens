@@ -24,7 +24,8 @@ const FAIL = (file, msg) => { failed++; console.log(`  ✗ ${file}: ${msg}`); };
 
 // Files permitted to name the pre-rename identifier, each because it IMPLEMENTS back-compat.
 const LEGACY_TAG_ALLOWLIST = new Set([
-  "src/ui/app.js",              // LEGACY_STORAGE_PREFIXES — migrateStorageKeys() carries saved palettes
+  "src/ui/app-helpers.mjs",     // LEGACY_STORAGE_PREFIXES — migrateStorageKeys() carries saved palettes
+                                // (TKT-0023: relocated verbatim out of app.js's former top matter)
   "src/ui/persist.js",          // the storage-key rename comment
   "figma/plugin/code.js",       // the ADR-014 orphaning comment
   "test/ui/headless-boot.mjs",  // the (mig) storage-migration assertions + the alias-is-gone assertion
