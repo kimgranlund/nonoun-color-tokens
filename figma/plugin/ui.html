@@ -5359,6 +5359,7 @@ __M.exports = (function(){
 const { paletteStops, EXPORT_STOPS, DEFAULT_CONTROLS } = __M.tonal;
 const { semanticRoles, refKey, refPath, refSlug, roleLeaf, applyRoleOverrides, applyOnColorContrast, applyAccentRef } = __M.semantic;
 const { COLLECTIONS } = __M.collections;
+const { oklchToRgb } = __M.okhsl;
 
 // WCAG relative luminance of an [r,g,b] (0..255) triple — for the opt-in contrast on-color pick.
 // Exported: ds-export.js's dsContrast also needs it (kept as one source, not a duplicate).
@@ -5574,8 +5575,11 @@ function derivePalette(palette, controls, overrides) {
   });
 
   // keyColors — retained brand colors, passed through verbatim (exact hex). They may sit
-  // off the generated ramp; the UI places them perceptually, exports keep them exact.
-  const keyColors = Array.isArray(palette.keyColors) ? palette.keyColors : [];
+  // off the generated ramp; the UI places them perceptually, exports keep them exact. `rgb` is
+  // derived once here (oklchToRgb) so every emitter that needs a hex/components leaf (DTCG, UI3)
+  // shares one conversion instead of re-deriving it — CSS/JSON still read `oklch` directly.
+  const keyColorsRaw = Array.isArray(palette.keyColors) ? palette.keyColors : [];
+  const keyColors = keyColorsRaw.map((kc) => ({ ...kc, rgb: oklchToRgb(kc.oklch[0], kc.oklch[1], kc.oklch[2]) }));
   return { name: palette.name, n, hue: palette.hue, stops, byStop, scrims, roles, keyColors };
 }
 
@@ -5755,6 +5759,15 @@ function exportDTCG(state, opts) {
       }
     }
     grp.scrim = scrimGrp;
+    // key colors NEST under a key/ group (mirrors scrim/'s two-segment shape, ADR-016) — retained
+    // brand colors, exact (frac 1, no alpha), keyed by their role string ("dominant"/"supportive"),
+    // never pad3'd (a key role is a word, not a stop number). Present only when the palette set any
+    // (TKT-0022 — these were silently absent from DTCG/UI3 despite exporting fine via CSS/JSON).
+    if (p.keyColors.length) {
+      const keyGrp = {};
+      for (const kc of p.keyColors) keyGrp[kc.role] = colorLeaf(kc.rgb, 1, null);
+      grp.key = keyGrp;
+    }
     rawTree[p.n] = grp;
   }
   // constants — fixed, non-palette raw primitives (currently just dialog-backdrop), a sibling GROUP
@@ -5820,6 +5833,11 @@ function exportUI3(state) {
         const sc = p.scrims[base][step];
         primVars[`raw/${p.n}/${refPath(`${base}-${step}`)}`] = { type: "COLOR", values: { Base: sc.hex } };
       }
+    }
+    // key colors: "raw/{n}/key/{role}" — retained brand colors, exact (mirrors the DTCG raw-tree
+    // key/ group; TKT-0022). Present only when the palette set any.
+    for (const kc of p.keyColors) {
+      primVars[`raw/${p.n}/key/${kc.role}`] = { type: "COLOR", values: { Base: hexOf(kc.rgb) } };
     }
     // semantic: "{n}/{kebab leaf}" -> in-file aliases to the raw key paths per mode (ADR-016).
     for (const r of p.roles) {
