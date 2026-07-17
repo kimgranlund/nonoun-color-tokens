@@ -1,10 +1,15 @@
 #!/usr/bin/env node
-// headless-boot.mjs — TEMPORARY self-verification harness (Phase-3 interaction polish).
-// A minimal DOM/window/localStorage shim so the real app.js web component boots in
-// Node, then drives the new interactions: undo/redo, slider-drag coalescing,
-// keyboard nav, handle-drag reorder, and zoom clamps. Exit 0=pass / 1=fail.
+// headless-boot.mjs — the custom minimal-DOM-shim harness for the ultimate-tokens UI (HctApp).
+// A minimal DOM/window/localStorage shim boots the real app.js web component in plain Node (no
+// jsdom, no browser), then drives it end to end: undo/redo, slider-drag coalescing, keyboard nav,
+// handle-drag reorder, zoom clamps, section switching (Color/Typography/Geometry), exports, the
+// Figma bridge, and more — one lettered assertion group per feature. Exit 0=pass / 1=fail.
 //
-// NOT part of the build or verify.mjs — run ad hoc and removed after.
+// PERMANENT: wired into test/run.mjs (as `ui/headless-boot.mjs`) and run on every `npm test`. See
+// CLAUDE.md's "Testing (the shim is not a real DOM)" section for the shim's known limits
+// (querySelector takes a single class only, no `id`/`textContent`, etc).
+
+import { ROLES, DEFAULT_PALETTES, CATEGORIES, CATEGORY_PRESETS, BRAND_PRESETS, CATEGORY_PRESET_PALETTES, CATEGORY_VOLUMES, CORE_RAMP_STOPS, EXTENDED_RAMP_STOPS, VOICES, TYPE_STEPS, GEOM_SIZES } from "./counts.mjs";
 
 const fails = [];
 const ok = (cond, msg) => { if (!cond) fails.push(msg); };
@@ -144,7 +149,7 @@ ok(app.sets && app.sets.length >= 1, "gallery seeded a default set");
 app.openSet(app.sets[0].id);
 flushRaf();
 ok(app.view === "editor", "openSet entered editor view");
-ok(app.doc && app.doc.palettes.length === 8, "doc has 8 palettes");
+ok(app.doc && app.doc.palettes.length === DEFAULT_PALETTES, `doc has ${DEFAULT_PALETTES} palettes`);
 
 // ── (a) undo/redo + slider drag = ONE step ────────────────────────────────────────
 const hue0 = app.doc.palettes[0].hue;
@@ -625,7 +630,7 @@ const fv = _pv(app.doc);
 ok(fv.exports.figma && !!fv.exports.figma.light && !!fv.exports.figma.dark && !!fv.exports.figma.raw, "(s1) projectView exposes figma.light/dark/raw");
 ok(fv.exports.figma.light !== fv.exports.figma.dark, "(s2) the Light and Dark files differ");
 ok(JSON.parse(fv.exports.figma.light).$extensions["com.figma.modeName"] === "Light" && JSON.parse(fv.exports.figma.dark).$extensions["com.figma.modeName"] === "Dark", "(s3) each file carries its Figma mode name");
-ok(Object.keys(JSON.parse(fv.exports.figma.light).danger || {}).filter((k) => k !== "$extensions").length === 53, "(s4) the Light file has all 53 roles per palette");
+ok(Object.keys(JSON.parse(fv.exports.figma.light).danger || {}).filter((k) => k !== "$extensions").length === ROLES, `(s4) the Light file has all ${ROLES} roles per palette`);
 app.exportOpen = true; app.exportTab = "figma"; app.render(); flushRaf();
 const bar = app.querySelector(".figma-files");
 const fileBtns = bar ? bar.children.filter((c) => c.tagName === "BUTTON") : [];
@@ -859,7 +864,7 @@ ok(app.scrimContext(app._view || projectViewZ(app.doc)), "(z) scrimContext rende
 // the Scrims tab shows the FULL scrim ramp — one cell per stop (19 core), not just the 7 roles.
 const enabledZ = app.doc.palettes.filter((p) => p.on !== false).length;
 const scrimCellsZ = walk(scrimSceneZ, (e) => e.classList && e.classList.contains("scrim-cell")).length;
-ok(scrimCellsZ === enabledZ * 19, `(z) Scrims tab = the full 19-stop ramp per enabled palette: ${scrimCellsZ} cells for ${enabledZ} palettes (core)`);
+ok(scrimCellsZ === enabledZ * CORE_RAMP_STOPS, `(z) Scrims tab = the full ${CORE_RAMP_STOPS}-stop ramp per enabled palette: ${scrimCellsZ} cells for ${enabledZ} palettes (core)`);
 // liveRefresh now coalesces to one rAF per frame — the Figma slider-drag jank fix.
 app._liveRaf = null;
 app.liveRefresh();
@@ -871,8 +876,8 @@ app.setCanvasView("palettes");
 
 // ── (aa) stops toggle (19 core / 25 extended) + the Semantic Mapping table ────────────
 const pvAA = app._view || projectViewZ(app.doc);
-ok(pvAA.palettes[0].ramp.length === 19 && pvAA.palettes[0].fullRamp.length === 25,
-  `(aa) projectView exposes ramp (19 core) + fullRamp (25 extended) — got ${pvAA.palettes[0].ramp.length}/${pvAA.palettes[0].fullRamp.length}`);
+ok(pvAA.palettes[0].ramp.length === CORE_RAMP_STOPS && pvAA.palettes[0].fullRamp.length === EXTENDED_RAMP_STOPS,
+  `(aa) projectView exposes ramp (${CORE_RAMP_STOPS} core) + fullRamp (${EXTENDED_RAMP_STOPS} extended) — got ${pvAA.palettes[0].ramp.length}/${pvAA.palettes[0].fullRamp.length}`);
 const roleAA = pvAA.palettes[0].roles[0];
 ok(roleAA.name && roleAA.lightRaw && roleAA.darkRaw && roleAA.lightRaw.includes("-"),
   "(aa) roles carry name + lightRaw/darkRaw token names for the mapping table");
@@ -1015,14 +1020,15 @@ app.toGallery();
 
 // ── (hh) Palette Categories: hub category grid → a category's read-only presets → open an editable copy ──
 const { CATEGORY_INDEX: SI, loadCategory: LS } = await import("../../src/ui/categories/index.js");
-ok(Array.isArray(SI) && SI.length === 8, `(hh) 8 category categories ship in the bundled index (got ${SI && SI.length})`);
-// "brands" is a small, real-identity set (7) — every OTHER category is the uniform sourced/decorative
-// scale (48). Count still checked exactly, per category, not relaxed to "> 0".
-ok(SI.every((c) => c.slug && c.category && c.count === (c.slug === "brands" ? 7 : 48) && Array.isArray(c.strip) && c.strip.length), "(hh) each category card has slug/name/count + a color strip");
+ok(Array.isArray(SI) && SI.length === CATEGORIES, `(hh) ${CATEGORIES} category categories ship in the bundled index (got ${SI && SI.length})`);
+// "brands" is a small, real-identity set (BRAND_PRESETS) — every OTHER category is the uniform
+// sourced/decorative scale (CATEGORY_PRESETS). Count still checked exactly, per category, not
+// relaxed to "> 0".
+ok(SI.every((c) => c.slug && c.category && c.count === (c.slug === "brands" ? BRAND_PRESETS : CATEGORY_PRESETS) && Array.isArray(c.strip) && c.strip.length), "(hh) each category card has slug/name/count + a color strip");
 const TPm = await LS("travel"); // one category lazily loaded
 const TP = TPm.PRESETS;
-ok(Array.isArray(TP) && TP.length === 48, `(hh) travel category lazily loads 48 presets (got ${TP && TP.length})`);
-ok(TP.every((p) => p.palettes.length === 11), "(hh) each preset has 11 palettes (a derived neutral + 6 sampled + info/success/warning/danger)");
+ok(Array.isArray(TP) && TP.length === CATEGORY_PRESETS, `(hh) travel category lazily loads ${CATEGORY_PRESETS} presets (got ${TP && TP.length})`);
+ok(TP.every((p) => p.palettes.length === CATEGORY_PRESET_PALETTES), `(hh) each preset has ${CATEGORY_PRESET_PALETTES} palettes (a derived neutral + 6 sampled + info/success/warning/danger)`);
 const SLOTS = ["neutral","primary","primary-muted","secondary","secondary-muted","tertiary","tertiary-muted","info","success","warning","danger"];
 ok(TP.every((p) => JSON.stringify(p.palettes.map((x) => x.name)) === JSON.stringify(SLOTS)), "(hh) every preset leads with the derived neutral, then the {tier}-{rank} + status model, identically");
 // the leading neutral is DERIVED from the character palettes' key colors (environment tone): a
@@ -1046,11 +1052,11 @@ ok(TP.every((p) => p.palettes.slice(1, 7).every((q) => q.keyColors && q.keyColor
 for (const c of SI) {
   const m = await LS(c.slug);
   if (c.slug === "brands") {
-    ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === 7 && m.PRESETS.every((p) => p.palettes.length >= 8),
-      `(hh) category "brands" loads 7 presets, each with its own real palette set (got ${m && m.PRESETS && m.PRESETS.length})`);
+    ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === BRAND_PRESETS && m.PRESETS.every((p) => p.palettes.length >= 8),
+      `(hh) category "brands" loads ${BRAND_PRESETS} presets, each with its own real palette set (got ${m && m.PRESETS && m.PRESETS.length})`);
   } else {
-    ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === 48 && m.PRESETS.every((p) => p.palettes.length === 11),
-      `(hh) category "${c.slug}" loads 48 presets × 11 palettes`);
+    ok(m && Array.isArray(m.PRESETS) && m.PRESETS.length === CATEGORY_PRESETS && m.PRESETS.every((p) => p.palettes.length === CATEGORY_PRESET_PALETTES),
+      `(hh) category "${c.slug}" loads ${CATEGORY_PRESETS} presets × ${CATEGORY_PRESET_PALETTES} palettes`);
   }
 }
 // lift-anchoring (EVEN mode): a LIGHT dominant must open LIGHT, not the old mid-dark L*≈46 grey.
@@ -1062,18 +1068,18 @@ const _lightPrime = _pvHH(_hydHH({ ..._light, toneMode: "even" })).palettes[1].r
 ok(_lightPrime.tone > 72, `(hh) [even] lift anchors the prime to source lightness — a light dominant opens LIGHT (550 L*=${_lightPrime.tone.toFixed(0)})`);
 app.toGallery(); flushRaf();
 // the HUB shows a category card per category (not the presets directly)
-ok(app.querySelectorAll(".category-card").length === 8, `(hh) the gallery hub renders a category card per category (got ${app.querySelectorAll(".category-card").length})`);
+ok(app.querySelectorAll(".category-card").length === CATEGORIES, `(hh) the gallery hub renders a category card per category (got ${app.querySelectorAll(".category-card").length})`);
 ok(app.querySelectorAll(".preset").length === 0, "(hh) preset tiles are NOT on the hub — they live inside a category");
-// descend into a category → its 48 read-only preset tiles render
+// descend into a category → its CATEGORY_PRESETS read-only preset tiles render
 await app.openCategory("travel"); flushRaf();
-ok(app.category === "travel" && app.querySelectorAll(".preset").length === 48, `(hh) opening a category renders a read-only preset tile per preset (got ${app.querySelectorAll(".preset").length})`);
+ok(app.category === "travel" && app.querySelectorAll(".preset").length === CATEGORY_PRESETS, `(hh) opening a category renders a read-only preset tile per preset (got ${app.querySelectorAll(".preset").length})`);
 const presetNames = new Set(TP.map((p) => p.name));
 ok(!app.sets.some((s) => presetNames.has(s.name)), "(hh) presets are NOT seeded into your sets (they ship in code, read-only)");
 const setsBeforeHH = app.sets.length;
 const openPreset = TP[0];
 app.openConfigAsSet(openPreset, "Opened");
 ok(app.view === "editor" && app.sets.length === setsBeforeHH + 1, "(hh) opening a preset adds an EDITABLE copy to your sets + enters the editor");
-ok(app.doc.palettes.length === 11 && app.doc.palettes[0].name === "neutral" && app.doc.palettes[1].name === "primary", "(hh) the opened copy carries the 11 named palettes (neutral first, then primary)");
+ok(app.doc.palettes.length === CATEGORY_PRESET_PALETTES && app.doc.palettes[0].name === "neutral" && app.doc.palettes[1].name === "primary", `(hh) the opened copy carries the ${CATEGORY_PRESET_PALETTES} named palettes (neutral first, then primary)`);
 ok(["info","success","warning","danger"].every((n) => app.doc.palettes.some((p) => p.name === n)), "(hh) the status palettes (info/success/warning/danger) are present in the copy");
 app.toGallery(); flushRaf();
 ok(app.category === "travel", "(hh) returning from the editor lands back on the open category page");
@@ -1081,9 +1087,9 @@ ok(app.category === "travel", "(hh) returning from the editor lands back on the 
 const tokenHH = openPreset.name.split(/\s+/).filter((w) => w.length > 6)[0] || openPreset.name.slice(0, 7);
 app.search = tokenHH; app.refreshTiles();
 const filteredHH = app.querySelectorAll(".preset").length;
-ok(filteredHH >= 1 && filteredHH < 48, `(hh) the search box filters the category's shelf too (got ${filteredHH} for "${tokenHH}")`);
+ok(filteredHH >= 1 && filteredHH < CATEGORY_PRESETS, `(hh) the search box filters the category's shelf too (got ${filteredHH} for "${tokenHH}")`);
 app.search = ""; app.closeCategory(); flushRaf();
-ok(app.category === null && app.querySelectorAll(".category-card").length === 8, "(hh) closing a category returns to the hub");
+ok(app.category === null && app.querySelectorAll(".category-card").length === CATEGORIES, "(hh) closing a category returns to the hub");
 
 // ── (jj) preset strip weighting (TKT-0003): a preset's strip WIDTH tracks its OWN authored
 // dominant/supporting/accent hierarchy (story.groups[].pct via colorRole), not a fixed template — so
@@ -1404,7 +1410,7 @@ ok(rtKC && rtKC.length === 1 && rtKC[0].role === "dominant" && Array.isArray(rtK
 const TPs = TPm.PRESETS, TVs = TPm.VOLUMES; // the lazily-loaded travel category
 ok(TPs.every((p) => typeof p.vol === "string" && p.vol), "(st1) every preset carries a volume (vol)");
 const withStory = TPs.filter((p) => p.story);
-ok(withStory.length === TPs.length && Object.keys(TVs).length === 12, `(st2) ALL ${TPs.length} presets carry a story + 12 volume headers (got ${withStory.length} / ${Object.keys(TVs).length})`);
+ok(withStory.length === TPs.length && Object.keys(TVs).length === CATEGORY_VOLUMES, `(st2) ALL ${TPs.length} presets carry a story + ${CATEGORY_VOLUMES} volume headers (got ${withStory.length} / ${Object.keys(TVs).length})`);
 const storyPreset = withStory[0];
 ok(storyPreset.story.title && storyPreset.story.narrative && Array.isArray(storyPreset.story.groups), "(st3) a story has title + narrative + groups");
 ok(storyPreset.palettes.some((q) => q.colorName && q.colorRole && q.description), "(st4) the curated colors carry name + role + description");
@@ -1445,7 +1451,7 @@ app.newPalTab = "relative"; app.newPalRel = "extend"; app.render(); flushRaf();
 ok(app.querySelectorAll(".newpal-rel").length === NP_RELS.length, `(np3) the Relative tab lists all ${NP_RELS.length} relationships (got ${app.querySelectorAll(".newpal-rel").length})`);
 // the two-column previews: hue circle (left) + chroma curve + the proposed ramp & dominant swatch (right).
 ok(!!app.querySelector(".newpal-hc") && app.querySelectorAll(".newpal-diagram").length === 2, "(np3c) left column shows the hue circle + chroma-curve diagrams");
-ok(!!app.querySelector(".newpal-ramp") && app.querySelector(".newpal-ramp").children.length >= 19, "(np3d) right column shows the proposed-palette ramp preview");
+ok(!!app.querySelector(".newpal-ramp") && app.querySelector(".newpal-ramp").children.length >= CORE_RAMP_STOPS, "(np3d) right column shows the proposed-palette ramp preview");
 ok(app.querySelectorAll(".newpal-pp-sw").length === 2, "(np3e) Relative preview shows BOTH a dominant + supporting swatch");
 // the priority chain: the ordered context (primary marked), so secondary/tertiary are visible too.
 const npChainSw = app.querySelectorAll(".newpal-pp-chain-sw");
@@ -1599,10 +1605,10 @@ app.commit((d) => { d.accentRef = "mode"; }); // restore default
 app.closeSettings(); flushRaf();
 ok(app.settingsOpen === false, "(set) closeSettings dismisses the modal");
 
-// ── (ty) Typography SECTION: the switcher flips this.section → full 33-step canvas specimen + inspector ──
+// ── (ty) Typography SECTION: the switcher flips this.section → full TYPE_STEPS-step canvas specimen (51) + inspector ──
 app.setSection("typography"); flushRaf();
 ok(app.section === "typography" && !!app.querySelector(".type-spec"), "(ty) the section switcher enters Typography (the canvas specimen renders)");
-ok(app.querySelectorAll(".type-spec-line").length === 51 && app.querySelectorAll(".type-spec-group").length === 15, `(ty) the canvas shows the FULL specimen — 51 steps (13 voices × 3 + the 2 interactive voices × 6) across the 15 named voices (Display·Headline·Sub-heading·Title·Sub-title·Lead·Body·Body-mono·Label·Label-mono·Kicker·Tiny·Tiny-mono·UI-control·UI-widget) (got ${app.querySelectorAll(".type-spec-line").length} lines / ${app.querySelectorAll(".type-spec-group").length} groups)`);
+ok(app.querySelectorAll(".type-spec-line").length === TYPE_STEPS && app.querySelectorAll(".type-spec-group").length === VOICES, `(ty) the canvas shows the FULL specimen — ${TYPE_STEPS} steps (13 voices × 3 + the 2 interactive voices × 6) across the ${VOICES} named voices (Display·Headline·Sub-heading·Title·Sub-title·Lead·Body·Body-mono·Label·Label-mono·Kicker·Tiny·Tiny-mono·UI-control·UI-widget) (got ${app.querySelectorAll(".type-spec-line").length} lines / ${app.querySelectorAll(".type-spec-group").length} groups)`);
 ok(app.querySelectorAll(".an-card").length >= 4, `(ty) the left rail shows the type analysis cards (got ${app.querySelectorAll(".an-card").length})`);
 // specimen order: each group lists LARGEST → smallest (the first token in the document is Display's LG step)
 ok(txtOf(app.querySelectorAll(".type-spec-token")[0] || {}) === "type-display-lg", `(ty) the specimen lists each group largest→smallest (first token is type-display-lg, got ${txtOf(app.querySelectorAll(".type-spec-token")[0] || {})})`);
@@ -1617,7 +1623,7 @@ ok(bkTy(app.doc).type && bkTy(app.doc).type.categories.Body && bkTy(app.doc).typ
 // (tyf) Fonts tab — an editable combobox per VOICE (all 11, matching 1:1 what's exported); a custom
 // family overrides that voice directly — there is no shared-role row — and flows to the scale + persist.
 app.typeSegment = "fonts"; app.render(); flushRaf();
-ok(app.querySelectorAll(".tyi-font-input").length === 15, `(tyf) the Fonts tab renders an editable combobox per voice (15) (got ${app.querySelectorAll(".tyi-font-input").length})`);
+ok(app.querySelectorAll(".tyi-font-input").length === VOICES, `(tyf) the Fonts tab renders an editable combobox per voice (${VOICES}) (got ${app.querySelectorAll(".tyi-font-input").length})`);
 app._setTypeVoiceFont("Body", "Custom Sans"); flushRaf();
 ok(app.doc.type.voices && app.doc.type.voices.Body.font === "Custom Sans" && app._activeTypeScale().voiceFonts.Body === "Custom Sans", "(tyf) a custom family writes to doc.type.voices[voice].font and flows into the resolved scale's voiceFonts");
 ok(hydSet(serSet(app.doc)).type.voices.Body.font === "Custom Sans", "(tyf) the custom font round-trips through persist");
@@ -1625,7 +1631,7 @@ app._setTypeVoiceFont("Body", ""); flushRaf();
 ok(!app.doc.type.voices, "(tyf) clearing the only override removes doc.type.voices (reverts to the treatment)");
 // (tyfa) font AVAILABILITY dots — two different truths, never conflated.
 app.render(); flushRaf();
-ok(app.querySelectorAll(".tyi-font-dot").length === 15, `(tyfa) one availability dot per voice (got ${app.querySelectorAll(".tyi-font-dot").length})`);
+ok(app.querySelectorAll(".tyi-font-dot").length === VOICES, `(tyfa) one availability dot per voice (got ${app.querySelectorAll(".tyi-font-dot").length})`);
 // web: the 4 self-hosted faces are "bundled"; an unmeasurable env never cries wolf (assumes it renders)
 ok(!app.inFigma && app._fontStatus("Inter").label === "bundled" && app._fontStatus("Inter").state === "ok", "(tyfa) a self-hosted face reads 'bundled' in the web app");
 ok(app._fontStatus("Bodoni Moda").state === "ok", "(tyfa) with no DOM measurement available the probe assumes the face renders (never a false 'falls back')");
@@ -1644,7 +1650,7 @@ app.typeSegment = "scale"; app.render(); flushRaf();
 // (tyv) Scale tab — per-voice tuning: select a voice → its shaping sliders expand; _setTypeVoice writes
 // doc.type.voices + flows to the scale + persist; reset clears. (Voices are mode-independent → the base.)
 app.typeVoice = null; app.render(); flushRaf();
-ok(app.querySelectorAll(".tyi-voice").length === 15 && !app.querySelector(".tyi-voice-edit"), `(tyv) the Scale tab lists the 15 voices, none expanded by default (got ${app.querySelectorAll(".tyi-voice").length})`);
+ok(app.querySelectorAll(".tyi-voice").length === VOICES && !app.querySelector(".tyi-voice-edit"), `(tyv) the Scale tab lists the ${VOICES} voices, none expanded by default (got ${app.querySelectorAll(".tyi-voice").length})`);
 app.typeVoice = "Body"; app.render(); flushRaf();
 ok(!!app.querySelector(".tyi-voice-edit") && !!app.querySelector(".is-sel"), "(tyv) selecting a voice expands its tuning sliders");
 app._setTypeVoice("Body", "weight", 600); flushRaf();
@@ -1701,8 +1707,8 @@ ok(!!app.querySelector(".tok-table") && !app.querySelector(".type-spec"), "(ty-t
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(ty-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
 ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Desktop")).length === 1 && walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 0, "(ty-tok) the base column header reads Desktop (the designed scale, the intrinsic anchor — no 'Base' column)");
 ok(app._typeTokenColumns().length === 1, "(ty-tok) base-only — exactly one column (Base) with no breakpoints");
-ok(app.querySelectorAll(".tok-row").length === 51, `(ty-tok) one row per type step (51) (got ${app.querySelectorAll(".tok-row").length})`);
-ok(app.querySelectorAll(".tok-group").length === 15, `(ty-tok) the rows are grouped by voice — 15 group headers (got ${app.querySelectorAll(".tok-group").length})`);
+ok(app.querySelectorAll(".tok-row").length === TYPE_STEPS, `(ty-tok) one row per type step (${TYPE_STEPS}) (got ${app.querySelectorAll(".tok-row").length})`);
+ok(app.querySelectorAll(".tok-group").length === VOICES, `(ty-tok) the rows are grouped by voice — ${VOICES} group headers (got ${app.querySelectorAll(".tok-group").length})`);
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}).startsWith("--type-display-lg"), `(ty-tok) the first (sticky) token name is the --type-display-lg step (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setTypeSpecMode("specimen"); flushRaf();
 ok(!!app.querySelector(".type-spec") && !app.querySelector(".tok-table"), "(ty-tok) toggling back to Specimen restores the live specimen (token table gone)");
@@ -1816,15 +1822,15 @@ app.typeMode = "compare"; app.render(); flushRaf();
   ok(cols.length === 1 + app.doc.type.modes.length, `(ty-cmp) Compare renders one column per mode — Base + ${app.doc.type.modes.length} breakpoint(s) = ${1 + app.doc.type.modes.length} (got ${cols.length})`);
   ok(!!app.querySelector(".canvas-compare") && !!app.querySelector(".compare"), "(ty-cmp) Compare uses the shared .canvas-compare / .canvas-scene.compare shell");
   ok(txtOf(app.querySelectorAll(".compare-col-label")[0] || {}) === "Base", "(ty-cmp) the first column is labelled Base");
-  // each column carries a full 33-line specimen (the override forced its mode while the scene built).
-  ok(app.querySelectorAll(".type-spec-line").length === 51 * cols.length, `(ty-cmp) every column renders the full 51-step specimen (got ${app.querySelectorAll(".type-spec-line").length} lines across ${cols.length} cols)`);
+  // each column carries a full TYPE_STEPS-line specimen (51) (the override forced its mode while the scene built).
+  ok(app.querySelectorAll(".type-spec-line").length === TYPE_STEPS * cols.length, `(ty-cmp) every column renders the full ${TYPE_STEPS}-step specimen (got ${app.querySelectorAll(".type-spec-line").length} lines across ${cols.length} cols)`);
   ok(app._typeModeOverride === null, "(ty-cmp) the transient _typeModeOverride is cleared after each column builds (never leaks)");
   // MAJOR: the inspector body-size slider edits the BASE scale in Compare (it shows Base) — not a no-op.
   app._setActiveTypeBodyBase(19); app.commitDrag?.(); flushRaf();
   ok(app.doc.type.bodyBase === 19, `(ty-cmp) the body-size slider edits doc.type.bodyBase while in Compare (got ${app.doc.type.bodyBase})`);
 }
 app.typeMode = "base"; app.render(); flushRaf();
-ok(!app.querySelector(".compare-col") && !!app.querySelector(".type-spec") && app.querySelectorAll(".type-spec-line").length === 51, "(ty-cmp) leaving Compare restores the single specimen scene");
+ok(!app.querySelector(".compare-col") && !!app.querySelector(".type-spec") && app.querySelectorAll(".type-spec-line").length === TYPE_STEPS, "(ty-cmp) leaving Compare restores the single specimen scene");
 // Compare is omitted when only Base exists (after the mode is deleted below) — asserted in (ty-cmp-omit).
 // (ty-tok-orphan) MAJOR 5 — deleting a mode STRIPS that mode's per-cell overrides (no "...|<id>" orphans
 // survive serialize→hydrate forever). Set a per-mode override, delete the mode, assert the key is gone.
@@ -1843,7 +1849,7 @@ ok(app.section === "color" && !app.querySelector(".type-spec") && !!app.querySel
 // control ramp + radius + space) on the canvas + left analysis rail + right inspector + token download ──
 app.setSection("geometry"); flushRaf();
 ok(app.section === "geometry" && !!app.querySelector(".geom-spec"), "(geo) the section switcher enters Geometry (the canvas dataset renders)");
-ok(app.querySelectorAll(".geom-spec-line").length === 6, `(geo) the canvas shows the 6-step control ramp (XS..2XL) (got ${app.querySelectorAll(".geom-spec-line").length})`);
+ok(app.querySelectorAll(".geom-spec-line").length === GEOM_SIZES, `(geo) the canvas shows the ${GEOM_SIZES}-step control ramp (XS..2XL) (got ${app.querySelectorAll(".geom-spec-line").length})`);
 // control ramp order: LARGEST → smallest (the first token in the document is the 2XL control)
 ok(txtOf(app.querySelectorAll(".geom-spec-token")[0] || {}) === "--size-2xl", `(geo) the control ramp lists largest→smallest (first token is --size-2xl, got ${txtOf(app.querySelectorAll(".geom-spec-token")[0] || {})})`);
 ok(app.querySelectorAll(".an-card").length >= 4, `(geo) the left rail shows the geometry analysis cards (got ${app.querySelectorAll(".an-card").length})`);
@@ -1870,7 +1876,7 @@ ok(bkGeo(app.doc).geometry && bkGeo(app.doc).geometry.sizes && bkGeo(app.doc).ge
 // (gsz) ramp-tab per-size HEIGHT tuning — the geometry analog of (tyv): select a size → its Height slider
 // expands; _setGeomSize writes the per-size override (the SAME store the token matrix uses) + persists; reset clears.
 app.setSection("geometry"); app.geomSegment = "ramp"; app.geomSize = null; app.render(); flushRaf();
-ok(app.querySelectorAll(".tyi-voice").length === 6 && !app.querySelector(".tyi-voice-edit"), `(gsz) the ramp tab lists the 6 sizes, none expanded by default (got ${app.querySelectorAll(".tyi-voice").length})`);
+ok(app.querySelectorAll(".tyi-voice").length === GEOM_SIZES && !app.querySelector(".tyi-voice-edit"), `(gsz) the ramp tab lists the ${GEOM_SIZES} sizes, none expanded by default (got ${app.querySelectorAll(".tyi-voice").length})`);
 app.geomSize = "MD"; app.render(); flushRaf();
 ok(!!app.querySelector(".tyi-voice-edit") && !!app.querySelector(".is-sel"), "(gsz) selecting a size expands its Height slider (is-sel + .tyi-voice-edit)");
 app._setGeomSize("MD", 52); flushRaf();
@@ -1886,7 +1892,7 @@ ok(!!app.querySelector(".tok-table") && !app.querySelector(".geom-spec"), "(geo-
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(geo-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
 ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Desktop")).length === 1 && walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 0, "(geo-tok) the base column header reads Desktop (the designed scale, the intrinsic anchor — no 'Base' column)");
 ok(app._geomTokenColumns().length === 1, "(geo-tok) base-only — exactly one column (Base) with no breakpoints");
-ok(app.querySelectorAll(".tok-row").length === 6, `(geo-tok) one row per control size (6) (got ${app.querySelectorAll(".tok-row").length})`);
+ok(app.querySelectorAll(".tok-row").length === GEOM_SIZES, `(geo-tok) one row per control size (${GEOM_SIZES}) (got ${app.querySelectorAll(".tok-row").length})`);
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}) === "--size-2xl", `(geo-tok) the first (sticky) token name is --size-2xl (largest→smallest) (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setGeomSpecMode("controls"); flushRaf();
 ok(!!app.querySelector(".geom-spec") && !app.querySelector(".tok-table"), "(geo-tok) toggling back to Controls restores the live controls scene (token table gone)");
@@ -1962,14 +1968,14 @@ app.geomMode = "compare"; app.render(); flushRaf();
   ok(cols.length === 1 + app.doc.geometry.modes.length, `(geo-cmp) Compare renders one column per mode — Base + ${app.doc.geometry.modes.length} breakpoint(s) = ${1 + app.doc.geometry.modes.length} (got ${cols.length})`);
   ok(!!app.querySelector(".canvas-compare") && !!app.querySelector(".compare"), "(geo-cmp) Compare uses the shared .canvas-compare / .canvas-scene.compare shell");
   ok(txtOf(app.querySelectorAll(".compare-col-label")[0] || {}) === "Base", "(geo-cmp) the first column is labelled Base");
-  ok(app.querySelectorAll(".geom-spec-line").length === 6 * cols.length, `(geo-cmp) every column renders the full 6-step control ramp (got ${app.querySelectorAll(".geom-spec-line").length} lines across ${cols.length} cols)`);
+  ok(app.querySelectorAll(".geom-spec-line").length === GEOM_SIZES * cols.length, `(geo-cmp) every column renders the full ${GEOM_SIZES}-step control ramp (got ${app.querySelectorAll(".geom-spec-line").length} lines across ${cols.length} cols)`);
   ok(app._geomModeOverride === null, "(geo-cmp) the transient _geomModeOverride is cleared after each column builds (never leaks)");
   // MAJOR: the inspector base-height slider edits the BASE scale in Compare (it shows Base) — not a no-op.
   app._setActiveGeomBaseHeight(40); app.commitDrag?.(); flushRaf();
   ok(app.doc.geometry.baseHeight === 40, `(geo-cmp) the base-height slider edits doc.geometry.baseHeight while in Compare (got ${app.doc.geometry.baseHeight})`);
 }
 app.geomMode = "base"; app.render(); flushRaf();
-ok(!app.querySelector(".compare-col") && !!app.querySelector(".geom-spec") && app.querySelectorAll(".geom-spec-line").length === 6, "(geo-cmp) leaving Compare restores the single controls scene");
+ok(!app.querySelector(".compare-col") && !!app.querySelector(".geom-spec") && app.querySelectorAll(".geom-spec-line").length === GEOM_SIZES, "(geo-cmp) leaving Compare restores the single controls scene");
 // (geo-tok-orphan) MAJOR 5 — deleting a mode STRIPS that mode's per-cell overrides (no orphaned "...|<id>"
 // keys survive serialize→hydrate forever). Set a per-mode override, delete the mode, assert the key is gone.
 app.setGeomTokenOverride("MD", _gbpId, 40); flushRaf();

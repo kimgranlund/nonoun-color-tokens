@@ -11,6 +11,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { CATEGORIES, CATEGORY_PRESETS, CATEGORY_VOLUMES, VOICES, TYPE_STEPS, CORE_RAMP_STOPS, GEOM_SIZES } from "../ui/counts.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
@@ -76,11 +77,11 @@ try {
 
   const el = `document.querySelector("ultimate-tokens")`;
   ok(await evalJS(`!!${el} && !!${el}.querySelector(".gallery")`), "gallery boots");
-  ok(await evalJS(`${el}.querySelectorAll(".category-card").length === 8`), "hub renders 8 category cards");
+  ok(await evalJS(`${el}.querySelectorAll(".category-card").length === ${CATEGORIES}`), `hub renders ${CATEGORIES} category cards`);
 
   await evalJS(`${el}.openCategory("travel")`, true); await sleep(1200);
-  ok(await evalJS(`${el}.category === "travel" && ${el}.querySelectorAll(".preset").length === 48`), "Travel category lazy-loads 48 palettes");
-  ok(await evalJS(`${el}.querySelectorAll(".preset-vol").length === 12`), "12 volume groups render");
+  ok(await evalJS(`${el}.category === "travel" && ${el}.querySelectorAll(".preset").length === ${CATEGORY_PRESETS}`), `Travel category lazy-loads ${CATEGORY_PRESETS} palettes`);
+  ok(await evalJS(`${el}.querySelectorAll(".preset-vol").length === ${CATEGORY_VOLUMES}`), `${CATEGORY_VOLUMES} volume groups render`);
 
   await evalJS(`${el}.closeCategory()`);
   await evalJS(`${el}.openSet(${el}.sets[0].id)`); await sleep(800);
@@ -166,9 +167,9 @@ try {
   console.log("  · screenshot → smoke-out/settings.png");
   await evalJS(`${el}.closeSettings()`); await sleep(120);
 
-  // Typography SECTION: the app-header switcher flips this.section → the full 39-step canvas specimen.
+  // Typography SECTION: the app-header switcher flips this.section → the full 51-step canvas specimen.
   await evalJS(`${el}.setSection("typography")`); await sleep(300);
-  ok(await evalJS(`(()=>{return ${el}.section==="typography" && ${el}.querySelectorAll(".type-spec-line").length===51 && ${el}.querySelectorAll(".type-spec-group").length===15})()`), "Typography section shows the full 51-step specimen (13×3 + 2×6) across the 15 named voices");
+  ok(await evalJS(`(()=>{return ${el}.section==="typography" && ${el}.querySelectorAll(".type-spec-line").length===${TYPE_STEPS} && ${el}.querySelectorAll(".type-spec-group").length===${VOICES}})()`), `Typography section shows the full ${TYPE_STEPS}-step specimen (13×3 + 2×6) across the ${VOICES} named voices`);
   ok(await evalJS(`(()=>{return !!${el}.querySelector(".tyi-voices") && ${el}.querySelectorAll(".an-card").length>=4})()`), "Typography section: right-pane inspector + left-rail analysis cards render");
   // entering the section injects the SELF-HOSTED base64 @font-face <style> (TIER 1) — no CDN, so the 4 base
   // faces render offline + in the Figma plugin (networkAccess:none).
@@ -213,7 +214,7 @@ try {
   // Geometry SECTION: the app-header switcher flips this.section → the full dimensional dataset (the 6-step
   // control ramp on the centering law + the radius + space ladders), left analysis rail + right inspector.
   await evalJS(`${el}.setSection("geometry")`); await sleep(300);
-  ok(await evalJS(`(()=>{return ${el}.section==="geometry" && ${el}.querySelectorAll(".geom-spec-line").length===6})()`), "Geometry section shows the 6-step control ramp (XS..2XL) on the canvas");
+  ok(await evalJS(`(()=>{return ${el}.section==="geometry" && ${el}.querySelectorAll(".geom-spec-line").length===${GEOM_SIZES}})()`), `Geometry section shows the ${GEOM_SIZES}-step control ramp (XS..2XL) on the canvas`);
   ok(await evalJS(`(()=>{return !!${el}.querySelector(".geom-spec .geom-shared-note") && ${el}.querySelectorAll(".an-card").length>=4 && (!!${el}.querySelector(".tyi-voices") || !!${el}.querySelector(".insp-title"))})()`), "Geometry section: left-rail analysis cards + right-pane inspector + the type-composition note render");
   ok(await evalJS(`(()=>{const b=${el}.querySelector(".geom-ctl");if(!b)return false;const r=b.getBoundingClientRect();return r.height>=18 && r.height<=80})()`), "Geometry specimen renders a real mock control box on the ramp");
   const geoShot = await send("Page.captureScreenshot", { format: "png" });
@@ -238,7 +239,7 @@ try {
   // swatch-only chips: no inline text, the palette name lives in the title (hover tooltip).
   ok(await evalJS(`(()=>{const c=${el}.querySelector(".newpal-chip");return !!c.getAttribute("title") && c.textContent.trim()===""})()`), "context chips are swatch-only (name in title)");
   // two-column previews: left = hue circle + chroma curve; right = the proposed-palette ramp.
-  ok(await evalJS(`!!${el}.querySelector(".newpal-hc svg") && ${el}.querySelectorAll(".newpal-diagram").length === 2 && ${el}.querySelector(".newpal-ramp").children.length >= 19`), "Relative tab renders hue circle + chroma curve + ramp preview");
+  ok(await evalJS(`!!${el}.querySelector(".newpal-hc svg") && ${el}.querySelectorAll(".newpal-diagram").length === 2 && ${el}.querySelector(".newpal-ramp").children.length >= ${CORE_RAMP_STOPS}`), "Relative tab renders hue circle + chroma curve + ramp preview");
   // priority order: the Dominant changes per relationship, the Primary (the anchor it pivots on) does NOT.
   const swAt = (rel) => evalJS(`(()=>{${el}.newPalRel="${rel}";${el}.render();const s=${el}.querySelectorAll(".newpal-pp-sw");return [s[0]&&s[0].getAttribute("style"), s[1]&&s[1].getAttribute("style")]})()`);
   const swAnchor = await swAt("anchor"), swContrast = await swAt("contrast");
@@ -254,7 +255,7 @@ try {
   console.log("  · screenshot → smoke-out/new-palette.png");
   // Custom tab: the picker + a live, in-place preview refresh on slider input.
   await evalJS(`(()=>{${el}.newPalTab="custom";${el}.newPalCustom={hue:300,chroma:70};${el}.render();})()`); await sleep(250);
-  ok(await evalJS(`!!${el}.querySelector(".newpal-custom") && ${el}.querySelector(".newpal-ramp").children.length >= 19`), "Custom tab shows the picker + live palette preview");
+  ok(await evalJS(`!!${el}.querySelector(".newpal-custom") && ${el}.querySelector(".newpal-ramp").children.length >= ${CORE_RAMP_STOPS}`), "Custom tab shows the picker + live palette preview");
   ok(await evalJS(`(()=>{const i=${el}.querySelector(".newpal-color-input");return !!i && i.getAttribute("type")==="color" && /^#[0-9a-fA-F]{6}$/.test(i.value)})()`), "Custom tab has a native color picker seeded from the proposed color");
   const npCustomShot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(resolve(OUT, "new-palette-custom.png"), Buffer.from(npCustomShot.data, "base64"));
