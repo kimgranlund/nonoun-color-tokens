@@ -8,6 +8,7 @@ import * as P from "../../figma/binder/bind-plan.mjs";
 import * as MAP from "../../figma/binder/mode-apply-plan.mjs";
 import * as TYPE from "../../src/engine/type.mjs";
 import * as GEOM from "../../src/engine/geometry.mjs";
+import { extractFunctionSource } from "../../figma/binder/splice-utils.mjs";
 
 const HERE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "figma", "binder"); // the binder lives in figma/binder/
 const RT = JSON.parse(readFileSync(new URL("../../docs/reference/data/role-table.json", import.meta.url), "utf8"));
@@ -215,22 +216,18 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
 {
   const FLAGSHIP_PATH = join(HERE, "..", "plugin", "code.js");
   const FLOAT_FNS = ["readFloatRegistry", "writeFloatRegistry", "ensureFloatCollection", "varsByName", "applyFloatPlans"];
-  const extractFn = (src, name) => {
-    const m = new RegExp("(?:async\\s+)?function\\s+" + name + "\\s*\\([^)]*\\)\\s*\\{").exec(src);
-    if (!m) return null;
-    let depth = 0, i = src.indexOf("{", m.index);
-    for (; i < src.length; i++) { if (src[i] === "{") depth++; else if (src[i] === "}" && --depth === 0) { i++; break; } }
-    return src.slice(m.index, i);
-  };
+  // extractFunctionSource is the SAME brace-matched extraction scripts/gen-figma-binder-code.mjs uses
+  // to splice these functions into the binder (TKT-0019) — shared from splice-utils.mjs so the
+  // generator and this tripwire can never quietly disagree on what "the same function" means.
   const norm = (code) => code.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ").trim();
   const keyLit = (src) => (/FLOAT_REGISTRY_KEY\s*=\s*("[^"]*")/.exec(src) || [])[1];
   try {
     const flagSrc = readFileSync(FLAGSHIP_PATH, "utf8");
     for (const fn of FLOAT_FNS) {
-      const a = extractFn(binderSrc, fn), b = extractFn(flagSrc, fn);
+      const a = extractFunctionSource(binderSrc, fn), b = extractFunctionSource(flagSrc, fn);
       if (!a) { FAIL("floatparity", `binder is missing ${fn}()`); continue; }
       if (!b) { FAIL("floatparity", `flagship is missing ${fn}()`); continue; }
-      if (norm(a) !== norm(b)) FAIL("floatparity", `${fn}() body drifted between the binder and the flagship (executor copies must stay byte-identical)`);
+      if (norm(a) !== norm(b)) FAIL("floatparity", `${fn}() body drifted between the binder and the flagship (executor copies must stay byte-identical — regenerate with scripts/gen-figma-binder-code.mjs)`);
     }
     if (!keyLit(binderSrc) || keyLit(binderSrc) !== keyLit(flagSrc)) FAIL("floatparity", `FLOAT_REGISTRY_KEY literal differs (binder ${keyLit(binderSrc)} vs flagship ${keyLit(flagSrc)}) — the two would not converge on one collection set`);
   } catch (e) { FAIL("floatparity", "could not load/compare the flagship executor: " + e.message); }
