@@ -383,6 +383,39 @@ Format: Context → Decision → Rationale → Consequences → Status.
   ShadCN's fixed vocabulary, Figma's all-pixel rule.
 - **Status.** DECIDED (ratified 2026-07-17; execution TKT-0011..0014).
 
+## ADR-017 — Ticket backend moves from `docs/tickets/*.md` files to GitHub Issues
+- **Context.** Since 2026-07-12 ([[tickets-workflow-adopted]]) `docs/tickets/` held every `kind:
+  bug`/`kind: feature` TICKET, minted by scribe's `/bug-report`/`/feature`, frontmatter carrying
+  `status`/`size`. By 2026-07-17 the store had grown to 30 files (TKT-0001..0030), 18 still open
+  (TKT-0004, TKT-0013..TKT-0030) — a plain-file backlog living only inside this repo, invisible to
+  GitHub's own issue search/labels/assignment/notifications, and duplicating machinery (`status:`,
+  `size:`) that Issues already provide natively (open/closed state, labels). The repo already ships
+  through GitHub (PRs, CI, `gh pr merge`) and `gh` is authenticated with `repo` scope — the
+  git-native backend scribe's `/bug-report`/`/feature` support out of the box was simply never
+  switched on here.
+- **Decision.** New bugs/features/issues route to **GitHub Issues** via `gh issue create`, not new
+  `docs/tickets/*.md` files. The payload contract is unchanged (Summary/Acceptance/Links/Scope-
+  Open/Findings as `##` sections); `kind:bug`/`kind:feature` + `size:small`/`size:big` labels
+  replace the frontmatter fields as the machine-read surface. `docs/tickets/` freezes as the
+  pre-2026-07-17 archive — its 12 already-`done` files stay put as historical record; its 18 open
+  files migrate to Issues (`TKT-0031`) rather than continuing to accrue alongside a second store.
+  CLAUDE.md's Layout section carries the routing-table row scribe's own intake Phase 0 reads to
+  detect this ruling.
+- **Rationale.** One live backlog beats two: a file-and-Issue split would silently fork "what's
+  open" across two places with no cross-link, and every future `/bug-report`/`/feature` run would
+  have to re-decide the backend from scratch without a durable ruling to read. GitHub's native
+  open/closed + labels + search subsumes the frontmatter `status:`/`size:` fields at zero added
+  maintenance, and surfaces the backlog to collaborators who don't have this repo's `docs/`
+  conventions loaded.
+- **Consequences.** Every consumer of the old file contract updates once: `project-docs`
+  (routes doc-shaped "what's open" questions — now split pre/post-2026-07-17), any script reading
+  `docs/tickets/*.md` frontmatter (none found outside the skill's own intake at ratification time —
+  reverify at TKT-0031), and this repo's own muscle memory ("check `docs/tickets/` for open work"
+  becomes "check `gh issue list`"). No file-format migration risk: Issues are created fresh from
+  each file's existing Summary/Acceptance/Links/Scope-Open text, not parsed/transformed
+  mechanically.
+- **Status.** DECIDED (ratified 2026-07-17; migration execution `TKT-0031`).
+
 ## Quick map: decisions an enhancing agent is most likely to "fix" (don't)
 | ADR | Looks wrong because… | But it's intentional because… |
 |-----|----------------------|-------------------------------|
