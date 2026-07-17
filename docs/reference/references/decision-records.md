@@ -508,6 +508,56 @@ Format: Context → Decision → Rationale → Consequences → Status.
   axis and the standalone binder's live-mode creation the same way, if/when a real 3rd-theme ask
   lands (tracked informally here, not yet a filed ticket).
 
+## ADR-020 — `bundle.mjs` stays the single-file inliner; vite is not byte-comparable and not adopted
+- **Context.** `scripts/bundle.mjs` is a hand-rolled regex import-transformer with manually-synced
+  `MODS`/`KEY` module registries and a documented no-default-export limitation. `vite` is already a
+  devDependency (it builds the real web app from `index.html`/`src/ui/index.html`). TKT-0028 was a
+  time-boxed spike asking whether vite's own single-file build capability could replace
+  `bundle.mjs` for the Figma-sandbox-embeddable bundle, with the acceptance bar stated explicitly
+  as **"adopt only on byte-comparable output."**
+- **Decision.** Keep `bundle.mjs`. Do not adopt vite for this artifact. Instead, harden
+  `bundle.mjs` with a `preflight()` whole-graph scan (below) that runs before any transform.
+- **Rationale.** A real vite build was attempted: a JS entry (`import "./styles.css"; import
+  "./app.js";`) built in `lib` mode with `rollupOptions.output.inlineDynamicImports: true` and
+  `cssCodeSplit: false` (vite 8.0.16, rolldown-powered) DOES fold every dynamic `import()` — the
+  category-module lazy chunks — into one chunk with no runtime module resolution, which is the
+  actual hard constraint (the Figma UI iframe has no module server to satisfy a real `import()`).
+  So vite *can* produce a working single-file bundle mechanically. But the acceptance bar is byte
+  parity, not "also works": vite/rolldown's output carries its own module-runtime prelude
+  (`rolldown/runtime.js`'s `__esmMin`/`__exportAll` helpers) and a completely different code shape
+  from `bundle.mjs`'s naive source concatenation, so byte-identical output is categorically
+  unreachable — not a tuning problem, a different tool. Measured on the SAME source tree: the
+  current `bundle.mjs` output (CSS + JS + HTML shell, unminified by construction) is **2832.8 KB**.
+  The vite build's JS+CSS alone (unminified) is **~3397.9 KB** (3301.15 KB JS + 96.75 KB CSS) —
+  **~20% larger before even adding an HTML shell**, and minifying the JS barely helps (3039.62 KB,
+  only ~8% smaller) because most of this artifact's bytes are inert DATA embedded as JS/JSON
+  string literals (the ~343 curated palettes, the base64-embedded self-hosted fonts, the whole
+  Figma binder `code.js` and MCP server source carried as string constants for download) — a
+  minifier cannot compress opaque string payloads the way it compresses logic. So switching
+  bundlers would be a straight ~20% size regression on a downloadable offline single-file build
+  and the Figma plugin's embedded UI, for a documented limitation (`export default`) that a repo
+  grep confirms **zero current files trigger** — a latent risk, not an active one.
+- **Consequences.** `bundle.mjs`'s `MODS`/`KEY` registries stay hand-maintained; every new module
+  in the import graph still needs an entry in both (unchanged going forward — `adding-export-formats`/
+  `building-editor-sections` and similar skills that touch these registries are unaffected). In
+  exchange, `scripts/bundle.mjs` gained a `preflight()` function that runs before any transform and
+  reports EVERY registry problem in one itemized error instead of dying on the first: (a) a `KEY`
+  entry pointing at a `MODS` key that doesn't exist — previously this destructured `__M.<key>` as
+  `undefined` and only threw in the **browser**, on whatever click path first reached it; (b) two
+  `MODS` entries sharing a basename in different directories — `KEY` is keyed by basename only, so
+  this silently resolved every importer to whichever one the object literal's last-key-wins landed
+  on, with **no error at all**; (c) the existing per-import/`export default` check, now run
+  up front across the WHOLE graph (every problem reported, not just the first file the assembly
+  loop happens to reach) with source-file context on each line. Verified: `npm test` and
+  `npm run build` green with byte-identical `dist/ultimate-tokens.html` (2832.8 KB) and
+  `figma/plugin/ui.html` (2835.8 KB) output before/after the hardening; `npm run smoke` (real
+  headless Chrome, TKT-0028's own verification bar for the Figma-embeddable bundle) green end to
+  end, including the Apply-to-Figma consent gate.
+- **Status.** DECIDED (ratified 2026-07-17; TKT-0028, a spike — no follow-up work implied). If a
+  future change genuinely needs a default export, or vite gains a mode that reproduces
+  `bundle.mjs`'s concatenation shape (no module-runtime prelude) at comparable size, this ADR is
+  the record to revisit, not to silently override.
+
 ## Quick map: decisions an enhancing agent is most likely to "fix" (don't)
 | ADR | Looks wrong because… | But it's intentional because… |
 |-----|----------------------|-------------------------------|
@@ -520,3 +570,4 @@ Format: Context → Decision → Rationale → Consequences → Status.
 | ADR-014 | a pre-rename `.fig` loses its embedded config, and no migration was written | `setPluginData` is namespaced per plugin id — the old keys are unreadable from the new id; a migration cannot exist |
 | ADR-015 | the product has no maker, no logo, and support points at an issue tracker | deliberate: the maker brand was retired; `test/repo/branding.mjs` fails the build if it returns |
 | ADR-018 | `role-table.json` isn't generated from `semantic.js` like the Figma binder's role table now is (TKT-0019) | it's a deliberate independent answer key; generating it would make the `refs-canonical` gate tautological |
+| ADR-020 | `scripts/bundle.mjs` still hand-rolls import transforms though `vite` is already a devDependency | measured: vite's single-file output is ~20% LARGER (rolldown runtime prelude + a data-heavy artifact minification barely shrinks) and can't be byte-comparable — the spike's own acceptance bar ruled it out |

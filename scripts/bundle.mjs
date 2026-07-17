@@ -54,12 +54,72 @@ const KEY = { "hct.js": "hct", "okhsl.js": "okhsl", "semantic.js": "semantic", "
   "drawer.js": "drawerMixin", "apply-gate.js": "applyGateMixin", "settings.js": "settingsMixin",
   ...Object.fromEntries(CATEGORY_FILES.map((f) => [f, categoryKey(f)])) };
 
+// Shared by preflight() (a read-only whole-graph scan that runs BEFORE any transform/assembly) and
+// transform() (the actual rewrite) — one copy of each regex, so a syntax the scanner learns to
+// recognize can't drift from what the transform recognizes (TKT-0028: see the preflight() comment).
+const STATIC_IMPORT_RE = /import\s+(\{[\s\S]*?\}|\*\s+as\s+[A-Za-z0-9_$]+)\s+from\s+["']([^"']+)["'];?/g;
+const DYNAMIC_IMPORT_RE = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
+
+// preflight() — TKT-0028 (the vite-vs-bundle.mjs spike; verdict: keep bundle.mjs, harden it here).
+// Before this, an unregistered import surfaced as a single `throw` wherever the transform loop
+// happened to reach it first — no file context, one problem at a time, and two other gaps had NO
+// check at all: (a) a KEY entry pointing at a MODS key that doesn't exist (typo'd during a rename)
+// destructures `__M.<key>` as undefined, which only throws in the BROWSER, on whatever click path
+// first touches it; (b) KEY is keyed by basename only, so two MODS entries sharing a basename in
+// different directories silently collide — no error at all, just the wrong module resolved at
+// runtime. This scan reads every MODS file once, up front, and reports every problem it finds in
+// ONE itemized error before a single line of output is assembled.
+function preflight() {
+  const problems = [];
+  const modsKeys = new Set(MODS.map(([k]) => k));
+
+  // (a) KEY -> MODS: every KEY value must be a real MODS key.
+  for (const [basename, key] of Object.entries(KEY)) {
+    if (!modsKeys.has(key)) problems.push(`KEY["${basename}"] -> "${key}" has no matching MODS entry (add ["${key}", "<path>"] to MODS, or fix the KEY typo)`);
+  }
+
+  // (b) basename collisions across MODS entries (KEY can only resolve one of them).
+  const byBasename = new Map();
+  for (const [key, rel] of MODS) {
+    const base = rel.split("/").pop();
+    if (!byBasename.has(base)) byBasename.set(base, []);
+    byBasename.get(base).push(key);
+  }
+  for (const [base, keys] of byBasename) {
+    if (keys.length > 1) problems.push(`basename collision: "${base}" is registered under ${keys.length} different MODS keys (${keys.join(", ")}) — KEY["${base}"] can only point at one, so imports of the others resolve to the wrong module`);
+  }
+
+  // (c) every static/dynamic import in every MODS-listed file resolves via KEY; no `export default`
+  // (unsupported by this inliner — it would leak into the module IIFE as a syntax error and only
+  // surface in the Chrome smoke leg otherwise). A MODS entry with a typo'd/stale path is ALSO a
+  // registry problem, not a raw ENOENT stack trace — report it the same way and move on so one bad
+  // path doesn't hide every other problem this scan would otherwise have found.
+  for (const [key, rel] of MODS) {
+    let src;
+    try {
+      src = readFileSync(`${ROOT}/${rel}`, "utf8");
+    } catch (e) {
+      problems.push(`MODS["${key}"] -> "${rel}" could not be read (${e.code || e.message}) — fix the path in MODS`);
+      continue;
+    }
+    for (const m of src.matchAll(STATIC_IMPORT_RE)) {
+      if (!KEY[m[2].split("/").pop()]) problems.push(`${rel}: import path "${m[2]}" is not registered in KEY (and its module, if new, is not in MODS)`);
+    }
+    for (const m of src.matchAll(DYNAMIC_IMPORT_RE)) {
+      if (!KEY[m[1].split("/").pop()]) problems.push(`${rel}: dynamic import("${m[1]}") is not registered in KEY (and its module, if new, is not in MODS)`);
+    }
+    if (/^export\s+default\b/m.test(src)) problems.push(`${rel}: uses "export default" — not supported by this single-file inliner, use a named export instead`);
+  }
+
+  if (problems.length) throw new Error(`bundle.mjs preflight found ${problems.length} registry problem${problems.length === 1 ? "" : "s"} — fix these (see the MODS/KEY comment in scripts/bundle.mjs) before bundling:\n` + problems.map((p) => "  - " + p).join("\n"));
+}
+
 function transform(src) {
   const names = new Set();
-  // rewrite imports (multi-line aware) -> destructure from the registry
-  src = src.replace(/import\s+(\{[\s\S]*?\}|\*\s+as\s+[A-Za-z0-9_$]+)\s+from\s+["']([^"']+)["'];?/g, (_, what, path) => {
+  // rewrite imports (multi-line aware) -> destructure from the registry. preflight() already proved
+  // every path here resolves, so no re-check is needed on this pass.
+  src = src.replace(STATIC_IMPORT_RE, (_, what, path) => {
     const key = KEY[path.split("/").pop()];
-    if (!key) throw new Error("unknown import path " + path);
     if (what.startsWith("*")) return `const ${what.split(/\s+as\s+/)[1]} = __M.${key};`;
     const inner = what.replace(/[{}]/g, "").split(",").map((s) => s.trim()).filter(Boolean)
       .map((s) => s.includes(" as ") ? s.replace(/\s+as\s+/, ": ") : s).join(", ");
@@ -67,20 +127,15 @@ function transform(src) {
   });
   // rewrite DYNAMIC import("./categories/<slug>.js") -> a synchronous registry resolve. The single-file
   // offline bundle has no module server, so each lazy category chunk is inlined into __M and resolved here.
-  src = src.replace(/\bimport\(\s*["']([^"']+)["']\s*\)/g, (_, path) => {
-    const key = KEY[path.split("/").pop()];
-    if (!key) throw new Error("unknown dynamic import path " + path);
-    return `Promise.resolve(__M.${key})`;
-  });
-  // `export default` is NOT supported by this naive inliner — it would leak into the module IIFE as a
-  // syntax error and only surface in the Chrome smoke leg. Fail loudly at bundle time instead.
-  if (/^export\s+default\b/m.test(src)) throw new Error("export default is not supported by the single-file bundler — use a named export");
+  src = src.replace(DYNAMIC_IMPORT_RE, (_, path) => `Promise.resolve(__M.${KEY[path.split("/").pop()]})`);
   // collect + strip declaration exports
   src = src.replace(/^export\s+(async\s+function|function|const|let|var|class)\s+([A-Za-z0-9_$]+)/gm, (_, kind, name) => { names.add(name); return `${kind} ${name}`; });
   // collect + strip list exports  (export { a, b as c };)
   src = src.replace(/^export\s*\{([^}]*)\};?\s*$/gm, (_, list) => { list.split(",").map((s) => s.trim()).filter(Boolean).forEach((s) => names.add((s.split(/\s+as\s+/)[1] || s).trim())); return ""; });
   return { src, names: [...names] };
 }
+
+preflight();
 
 let out = "const __M = {};\n";
 for (const [key, rel] of MODS) {
