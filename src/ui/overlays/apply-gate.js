@@ -21,6 +21,10 @@ export class ApplyGateMixinImpl {
   // variables first" road-block (explicit consent + destructive-overwrite warning) before touching
   // the file. Normal apply is cookieable ("don't show again"); the destructive Regroup ALWAYS warns.
   requestApplyToFigma(rebuild = false) {
+    // TKT-0004: belt-and-suspenders re-entry guard — the disabled Apply/Regroup buttons (drawer.js)
+    // are the primary defense, but this closes every OTHER path (a direct call, a future affordance)
+    // while an apply is already in flight, not just the two trigger buttons.
+    if (this._applyBusy) return;
     if (!rebuild && this._applyConsented()) { this.applyToFigma(false); return; }
     this.applyGateRebuild = !!rebuild;
     this.applyGateDontShow = false;
@@ -58,6 +62,7 @@ export class ApplyGateMixinImpl {
     // rebuild = the opt-in "Regroup" path: re-create the Color Semantic collection so it adopts the
     // canonical grouped order (Figma keeps existing variables' positions on a normal update). It
     // re-creates the semantic variables — bound layers detach (warned in the apply gate).
+    if (this._applyBusy) return; // TKT-0004: the final backstop — never post a second concurrent apply
     try {
       // Apply respects the SAME export-system opt-in as Download-All (this.exportSystems): a toggled-off
       // system is NOT written to the file. Color omits `dtcg` (code.js then skips the color collections);
@@ -87,6 +92,12 @@ export class ApplyGateMixinImpl {
         }
       }
       parent.postMessage({ pluginMessage: msg }, "*");
+      // TKT-0004: the PERSISTENT busy state — set the moment "apply" is posted, cleared only by
+      // onApplyDone/onApplyError (the real completion signal; this toast below is only optimistic).
+      // render() reflects it as the .apply-busy host indicator (styles.css) AND disables the
+      // Apply/Regroup trigger (drawer.js), closing the double-submit gap a transient toast alone left open.
+      this._applyBusy = true;
+      this.render();
       // Optimistic "in progress" toast; the sandbox posts {apply-done} back when the write actually completes
       // (→ onApplyDone → a "done" toast), or {apply-error} on failure (→ onApplyError). See the ui.html bridge.
       this.toast(rebuild ? "Regrouping Color Semantic…" : "Applying to Figma…");
@@ -102,6 +113,8 @@ export class ApplyGateMixinImpl {
     const n = (m && (Number(m.raw) || 0) + (Number(m.semantic) || 0) + (Number(m.floatVars) || 0)) || 0;
     const st = (m && (Number(m.paintStyles) || 0) + (Number(m.textStyles) || 0)) || 0;
     this.applyGateOpen = false; // defensive: never leave the gate open past completion
+    this._applyBusy = false; // TKT-0004: the operation is over — clear the persistent busy state
+    this.render(); // reflect both of the above (re-enables the trigger, clears the busy indicator) + rebuild toastEl
     const varsPart = n ? `${n} variable${n === 1 ? "" : "s"}` : "";
     const stylesPart = st ? `${st} style swatch${st === 1 ? "" : "es"}` : "";
     const what = [varsPart, stylesPart].filter(Boolean).join(" + ");
@@ -116,6 +129,8 @@ export class ApplyGateMixinImpl {
   }
 
   onApplyError() {
+    this._applyBusy = false; // TKT-0004: clear the persistent busy state on failure too (the toast still carries the error detail)
+    this.render();
     this.toast("Couldn't apply to Figma — please try again.");
   }
 

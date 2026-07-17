@@ -114,6 +114,56 @@ ultimate-tokens[data-motion="reduced"] *::after {
   }
 }
 
+/* TKT-0004 — Apply-to-Figma busy state: a PERSISTENT, INDETERMINATE indicator for the real,
+   unbounded duration of an in-flight apply (from the "apply" postMessage until apply-done/
+   apply-error — see app.js's applyToFigma/onApplyDone/onApplyError), closing the gap a transient
+   toast alone left once its timeout passed. `.apply-busy` is set on the HOST element AND (render())
+   the open export `.drawer` <dialog> — never in the web-app preview build (Figma-plugin-embed only,
+   gated by `this.inFigma`). TWO rings, not one: the Apply/Regroup triggers live INSIDE the drawer,
+   a native <dialog> promoted to the browser's TOP LAYER by showModal() — a `position:fixed` ring on
+   the host alone would render BELOW that top layer (dialog + its ::backdrop always paint above
+   normal stacking, no z-index escapes it), so while the drawer is open the host ring would sit
+   behind the drawer panel/dim behind its backdrop. The drawer-scoped ring below solves that by
+   being framed to the dialog's OWN box (already in the top layer, so no stacking fight) — the host
+   ring still matters if the drawer gets closed mid-apply (nothing else prevents that). Both use the
+   SAME gradient-mask technique (padding + mask-composite:exclude, not `border`/`outline`, so neither
+   affects box geometry) for a real 6px INSET frame with a looping background-position sweep. */
+ultimate-tokens.apply-busy::after,
+dialog.drawer.apply-busy::after {
+  content: "";
+  inset: 0;
+  padding: 6px;
+  pointer-events: none;
+  z-index: 999;
+  background: linear-gradient(120deg, var(--accent), var(--ok), var(--accent));
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: apply-busy-sweep 2.4s linear infinite;
+}
+ultimate-tokens.apply-busy::after { position: fixed; } /* frames the whole plugin viewport */
+dialog.drawer.apply-busy::after { position: absolute; } /* frames the drawer's OWN box (dialog.drawer is already position:fixed, so this is relative to it) */
+@keyframes apply-busy-sweep {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+/* `ultimate-tokens[data-motion="reduced"] *::after` (above) is a DESCENDANT selector — `*` can never
+   match the HOST element's own pseudo-element (an element is not its own descendant), so it silently
+   never reaches `ultimate-tokens.apply-busy::after` itself. (`dialog.drawer.apply-busy::after` IS a
+   real descendant of the host, so that ring is already covered by the existing rule above — no gap
+   there.) This explicit, self-targeting pair closes that gap for the host-level ring. */
+ultimate-tokens[data-motion="reduced"].apply-busy::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  ultimate-tokens[data-motion="system"].apply-busy::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 /* Hidden scrollbars — content still scrolls; the bar is just not painted. Keeps the
    chrome clean and avoids the bright native scrollbar in a Figma plugin iframe. */
 * { scrollbar-width: none; }                    /* Firefox / modern */
@@ -13976,7 +14026,8 @@ class DrawerMixinImpl {
         this.inFigma
           ? btn([icon("arrows-clockwise"), "Regroup"], {
               cls: "figma-regroup",
-              title: "Rebuild the Color Semantic variables in grouped order (regular · containers · surfaces · scrims). Re-creates them, so layers bound to them will need reconnecting. Color Primitives are untouched.",
+              title: this._applyBusy ? "Applying…" : "Rebuild the Color Semantic variables in grouped order (regular · containers · surfaces · scrims). Re-creates them, so layers bound to them will need reconnecting. Color Primitives are untouched.",
+              disabled: !!this._applyBusy, // TKT-0004: no double-firing a second apply while one is in flight
               onclick: () => this.requestApplyToFigma(true),
             })
           : false,
@@ -14028,7 +14079,8 @@ class DrawerMixinImpl {
           ? btn([icon("flag"), "Apply Variables"], {
               variant: "primary",
               cls: "figma-apply",
-              title: "Create/update the Color Primitives + Color Semantic (Light/Dark) variable collections directly in this Figma file",
+              title: this._applyBusy ? "Applying…" : "Create/update the Color Primitives + Color Semantic (Light/Dark) variable collections directly in this Figma file",
+              disabled: !!this._applyBusy, // TKT-0004: no double-firing a second apply while one is in flight
               onclick: () => this.requestApplyToFigma(),
             })
           : false,
@@ -14265,6 +14317,10 @@ class ApplyGateMixinImpl {
   // variables first" road-block (explicit consent + destructive-overwrite warning) before touching
   // the file. Normal apply is cookieable ("don't show again"); the destructive Regroup ALWAYS warns.
   requestApplyToFigma(rebuild = false) {
+    // TKT-0004: belt-and-suspenders re-entry guard — the disabled Apply/Regroup buttons (drawer.js)
+    // are the primary defense, but this closes every OTHER path (a direct call, a future affordance)
+    // while an apply is already in flight, not just the two trigger buttons.
+    if (this._applyBusy) return;
     if (!rebuild && this._applyConsented()) { this.applyToFigma(false); return; }
     this.applyGateRebuild = !!rebuild;
     this.applyGateDontShow = false;
@@ -14302,6 +14358,7 @@ class ApplyGateMixinImpl {
     // rebuild = the opt-in "Regroup" path: re-create the Color Semantic collection so it adopts the
     // canonical grouped order (Figma keeps existing variables' positions on a normal update). It
     // re-creates the semantic variables — bound layers detach (warned in the apply gate).
+    if (this._applyBusy) return; // TKT-0004: the final backstop — never post a second concurrent apply
     try {
       // Apply respects the SAME export-system opt-in as Download-All (this.exportSystems): a toggled-off
       // system is NOT written to the file. Color omits `dtcg` (code.js then skips the color collections);
@@ -14331,6 +14388,12 @@ class ApplyGateMixinImpl {
         }
       }
       parent.postMessage({ pluginMessage: msg }, "*");
+      // TKT-0004: the PERSISTENT busy state — set the moment "apply" is posted, cleared only by
+      // onApplyDone/onApplyError (the real completion signal; this toast below is only optimistic).
+      // render() reflects it as the .apply-busy host indicator (styles.css) AND disables the
+      // Apply/Regroup trigger (drawer.js), closing the double-submit gap a transient toast alone left open.
+      this._applyBusy = true;
+      this.render();
       // Optimistic "in progress" toast; the sandbox posts {apply-done} back when the write actually completes
       // (→ onApplyDone → a "done" toast), or {apply-error} on failure (→ onApplyError). See the ui.html bridge.
       this.toast(rebuild ? "Regrouping Color Semantic…" : "Applying to Figma…");
@@ -14346,6 +14409,8 @@ class ApplyGateMixinImpl {
     const n = (m && (Number(m.raw) || 0) + (Number(m.semantic) || 0) + (Number(m.floatVars) || 0)) || 0;
     const st = (m && (Number(m.paintStyles) || 0) + (Number(m.textStyles) || 0)) || 0;
     this.applyGateOpen = false; // defensive: never leave the gate open past completion
+    this._applyBusy = false; // TKT-0004: the operation is over — clear the persistent busy state
+    this.render(); // reflect both of the above (re-enables the trigger, clears the busy indicator) + rebuild toastEl
     const varsPart = n ? `${n} variable${n === 1 ? "" : "s"}` : "";
     const stylesPart = st ? `${st} style swatch${st === 1 ? "" : "es"}` : "";
     const what = [varsPart, stylesPart].filter(Boolean).join(" + ");
@@ -14360,6 +14425,8 @@ class ApplyGateMixinImpl {
   }
 
   onApplyError() {
+    this._applyBusy = false; // TKT-0004: clear the persistent busy state on failure too (the toast still carries the error detail)
+    this.render();
     this.toast("Couldn't apply to Figma — please try again.");
   }
 
@@ -15201,6 +15268,11 @@ class HctApp extends HTMLElement {
     this.applyGateOpen = false;
     this.applyGateRebuild = false; // the pending action: false = apply, true = regroup
     this.applyGateDontShow = false; // the "don't show again" checkbox (transient, reset on open)
+    // TKT-0004: persistent busy state for the SAME apply — true from the moment "apply" is posted
+    // until apply-done/apply-error replies (see applyToFigma/onApplyDone/onApplyError). Drives the
+    // .apply-busy host class (styles.css — an indeterminate, motion-safe indicator) AND disables the
+    // Apply/Regroup trigger (drawer.js) so a slow apply can't be double-fired.
+    this._applyBusy = false;
     this.settingsOpen = false; // the Settings page (token-mapping + app prefs)
     this.settingsSection = "mapping"; // which Settings nav item is active (left-nav page layout)
     this.geomSpecMode = "controls"; // geometry canvas: controls (live mock controls on the ramp) | tokens (editable token matrix: Base + breakpoints) — geom-section sub-state
@@ -15588,6 +15660,17 @@ class HctApp extends HTMLElement {
     this.replaceChildren(this.view === "gallery" ? this.renderGallery() : this.renderEditor());
     this.dataset.theme = this.theme;
     this.dataset.motion = this.motion; // styles.css gates transitions/animations on [data-motion]
+    // TKT-0004: the Apply-to-Figma busy indicator — Figma-plugin-embed only (the web-app preview has
+    // no Apply-to-Figma action, so this is never set there even if _applyBusy were somehow true).
+    // ALSO stamped on the open export .drawer <dialog>: it's a native top-layer dialog (showModal()),
+    // which paints above the host's own fixed-position ring regardless of z-index — the Apply/Regroup
+    // triggers live inside it, so the drawer needs its OWN ring to stay visible while it's open
+    // (styles.css's dialog.drawer.apply-busy::after). Harmless no-op while the drawer is closed
+    // (querySelector finds nothing to mark).
+    const applyBusyNow = !!(this.inFigma && this._applyBusy);
+    this.classList.toggle("apply-busy", applyBusyNow);
+    const drawerEl = this.querySelector(".drawer");
+    if (drawerEl) drawerEl.classList.toggle("apply-busy", applyBusyNow);
     // The app-footer renders an empty shell with stable hooks; paint its dynamic
     // readouts now (the same path liveRefresh uses during a drag).
     if (this.view === "editor") this.paintAppFooter(this._view);

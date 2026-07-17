@@ -99,6 +99,56 @@ ultimate-tokens[data-motion="reduced"] *::after {
   }
 }
 
+/* TKT-0004 — Apply-to-Figma busy state: a PERSISTENT, INDETERMINATE indicator for the real,
+   unbounded duration of an in-flight apply (from the "apply" postMessage until apply-done/
+   apply-error — see app.js's applyToFigma/onApplyDone/onApplyError), closing the gap a transient
+   toast alone left once its timeout passed. `.apply-busy` is set on the HOST element AND (render())
+   the open export `.drawer` <dialog> — never in the web-app preview build (Figma-plugin-embed only,
+   gated by `this.inFigma`). TWO rings, not one: the Apply/Regroup triggers live INSIDE the drawer,
+   a native <dialog> promoted to the browser's TOP LAYER by showModal() — a `position:fixed` ring on
+   the host alone would render BELOW that top layer (dialog + its ::backdrop always paint above
+   normal stacking, no z-index escapes it), so while the drawer is open the host ring would sit
+   behind the drawer panel/dim behind its backdrop. The drawer-scoped ring below solves that by
+   being framed to the dialog's OWN box (already in the top layer, so no stacking fight) — the host
+   ring still matters if the drawer gets closed mid-apply (nothing else prevents that). Both use the
+   SAME gradient-mask technique (padding + mask-composite:exclude, not `border`/`outline`, so neither
+   affects box geometry) for a real 6px INSET frame with a looping background-position sweep. */
+ultimate-tokens.apply-busy::after,
+dialog.drawer.apply-busy::after {
+  content: "";
+  inset: 0;
+  padding: 6px;
+  pointer-events: none;
+  z-index: 999;
+  background: linear-gradient(120deg, var(--accent), var(--ok), var(--accent));
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: apply-busy-sweep 2.4s linear infinite;
+}
+ultimate-tokens.apply-busy::after { position: fixed; } /* frames the whole plugin viewport */
+dialog.drawer.apply-busy::after { position: absolute; } /* frames the drawer's OWN box (dialog.drawer is already position:fixed, so this is relative to it) */
+@keyframes apply-busy-sweep {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+/* `ultimate-tokens[data-motion="reduced"] *::after` (above) is a DESCENDANT selector — `*` can never
+   match the HOST element's own pseudo-element (an element is not its own descendant), so it silently
+   never reaches `ultimate-tokens.apply-busy::after` itself. (`dialog.drawer.apply-busy::after` IS a
+   real descendant of the host, so that ring is already covered by the existing rule above — no gap
+   there.) This explicit, self-targeting pair closes that gap for the host-level ring. */
+ultimate-tokens[data-motion="reduced"].apply-busy::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  ultimate-tokens[data-motion="system"].apply-busy::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 /* Hidden scrollbars — content still scrolls; the bar is just not painted. Keeps the
    chrome clean and avoids the bright native scrollbar in a Figma plugin iframe. */
 * { scrollbar-width: none; }                    /* Firefox / modern */
