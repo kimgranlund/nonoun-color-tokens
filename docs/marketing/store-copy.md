@@ -137,7 +137,7 @@ rest of the body to begin after it so the card truncates on a complete thought
 > Ship the whole kit without a hand-off: **CSS custom properties**, **W3C design tokens (DTCG)**,
 > **Tailwind**, and **shadcn** — under your own naming, whether that's the default, a Material 3-style
 > `--md-sys-*` root, or a `--{brand}-*` prefix your codebase already uses. Bind it to **Figma variables** —
-> Color Primitives and Color Modes, aliased so a raw-color edit cascades to every role — with **style
+> Color Primitives and Color Semantic, aliased so a raw-color edit cascades to every role — with **style
 > swatches** bound to those variables: a paint style per semantic role, a text style per type step, each
 > tracking Light and Dark automatically. Or serve it to your
 > AI coding agents over **MCP**, so they build with your exact tokens instead of guessing a hex; the free

@@ -156,9 +156,10 @@ Figma DTCG 3-file zip (resolved colors, ADR-002), UI3 Collections (interchange-o
 ADR-007/OD-003), Tailwind v4, and ShadCN (a curated subset, not all roles). Padding via `pad3`/`refKey` (ADR-006).
 
 ## 10. Figma Plugin 📐
-See `references/knowledge-05-figma-plugin.md`. Binds the `Color Modes` collection to `Color Primitives`
-by `createVariableAlias` for a true cascade JSON import cannot provide (ADR-002). Same role
-table as the generator (parity). (Collections renamed from `semantic-colors` / `raw-colors`.)
+See `references/knowledge-05-figma-plugin.md`. Binds the `Color Semantic` collection (ADR-016; was
+`Color Modes`) to `Color Primitives` by `createVariableAlias` for a true cascade JSON import cannot
+provide (ADR-002). Same role table as the generator (parity). (Collections renamed from
+`semantic-colors` / `raw-colors`, then `Color Modes` → `Color Semantic`.)
 
 ## 11. UI / Interaction 📐
 A **gallery** hub (Your Palettes + **Color Categories** — 7 curated categories × 48 = 336 presets,

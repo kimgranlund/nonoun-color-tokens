@@ -1,5 +1,5 @@
 // style-plan.mjs — the PURE, testable planner for the Figma STYLES swatches (paint styles bound to the
-// Color Modes variables; text styles bound to the Geometry (type/) + Font Primitives variables). The third
+// Color Semantic variables; text styles bound to the Breakpoints (type/) + Font Primitives variables). The third
 // planner sibling: bind-plan.mjs plans the color alias cascade, mode-apply-plan.mjs plans the moded
 // float collections, THIS plans the styles layer that sits on top of both. No `figma` calls here —
 // `figma/plugin/code.js#applyStylePlans` executes the plan verbatim (the executor is dumb by design).
@@ -12,7 +12,7 @@
 //
 // OUTPUT — stylePlans({ families, scale, include }) → { paints, texts }:
 //   paints: [{ name: "Primary/onPrimary" | "Primary/scrims/scrim" | "Primary/surfaces/surface",
-//              varName: "primary/onPrimary" }]                   // → Color Modes variable, ratified grouping:
+//              varName: "primary/onPrimary" }]                   // → Color Semantic variable, ratified grouping:
 //                                                                //   scrim* → scrims/ · surface*|container* → surfaces/
 //   texts:  [{ name: "Display/lg" (voice explicitly opted OUT of siblings via weights:[] — bare) |
 //                     "Display/lg/heavier •" (core, siblings exist — dot-SUFFIXED, lowercase; the
@@ -35,7 +35,7 @@
 //                     token, so it consistently means "the default in this list" regardless of what
 //                     precedes it),
 //              voice, step,
-//              bind:    { fontSize, lineHeight, letterSpacing,   // → Geometry collection type/ keys (TKT-0009)
+//              bind:    { fontSize, lineHeight, letterSpacing,   // → Breakpoints collection type/ keys (TKT-0009)
 //                         paragraphSpacing?,                     //   (prose voices only)
 //                         fontFamily,                            // → Font Primitives font/<voice> (STRING alias)
 //                         fontStyle? | fontWeight? },            // → weight-style/<voice>/<slug> OR
