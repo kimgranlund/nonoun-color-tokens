@@ -65,6 +65,12 @@ const clean = (s) =>
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n))
     .replace(/\s+/g, " ").trim();
 const oklchOf = (s) => String(s || "").trim().split(/\s+/).map(Number);
+// r4 — stable 4-decimal rounding for every EMITTED oklch component. Derived values (deriveNeutral's
+// circular-mean hue) are raw doubles whose last ulp differs across V8/Node versions; unrounded, that
+// version noise lands in COMMITTED artifacts and trips CI's generated-artifact drift gate (TKT-0011
+// found it live: hue 82.17507227608866 vs ...886 between Node 22.14 and CI's 22.x). 1e-4 is far below
+// any perceptual threshold.
+const r4 = (v) => Number(Number(v).toFixed(4));
 
 // tidyVolumeTitle — the source h1s lead with the redundant "Four palettes from …" count (the tile
 // strip already shows the count). Strip that lead-in, capitalize, and drop the trailing period so a
@@ -99,7 +105,7 @@ const palette = (name, hex, oklch, sw) => {
     hueShift: 0,
     hueSameDir: false,
     // retain the EXACT source color as the `dominant` key color, in OKLCH (less lossy than hex).
-    keyColors: [{ role: "dominant", oklch: oklch.map((v) => Number(v)) }],
+    keyColors: [{ role: "dominant", oklch: oklch.map(r4) }],
     // the curated color's STORY: evocative name, one-line description, source role.
     ...(sw ? { colorName: clean(sw.name), description: clean(sw.note), colorRole: HIER_ROLE[sw.hier] || sw.hier } : {}),
     on: true,
@@ -155,7 +161,7 @@ function deriveNeutralPalette(palettes) {
     lift: 0,
     hueShift: 0,
     hueSameDir: false,
-    keyColors: [{ role: "dominant", oklch: oklch.map((v) => Number(v)) }],
+    keyColors: [{ role: "dominant", oklch: oklch.map(r4) }],
     on: true,
   };
 }
