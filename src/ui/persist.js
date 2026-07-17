@@ -25,6 +25,11 @@ import { DEFAULT_TYPE } from "../engine/type.mjs";
 //       moved to its nearest valid bound; every other (in-domain) field, including
 //       sibling fields inside the same palette object, is preserved byte-for-byte.
 //
+// serialize() also stamps a schemaVersion (CURRENT_SCHEMA_VERSION); hydrate() runs any still-relevant
+// RENAME_MAPS entry BEFORE the domain clamp, so a doc saved before a canon rename (a voice, a
+// treatment id, …) survives translated onto its current name instead of being silently dropped by an
+// allowlist that only ever recognizes the current names (TKT-0016 — see the RENAME_MAPS block below).
+//
 // No dependencies.
 
 // The persistence key — the exact slot the storage chain reads/writes (spec-draft §11).
@@ -192,13 +197,100 @@ function clampOverrides(o) {
   return out;
 }
 
+// ── schemaVersion + rename maps (TKT-0016) ──────────────────────────────────────────────
+// A canon RENAME (a voice, a treatment id, any field this file allowlists) that isn't also
+// translated at hydrate time gets SILENTLY DROPPED by the allowlist clamp below — the 2026-07-13
+// voice-taxonomy rename (Heading->Headline, UI->Label, Quote/Caption/Legal folded into Lead/Tiny/Body)
+// is a live example: a doc saved before that rename still carries the OLD voice names in
+// `type.voices`, and clampType's VOICES allowlist (only ever the NEW names) drops them on every
+// hydrate since. This is the SAME "translate a legacy doc forward" principle as the hueSpace legacy
+// stamp (app-helpers.mjs#hydrateStoredDoc: a doc predating hueSpace is stamped "cam16" BEFORE
+// hydrate runs, so it keeps rendering as it always did) — generalized here into a versioned,
+// in-file mechanism instead of a one-field, one-off wrapper living outside persist.js.
+//
+// CURRENT_SCHEMA_VERSION is stamped onto every doc serialize() writes. hydrate() reads the incoming
+// snapshot's schemaVersion (an ABSENT field means "before schemaVersion existed", i.e. 0 — every doc
+// saved before this ticket) and runs every RENAME_MAPS entry the doc predates, BEFORE the allowlist
+// clamp, so a renamed field survives translated onto its current name instead of being dropped.
+//
+// STANDING CONVENTION — every future canon rename (see type-scale's SKILL.md "new voice group" note)
+// MUST add its own RENAME_MAPS entry here and bump CURRENT_SCHEMA_VERSION, in the SAME change that
+// renames it. This is not a one-off fix for the 2026-07-13 voices; it's how every rename ships from
+// now on, the same way a Figma variable rename ships its FIGMA_MIGRATIONS entry (TKT-0012).
+export const CURRENT_SCHEMA_VERSION = 1;
+
+// Each entry applies to a doc whose schemaVersion is strictly LESS than `version` (an absent
+// schemaVersion is 0, so every pre-schemaVersion doc qualifies for every entry). `renameVoices` is an
+// old-name -> new-name map applied to BOTH voice-keyed facets: `type.voices` keys directly, AND the
+// leading "<voice>|…" segment of `type.tokenOverrides` per-cell keys (clampTokenOverrides only
+// validates key ARITY, not the voice segment's membership in VOICES — so a stale-name tokenOverrides
+// key would otherwise survive hydrate unchanged as an inert orphan, silently no-op forever, rather than
+// either dropping visibly or migrating; this rewrites it instead). Either side: the OLD key moves onto
+// the NEW key, UNLESS the doc already ALSO has the new key (a doc could plausibly have picked up a
+// fresh override under the new name after upgrading — that later, already-current value is presumed
+// intentional and is never clobbered by the stale old-name entry).
+const RENAME_MAPS = [
+  {
+    version: 1, // the 2026-07-13 voice-taxonomy rename — every doc saved before it has schemaVersion 0/absent
+    renameVoices: { Heading: "Headline", UI: "Label", Quote: "Lead", Caption: "Tiny", Legal: "Body" },
+  },
+];
+
+// renameKeyedMap(obj, renameMap, rewriteKey) — generic old->new key migration for a plain map: for every
+// key whose (renameKeyed-computed) old identity is in `renameMap`, move its value onto `rewriteKey`'s
+// new-identity key, UNLESS that new key already exists (never clobber an already-current value). Returns
+// the SAME object reference when nothing changes (so a current doc isn't defensively cloned for nothing).
+function renameKeyedMap(obj, renameMap, rewriteKey) {
+  if (!obj || typeof obj !== "object") return obj;
+  const out = { ...obj };
+  let changed = false;
+  for (const key of Object.keys(obj)) {
+    const newKey = rewriteKey(key, renameMap);
+    if (newKey && newKey !== key) {
+      if (!(newKey in out)) out[newKey] = out[key];
+      delete out[key];
+      changed = true;
+    }
+  }
+  return changed ? out : obj;
+}
+
+// applyRenameMaps — walk every RENAME_MAPS entry the incoming snapshot predates and translate its
+// voice-keyed facets forward (`type.voices` keys + `type.tokenOverrides`' leading voice segment). Runs
+// BEFORE any allowlist clamp (see hydrate() below). Pure: returns a new snapshot when a rename actually
+// fires, the SAME snapshot reference otherwise (so a current doc pays no cost).
+function applyRenameMaps(snapshot) {
+  const fromVersion = Number.isFinite(snapshot && snapshot.schemaVersion) ? snapshot.schemaVersion : 0;
+  if (fromVersion >= CURRENT_SCHEMA_VERSION) return snapshot; // already current — nothing to translate
+  let s = snapshot;
+  for (const entry of RENAME_MAPS) {
+    if (fromVersion >= entry.version) continue; // this doc is already past this particular rename
+    if (entry.renameVoices && s && s.type && typeof s.type === "object") {
+      let type = s.type;
+      const voices = renameKeyedMap(type.voices, entry.renameVoices, (k, m) => m[k]);
+      if (voices !== type.voices) type = { ...type, voices };
+      // type keys are "<voice>|<step>|<modeKey>" (3 segments) — rename only the leading segment.
+      const tov = renameKeyedMap(type.tokenOverrides, entry.renameVoices, (k, m) => {
+        const seg = k.split("|");
+        if (seg.length !== 3 || !m[seg[0]]) return null;
+        return [m[seg[0]], seg[1], seg[2]].join("|");
+      });
+      if (tov !== type.tokenOverrides) type = { ...type, tokenOverrides: tov };
+      if (type !== s.type) s = { ...s, type };
+    }
+  }
+  return s;
+}
+
 // ── serialize ─────────────────────────────────────────────────────────────────────
 // Produce a plain JSON-able snapshot of `state`. This is a faithful copy (no lossy
 // transform, no rounding, no reordering of palette contents), so that for an in-domain
 // State the snapshot carries every value unchanged and hydrate can reproduce it exactly.
-// JSON.parse(JSON.stringify(...)) gives a deep, plain, structurally-identical clone.
+// JSON.parse(JSON.stringify(...)) gives a deep, plain, structurally-identical clone. schemaVersion is
+// stamped on top (TKT-0016) — it's a bookkeeping field for hydrate()'s rename maps, not part of the
+// runtime State, so hydrate() reads and then drops it (never appears in hydrate's return value).
 export function serialize(state) {
-  return JSON.parse(JSON.stringify(state));
+  return { ...JSON.parse(JSON.stringify(state)), schemaVersion: CURRENT_SCHEMA_VERSION };
 }
 
 // ── hydrate ─────────────────────────────────────────────────────────────────────
@@ -207,7 +299,11 @@ export function serialize(state) {
 // only a violated field is moved to its nearest valid bound. NOT a clamp-to-default and
 // NOT a reset — those discard user state and fail the sealed roundtrip/per-field gates.
 export function hydrate(snapshot) {
-  const s = (snapshot && typeof snapshot === "object") ? snapshot : {};
+  const raw = (snapshot && typeof snapshot === "object") ? snapshot : {};
+  // TKT-0016 — translate an older doc forward through any still-relevant rename maps BEFORE the
+  // allowlist clamp below runs, so a renamed voice survives onto its current name instead of being
+  // silently dropped by clampType's VOICES allowlist.
+  const s = applyRenameMaps(raw);
 
   // Palettes first: `selected`'s upper bound is relational to the hydrated count.
   const rawPalettes = Array.isArray(s.palettes) ? s.palettes : [];
