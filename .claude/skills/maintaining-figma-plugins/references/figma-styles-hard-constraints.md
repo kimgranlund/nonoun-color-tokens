@@ -1,6 +1,6 @@
 # Figma text-style hard constraints — found live, 2026-07-13/14
 
-Five constraints of Figma's real Plugin API surface, each discovered against a REAL applied file
+Seven constraints of Figma's real Plugin API surface, each discovered against a REAL applied file
 (BZZR) after the static parity gates were already green — none is documented crisply by Figma, and
 each shipped here as a fix to a live defect. Cite these before "improving" the styles layer; every
 one of them looks like a bug you'd want to fix until you know why it's load-bearing.

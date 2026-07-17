@@ -129,7 +129,7 @@ verifiers and `npm test` are green.
 | `references/foundations.md` | the two-plugin split, the alias-cascade mechanism, the binder bind loop, the app apply/prune/rebuild contract, the parity model, the four constraints |
 | `references/best-practices.md` | the non-obvious do/don't (offline, `catch (e)`, friendly errors, idempotent find-or-create, the binder `missing` list) + a worked debug walkthrough |
 | `references/rubric.md` | score a Figma-plugin change before calling it done (offline + parity + VM-safe are the gates) |
-| `references/figma-styles-hard-constraints.md` | before changing the styles executor/planner — the five live-file API constraints (fontStyle/fontWeight XOR, NUMBER-only metric fields, path-prefix folder-ization, no variable-font axis metadata, real-font name/weight matching) |
+| `references/figma-styles-hard-constraints.md` | before changing the styles executor/planner — the seven live-file API constraints (fontStyle/fontWeight XOR, NUMBER-only metric fields, path-prefix folder-ization, no variable-font axis metadata, real-font name/weight matching, per-segment text bindings, full-payload mode adds) |
 | `docs/reference/references/knowledge-05-figma-plugin.md` | the conceptual model — why aliasing gives the cascade, files/manifest, run instructions, failure modes (owned there — cite, don't copy) |
 | `.claude/skills/adding-semantic-roles/` | the `code.js#roleTable(n)` role-row edit + every parity site (owned there — a role change is THAT skill, not this one) |
 
