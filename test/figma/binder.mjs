@@ -35,6 +35,27 @@ if (dangling.length) FAIL("bindings", `${dangling.length} dangling target(s), e.
 // non-vacuity: a full plan covers every role's light+dark across all palettes
 const plan = P.bindingPlan(NAMES);
 if (!Array.isArray(plan) || plan.length !== 53 * NAMES.length) FAIL("bindings", `bindingPlan length ${plan && plan.length}, want ${53 * NAMES.length}`);
+// every entry carries exactly 2 targets (Light, Dark) by DEFAULT — the default theme axis.
+if (plan.length && (!Array.isArray(plan[0].targets) || plan[0].targets.length !== 2 || plan[0].targets.map((t) => t.mode).join() !== "Light,Dark")) {
+  FAIL("bindings", `bindingPlan()'s default targets = ${plan[0] && JSON.stringify(plan[0].targets)}, want [{mode:"Light",...},{mode:"Dark",...}]`);
+}
+
+// ── hpg-plugin-themes (TKT-0021 — the theme axis flows generically through bind-plan.mjs, not a
+//    hardcoded Light/Dark pair): a 3-theme axis (Light/Dark/Dim) produces a THIRD target per role,
+//    and bindingTargets contributes NO new raw names (Dim reuses the "dark" side's ref) ──
+const THEMES_3 = [{ name: "Light", side: "light" }, { name: "Dark", side: "dark" }, { name: "Dim", side: "dark" }];
+const targets3 = P.bindingTargets(NAMES, THEMES_3);
+if (JSON.stringify(targets3) !== JSON.stringify(targets)) FAIL("themes", "a 3rd theme reusing the 'dark' side changed the raw target SET (should be identical — no new raw refs)");
+const plan3 = P.bindingPlan(NAMES, THEMES_3);
+if (!Array.isArray(plan3) || plan3.length !== plan.length) FAIL("themes", `3-theme bindingPlan length ${plan3 && plan3.length}, want ${plan.length} (same role count)`);
+else {
+  const row = plan3[0];
+  if (!Array.isArray(row.targets) || row.targets.length !== 3 || row.targets.map((t) => t.mode).join() !== "Light,Dark,Dim") {
+    FAIL("themes", `3-theme bindingPlan row targets = ${row && JSON.stringify(row.targets)}, want modes Light,Dark,Dim`);
+  } else if (row.targets[1].target !== row.targets[2].target) {
+    FAIL("themes", "Dim (side:'dark') target does not match Dark's target (same side should resolve to the same raw ref)");
+  }
+}
 
 // ── hpg-plugin-offline: manifest parses + declares NO network access (current Figma manifest format:
 //    networkAccess.allowedDomains = ["none"]); code.js syntactically valid ─
@@ -260,7 +281,7 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-for (const g of ["bindings", "offline", "parity", "floatanchor", "floatcreate", "floatindep", "floatnoop", "floatparity"]) {
+for (const g of ["bindings", "themes", "offline", "parity", "floatanchor", "floatcreate", "floatindep", "floatnoop", "floatparity"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
