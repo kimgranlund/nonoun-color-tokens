@@ -29,7 +29,7 @@
 // theme light/dark/auto.
 
 import { paletteStops, EXPORT_STOPS, DEFAULT_CONTROLS } from "./tonal.js";
-import { semanticRoles, refKey, refPath, refSlug, roleLeaf, applyRoleOverrides, applyOnColorContrast, applyAccentRef } from "./semantic.js";
+import { semanticRoles, refKey, refPath, refSlug, roleLeaf, applyRoleOverrides, applyOnColorContrast, applyAccentRef, DEFAULT_THEMES } from "./semantic.js";
 import { COLLECTIONS } from "./collections.js";
 import { oklchToRgb } from "./okhsl.js";
 
@@ -399,20 +399,33 @@ export function exportJSON(state) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// 4. Figma DTCG — exactly the 3 named files
+// 4. Figma DTCG — the raw file plus one semantic file per THEME
 // ──────────────────────────────────────────────────────────────────────────────
-// palette.tokens.json  -> RAW collection (mode Value): 25 solids + 11 scrims per palette.
-// Light_tokens.json    -> SEMANTIC (mode Light): 53 roles RESOLVED to the LIGHT ref's color.
-// Dark_tokens.json     -> SEMANTIC (mode Dark):  53 roles RESOLVED to the DARK  ref's color.
+// palette.tokens.json     -> RAW collection (mode Value): 25 solids + 11 scrims per palette.
+// {theme.name}_tokens.json -> SEMANTIC (mode {theme.name}): 53 roles RESOLVED to the theme's
+//                             `side` ref's color ("light" or "dark" — see semantic.js's
+//                             DEFAULT_THEMES header note: a role stays a 2-ended light/dark
+//                             model; a THEME is a named mode bound to one of those two ends).
+//
+// opts.themes (TKT-0021 — the theme axis, generalized): an array of {name, side}, default
+// semantic.js's DEFAULT_THEMES ([{name:"Light",side:"light"},{name:"Dark",side:"dark"}]) — so
+// an absent/default opts.themes reproduces today's exact "Light_tokens.json"/"Dark_tokens.json"
+// pair, byte-identical. A caller can pass a longer list (e.g. + {name:"Dim",side:"dark"}) to add
+// a named mode with NO engine change — the axis is data now, not a hardcoded pair. This does NOT
+// give a theme its own resolved color per role (that would need a 3rd ref in the role table
+// itself, a separate and much larger change) — every theme's value is one of the role's two
+// EXISTING resolved ends.
 //
 // opts.rawColl branch (ADR-002):
 //   BLANK/undefined -> NO semantic leaf carries com.figma.aliasData (resolved-only;
 //                      always imports natively).
 //   SET             -> EVERY semantic leaf carries com.figma.aliasData =
 //                      { targetVariableName: "{n}/{refPath(ref)}", targetVariableSetName: rawColl }
-//                      (the per-mode ref: light's ref for Light, dark's ref for Dark).
+//                      (the ref for that theme's `side`: light's ref for a "light"-side theme,
+//                      dark's ref for a "dark"-side theme).
 export function exportDTCG(state, opts) {
   const rawColl = opts && opts.rawColl ? opts.rawColl : "";
+  const themes = opts && Array.isArray(opts.themes) && opts.themes.length ? opts.themes : DEFAULT_THEMES;
   const palettes = derivedAll(state);
 
   // RAW tree: { [n]: { [pad3]: leaf, [base-i]: leaf } } — resolved, no aliasData.
@@ -446,19 +459,19 @@ export function exportDTCG(state, opts) {
   // to the palette names (never itself resolved from a palette). Single value, no per-mode variance.
   rawTree.constants = { "dialog-backdrop": colorLeaf(DIALOG_BACKDROP_RGB, DIALOG_BACKDROP_ALPHA_PCT / 100, null) };
 
-  // SEMANTIC tree for one mode ("light" | "dark"): each role -> resolved leaf,
-  // with aliasData attached iff rawColl is set, targeting that mode's ref.
-  const semanticTree = (mode) => {
+  // SEMANTIC tree for one theme's `side` ("light" | "dark"): each role -> resolved leaf,
+  // with aliasData attached iff rawColl is set, targeting that side's ref.
+  const semanticTree = (side) => {
     const tree = {};
     for (const p of palettes) {
       const grp = {};
       for (const r of p.roles) {
-        const side = mode === "light" ? r.light : r.dark;
-        const ref = mode === "light" ? r.lightRef : r.darkRef;
+        const end = side === "light" ? r.light : r.dark;
+        const ref = side === "light" ? r.lightRef : r.darkRef;
         const alias = rawColl
           ? { targetVariableName: `${p.n}/${refPath(ref)}`, targetVariableSetName: rawColl }
           : null;
-        grp[roleLeaf(p.n, r)] = colorLeaf(side.rgb, side.frac, alias);
+        grp[roleLeaf(p.n, r)] = colorLeaf(end.rgb, end.frac, alias);
       }
       tree[p.n] = grp;
     }
@@ -478,11 +491,11 @@ export function exportDTCG(state, opts) {
     $extensions: { "com.figma.modeName": modeName },
   });
 
-  return {
-    "palette.tokens.json": figmaMode(rawTree, "Value"),
-    "Light_tokens.json": figmaMode(semanticTree("light"), "Light"),
-    "Dark_tokens.json": figmaMode(semanticTree("dark"), "Dark"),
-  };
+  // one semantic file per theme, in `themes` order — with the default DEFAULT_THEMES this produces
+  // exactly {"Light_tokens.json":..., "Dark_tokens.json":...}, byte-identical to the pre-TKT-0021 shape.
+  const out = { "palette.tokens.json": figmaMode(rawTree, "Value") };
+  for (const t of themes) out[`${t.name}_tokens.json`] = figmaMode(semanticTree(t.side), t.name);
+  return out;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
