@@ -16,12 +16,13 @@ const NAMES = RT.defaults.map((p) => p.name.toLowerCase());
 const fails = [];
 const FAIL = (g, m) => { if (!fails.some((f) => f.startsWith(g + ":"))) fails.push(`${g}: ${m}`); };
 
-// canonical raw-colors variable name set (the answer key): {n}/{pad3(stop)} ∪ {n}/{pad3(base)}-{pad3(step)}
+// canonical raw-colors variable name set (the answer key): {n}/{pad3(stop)} ∪ {n}/scrim/{pad3(step)}
+// (ADR-016 nested the scrims; the 500 base is implicit while SCRIM_BASES is the single canonical 500)
 const pad3 = (s) => String(s).padStart(3, "0");
 const CANON = new Set();
 for (const n of NAMES) {
   for (const s of EXPORT_STOPS) CANON.add(`${n}/${pad3(s)}`);
-  for (const b of SCRIM_BASES) for (const step of SCRIM_STEPS) CANON.add(`${n}/${pad3(b)}-${pad3(step)}`);
+  for (const b of SCRIM_BASES) for (const step of SCRIM_STEPS) CANON.add(`${n}/${b === 500 || b === "500" ? "scrim" : `scrim/${pad3(b)}`}/${pad3(step)}`);
 }
 
 // ── hpg-plugin-bindings: every emitted target exists in the canonical raw-colors name set ─
@@ -147,9 +148,9 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
       const geomIx = GEOM.geomTokensFigmaModes(GEOM.geomScale({ treatment: "comfortable", baseHeight: 28 }), [{ name: "Desktop", scale: GEOM.geomScale({ treatment: "comfortable", baseHeight: 40 }) }]);
       const plans = MAP.modeApplyPlan(MAP.mergeModeInterchanges(typeIx, geomIx));
       const fr = await applyFloatPlans(plans);
-      const geo = F.collections.find((c) => c.name === "Geometry");
+      const geo = F.collections.find((c) => c.name === "Breakpoints");
       if (F.collections.some((c) => c.name === "Typography")) FAIL("floatcreate", "the merged apply minted a Typography collection (the pre-TKT-0009 shape)");
-      if (!geo) FAIL("floatcreate", "no Geometry collection created");
+      if (!geo) FAIL("floatcreate", "no Breakpoints collection created");
       if (geo && geo.modes.map((m) => m.name).join() !== "Base,Desktop") FAIL("floatcreate", `Geometry modes = ${geo && geo.modes.map((m) => m.name)}, want Base,Desktop`);
       if (fr.collections !== 1) FAIL("floatcreate", `applyFloatPlans reported ${fr.collections} collections, want 1 (merged)`);
       if (geo) {
@@ -157,14 +158,14 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
         if (!gVars.some((v) => v.name.startsWith("type/"))) FAIL("floatcreate", "the type/ half is missing from the merged collection");
         if (!gVars.some((v) => v.name.startsWith("size/"))) FAIL("floatcreate", "the box-geometry half is missing from the merged collection");
         const baseId = geo.modes[0].modeId, bpId = geo.modes[1].modeId;
-        const bodyMd = gVars.find((v) => v.name === "type/Body/MD/size");
-        if (!bodyMd) FAIL("floatcreate", "type/Body/MD/size variable missing");
-        else if (!Number.isFinite(bodyMd.valuesByMode[baseId]) || !Number.isFinite(bodyMd.valuesByMode[bpId])) FAIL("floatcreate", "type/Body/MD/size not value-complete across modes");
-        else if (bodyMd.valuesByMode[baseId] === bodyMd.valuesByMode[bpId]) FAIL("floatcreate", "type/Body/MD/size Base == Desktop (per-mode values should differ)");
+        const bodyMd = gVars.find((v) => v.name === "type/body/md/size");
+        if (!bodyMd) FAIL("floatcreate", "type/body/md/size variable missing");
+        else if (!Number.isFinite(bodyMd.valuesByMode[baseId]) || !Number.isFinite(bodyMd.valuesByMode[bpId])) FAIL("floatcreate", "type/body/md/size not value-complete across modes");
+        else if (bodyMd.valuesByMode[baseId] === bodyMd.valuesByMode[bpId]) FAIL("floatcreate", "type/body/md/size Base == Desktop (per-mode values should differ)");
       }
       // idempotency: re-apply → no doubled collection/modes/vars
       await applyFloatPlans(plans);
-      if (F.collections.filter((c) => c.name === "Geometry").length !== 1) FAIL("floatcreate", "re-apply duplicated the Geometry collection");
+      if (F.collections.filter((c) => c.name === "Breakpoints").length !== 1) FAIL("floatcreate", "re-apply duplicated the Breakpoints collection");
       if (geo && geo.modes.length !== 2) FAIL("floatcreate", `re-apply left ${geo && geo.modes.length} Geometry modes, want 2 (no duplicate mode)`);
       // drop the breakpoint → its mode is pruned on re-apply (Base survives, is never removable)
       const baseOnly = MAP.mergeModeInterchanges(
@@ -189,7 +190,7 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
     const { main } = loadBinder(injected, F.figma);
     await main();
     if (F.collections.some((c) => c.name === "Color Modes" || c.name === "Color Primitives")) FAIL("floatindep", "main() created a Color collection with no Color Primitives present");
-    if (!F.collections.some((c) => c.name === "Geometry")) FAIL("floatindep", "main() skipped the merged Geometry breakpoint collection when Color Primitives was absent (color-abort still blocking breakpoints)");
+    if (!F.collections.some((c) => c.name === "Breakpoints")) FAIL("floatindep", "main() skipped the merged Breakpoints collection when Color Primitives was absent (color-abort still blocking breakpoints)");
   } catch (e) { FAIL("floatindep", "main() threw with no Color Primitives + a non-empty FLOAT_PLANS: " + e.message); }
 }
 
@@ -200,7 +201,7 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
   try {
     const { main } = loadBinder(binderSrc, F.figma);
     await main();
-    if (F.collections.some((c) => c.name === "Typography" || c.name === "Geometry")) FAIL("floatnoop", "the checked-in binder (FLOAT_PLANS []) created a breakpoint collection");
+    if (F.collections.some((c) => c.name === "Typography" || c.name === "Geometry" || c.name === "Breakpoints")) FAIL("floatnoop", "the checked-in binder (FLOAT_PLANS []) created a breakpoint collection");
   } catch (e) { FAIL("floatnoop", "main() threw on the generic (FLOAT_PLANS []) binder: " + e.message); }
 }
 

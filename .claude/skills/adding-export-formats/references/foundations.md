@@ -71,7 +71,7 @@ The serializers are deliberately thin because the formatting primitives are shar
 - `roleOklch(end)` — a resolved role end (`{rgb, frac}`) → an `oklch()` string, adding `/ a%` when
   `end.frac < 1`. This is the one-liner Tailwind and ShadCN both call to print a role.
 - `refKey(ref)` (imported from `semantic.js`) — normalizes a ref to its var-name fragment (`'50'`→`'050'`,
-  `'500-200'`→`'500-200'`). The single source so a ref can't drift between `50` and `050`. This is what
+  `'500-200'`→`'500-200'` internally; EMITTED via `refPath` `scrim/200` on slash surfaces / `refSlug` `scrim-200` on hyphen surfaces — ADR-016). The single source so a ref can't drift between `50` and `050`. This is what
   emitters use to build a var NAME — they never re-resolve a ref to a color (the role ends already carry it).
 - `colorLeaf(rgb, frac, alias)` — the DTCG color leaf: `$type:"color"`, `$value:{colorSpace:"srgb",
   components, alpha:frac, hex}`, `$extensions` (`com.figma.hiddenFromPublishing`, `com.figma.scopes`,

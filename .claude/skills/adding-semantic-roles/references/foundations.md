@@ -16,9 +16,9 @@ primitive.
 ### 2. A ref is a stop name — solid or scrim
 
 - **Solid**: `'550'` — a tonal stop. `refKey('550') → '550'`; `refKey('50') → '050'` (zero-padded to 3).
-- **Scrim**: `'500-200'` — the **500** color at alpha% = step/10 (so `500-200` = 500 @ 20%). It tracks the
+- **Scrim**: ref `'500-200'` — the **500** color at alpha% = step/10 (so `500-200` = 500 @ 20%), emitted as the nested `scrim/200` path (`refPath`) / `scrim-200` slug (`refSlug`) since ADR-016. It tracks the
   500 stop as hue/chroma/skew/lift change, i.e. it is a translucency sub-variant of the palette.
-  `refKey('500-200') → '500-200'` (base padded, `-step` suffix kept verbatim).
+  `refKey('500-200') → '500-200'` (the internal normalizer); the EMITTED forms come from `refPath` (`scrim/200`) and `refSlug` (`scrim-200`) — ADR-016.
 
 `refKey` (in `semantic.js`, re-imported by `bind-plan.mjs`, and replicated in the Figma `code.js`) is the
 single normaliser — it is why a ref can't drift between "50" and "050". Pick refs from a neighbour in the

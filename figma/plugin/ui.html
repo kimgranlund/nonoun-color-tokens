@@ -1513,6 +1513,24 @@ a.account-manage:hover { text-decoration: underline; }
 <body><ultimate-tokens></ultimate-tokens>
 <script type="module">
 const __M = {};
+__M.collections = (function(){
+// collections.js — THE canonical Figma collection names (ADR-016, one shared constant pair ending the
+// three-way split the 2026-07-17 librarian review found: exportUI3 said "Color / Primitives" while the
+// plugin created "Color Primitives"). Every engine emitter + the app import from HERE; the two sandbox
+// runtimes (figma/plugin/code.js, figma/binder/.../code.js) cannot import ESM and carry literals that a
+// parity gate diffs against these values (test/figma/plugin.mjs `collnames` family).
+// "Color Semantic" (was "Color Modes") names the content — the Light/Dark axis is self-evident;
+// "Breakpoints" (was "Geometry") names the mode axis — the collection hosts box geometry AND type/.
+// Renames ride FIGMA_MIGRATIONS (TKT-0012) so existing user files adopt by id, never by prune.
+const COLLECTIONS = {
+  colorRaw: "Color Primitives",
+  colorSemantic: "Color Semantic",
+  breakpoints: "Breakpoints",
+  fontPrimitives: "Font Primitives",
+};
+
+return { COLLECTIONS };
+})();
 __M.hct = (function(){
 // hct.js — HCT color engine (CAM16 hue/chroma + CIELAB L* tone), vanilla ESM, no deps.
 //
@@ -2111,6 +2129,30 @@ const SCRIM_KEYS = [
  * @param {string} ref e.g. "50", "550", "500-050"
  * @returns {string}
  */
+// ── ADR-016 (kebab wave) emitted-name helpers ─────────────────────────────────────────────────
+// roleLeaf — the kebab LEAF a semantic role emits on slash-path surfaces (Figma variables, UI3,
+// DTCG keys, JSON): suffix-derived, so every format shares CSS's own vocabulary ("-on-surface" →
+// "on-surface"); the prime accent role (empty suffix) keeps the palette name as its leaf
+// ("primary/primary" — structural, predates the wave). Internal `key` stays camelCase JS.
+function roleLeaf(paletteName, role) {
+  return role.suffix ? role.suffix.slice(1) : paletteName;
+}
+// refPath / refSlug — the emitted form of a raw ref under ADR-016's scrim NESTING rule
+// ("{n}/scrim/{step}" — two segments, never a numeral-compound leaf; the 500 base is omitted while
+// SCRIM_BASES is the single canonical 500 — re-add "scrim/{base}/{step}" only if a second base ever
+// ships). refPath = slash surfaces (Figma/UI3/DTCG/JSON trees); refSlug = hyphen surfaces (CSS
+// custom properties). Solid stops stay the 3-digit padded literal on both.
+function refPath(ref) {
+  const s = String(ref);
+  const dash = s.indexOf('-');
+  if (dash === -1) return s.padStart(3, '0');
+  const base = s.slice(0, dash), step = s.slice(dash + 1).padStart(3, '0');
+  return (base === '500' ? 'scrim/' : 'scrim/' + base.padStart(3, '0') + '/') + step;
+}
+function refSlug(ref) {
+  return refPath(ref).replace(/\//g, '-');
+}
+
 function refKey(ref) {
   const s = String(ref);
   const dash = s.indexOf('-');
@@ -2321,7 +2363,7 @@ function applyAccentRef(roles, accentRef) {
   return roles.map((r) => (r.suffix === '' ? { ...r, light: '500', dark: '500' } : r));
 }
 
-return { refKey, semanticRoles, applyRoleOverrides, applyOnColorContrast, applyAccentRef };
+return { roleLeaf, refPath, refSlug, refKey, semanticRoles, applyRoleOverrides, applyOnColorContrast, applyAccentRef };
 })();
 __M.tonal = (function(){
 // tonal.js — tonal-scale generation module (vanilla ESM, no deps).
@@ -3237,12 +3279,14 @@ function siblingStyleName(coreStyleName, coreWeightName, siblingName) {
 // text-style planner (figma/binder/style-plan.mjs, which binds the CORE style to it) — they must
 // never independently recompute this, the same drift class siblingStyleName above already fixed once.
 function coreWeightKey(voice, coreWeightName, sibs) {
-  if (!coreWeightName) return voice;
+  const v = String(voice).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); // ADR-016 kebab segment
+  if (!coreWeightName) return v;
   const taken = Array.isArray(sibs) && sibs.some((wv) => wv.slug === coreWeightName.slug);
-  return taken ? voice : `${voice}/${coreWeightName.slug}`;
+  return taken ? v : `${v}/${coreWeightName.slug}`;
 }
 
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
+const { COLLECTIONS } = __M.collections;
 const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 // typeTokensCSS — CSS custom properties (font families + per-step size/line/tracking/weight) plus a
@@ -3374,12 +3418,12 @@ function typeTokensDTCG(scale, { unit = "px" } = {}) {
   // just the 5 shared defaults. Un-overridden voices repeat their role's family — same value the
   // composite typography tokens below already carry.
   const fontFamily = {};
-  for (const voice of Object.keys(scale.categories)) fontFamily[voice] = { $type: "fontFamily", $value: resolvedFontFor(scale, voice) };
+  for (const voice of Object.keys(scale.categories)) fontFamily[kebab(voice)] = { $type: "fontFamily", $value: resolvedFontFor(scale, voice) };
   const typography = {};
   for (const [cName, steps] of Object.entries(scale.categories)) {
-    typography[cName] = {};
+    typography[kebab(cName)] = {};
     for (const [sName, s] of Object.entries(steps)) {
-      typography[cName][sName] = {
+      typography[kebab(cName)][sName.toLowerCase()] = {
         $type: "typography",
         // fontFamily resolves the per-voice override (if any) — an overridden voice's DTCG carries its own
         // family; an un-overridden voice still reads its role's family (identical to before this channel).
@@ -3391,8 +3435,8 @@ function typeTokensDTCG(scale, { unit = "px" } = {}) {
   // ({ Display: { Bold: { $type:"fontWeight", $value:700 } } }). Absent when none (identity gate).
   const weights = {};
   if (scale.weights) for (const [cName, list] of Object.entries(scale.weights)) {
-    weights[cName] = {};
-    for (const wv of list) weights[cName][wv.name] = { $type: "fontWeight", $value: wv.weight };
+    weights[kebab(cName)] = {};
+    for (const wv of list) weights[kebab(cName)][wv.slug] = { $type: "fontWeight", $value: wv.weight };
   }
   return { fontFamily, typography, ...(Object.keys(weights).length ? { weights } : {}) };
 }
@@ -3416,7 +3460,8 @@ function typeTokensDTCG(scale, { unit = "px" } = {}) {
 // `opts.baseName` (default "Base") NAMES the synthetic base layer (e.g. "Mobile" — the standard set);
 // `opts.baseLast` (default false) places it AFTER the breakpoints: Figma's default mode is the FIRST mode,
 // so a desktop-first collection stores modes [Desktop, Tablet] and emits [Desktop, Tablet, Mobile].
-const TYPE_FIGMA_PROPS = ["size", "lineHeight", "letterSpacing", "weight", "paragraphSpacing"];
+// ADR-016: emitted prop leaves are kebab ([engine field, emitted leaf]).
+const TYPE_FIGMA_PROPS = [["size", "size"], ["lineHeight", "line-height"], ["letterSpacing", "letter-spacing"], ["weight", "weight"], ["paragraphSpacing", "paragraph-spacing"]];
 // disambiguateModeNames — Figma requires DISTINCT mode names per collection. The synthetic base layer
 // (named `baseName`, default "Base") is reserved, so a breakpoint sharing its name (or any duplicate of
 // another breakpoint) is renamed ("Mobile 2", …) before it would silently shadow another mode / emit
@@ -3444,9 +3489,9 @@ function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base", baseLa
   const layer = (scale, mode) => {
     for (const [cName, steps] of Object.entries(scale.categories)) {
       for (const [sName, s] of Object.entries(steps)) {
-        for (const prop of TYPE_FIGMA_PROPS) set(`type/${cName}/${sName}/${prop}`, mode, s[prop]);
+        for (const [field, leaf] of TYPE_FIGMA_PROPS) set(`type/${kebab(cName)}/${sName.toLowerCase()}/${leaf}`, mode, s[field]);
         // singleLineHeight exists only on the BOX voices (Kicker · UI-control · UI-widget) — pixels too.
-        if (s.singleLineHeight != null) set(`type/${cName}/${sName}/singleLineHeight`, mode, s.singleLineHeight);
+        if (s.singleLineHeight != null) set(`type/${kebab(cName)}/${sName.toLowerCase()}/single-line-height`, mode, s.singleLineHeight);
       }
     }
   };
@@ -3454,12 +3499,12 @@ function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base", baseLa
   list.forEach((m, i) => layer(m.scale, names[i]));
   return {
     $schema: "figma-ui3-variables.float.schema.v1",
-    collections: { "Geometry": { modes: modeNames, variables } },
+    collections: { [COLLECTIONS.breakpoints]: { modes: modeNames, variables } },
   };
 }
 
 // typeTokensFigmaPrimitives — the "Font Primitives" COMPANION collection to typeTokensFigmaModes: the
-// distinct font families deduped into `family/<role>` STRING primitives (plus a `family/voice/<voice>`
+// distinct font families deduped into `family/<role>` STRING primitives (plus an `override/<voice>`
 // primitive for a family that's ONLY reached via a per-voice override — never shared with a role or
 // another voice), a `font/<voice>` ALIAS per voice pointing at its resolved family primitive (edit the
 // primitive; every voice sharing it follows), and a `weight/<voice>` FLOAT primitive (the voice's uniform
@@ -3484,11 +3529,11 @@ function typeTokensFigmaPrimitives(scale) {
       // genuinely distinct override family (matching no existing primitive's value) mints its own —
       // dedupe by VALUE, not by source, so two voices overridden to the same custom family share one.
       if (!famKey[fam]) {
-        const key = `family/voice/${kebab(voice)}`;
+        const key = `override/${kebab(voice)}`;
         famKey[fam] = key;
         variables[key] = { type: "STRING", values: { Value: fam } };
       }
-      variables[`font/${voice}`] = { type: "ALIAS", target: famKey[fam] };
+      variables[`font/${kebab(voice)}`] = { type: "ALIAS", target: famKey[fam] };
     }
     const first = Object.values(steps)[0];
     const coreWeightName = first && Number.isFinite(first.weight) ? weightNameFor(first.weight) : null;
@@ -3506,8 +3551,8 @@ function typeTokensFigmaPrimitives(scale) {
     // "Condensed Bold Italic") is a REAL font-loading bug, not cosmetic: this primitive is what a
     // non-variable face's sibling text style binds `fontStyle` to.
     if (sibs) for (const wv of sibs) {
-      variables[`weight/${voice}/${wv.slug}`] = { type: "FLOAT", values: { Value: wv.weight } };
-      variables[`weight-style/${voice}/${wv.slug}`] = { type: "STRING", values: { Value: siblingStyleName(sn, coreWeightName, wv.name) } };
+      variables[`weight/${kebab(voice)}/${wv.slug}`] = { type: "FLOAT", values: { Value: wv.weight } };
+      variables[`weight-style/${kebab(voice)}/${wv.slug}`] = { type: "STRING", values: { Value: siblingStyleName(sn, coreWeightName, wv.name) } };
     }
   }
   return {
@@ -3551,6 +3596,8 @@ __M.geometry = (function(){
 // design), and the ramp's MD kink fits no power law — hand-authored IS the law, like type's SIZES.
 // icon/caret remain rule-derived — they reproduce the hand-tuned reference ramp (20·24·28·36·48·64)
 // to ±1px and generalize to any scaled baseHeight.
+
+const { COLLECTIONS } = __M.collections;
 
 const round = (v) => Math.round(v);
 const roundEven = (v) => 2 * Math.round(v / 2);
@@ -3811,11 +3858,12 @@ function geomTokensDTCG(scale, { unit = "px" } = {}) {
   const dim = (px) => ({ $type: "dimension", $value: dimUnit(px, unit) });
   const size = {};
   for (const [name, s] of Object.entries(scale.sizes)) {
-    size[name] = {
+    // ADR-016: kebab field names, lowercase step keys, the icon-gap/pill-radius homonym renames.
+    size[name.toLowerCase()] = {
       height: dim(s.height), icon: dim(s.icon), caret: dim(s.caret), font: dim(s.font),
-      gap: dim(s.gap), paddingNarrow: dim(s.paddingNarrow), paddingWide: dim(s.paddingWide),
-      paddingNarrowCompact: dim(s.paddingNarrowCompact), paddingWideCompact: dim(s.paddingWideCompact),
-      radius: dim(s.radiusPill), minWidth: dim(s.minWidth),
+      "icon-gap": dim(s.gap), "padding-narrow": dim(s.paddingNarrow), "padding-wide": dim(s.paddingWide),
+      "padding-narrow-compact": dim(s.paddingNarrowCompact), "padding-wide-compact": dim(s.paddingWideCompact),
+      "pill-radius": dim(s.radiusPill), "min-width": dim(s.minWidth),
     };
   }
   const radius = {};
@@ -3837,11 +3885,11 @@ function geomTokensFigma(scale) {
   const num = (v) => ({ $type: "number", $value: v });
   const size = {};
   for (const [name, s] of Object.entries(scale.sizes)) {
-    size[name] = {
+    size[name.toLowerCase()] = {
       height: num(s.height), icon: num(s.icon), caret: num(s.caret),
-      gap: num(s.gap), paddingNarrow: num(s.paddingNarrow), paddingWide: num(s.paddingWide),
-      paddingNarrowCompact: num(s.paddingNarrowCompact), paddingWideCompact: num(s.paddingWideCompact),
-      radius: num(s.radiusPill), minWidth: num(s.minWidth),
+      "icon-gap": num(s.gap), "padding-narrow": num(s.paddingNarrow), "padding-wide": num(s.paddingWide),
+      "padding-narrow-compact": num(s.paddingNarrowCompact), "padding-wide-compact": num(s.paddingWideCompact),
+      "pill-radius": num(s.radiusPill), "min-width": num(s.minWidth),
     };
   }
   const radius = {};
@@ -3849,7 +3897,7 @@ function geomTokensFigma(scale) {
   const space = {};
   for (const [k, v] of Object.entries(scale.space)) space[k] = num(v);
   const group = (src) => { const g = {}; for (const [k, v] of Object.entries(src || {})) g[camelKebab(k)] = num(v); return g; };
-  return { Geometry: { size, radius, space, inset: group(scale.insets), gap: group(scale.gaps), border: group(scale.borders), focus: group(scale.focus) } };
+  return { [COLLECTIONS.breakpoints]: { size, radius, space, inset: group(scale.insets), gap: group(scale.gaps), border: group(scale.borders), focus: group(scale.focus) } };
 }
 
 // geomTokensFigmaModes — the geometry as a single Figma-variable COLLECTION ("Geometry") with one MODE per
@@ -3863,7 +3911,10 @@ function geomTokensFigma(scale) {
 // named, not media-queried). IDENTITY: `modes = []` ⇒ a single base mode whose values equal the base.
 // `opts.baseName` (default "Base") NAMES the synthetic base layer (e.g. "Mobile" — the standard set);
 // `opts.baseLast` (default false) places it AFTER the breakpoints (Figma's default mode = the FIRST mode).
-const GEOM_SIZE_FIELDS = [["height", "height"], ["icon", "icon"], ["caret", "caret"], ["gap", "gap"], ["paddingNarrow", "paddingNarrow"], ["paddingWide", "paddingWide"], ["paddingNarrowCompact", "paddingNarrowCompact"], ["paddingWideCompact", "paddingWideCompact"], ["radius", "radiusPill"], ["minWidth", "minWidth"]];
+// ADR-016: emitted field names are kebab; the two homonyms rename at the leaf — `icon-gap` (the
+// control-internal icon↔label gap, vs the container gap/ scale) and `pill-radius` (the height-linked
+// pill corner, vs the radius/ ladder).
+const GEOM_SIZE_FIELDS = [["height", "height"], ["icon", "icon"], ["caret", "caret"], ["icon-gap", "gap"], ["padding-narrow", "paddingNarrow"], ["padding-wide", "paddingWide"], ["padding-narrow-compact", "paddingNarrowCompact"], ["padding-wide-compact", "paddingWideCompact"], ["pill-radius", "radiusPill"], ["min-width", "minWidth"]];
 // Figma requires DISTINCT mode names per collection; the synthetic base layer (`baseName`) is reserved +
 // de-dup (case-insensitively) so a breakpoint sharing its name / two same-named modes can't collide on import.
 function disambiguateModeNames(names, baseName = "Base") {
@@ -3889,7 +3940,7 @@ function geomTokensFigmaModes(baseScale, modes = [], { baseName = "Base", baseLa
   // baseHeight; radii/space are treatment-derived (mode-independent), but we emit per-mode for completeness.
   const layer = (scale, mode) => {
     for (const [name, s] of Object.entries(scale.sizes))
-      for (const [field, src] of GEOM_SIZE_FIELDS) set(`size/${name}/${field}`, mode, s[src]);
+      for (const [field, src] of GEOM_SIZE_FIELDS) set(`size/${name.toLowerCase()}/${field}`, mode, s[src]);
     for (const [k, v] of Object.entries(scale.radii)) set(`radius/${k}`, mode, v);
     for (const [k, v] of Object.entries(scale.space)) set(`space/${k}`, mode, v);
     for (const [k, v] of Object.entries(scale.insets || {})) set(`inset/${camelKebab(k)}`, mode, v);
@@ -3901,7 +3952,7 @@ function geomTokensFigmaModes(baseScale, modes = [], { baseName = "Base", baseLa
   list.forEach((m, i) => layer(m.scale, names[i]));
   return {
     $schema: "figma-ui3-variables.float.schema.v1",
-    collections: { "Geometry": { modes: modeNames, variables } },
+    collections: { [COLLECTIONS.breakpoints]: { modes: modeNames, variables } },
   };
 }
 
@@ -4556,7 +4607,7 @@ function clampFigmaCollections(fc) {
     return s && s !== dflt ? s : "";
   };
   const raw = pick(fc.raw, "Color Primitives");
-  const semantic = pick(fc.semantic, "Color Modes");
+  const semantic = pick(fc.semantic, "Color Semantic"); // ADR-016 (was "Color Modes")
   if (!raw && !semantic) return {};
   return { figmaCollections: { ...(raw ? { raw } : {}), ...(semantic ? { semantic } : {}) } };
 }
@@ -5295,7 +5346,8 @@ __M.exports = (function(){
 // theme light/dark/auto.
 
 const { paletteStops, EXPORT_STOPS, DEFAULT_CONTROLS } = __M.tonal;
-const { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAccentRef } = __M.semantic;
+const { semanticRoles, refKey, refPath, refSlug, roleLeaf, applyRoleOverrides, applyOnColorContrast, applyAccentRef } = __M.semantic;
+const { COLLECTIONS } = __M.collections;
 const { iconSystem, iconSystemLabel } = __M.iconSystems;
 const { motionTokens, MOTION_EASING, MOTION_DURATION, MOTION_NEVER } = __M.motion;
 const { oklchToSrgb8, hexToSrgb8, pyRound, dsBundleGates } = __M.dsGates; // §8 carrier primitives + the gate itself — the receipt cites the SAME run the gate measures
@@ -5588,19 +5640,20 @@ function cssFrom(palettes, oklch, pfx = "c") {
       const val = oklch ? oklchStr(rgbToOklch(rgb)) : hexOf(rgb);
       lines.push(`  --${pfx}-${p.n}-${key}: ${val};`);
     }
-    // scrim RAW vars: --{pfx}-{n}-500-{step}  (the 500 color at alpha% = step/10)
+    // scrim RAW vars: --{pfx}-{n}-scrim-{step} (ADR-016 nesting, hyphen surface; the canonical 500
+    // base is omitted while SCRIM_BASES is single — refSlug re-adds it if a second base ever ships)
     for (const base of SCRIM_BASES) {
       for (const step of SCRIM_STEPS) {
         const sc = p.scrims[base][step];
         const val = oklch ? oklchStrA(rgbToOklch(sc.rgb), sc.alphaPct) : sc.hex;
-        lines.push(`  --${pfx}-${p.n}-${pad3(base)}-${pad3(step)}: ${val};`);
+        lines.push(`  --${pfx}-${p.n}-${refSlug(`${base}-${step}`)}: ${val};`);
       }
     }
     // SEMANTIC --{pfx}-{n}-{role} vars: light-dark(var(light raw), var(dark raw)) (ADR-005)
     lines.push(`  /* ${p.name} — semantic roles */`);
     for (const r of p.roles) {
-      const lv = `var(--${pfx}-${p.n}-${refKey(r.lightRef)})`;
-      const dv = `var(--${pfx}-${p.n}-${refKey(r.darkRef)})`;
+      const lv = `var(--${pfx}-${p.n}-${refSlug(r.lightRef)})`;
+      const dv = `var(--${pfx}-${p.n}-${refSlug(r.darkRef)})`;
       lines.push(`  --${pfx}-${p.n}${r.suffix}: light-dark(${lv}, ${dv});`);
     }
     // KEY COLORS — retained brand values by expression (dominant/supportive), exact in OKLCH
@@ -5619,8 +5672,10 @@ function cssFrom(palettes, oklch, pfx = "c") {
 // ──────────────────────────────────────────────────────────────────────────────
 // 3. JSON
 // ──────────────────────────────────────────────────────────────────────────────
-// { meta..., [paletteName]: { stops:{pad3:hex}, scrims:{base-i:{hex,alpha}}, semantic:[{key,light,dark}] } }
-// Keyed by the original palette NAME; disabled palettes are absent.
+// { meta..., [paletteSlug]: { stops:{pad3:hex}, scrims:{step:{hex,alpha}}, semantic:[{key,light,dark}] } }
+// Keyed by the palette SLUG (ADR-016 — every other format keys by slug; the display name rides
+// nowhere in JSON, by design). Scrims key by their 3-digit STEP (the single canonical 500 base is
+// implicit); semantic `key` is the kebab leaf shared with every surface. Disabled palettes absent.
 function exportJSON(state) {
   const palettes = derivedAll(state);
   const out = {};
@@ -5629,18 +5684,18 @@ function exportJSON(state) {
     const stops = {};
     for (const key of Object.keys(p.stops)) stops[key] = p.stops[key].hex;
 
-    // scrims: { "500-200": {hex, alpha}, ... } — "500-{step}", alpha% = step/10.
+    // scrims: { "200": {hex, alpha}, ... } — keyed by padded STEP, alpha% = step/10 (500 base implicit).
     const scrims = {};
     for (const base of SCRIM_BASES) {
       for (const step of SCRIM_STEPS) {
         const sc = p.scrims[base][step];
-        scrims[`${pad3(base)}-${pad3(step)}`] = { hex: sc.hex, alpha: sc.alphaPct };
+        scrims[pad3(step)] = { hex: sc.hex, alpha: sc.alphaPct };
       }
     }
 
-    // semantic: [{ key, light:"#hex", dark:"#hex" }, ...] — both refs resolved.
+    // semantic: [{ key, light:"#hex", dark:"#hex" }, ...] — `key` is the kebab leaf (ADR-016).
     const semantic = p.roles.map((r) => ({
-      key: r.key,
+      key: roleLeaf(p.n, r),
       light: r.light.hex,
       dark: r.dark.hex,
     }));
@@ -5648,11 +5703,11 @@ function exportJSON(state) {
     const palette = { stops, scrims, semantic };
     // keyColors: [{ role, oklch:[L,C,H], name? }] — retained exact brand colors (present only when set).
     if (p.keyColors.length) palette.keyColors = p.keyColors.map((kc) => ({ role: kc.role, oklch: kc.oklch, ...(kc.name ? { name: kc.name } : {}) }));
-    out[p.name] = palette;
+    out[p.n] = palette;
   }
-  // constants — fixed, non-palette tokens (currently just dialogBackdrop). A sibling key to the
-  // palette names, never itself a palette.
-  out.constants = { dialogBackdrop: { hex: dialogBackdropHex() } };
+  // constants — fixed, non-palette tokens (currently just dialog-backdrop). A sibling key to the
+  // palette slugs, never itself a palette.
+  out.constants = { "dialog-backdrop": { hex: dialogBackdropHex() } };
   return out;
 }
 
@@ -5667,7 +5722,7 @@ function exportJSON(state) {
 //   BLANK/undefined -> NO semantic leaf carries com.figma.aliasData (resolved-only;
 //                      always imports natively).
 //   SET             -> EVERY semantic leaf carries com.figma.aliasData =
-//                      { targetVariableName: "{n}/{refKey(ref)}", targetVariableSetName: rawColl }
+//                      { targetVariableName: "{n}/{refPath(ref)}", targetVariableSetName: rawColl }
 //                      (the per-mode ref: light's ref for Light, dark's ref for Dark).
 function exportDTCG(state, opts) {
   const rawColl = opts && opts.rawColl ? opts.rawColl : "";
@@ -5680,12 +5735,15 @@ function exportDTCG(state, opts) {
     for (const key of Object.keys(p.stops)) {
       grp[key] = colorLeaf(p.stops[key].rgb, 1, null);
     }
+    // scrims NEST under a scrim/ group (ADR-016 — two segments, never a numeral-compound leaf).
+    const scrimGrp = {};
     for (const base of SCRIM_BASES) {
       for (const step of SCRIM_STEPS) {
         const sc = p.scrims[base][step];
-        grp[`${pad3(base)}-${pad3(step)}`] = colorLeaf(sc.rgb, sc.frac, null);
+        scrimGrp[pad3(step)] = colorLeaf(sc.rgb, sc.frac, null);
       }
     }
+    grp.scrim = scrimGrp;
     rawTree[p.n] = grp;
   }
   // constants — fixed, non-palette raw primitives (currently just dialog-backdrop), a sibling GROUP
@@ -5702,9 +5760,9 @@ function exportDTCG(state, opts) {
         const side = mode === "light" ? r.light : r.dark;
         const ref = mode === "light" ? r.lightRef : r.darkRef;
         const alias = rawColl
-          ? { targetVariableName: `${p.n}/${refKey(ref)}`, targetVariableSetName: rawColl }
+          ? { targetVariableName: `${p.n}/${refPath(ref)}`, targetVariableSetName: rawColl }
           : null;
-        grp[r.key] = colorLeaf(side.rgb, side.frac, alias);
+        grp[roleLeaf(p.n, r)] = colorLeaf(side.rgb, side.frac, alias);
       }
       tree[p.n] = grp;
     }
@@ -5749,16 +5807,16 @@ function exportUI3(state) {
     for (const base of SCRIM_BASES) {
       for (const step of SCRIM_STEPS) {
         const sc = p.scrims[base][step];
-        primVars[`raw/${p.n}/${pad3(base)}-${pad3(step)}`] = { type: "COLOR", values: { Base: sc.hex } };
+        primVars[`raw/${p.n}/${refPath(`${base}-${step}`)}`] = { type: "COLOR", values: { Base: sc.hex } };
       }
     }
-    // semantic: "{n}/{key}" -> in-file aliases to the raw key paths per mode.
+    // semantic: "{n}/{kebab leaf}" -> in-file aliases to the raw key paths per mode (ADR-016).
     for (const r of p.roles) {
-      semVars[`${p.n}/${r.key}`] = {
+      semVars[`${p.n}/${roleLeaf(p.n, r)}`] = {
         type: "COLOR",
         values: {
-          Light: `{raw/${p.n}/${refKey(r.lightRef)}}`,
-          Dark: `{raw/${p.n}/${refKey(r.darkRef)}}`,
+          Light: `{raw/${p.n}/${refPath(r.lightRef)}}`,
+          Dark: `{raw/${p.n}/${refPath(r.darkRef)}}`,
         },
       };
     }
@@ -5772,8 +5830,8 @@ function exportUI3(state) {
   return {
     $schema: "figma-ui3-variables.color.schema.v1",
     collections: {
-      "Color / Primitives": { modes: ["Base"], variables: primVars },
-      "Color / Semantic": { modes: ["Light", "Dark"], variables: semVars },
+      [COLLECTIONS.colorRaw]: { modes: ["Base"], variables: primVars },
+      [COLLECTIONS.colorSemantic]: { modes: ["Light", "Dark"], variables: semVars },
     },
   };
 }
@@ -7229,7 +7287,7 @@ __M.figmaPlugin = (function(){
 const FIGMA_PLUGIN = {
   name: "Color Tokens Semantic Binder",
   manifest: "{\n  \"name\": \"Color Tokens Semantic Binder\",\n  \"id\": \"color-tokens-semantic-binder\",\n  \"api\": \"1.0.0\",\n  \"main\": \"code.js\",\n  \"editorType\": [\n    \"figma\"\n  ],\n  \"documentAccess\": \"dynamic-page\",\n  \"networkAccess\": {\n    \"allowedDomains\": [\n      \"none\"\n    ]\n  }\n}\n",
-  code: "// figma-semantic-binder/code.js — the Color Tokens cascade binder runtime.\n//\n// Runs inside Figma (uses the `figma` global). It gives the live raw->semantic cascade that\n// native JSON import cannot (knowledge-05 §1): each semantic role is aliased to the REAL raw\n// Variable object via figma.variables.createVariableAlias, so editing a raw color propagates\n// to every semantic role that aliases it.\n//\n// OFFLINE (ADR-010 / AC-P3): no network I/O. No fetch / XMLHttpRequest / WebSocket / dynamic\n// import() of a remote URL / figma.showUI to a remote origin. manifest.networkAccess === \"none\".\n//\n// PARITY: the binding loop below MIRRORS ../bind-plan.mjs (bindingPlan / bindingTargets) — the\n// same role table, the same refKey normaliser, the same \"{n}/{refKey(ref)}\" target grammar.\n// bind-plan.mjs is the pure, harness-tested source of truth; this file replicates it verbatim\n// because Figma plugin code runs in a non-module sandbox and cannot import the .mjs at run time.\n// Both derive from the validated capability.system.semantic-mapping role table. Because every\n// target is refKey() of a ref from that table (solid stop -> pad3 \"050\"; scrim base 250/500/750\n// with alpha% = step/10 -> \"{base}-{step}\" verbatim), every emitted \"{n}/{refKey}\" is a member of\n// the canonical raw-colors name set — no unpadded \"{n}/50\", no out-of-range \"{n}/500-999\".\n\nconst RAW_COLLECTION = \"Color Primitives\";\nconst SEMANTIC_COLLECTION = \"Color Modes\";\n\n// The 8 default palettes (knowledge-05 §3; defaults[].name in data/role-table.json).\nconst PALETTES = [\n  \"neutral\",\n  \"primary\",\n  \"secondary\",\n  \"tertiary\",\n  \"info\",\n  \"success\",\n  \"danger\",\n  \"warning\",\n];\n\n// ── breakpoint-moded Type/Geometry (baked at download time) ──────────────────────────────\n// Color modes are ALIASES to already-imported raw primitives (the cascade above), so they can only be\n// bound live. Type/Geometry breakpoint modes are pure LITERAL float values — nothing to alias — so they\n// can be carried as DATA: app.js's downloadFigmaPlugin() string-replaces this anchor with the current\n// project's _figmaFloatPlans() at download time. Default [] = the generic/asset form (no breakpoints\n// baked in) — a no-op, so the checked-in binder stays palette-agnostic.\nconst FLOAT_PLANS = JSON.parse(\"[]\"); /* __ULTIMATE_TOKENS_FLOAT_PLANS__ */\n\n// FLOAT_REGISTRY_KEY — the PROVENANCE registry for the breakpoint-moded Type/Geometry collections, a\n// name→collectionId map stored in root pluginData (travels with the .fig, like the palette set). Kept\n// as the SAME key string as figma/plugin/code.js so the flagship plugin and this binder converge on the\n// SAME collections idempotently if a user runs both against one file.\nconst FLOAT_REGISTRY_KEY = \"ultimate-tokens-float-collections\";\n\n// MIRRORS figma/plugin/code.js's float executor: readFloatRegistry/writeFloatRegistry/\n// ensureFloatCollection/varsByName/applyFloatPlans are ported VERBATIM — a pure DATA executor (no\n// planner to spec-gate against), using only figma.variables.* + figma.root.get/setPluginData, both\n// available to any plugin (no color-specific state). The executable bodies MUST stay byte-identical to\n// the flagship (the surrounding comments may differ); the `floatparity` gate in test/figma/binder.mjs\n// enforces it by comparing comment-stripped bodies, so running both converges on ONE collection set.\nfunction readFloatRegistry() {\n  const raw = figma.root.getPluginData(FLOAT_REGISTRY_KEY);\n  if (!raw) return {};\n  try { const r = JSON.parse(raw); return r && typeof r === \"object\" ? r : {}; } catch (e) { return {}; }\n}\nfunction writeFloatRegistry(reg) { figma.root.setPluginData(FLOAT_REGISTRY_KEY, JSON.stringify(reg)); }\n\n// ensureFloatCollection — OUR managed Type/Geometry collection for `name`, by PROVENANCE (the registry's\n// stored id), creating + registering it if absent. Unlike ensureCollection (color, below), it NEVER\n// adopts a same-named collection it didn't create — so applyFloatPlans' rename/prune can't ever hit a\n// user's own \"Typography\"/\"Geometry\". A user manual-rename survives (we track id, not name); a\n// user-deleted one is re-created. `reg` is mutated in place; the caller persists it once via writeFloatRegistry.\nasync function ensureFloatCollection(name, reg, renameFrom) {\n  const cols = await figma.variables.getLocalVariableCollectionsAsync();\n  const known = reg[name] && cols.find((c) => c.id === reg[name]);\n  if (known) return known;\n  for (const old of (Array.isArray(renameFrom) ? renameFrom : [])) {\n    const prev = reg[old] && cols.find((c) => c.id === reg[old]);\n    if (prev) {\n      prev.name = name;\n      reg[name] = prev.id;\n      delete reg[old];\n      return prev;\n    }\n  }\n  const made = figma.variables.createVariableCollection(name);\n  reg[name] = made.id;\n  return made;\n}\n\nasync function varsByName(collectionId) {\n  const all = await figma.variables.getLocalVariablesAsync();\n  const m = {};\n  for (const v of all) if (v.variableCollectionId === collectionId) m[v.name] = v;\n  return m;\n}\n\n// applyFloatPlans — execute the UI-computed apply PLANS that figma/binder/mode-apply-plan.mjs produces\n// (one entry per collection: { collection, modes, defaultMode:\"Base\", addModes, variables:[{name,type,\n// values:[{mode,value}]}] }). The plan is pure DATA the UI already ran validateModeInterchange + ordering\n// over, so this stays a thin EXECUTOR — there is no planner to inline or parity-gate (unlike the color\n// cascade above, which mirrors the role table). Idempotent: collections, modes, and variables are\n// reconciled BY NAME and stale ones pruned, so re-applying after a breakpoint/voice change converges the\n// file to exactly the current plan (never doubling, never leaving a removed breakpoint's mode behind).\nasync function applyFloatPlans(plans) {\n  let collections = 0, variables = 0;\n  const reg = readFloatRegistry(); // provenance: only ever touch a collection this plugin created (see ensureFloatCollection)\n  for (const plan of (Array.isArray(plans) ? plans : [])) {\n    if (!plan || !plan.collection || !Array.isArray(plan.modes) || !plan.modes.length) continue;\n    const coll = await ensureFloatCollection(plan.collection, reg, plan.renameFrom);\n    // The collection's DEFAULT mode (Figma rejects removing it) — rename it to the plan's first mode (\"Base\");\n    // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a plugin-created\n    // collection they coincide, but a foreign same-named collection's default may not be the first mode, and\n    // pruning it would throw. (The headless mock has no defaultModeId → falls back to modes[0].)\n    const defaultId = coll.defaultModeId || coll.modes[0].modeId;\n    coll.renameMode(defaultId, plan.defaultMode);\n    const findMode = (nm) => coll.modes.find((m) => m.name.toLowerCase() === String(nm).toLowerCase());\n    const modeId = {};\n    modeId[plan.defaultMode] = defaultId;\n    for (const nm of plan.addModes) { const ex = findMode(nm); modeId[nm] = ex ? ex.modeId : coll.addMode(nm); }\n    // prune stale modes (a breakpoint the user removed) — never the default, never the last remaining mode.\n    const wanted = new Set(plan.modes.map((m) => String(m).toLowerCase()));\n    for (const m of coll.modes.slice()) {\n      if (m.modeId === defaultId) continue;\n      if (!wanted.has(m.name.toLowerCase()) && coll.modes.length > 1) coll.removeMode(m.modeId);\n    }\n    // variables: create-or-reuse by name; write every mode's value; prune orphans scoped to THIS collection.\n    const byName = await varsByName(coll.id);\n    for (const [oldName, newName] of Object.entries(plan.renames || {})) {\n      if (byName[oldName] && !byName[newName]) {\n        byName[oldName].name = newName;\n        byName[newName] = byName[oldName];\n        delete byName[oldName];\n      }\n    }\n    const current = new Set();\n    for (const v of plan.variables) {\n      const vr = byName[v.name] || figma.variables.createVariable(v.name, coll, v.type || \"FLOAT\");\n      for (const pair of v.values) {\n        const mid = modeId[pair.mode];\n        if (mid != null && Number.isFinite(Number(pair.value))) vr.setValueForMode(mid, Number(pair.value));\n      }\n      byName[v.name] = vr; current.add(v.name); variables++;\n    }\n    for (const name of Object.keys(byName)) if (!current.has(name)) byName[name].remove();\n    // retire — collections THIS plan supersedes (plan.retire; TKT-0009, see the flagship's comment).\n    for (const nm of (Array.isArray(plan.retire) ? plan.retire : [])) {\n      if (!reg[nm]) continue;\n      const cols = await figma.variables.getLocalVariableCollectionsAsync();\n      const stale = cols.find((c) => c.id === reg[nm]);\n      if (stale) stale.remove();\n      delete reg[nm];\n    }\n    collections++;\n  }\n  writeFloatRegistry(reg); // persist the name→id provenance map (any newly-created collections)\n  return { collections: collections, variables: variables };\n}\n\n// refKey: mirror of semantic.js / bind-plan.mjs. Solid stops zero-pad to 3 digits\n// (\"50\" -> \"050\"); scrim refs (\"500-200\") keep the \"-step\" suffix and pad the base stop.\nfunction refKey(ref) {\n  const s = String(ref);\n  const dash = s.indexOf(\"-\");\n  if (dash === -1) return s.padStart(3, \"0\");\n  return s.slice(0, dash).padStart(3, \"0\") + s.slice(dash);\n}\n\n// roleTable(n) — the 53 roles for a palette, name-substituted exactly as semantic.js /\n// bind-plan.mjs produce them: accent + on-accent keys carry the palette name; shared roles do\n// not. Refs are the canonical values from data/role-table.json (validated semantic-mapping).\n// `key` is the semantic variable name part (\"{n}/{key}\"); `light`/`dark` feed targetName.\nfunction roleTable(n) {\n  const N = n.charAt(0).toUpperCase() + n.slice(1);\n  return [\n    // 1. ACCENT — name-prefixed; prime role has empty suffix.\n    { key: n, suffix: \"\", light: \"550\", dark: \"450\" },\n    { key: n + \"Dim\", suffix: \"-dim\", light: \"650\", dark: \"700\" },\n    { key: n + \"Bright\", suffix: \"-bright\", light: \"350\", dark: \"400\" },\n    { key: n + \"Low\", suffix: \"-low\", light: \"350\", dark: \"700\" },\n    { key: n + \"High\", suffix: \"-high\", light: \"650\", dark: \"400\" },\n\n    // 1b. ACCENT INTERACTION STATES — hover/active are prime ±1/±2 steps (mode-mirrored); disabled a\n    //     translucent wash of the palette's 500 at 60% (no neutral primitive in the per-palette ref model). Lockstep w/ semantic.js.\n    { key: n + \"Hover\", suffix: \"-hover\", light: \"650\", dark: \"350\" },\n    { key: n + \"Active\", suffix: \"-active\", light: \"750\", dark: \"250\" },\n    { key: n + \"Disabled\", suffix: \"-disabled\", light: \"500-600\", dark: \"500-600\" },\n\n    // 2. ON-ACCENT — name-prefixed; fixed to the light end in BOTH modes (OD-001).\n    { key: \"on\" + N, suffix: \"-on-\" + n, light: \"50\", dark: \"50\" },\n    { key: \"on\" + N + \"Variant\", suffix: \"-on-\" + n + \"-variant\", light: \"200\", dark: \"200\" },\n\n    // 2b. ON-ACCENT INTERACTION STATES — hover/active track the base on-color; disabled is a translucent\n    //     inert label (opts out of the contrast guarantee). Lockstep w/ semantic.js.\n    { key: \"on\" + N + \"Hover\", suffix: \"-on-\" + n + \"-hover\", light: \"50\", dark: \"50\" },\n    { key: \"on\" + N + \"Active\", suffix: \"-on-\" + n + \"-active\", light: \"50\", dark: \"50\" },\n    { key: \"on\" + N + \"Disabled\", suffix: \"-on-\" + n + \"-disabled\", light: \"500-400\", dark: \"500-400\" },\n\n    // 3. ON-SURFACE — shared.\n    { key: \"onSurface\", suffix: \"-on-surface\", light: \"950\", dark: \"50\" },\n    { key: \"onSurfaceVariant\", suffix: \"-on-surface-variant\", light: \"750\", dark: \"250\" },\n\n    // 3b. ON-SURFACE INTERACTION STATES — shared. onSurface holds at the ceiling (950/50); disabled a\n    //     translucent inert label on the 500 ramp. onSurfaceVariant carries NO states. Lockstep w/ semantic.js.\n    { key: \"onSurfaceHover\", suffix: \"-on-surface-hover\", light: \"950\", dark: \"50\" },\n    { key: \"onSurfaceActive\", suffix: \"-on-surface-active\", light: \"950\", dark: \"50\" },\n    { key: \"onSurfaceDisabled\", suffix: \"-on-surface-disabled\", light: \"500-400\", dark: \"500-400\" },\n\n    // placeholder — field placeholder text: one mirrored step MORE muted than onSurfaceVariant (650/350);\n    // a SOLID stop (translucent placeholder text is the classic a11y failure), fixed per mode.\n    { key: \"placeholder\", suffix: \"-placeholder\", light: \"650\", dark: \"350\" },\n\n    // 4. OUTLINE — shared; on the 500 scrim ramp (light === dark).\n    { key: \"outline\", suffix: \"-outline\", light: \"500-600\", dark: \"500-600\" },\n    { key: \"outlineVariant\", suffix: \"-outline-variant\", light: \"500-300\", dark: \"500-300\" }, // no interaction states\n\n    // 4b. OUTLINE INTERACTION STATES — one strength stronger per state; disabled a faint border.\n    //     outlineVariant (the weaker divider) carries NONE. Lockstep w/ semantic.js.\n    { key: \"outlineHover\", suffix: \"-outline-hover\", light: \"500-700\", dark: \"500-700\" },\n    { key: \"outlineActive\", suffix: \"-outline-active\", light: \"500-800\", dark: \"500-800\" },\n    { key: \"outlineDisabled\", suffix: \"-outline-disabled\", light: \"500-400\", dark: \"500-400\" },\n\n    // 5. CONTAINER — shared; on the 500 scrim ramp (light === dark).\n    { key: \"container\", suffix: \"-container\", light: \"500-200\", dark: \"500-200\" },\n    { key: \"containerLow\", suffix: \"-container-low\", light: \"500-100\", dark: \"500-100\" },\n    { key: \"containerHigh\", suffix: \"-container-high\", light: \"500-300\", dark: \"500-300\" },\n\n    // 5b. CONTAINER INTERACTION STATES — one strength stronger per state; disabled the faintest.\n    { key: \"containerHover\", suffix: \"-container-hover\", light: \"500-300\", dark: \"500-300\" },\n    { key: \"containerActive\", suffix: \"-container-active\", light: \"500-400\", dark: \"500-400\" },\n    { key: \"containerDisabled\", suffix: \"-container-disabled\", light: \"500-100\", dark: \"500-100\" },\n\n    // 6. INVERSE — shared.\n    { key: \"inverseSurface\", suffix: \"-inverse-surface\", light: \"900\", dark: \"100\" },\n    { key: \"inverseOnSurface\", suffix: \"-inverse-on-surface\", light: \"50\", dark: \"950\" },\n\n    // 7. SURFACE — shared base surfaces.\n    { key: \"background\", suffix: \"-background\", light: \"100\", dark: \"900\" },\n    { key: \"surface\", suffix: \"-surface\", light: \"125\", dark: \"875\" },\n\n    // 8. SURFACE DIM/BRIGHT — shared; non-mirror.\n    { key: \"surfaceDimmest\", suffix: \"-surface-dimmest\", light: \"200\", dark: \"950\" },\n    { key: \"surfaceDimmer\", suffix: \"-surface-dimmer\", light: \"175\", dark: \"925\" },\n    { key: \"surfaceDim\", suffix: \"-surface-dim\", light: \"150\", dark: \"900\" },\n    { key: \"surfaceBright\", suffix: \"-surface-bright\", light: \"100\", dark: \"850\" },\n    { key: \"surfaceBrighter\", suffix: \"-surface-brighter\", light: \"75\", dark: \"825\" },\n    { key: \"surfaceBrightest\", suffix: \"-surface-brightest\", light: \"50\", dark: \"800\" },\n\n    // 9. SURFACE LOW/HIGH — shared; mirror (sum 1000).\n    { key: \"surfaceLowest\", suffix: \"-surface-lowest\", light: \"50\", dark: \"950\" },\n    { key: \"surfaceLower\", suffix: \"-surface-lower\", light: \"75\", dark: \"925\" },\n    { key: \"surfaceLow\", suffix: \"-surface-low\", light: \"100\", dark: \"900\" },\n    { key: \"surfaceHigh\", suffix: \"-surface-high\", light: \"150\", dark: \"850\" },\n    { key: \"surfaceHigher\", suffix: \"-surface-higher\", light: \"175\", dark: \"825\" },\n    { key: \"surfaceHighest\", suffix: \"-surface-highest\", light: \"200\", dark: \"800\" },\n\n    // 10. SCRIM — shared; 7 strengths on the 500 ramp (alpha% = step/10), mode-independent.\n    //     Listed LAST (mirrors semantic.js) so the bound variables group regular → containers →\n    //     surfaces → scrims. Sequential 5–60%: weakest..strongest = 50/100/200/300/400/500/600.\n    { key: \"scrimWeakest\", suffix: \"-scrim-weakest\", light: \"500-050\", dark: \"500-050\" },\n    { key: \"scrimWeaker\", suffix: \"-scrim-weaker\", light: \"500-100\", dark: \"500-100\" },\n    { key: \"scrimWeak\", suffix: \"-scrim-weak\", light: \"500-200\", dark: \"500-200\" },\n    { key: \"scrim\", suffix: \"-scrim\", light: \"500-300\", dark: \"500-300\" },\n    { key: \"scrimStrong\", suffix: \"-scrim-strong\", light: \"500-400\", dark: \"500-400\" },\n    { key: \"scrimStronger\", suffix: \"-scrim-stronger\", light: \"500-500\", dark: \"500-500\" },\n    { key: \"scrimStrongest\", suffix: \"-scrim-strongest\", light: \"500-600\", dark: \"500-600\" },\n  ];\n}\n\n// The raw-colors target a ref resolves to: \"{n}/{refKey(ref)}\" — the load-bearing grammar.\n// Identical to bind-plan.mjs targetName; guarantees membership in the canonical raw name set.\nfunction targetName(paletteName, ref) {\n  return paletteName + \"/\" + refKey(ref);\n}\n\nasync function main() {\n  const collections = await figma.variables.getLocalVariableCollectionsAsync();\n  const rawColl = collections.find((c) => c.name === RAW_COLLECTION);\n\n  // Color and Type/Geometry breakpoints are INDEPENDENT — neither aborts the other. Color needs a live\n  // \"Color Primitives\" collection to alias against (skipped, not fatal, when absent); the breakpoint\n  // collections are baked data (FLOAT_PLANS) that need nothing from the file.\n  let bound = 0;\n  const missing = [];\n  if (rawColl) {\n    // 1. Index the Color Primitives variables by name.\n    const allVars = await figma.variables.getLocalVariablesAsync();\n    const rawVars = {};\n    for (const v of allVars) {\n      if (v.variableCollectionId === rawColl.id) rawVars[v.name] = v;\n    }\n\n    // 2. Create/find the Color Modes collection with Light + Dark modes.\n    let sem = collections.find((c) => c.name === SEMANTIC_COLLECTION);\n    if (!sem) sem = figma.variables.createVariableCollection(SEMANTIC_COLLECTION);\n    const lightMode = sem.modes[0].modeId;\n    const darkMode = (sem.modes[1] && sem.modes[1].modeId) || sem.addMode(\"Dark\");\n\n    // 3. For each palette and role, resolve lt/dt = rawVars[\"{n}/{refKey(...)}\"] and alias both\n    //    modes by reference (the cascade). Mirrors bind-plan.mjs.bindingPlan.\n    for (const n of PALETTES) {\n      for (const r of roleTable(n)) {\n        const ltName = targetName(n, r.light);\n        const dtName = targetName(n, r.dark);\n        const lt = rawVars[ltName];\n        const dt = rawVars[dtName];\n        if (!lt) { missing.push(ltName); continue; }\n        if (!dt) { missing.push(dtName); continue; }\n\n        const semName = n + \"/\" + r.key;\n        const refreshed = await figma.variables.getLocalVariablesAsync();\n        const semVar =\n          refreshed.find((v) => v.variableCollectionId === sem.id && v.name === semName) ||\n          figma.variables.createVariable(semName, sem, \"COLOR\");\n\n        semVar.setValueForMode(lightMode, figma.variables.createVariableAlias(lt));\n        semVar.setValueForMode(darkMode, figma.variables.createVariableAlias(dt));\n        bound++;\n      }\n    }\n  }\n\n  // 4. Type/Geometry breakpoint-moded FLOAT collections — baked at download time (see FLOAT_PLANS above).\n  //    A no-op (fp stays null) for the generic/asset checked-in binder, whose FLOAT_PLANS is [].\n  let fp = null;\n  if (FLOAT_PLANS.length) fp = await applyFloatPlans(FLOAT_PLANS);\n\n  if (!rawColl && !fp) {\n    figma.notify('No \"Color Primitives\" collection found — apply your palette in Ultimate Tokens first, then run the Binder.', { error: true });\n    figma.closePlugin();\n    return;\n  }\n\n  const parts = [];\n  parts.push(\n    rawColl\n      ? \"Bound \" + bound + \" colour role\" + (bound === 1 ? \"\" : \"s\") + (missing.length ? (\", \" + missing.length + \" skipped (raw colour missing)\") : \"\")\n      : 'Colour skipped — no \"Color Primitives\" collection',\n  );\n  if (fp) parts.push(fp.collections + \" breakpoint collection\" + (fp.collections === 1 ? \"\" : \"s\") + \", \" + fp.variables + \" sized var\" + (fp.variables === 1 ? \"\" : \"s\"));\n  figma.notify(parts.join(\" · \"));\n  figma.closePlugin();\n}\n\n// Never surface a raw error / stack to the user (Figma policy): log the technical detail to the console,\n// show a friendly message, and close cleanly.\nmain().catch((e) => {\n  console.error(\"[Color Tokens Semantic Binder] bind failed:\", e);\n  figma.notify(\"Couldn't bind the semantic variables. Please try again — if it keeps happening, open an issue at github.com/kimgranlund/ultimate-tokens.\", { error: true });\n  figma.closePlugin();\n});\n",
+  code: "// figma-semantic-binder/code.js — the Color Tokens cascade binder runtime.\n//\n// Runs inside Figma (uses the `figma` global). It gives the live raw->semantic cascade that\n// native JSON import cannot (knowledge-05 §1): each semantic role is aliased to the REAL raw\n// Variable object via figma.variables.createVariableAlias, so editing a raw color propagates\n// to every semantic role that aliases it.\n//\n// OFFLINE (ADR-010 / AC-P3): no network I/O. No fetch / XMLHttpRequest / WebSocket / dynamic\n// import() of a remote URL / figma.showUI to a remote origin. manifest.networkAccess === \"none\".\n//\n// PARITY: the binding loop below MIRRORS ../bind-plan.mjs (bindingPlan / bindingTargets) — the\n// same role table, the same refKey normaliser, the same \"{n}/{refKey(ref)}\" target grammar.\n// bind-plan.mjs is the pure, harness-tested source of truth; this file replicates it verbatim\n// because Figma plugin code runs in a non-module sandbox and cannot import the .mjs at run time.\n// Both derive from the validated capability.system.semantic-mapping role table. Because every\n// target is refKey() of a ref from that table (solid stop -> pad3 \"050\"; scrim base 250/500/750\n// with alpha% = step/10 -> \"{base}-{step}\" verbatim), every emitted \"{n}/{refKey}\" is a member of\n// the canonical raw-colors name set — no unpadded \"{n}/50\", no out-of-range \"{n}/500-999\".\n\nconst RAW_COLLECTION = \"Color Primitives\";\nconst SEMANTIC_COLLECTION = \"Color Semantic\"; // ADR-016 (was \"Color Modes\")\n\n// The 8 default palettes (knowledge-05 §3; defaults[].name in data/role-table.json).\nconst PALETTES = [\n  \"neutral\",\n  \"primary\",\n  \"secondary\",\n  \"tertiary\",\n  \"info\",\n  \"success\",\n  \"danger\",\n  \"warning\",\n];\n\n// ── breakpoint-moded Type/Geometry (baked at download time) ──────────────────────────────\n// Color modes are ALIASES to already-imported raw primitives (the cascade above), so they can only be\n// bound live. Type/Geometry breakpoint modes are pure LITERAL float values — nothing to alias — so they\n// can be carried as DATA: app.js's downloadFigmaPlugin() string-replaces this anchor with the current\n// project's _figmaFloatPlans() at download time. Default [] = the generic/asset form (no breakpoints\n// baked in) — a no-op, so the checked-in binder stays palette-agnostic.\nconst FLOAT_PLANS = JSON.parse(\"[]\"); /* __ULTIMATE_TOKENS_FLOAT_PLANS__ */\n\n// FLOAT_REGISTRY_KEY — the PROVENANCE registry for the breakpoint-moded Type/Geometry collections, a\n// name→collectionId map stored in root pluginData (travels with the .fig, like the palette set). Kept\n// as the SAME key string as figma/plugin/code.js so the flagship plugin and this binder converge on the\n// SAME collections idempotently if a user runs both against one file.\nconst FLOAT_REGISTRY_KEY = \"ultimate-tokens-float-collections\";\n\n// MIRRORS figma/plugin/code.js's float executor: readFloatRegistry/writeFloatRegistry/\n// ensureFloatCollection/varsByName/applyFloatPlans are ported VERBATIM — a pure DATA executor (no\n// planner to spec-gate against), using only figma.variables.* + figma.root.get/setPluginData, both\n// available to any plugin (no color-specific state). The executable bodies MUST stay byte-identical to\n// the flagship (the surrounding comments may differ); the `floatparity` gate in test/figma/binder.mjs\n// enforces it by comparing comment-stripped bodies, so running both converges on ONE collection set.\nfunction readFloatRegistry() {\n  const raw = figma.root.getPluginData(FLOAT_REGISTRY_KEY);\n  if (!raw) return {};\n  try { const r = JSON.parse(raw); return r && typeof r === \"object\" ? r : {}; } catch (e) { return {}; }\n}\nfunction writeFloatRegistry(reg) { figma.root.setPluginData(FLOAT_REGISTRY_KEY, JSON.stringify(reg)); }\n\n// ensureFloatCollection — OUR managed Type/Geometry collection for `name`, by PROVENANCE (the registry's\n// stored id), creating + registering it if absent. Unlike ensureCollection (color, below), it NEVER\n// adopts a same-named collection it didn't create — so applyFloatPlans' rename/prune can't ever hit a\n// user's own \"Typography\"/\"Geometry\". A user manual-rename survives (we track id, not name); a\n// user-deleted one is re-created. `reg` is mutated in place; the caller persists it once via writeFloatRegistry.\nasync function ensureFloatCollection(name, reg, renameFrom) {\n  const cols = await figma.variables.getLocalVariableCollectionsAsync();\n  const known = reg[name] && cols.find((c) => c.id === reg[name]);\n  if (known) return known;\n  for (const old of (Array.isArray(renameFrom) ? renameFrom : [])) {\n    const prev = reg[old] && cols.find((c) => c.id === reg[old]);\n    if (prev) {\n      prev.name = name;\n      reg[name] = prev.id;\n      delete reg[old];\n      return prev;\n    }\n  }\n  const made = figma.variables.createVariableCollection(name);\n  reg[name] = made.id;\n  return made;\n}\n\nasync function varsByName(collectionId) {\n  const all = await figma.variables.getLocalVariablesAsync();\n  const m = {};\n  for (const v of all) if (v.variableCollectionId === collectionId) m[v.name] = v;\n  return m;\n}\n\n// applyFloatPlans — execute the UI-computed apply PLANS that figma/binder/mode-apply-plan.mjs produces\n// (one entry per collection: { collection, modes, defaultMode:\"Base\", addModes, variables:[{name,type,\n// values:[{mode,value}]}] }). The plan is pure DATA the UI already ran validateModeInterchange + ordering\n// over, so this stays a thin EXECUTOR — there is no planner to inline or parity-gate (unlike the color\n// cascade above, which mirrors the role table). Idempotent: collections, modes, and variables are\n// reconciled BY NAME and stale ones pruned, so re-applying after a breakpoint/voice change converges the\n// file to exactly the current plan (never doubling, never leaving a removed breakpoint's mode behind).\nasync function applyFloatPlans(plans) {\n  let collections = 0, variables = 0;\n  const reg = readFloatRegistry(); // provenance: only ever touch a collection this plugin created (see ensureFloatCollection)\n  for (const plan of (Array.isArray(plans) ? plans : [])) {\n    if (!plan || !plan.collection || !Array.isArray(plan.modes) || !plan.modes.length) continue;\n    const coll = await ensureFloatCollection(plan.collection, reg, plan.renameFrom);\n    // The collection's DEFAULT mode (Figma rejects removing it) — rename it to the plan's first mode (\"Base\");\n    // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a plugin-created\n    // collection they coincide, but a foreign same-named collection's default may not be the first mode, and\n    // pruning it would throw. (The headless mock has no defaultModeId → falls back to modes[0].)\n    const defaultId = coll.defaultModeId || coll.modes[0].modeId;\n    coll.renameMode(defaultId, plan.defaultMode);\n    const findMode = (nm) => coll.modes.find((m) => m.name.toLowerCase() === String(nm).toLowerCase());\n    const modeId = {};\n    modeId[plan.defaultMode] = defaultId;\n    for (const nm of plan.addModes) { const ex = findMode(nm); modeId[nm] = ex ? ex.modeId : coll.addMode(nm); }\n    // prune stale modes (a breakpoint the user removed) — never the default, never the last remaining mode.\n    const wanted = new Set(plan.modes.map((m) => String(m).toLowerCase()));\n    for (const m of coll.modes.slice()) {\n      if (m.modeId === defaultId) continue;\n      if (!wanted.has(m.name.toLowerCase()) && coll.modes.length > 1) coll.removeMode(m.modeId);\n    }\n    // variables: create-or-reuse by name; write every mode's value; prune orphans scoped to THIS collection.\n    const byName = await varsByName(coll.id);\n    for (const [oldName, newName] of Object.entries(plan.renames || {})) {\n      if (byName[oldName] && !byName[newName]) {\n        byName[oldName].name = newName;\n        byName[newName] = byName[oldName];\n        delete byName[oldName];\n      }\n    }\n    const current = new Set();\n    for (const v of plan.variables) {\n      const vr = byName[v.name] || figma.variables.createVariable(v.name, coll, v.type || \"FLOAT\");\n      for (const pair of v.values) {\n        const mid = modeId[pair.mode];\n        if (mid != null && Number.isFinite(Number(pair.value))) vr.setValueForMode(mid, Number(pair.value));\n      }\n      byName[v.name] = vr; current.add(v.name); variables++;\n    }\n    for (const name of Object.keys(byName)) if (!current.has(name)) byName[name].remove();\n    // retire — collections THIS plan supersedes (plan.retire; TKT-0009, see the flagship's comment).\n    for (const nm of (Array.isArray(plan.retire) ? plan.retire : [])) {\n      if (!reg[nm]) continue;\n      const cols = await figma.variables.getLocalVariableCollectionsAsync();\n      const stale = cols.find((c) => c.id === reg[nm]);\n      if (stale) stale.remove();\n      delete reg[nm];\n    }\n    collections++;\n  }\n  writeFloatRegistry(reg); // persist the name→id provenance map (any newly-created collections)\n  return { collections: collections, variables: variables };\n}\n\n// refKey: mirror of semantic.js refPath / bind-plan.mjs targetName (ADR-016). Solid stops zero-pad\n// to 3 digits (\"50\" -> \"050\"); scrim refs NEST — \"500-200\" -> \"scrim/200\" (the canonical 500 base is\n// omitted; a non-500 base would emit \"scrim/{base}/{step}\").\nfunction refKey(ref) {\n  const s = String(ref);\n  const dash = s.indexOf(\"-\");\n  if (dash === -1) return s.padStart(3, \"0\");\n  const base = s.slice(0, dash);\n  const step = s.slice(dash + 1).padStart(3, \"0\");\n  return (base === \"500\" ? \"scrim/\" : \"scrim/\" + base.padStart(3, \"0\") + \"/\") + step;\n}\n\n// roleTable(n) — the 53 roles for a palette, name-substituted exactly as semantic.js /\n// bind-plan.mjs produce them: accent + on-accent keys carry the palette name; shared roles do\n// not. Refs are the canonical values from data/role-table.json (validated semantic-mapping).\n// The semantic variable name is \"{n}/{kebab leaf}\" (suffix-derived, ADR-016); `light`/`dark` feed targetName.\nfunction roleTable(n) {\n  const N = n.charAt(0).toUpperCase() + n.slice(1);\n  return [\n    // 1. ACCENT — name-prefixed; prime role has empty suffix.\n    { key: n, suffix: \"\", light: \"550\", dark: \"450\" },\n    { key: n + \"Dim\", suffix: \"-dim\", light: \"650\", dark: \"700\" },\n    { key: n + \"Bright\", suffix: \"-bright\", light: \"350\", dark: \"400\" },\n    { key: n + \"Low\", suffix: \"-low\", light: \"350\", dark: \"700\" },\n    { key: n + \"High\", suffix: \"-high\", light: \"650\", dark: \"400\" },\n\n    // 1b. ACCENT INTERACTION STATES — hover/active are prime ±1/±2 steps (mode-mirrored); disabled a\n    //     translucent wash of the palette's 500 at 60% (no neutral primitive in the per-palette ref model). Lockstep w/ semantic.js.\n    { key: n + \"Hover\", suffix: \"-hover\", light: \"650\", dark: \"350\" },\n    { key: n + \"Active\", suffix: \"-active\", light: \"750\", dark: \"250\" },\n    { key: n + \"Disabled\", suffix: \"-disabled\", light: \"500-600\", dark: \"500-600\" },\n\n    // 2. ON-ACCENT — name-prefixed; fixed to the light end in BOTH modes (OD-001).\n    { key: \"on\" + N, suffix: \"-on-\" + n, light: \"50\", dark: \"50\" },\n    { key: \"on\" + N + \"Variant\", suffix: \"-on-\" + n + \"-variant\", light: \"200\", dark: \"200\" },\n\n    // 2b. ON-ACCENT INTERACTION STATES — hover/active track the base on-color; disabled is a translucent\n    //     inert label (opts out of the contrast guarantee). Lockstep w/ semantic.js.\n    { key: \"on\" + N + \"Hover\", suffix: \"-on-\" + n + \"-hover\", light: \"50\", dark: \"50\" },\n    { key: \"on\" + N + \"Active\", suffix: \"-on-\" + n + \"-active\", light: \"50\", dark: \"50\" },\n    { key: \"on\" + N + \"Disabled\", suffix: \"-on-\" + n + \"-disabled\", light: \"500-400\", dark: \"500-400\" },\n\n    // 3. ON-SURFACE — shared.\n    { key: \"onSurface\", suffix: \"-on-surface\", light: \"950\", dark: \"50\" },\n    { key: \"onSurfaceVariant\", suffix: \"-on-surface-variant\", light: \"750\", dark: \"250\" },\n\n    // 3b. ON-SURFACE INTERACTION STATES — shared. onSurface holds at the ceiling (950/50); disabled a\n    //     translucent inert label on the 500 ramp. onSurfaceVariant carries NO states. Lockstep w/ semantic.js.\n    { key: \"onSurfaceHover\", suffix: \"-on-surface-hover\", light: \"950\", dark: \"50\" },\n    { key: \"onSurfaceActive\", suffix: \"-on-surface-active\", light: \"950\", dark: \"50\" },\n    { key: \"onSurfaceDisabled\", suffix: \"-on-surface-disabled\", light: \"500-400\", dark: \"500-400\" },\n\n    // placeholder — field placeholder text: one mirrored step MORE muted than onSurfaceVariant (650/350);\n    // a SOLID stop (translucent placeholder text is the classic a11y failure), fixed per mode.\n    { key: \"placeholder\", suffix: \"-placeholder\", light: \"650\", dark: \"350\" },\n\n    // 4. OUTLINE — shared; on the 500 scrim ramp (light === dark).\n    { key: \"outline\", suffix: \"-outline\", light: \"500-600\", dark: \"500-600\" },\n    { key: \"outlineVariant\", suffix: \"-outline-variant\", light: \"500-300\", dark: \"500-300\" }, // no interaction states\n\n    // 4b. OUTLINE INTERACTION STATES — one strength stronger per state; disabled a faint border.\n    //     outlineVariant (the weaker divider) carries NONE. Lockstep w/ semantic.js.\n    { key: \"outlineHover\", suffix: \"-outline-hover\", light: \"500-700\", dark: \"500-700\" },\n    { key: \"outlineActive\", suffix: \"-outline-active\", light: \"500-800\", dark: \"500-800\" },\n    { key: \"outlineDisabled\", suffix: \"-outline-disabled\", light: \"500-400\", dark: \"500-400\" },\n\n    // 5. CONTAINER — shared; on the 500 scrim ramp (light === dark).\n    { key: \"container\", suffix: \"-container\", light: \"500-200\", dark: \"500-200\" },\n    { key: \"containerLow\", suffix: \"-container-low\", light: \"500-100\", dark: \"500-100\" },\n    { key: \"containerHigh\", suffix: \"-container-high\", light: \"500-300\", dark: \"500-300\" },\n\n    // 5b. CONTAINER INTERACTION STATES — one strength stronger per state; disabled the faintest.\n    { key: \"containerHover\", suffix: \"-container-hover\", light: \"500-300\", dark: \"500-300\" },\n    { key: \"containerActive\", suffix: \"-container-active\", light: \"500-400\", dark: \"500-400\" },\n    { key: \"containerDisabled\", suffix: \"-container-disabled\", light: \"500-100\", dark: \"500-100\" },\n\n    // 6. INVERSE — shared.\n    { key: \"inverseSurface\", suffix: \"-inverse-surface\", light: \"900\", dark: \"100\" },\n    { key: \"inverseOnSurface\", suffix: \"-inverse-on-surface\", light: \"50\", dark: \"950\" },\n\n    // 7. SURFACE — shared base surfaces.\n    { key: \"background\", suffix: \"-background\", light: \"100\", dark: \"900\" },\n    { key: \"surface\", suffix: \"-surface\", light: \"125\", dark: \"875\" },\n\n    // 8. SURFACE DIM/BRIGHT — shared; non-mirror.\n    { key: \"surfaceDimmest\", suffix: \"-surface-dimmest\", light: \"200\", dark: \"950\" },\n    { key: \"surfaceDimmer\", suffix: \"-surface-dimmer\", light: \"175\", dark: \"925\" },\n    { key: \"surfaceDim\", suffix: \"-surface-dim\", light: \"150\", dark: \"900\" },\n    { key: \"surfaceBright\", suffix: \"-surface-bright\", light: \"100\", dark: \"850\" },\n    { key: \"surfaceBrighter\", suffix: \"-surface-brighter\", light: \"75\", dark: \"825\" },\n    { key: \"surfaceBrightest\", suffix: \"-surface-brightest\", light: \"50\", dark: \"800\" },\n\n    // 9. SURFACE LOW/HIGH — shared; mirror (sum 1000).\n    { key: \"surfaceLowest\", suffix: \"-surface-lowest\", light: \"50\", dark: \"950\" },\n    { key: \"surfaceLower\", suffix: \"-surface-lower\", light: \"75\", dark: \"925\" },\n    { key: \"surfaceLow\", suffix: \"-surface-low\", light: \"100\", dark: \"900\" },\n    { key: \"surfaceHigh\", suffix: \"-surface-high\", light: \"150\", dark: \"850\" },\n    { key: \"surfaceHigher\", suffix: \"-surface-higher\", light: \"175\", dark: \"825\" },\n    { key: \"surfaceHighest\", suffix: \"-surface-highest\", light: \"200\", dark: \"800\" },\n\n    // 10. SCRIM — shared; 7 strengths on the 500 ramp (alpha% = step/10), mode-independent.\n    //     Listed LAST (mirrors semantic.js) so the bound variables group regular → containers →\n    //     surfaces → scrims. Sequential 5–60%: weakest..strongest = 50/100/200/300/400/500/600.\n    { key: \"scrimWeakest\", suffix: \"-scrim-weakest\", light: \"500-050\", dark: \"500-050\" },\n    { key: \"scrimWeaker\", suffix: \"-scrim-weaker\", light: \"500-100\", dark: \"500-100\" },\n    { key: \"scrimWeak\", suffix: \"-scrim-weak\", light: \"500-200\", dark: \"500-200\" },\n    { key: \"scrim\", suffix: \"-scrim\", light: \"500-300\", dark: \"500-300\" },\n    { key: \"scrimStrong\", suffix: \"-scrim-strong\", light: \"500-400\", dark: \"500-400\" },\n    { key: \"scrimStronger\", suffix: \"-scrim-stronger\", light: \"500-500\", dark: \"500-500\" },\n    { key: \"scrimStrongest\", suffix: \"-scrim-strongest\", light: \"500-600\", dark: \"500-600\" },\n  ];\n}\n\n// The raw-colors target a ref resolves to: \"{n}/{refKey(ref)}\" — the load-bearing grammar.\n// Identical to bind-plan.mjs targetName; guarantees membership in the canonical raw name set.\nfunction targetName(paletteName, ref) {\n  return paletteName + \"/\" + refKey(ref);\n}\n\nasync function main() {\n  const collections = await figma.variables.getLocalVariableCollectionsAsync();\n  const rawColl = collections.find((c) => c.name === RAW_COLLECTION);\n\n  // Color and Type/Geometry breakpoints are INDEPENDENT — neither aborts the other. Color needs a live\n  // \"Color Primitives\" collection to alias against (skipped, not fatal, when absent); the breakpoint\n  // collections are baked data (FLOAT_PLANS) that need nothing from the file.\n  let bound = 0;\n  const missing = [];\n  if (rawColl) {\n    // 1. Index the Color Primitives variables by name.\n    const allVars = await figma.variables.getLocalVariablesAsync();\n    const rawVars = {};\n    for (const v of allVars) {\n      if (v.variableCollectionId === rawColl.id) rawVars[v.name] = v;\n    }\n\n    // 2. Create/find the Color Modes collection with Light + Dark modes.\n    let sem = collections.find((c) => c.name === SEMANTIC_COLLECTION);\n    if (!sem) sem = figma.variables.createVariableCollection(SEMANTIC_COLLECTION);\n    const lightMode = sem.modes[0].modeId;\n    const darkMode = (sem.modes[1] && sem.modes[1].modeId) || sem.addMode(\"Dark\");\n\n    // 3. For each palette and role, resolve lt/dt = rawVars[\"{n}/{refKey(...)}\"] and alias both\n    //    modes by reference (the cascade). Mirrors bind-plan.mjs.bindingPlan.\n    for (const n of PALETTES) {\n      for (const r of roleTable(n)) {\n        const ltName = targetName(n, r.light);\n        const dtName = targetName(n, r.dark);\n        const lt = rawVars[ltName];\n        const dt = rawVars[dtName];\n        if (!lt) { missing.push(ltName); continue; }\n        if (!dt) { missing.push(dtName); continue; }\n\n        const semName = n + \"/\" + (r.suffix ? r.suffix.slice(1) : n); // ADR-016 kebab leaf\n        const refreshed = await figma.variables.getLocalVariablesAsync();\n        const semVar =\n          refreshed.find((v) => v.variableCollectionId === sem.id && v.name === semName) ||\n          figma.variables.createVariable(semName, sem, \"COLOR\");\n\n        semVar.setValueForMode(lightMode, figma.variables.createVariableAlias(lt));\n        semVar.setValueForMode(darkMode, figma.variables.createVariableAlias(dt));\n        bound++;\n      }\n    }\n  }\n\n  // 4. Type/Geometry breakpoint-moded FLOAT collections — baked at download time (see FLOAT_PLANS above).\n  //    A no-op (fp stays null) for the generic/asset checked-in binder, whose FLOAT_PLANS is [].\n  let fp = null;\n  if (FLOAT_PLANS.length) fp = await applyFloatPlans(FLOAT_PLANS);\n\n  if (!rawColl && !fp) {\n    figma.notify('No \"Color Primitives\" collection found — apply your palette in Ultimate Tokens first, then run the Binder.', { error: true });\n    figma.closePlugin();\n    return;\n  }\n\n  const parts = [];\n  parts.push(\n    rawColl\n      ? \"Bound \" + bound + \" colour role\" + (bound === 1 ? \"\" : \"s\") + (missing.length ? (\", \" + missing.length + \" skipped (raw colour missing)\") : \"\")\n      : 'Colour skipped — no \"Color Primitives\" collection',\n  );\n  if (fp) parts.push(fp.collections + \" breakpoint collection\" + (fp.collections === 1 ? \"\" : \"s\") + \", \" + fp.variables + \" sized var\" + (fp.variables === 1 ? \"\" : \"s\"));\n  figma.notify(parts.join(\" · \"));\n  figma.closePlugin();\n}\n\n// Never surface a raw error / stack to the user (Figma policy): log the technical detail to the console,\n// show a friendly message, and close cleanly.\nmain().catch((e) => {\n  console.error(\"[Color Tokens Semantic Binder] bind failed:\", e);\n  figma.notify(\"Couldn't bind the semantic variables. Please try again — if it keeps happening, open an issue at github.com/kimgranlund/ultimate-tokens.\", { error: true });\n  figma.closePlugin();\n});\n",
 };
 
 return { FIGMA_PLUGIN };
@@ -7819,29 +7877,83 @@ function zipStore(files, { date = new Date() } = {}) {
 return { crc32, zipStore };
 })();
 __M.figmaMigrations = (function(){
-// migrations.mjs — the ACTIVE rename/retire migration maps (TKT-0012 capability; TKT-0013 will carry
-// the ADR-016 kebab wave here). One module, imported by the app (float plans, color apply message,
-// style plans) so every executor path receives the same maps. EMPTY maps = every pass is a no-op and
-// the apply output is byte-identical (the identity gate in test/figma/plugin.mjs).
+// migrations.mjs — the ACTIVE rename/retire migration maps (TKT-0012 capability). TKT-0013 carries
+// the ADR-016 kebab wave below. One module, imported by the app (float plans, color apply message,
+// style plans) so every executor path receives the same maps.
 //
-// Shape:
-//   floats.collections — keyed by CURRENT moded-collection name:
-//     { "Breakpoints": { renameFrom: ["Geometry"], vars: { "size/MD/paddingNarrow": "size/md/padding-narrow", … } } }
-//   color — variable renames per color collection + collection renames (name-adopted, not registry):
-//     { raw: { "<old>": "<new>" }, semantic: { … }, collections: { "<newName>": ["<oldName>", …] } }
-//   styles — registry re-keys for renamed style names:
-//     { paints: { "<old>": "<new>" }, texts: { … } }
+// MIGRATION MAPS ARE FROZEN HISTORY: the old-name derivations below encode the PRE-wave grammar
+// exactly as it shipped (Title-case voices, UPPER steps, camel props, "500-{step}" scrim leaves,
+// camel role keys) — never "modernize" them to track live canon; they exist to find yesterday's
+// variables in a user's file and rename them in place.
 //
-// CONVENTION (recorded in TKT-0012): every ticket that renames an emitted variable, collection, or
-// style name adds its map HERE in the same change — a rename without a map is a binding-breaking
-// prune for every existing user file.
+// CONVENTION (TKT-0012, recorded in shipping-changes): every ticket that renames an emitted
+// variable, collection, or style name adds its map HERE in the same change.
+
+const { semanticRoles } = __M.semantic;
+
+// ── the ADR-016 kebab wave (TKT-0013, 2026-07-17) ────────────────────────────────────────────────
+
+// frozen pre-wave reverse tables
+const OLD_VOICE = { "display": "Display", "headline": "Headline", "sub-heading": "Sub-heading", "title": "Title", "sub-title": "Sub-title", "lead": "Lead", "body": "Body", "body-mono": "Body-mono", "label": "Label", "label-mono": "Label-mono", "kicker": "Kicker", "tiny": "Tiny", "tiny-mono": "Tiny-mono", "ui-control": "UI-control", "ui-widget": "UI-widget" };
+const OLD_PROP = { "size": "size", "line-height": "lineHeight", "letter-spacing": "letterSpacing", "weight": "weight", "paragraph-spacing": "paragraphSpacing", "single-line-height": "singleLineHeight" };
+const OLD_FIELD = { "height": "height", "icon": "icon", "caret": "caret", "icon-gap": "gap", "padding-narrow": "paddingNarrow", "padding-wide": "paddingWide", "padding-narrow-compact": "paddingNarrowCompact", "padding-wide-compact": "paddingWideCompact", "pill-radius": "radius", "min-width": "minWidth" };
+
+// kebabWaveOldName(newName) → the pre-wave name for a CURRENT Breakpoints-collection variable, or
+// null when unchanged (space/radius/inset/gap/border/focus were already kebab).
+function kebabWaveOldName(newName) {
+  const seg = String(newName).split("/");
+  if (seg[0] === "type" && seg.length === 4) {
+    const v = OLD_VOICE[seg[1]], p = OLD_PROP[seg[3]];
+    if (v && p) {
+      const old = `type/${v}/${seg[2].toUpperCase()}/${p}`;
+      return old === newName ? null : old;
+    }
+  }
+  if (seg[0] === "size" && seg.length === 3) {
+    const f = OLD_FIELD[seg[2]];
+    if (f) {
+      const old = `size/${seg[1].toUpperCase()}/${f}`;
+      return old === newName ? null : old;
+    }
+  }
+  return null;
+}
+
+// kebabWaveVarRenames(currentNames) → { oldName: newName } for a plan's variable list.
+function kebabWaveVarRenames(currentNames) {
+  const out = {};
+  for (const name of currentNames || []) {
+    const old = kebabWaveOldName(name);
+    if (old) out[old] = name;
+  }
+  return out;
+}
+
+// kebabWaveColorRenames(paletteSlugs) → the color-collection maps: semantic roles moved from camel
+// keys ("{n}/onSurface") to kebab leaves ("{n}/on-surface"); raw scrims nested ("{n}/500-200" →
+// "{n}/scrim/200"). semanticRoles still carries BOTH forms (key = the frozen camel, suffix = kebab).
+const SCRIM_STEPS_FROZEN = ["050", "100", "200", "300", "400", "500", "600"];
+function kebabWaveColorRenames(paletteSlugs) {
+  const semantic = {}, raw = {};
+  for (const n of paletteSlugs || []) {
+    for (const r of semanticRoles(n)) {
+      const leaf = r.suffix ? r.suffix.slice(1) : n;
+      if (r.key !== leaf) semantic[`${n}/${r.key}`] = `${n}/${leaf}`;
+    }
+    for (const step of SCRIM_STEPS_FROZEN) raw[`${n}/500-${step}`] = `${n}/scrim/${step}`;
+  }
+  return { semantic, raw };
+}
+
 const FIGMA_MIGRATIONS = {
-  floats: { collections: {} },
-  color: { raw: {}, semantic: {}, collections: {} },
+  // floats: stamped by the app AFTER planning (the var map derives from the live plan's names via
+  // kebabWaveVarRenames — see _figmaFloatPlans); the collection rename is static.
+  floats: { collections: { "Breakpoints": { renameFrom: ["Geometry"] } } },
+  color: { collections: { "Color Semantic": ["Color Modes"] } },
   styles: { paints: {}, texts: {} },
 };
 
-return { FIGMA_MIGRATIONS };
+return { kebabWaveOldName, kebabWaveVarRenames, kebabWaveColorRenames, FIGMA_MIGRATIONS };
 })();
 __M.modeApplyPlan = (function(){
 // mode-apply-plan.mjs — the PURE, testable planner for APPLYING a breakpoint-moded variable collection
@@ -8071,7 +8183,7 @@ __M.stylePlan = (function(){
 // Deterministic: paints in families×roles order, texts in the scale's voice/step order, siblings after
 // their core in list order. Same inputs ⇒ byte-identical plan (the executor's idempotency rides on it).
 
-const { semanticRoles } = __M.semantic;
+const { semanticRoles, roleLeaf } = __M.semantic;
 const { weightNameFor, resolvedFontFor, siblingStyleName, coreWeightKey, relativeWeightLabel, BODY_CLASS_VOICES, BODY_WEIGHT_LABELS } = __M.type;
 
 // SINGLE_LINE_VOICES — voices that additionally get a "-single"-suffixed text-style sibling (1.0
@@ -8100,7 +8212,9 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
     for (const f of families) {
       if (!f || typeof f.n !== "string" || !f.n || typeof f.name !== "string" || !f.name) continue;
       for (const r of semanticRoles(f.n)) {
-        paints.push({ name: `${f.name}/${styleGroupOf(r.key)}${r.key}`, varName: `${f.n}/${r.key}` });
+        // style NAME keeps the display vocabulary (camel key — TKT-0025 owns that seam); the bound
+        // VARIABLE rides the ADR-016 kebab leaf.
+        paints.push({ name: `${f.name}/${styleGroupOf(r.key)}${r.key}`, varName: `${f.n}/${roleLeaf(f.n, r)}` });
       }
     }
   }
@@ -8140,12 +8254,13 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
         const stepSlug = String(step).toLowerCase();
         // paragraphSpacing rides only where the engine emits it (prose voices); a 0 is still a value.
         const hasPara = Number.isFinite(s.paragraphSpacing);
+        const kv = voice.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); // ADR-016 kebab segment
         const bindBase = {
-          fontSize: `type/${voice}/${step}/size`,
-          lineHeight: `type/${voice}/${step}/lineHeight`,
-          letterSpacing: `type/${voice}/${step}/letterSpacing`,
-          ...(hasPara ? { paragraphSpacing: `type/${voice}/${step}/paragraphSpacing` } : {}),
-          fontFamily: `font/${voice}`,
+          fontSize: `type/${kv}/${stepSlug}/size`,
+          lineHeight: `type/${kv}/${stepSlug}/line-height`,
+          letterSpacing: `type/${kv}/${stepSlug}/letter-spacing`,
+          ...(hasPara ? { paragraphSpacing: `type/${kv}/${stepSlug}/paragraph-spacing` } : {}),
+          fontFamily: `font/${kv}`,
         };
         const litBase = {
           family,
@@ -8202,7 +8317,7 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
           texts.push({
             name: `${voice}/${stepSlug}/${wvLabel}`,
             voice, step,
-            bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${voice}/${wv.slug}` } : { fontWeight: `weight/${voice}/${wv.slug}` }) },
+            bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${kv}/${wv.slug}` } : { fontWeight: `weight/${kv}/${wv.slug}` }) },
             literal: { ...litBase, styleName: wvStyleName, weight: wv.weight },
           });
         }
@@ -8222,7 +8337,7 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
         // the literal fallback below survives for any prose voice a future config might opt in.
         if (SINGLE_LINE_VOICES.has(voice)) {
           const singleLineHeight = s.singleLineHeight ?? s.size;
-          const singleBindBase = { ...bindBase, ...(s.singleLineHeight != null ? { lineHeight: `type/${voice}/${step}/singleLineHeight` } : {}) };
+          const singleBindBase = { ...bindBase, ...(s.singleLineHeight != null ? { lineHeight: `type/${kv}/${stepSlug}/single-line-height` } : {}) };
           if (s.singleLineHeight == null) delete singleBindBase.lineHeight; // no live variable for Body — literal only
           const singleLitBase = { ...litBase, lineHeight: singleLineHeight };
           texts.push({
@@ -8237,7 +8352,7 @@ function stylePlans({ families = [], scale = null, include = {} } = {}) {
             texts.push({
               name: `${voice}/${stepSlug}/${wvLabel}-single`,
               voice, step,
-              bind: { ...singleBindBase, ...(coreStyleName ? { fontStyle: `weight-style/${voice}/${wv.slug}` } : { fontWeight: `weight/${voice}/${wv.slug}` }) },
+              bind: { ...singleBindBase, ...(coreStyleName ? { fontStyle: `weight-style/${kv}/${wv.slug}` } : { fontWeight: `weight/${kv}/${wv.slug}` }) },
               literal: { ...singleLitBase, styleName: wvStyleName, weight: wv.weight },
             });
           }
@@ -8344,6 +8459,7 @@ __M.model = (function(){
 // The document is the single source of truth. Every value on the right of the
 // app is projectView(document) — recomputed, never persisted.
 
+const { COLLECTIONS } = __M.collections;
 const { hctToRgb, hctToOklch, lstarFromRgb, cam16FromRgb, peakC } = __M.hct;
 const { oklchToRgb } = __M.okhsl;
 const { iconSystem } = __M.iconSystems;
@@ -8539,12 +8655,12 @@ function stateOf(doc) {
 // figmaBundle — the DTCG export with raw-collection aliasing ON: the exact shape the Figma plugin's
 // code.js turns into a raw-primitives collection + a semantic Light/Dark collection aliased to it.
 // Each semantic leaf carries com.figma.aliasData.targetVariableName/targetVariableSetName so the
-// plugin can build the cascade. Collection names default to "Color Primitives"/"Color Modes" and are
+// plugin can build the cascade. Collection names default to "Color Primitives"/"Color Semantic" (ADR-016) and are
 // overridable per-doc (Settings › Token mapping → doc.figmaCollections; figmaCollectionNames resolves).
 function figmaCollectionNames(doc) {
   const fc = (doc && doc.figmaCollections) || {};
   const pick = (v, dflt) => (typeof v === "string" && v.trim() ? v.trim() : dflt);
-  return { raw: pick(fc.raw, "Color Primitives"), semantic: pick(fc.semantic, "Color Modes") };
+  return { raw: pick(fc.raw, COLLECTIONS.colorRaw), semantic: pick(fc.semantic, COLLECTIONS.colorSemantic) };
 }
 function figmaBundle(doc) {
   return exportDTCG(stateOf(doc), { rawColl: figmaCollectionNames(doc).raw });
@@ -8933,7 +9049,8 @@ const { typeScale, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, typeT
 const { geomScale, geomTokensCSS, geomTokensBreakpointCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } = __M.geometry;
 const { zipStore } = __M.zip;
 const { modeApplyPlan, validateModeInterchange, mergeModeInterchanges, applyRenameMigrations } = __M.modeApplyPlan;
-const { FIGMA_MIGRATIONS } = __M.figmaMigrations;
+const { FIGMA_MIGRATIONS, kebabWaveVarRenames, kebabWaveColorRenames } = __M.figmaMigrations;
+const { COLLECTIONS } = __M.collections;
 const { stylePlans, primitivesApplyPlan } = __M.stylePlan;
 const { ICON_SYSTEMS, iconSystem, iconSystemById, iconSystemLabel } = __M.iconSystems;
 const { icon } = __M.icons;
@@ -8985,7 +9102,7 @@ native import, and import the primitives FIRST.
 
 To test (Figma → Local variables → Import):
   1. Import palette.tokens.json   → creates the "Color Primitives" collection.
-  2. Import Light_tokens.json then Dark_tokens.json → creates "Color Modes".
+  2. Import Light_tokens.json then Dark_tokens.json → creates "Color Semantic".
   3. Open a semantic variable (e.g. primary). It should show as an ALIAS to a
      Color Primitives variable (not a flat color), and editing that primitive should
      update it. If it imports as resolved colors (no alias) or errors on import, the
@@ -14551,14 +14668,14 @@ class HctApp extends HTMLElement {
                   title: "Download the Color Tokens Semantic Binder plugin (manifest.json + code.js). In Figma: Plugins → Development → Import plugin from manifest — it aliases each semantic role to its raw variable so editing a raw color cascades.",
                   onclick: () => this.downloadFigmaPlugin(),
                 }),
-                // Opt-in (inside Figma only): re-create Color Modes so it adopts the grouped order
+                // Opt-in (inside Figma only): re-create Color Semantic so it adopts the grouped order
                 // (Figma won't reorder existing variables on a normal apply). Lives here, beside the
                 // Binder plugin, because it's a Figma-tab action — re-creates vars, so bound layers
                 // need reconnecting.
                 this.inFigma
                   ? btn([icon("arrows-clockwise"), "Regroup"], {
                       cls: "figma-regroup",
-                      title: "Rebuild the Color Modes variables in grouped order (regular · containers · surfaces · scrims). Re-creates them, so layers bound to them will need reconnecting. Color Primitives are untouched.",
+                      title: "Rebuild the Color Semantic variables in grouped order (regular · containers · surfaces · scrims). Re-creates them, so layers bound to them will need reconnecting. Color Primitives are untouched.",
                       onclick: () => this.requestApplyToFigma(true),
                     })
                   : false,
@@ -14604,7 +14721,7 @@ class HctApp extends HTMLElement {
               ? btn([icon("flag"), "Apply Variables"], {
                   variant: "primary",
                   cls: "figma-apply",
-                  title: "Create/update the Color Primitives + Color Modes (Light/Dark) variable collections directly in this Figma file",
+                  title: "Create/update the Color Primitives + Color Semantic (Light/Dark) variable collections directly in this Figma file",
                   onclick: () => this.requestApplyToFigma(),
                 })
               : false,
@@ -14738,7 +14855,7 @@ class HctApp extends HTMLElement {
     // figma/styles.plan.json — the plugin-free STYLES import artifact (rides the Styles opt-out chip,
     // compositional with the system toggles like the apply path): the same pure plans the in-Figma
     // apply executes, so external tooling (or a later plugin-free import) can create the bound
-    // swatches without re-deriving anything. paints → Color Modes bindings; texts → Typography/Font
+    // swatches without re-deriving anything. paints → Color Semantic bindings; texts → Breakpoints (type/)/Font
     // Primitives bindings + literal fallbacks; fontPrimitives → the ordered ensure-plan.
     if (sys.styles !== false && (sys.color || sys.type)) {
       const stScale = sys.type ? this._typeScaleFor("base") : null;
@@ -14780,7 +14897,7 @@ class HctApp extends HTMLElement {
         "| `tailwind/` · `shadcn/` | Framework presets |",
       );
       const collNames = figmaCollectionNames(this.doc);
-      const customColl = collNames.raw !== "Color Primitives" || collNames.semantic !== "Color Modes";
+      const customColl = collNames.raw !== COLLECTIONS.colorRaw || collNames.semantic !== COLLECTIONS.colorSemantic;
       rows.push(
         "| `figma/` | Importable Figma variable files (Light/Dark semantic + primitives" + (sys.type !== false || sys.geometry !== false ? " + the breakpoint-moded Typography/Geometry collections" : "") + ") |",
         "| `figma-aliased/` | The raw→semantic aliased variant (plugin-free import path)" + (customColl ? ` — targets collections named \`${collNames.raw}\` / \`${collNames.semantic}\` (renamed in Settings › Token mapping)` : "") + " |",
@@ -14933,7 +15050,7 @@ class HctApp extends HTMLElement {
   _setApplyConsent() { try { localStorage.setItem(this._applyConsentKey(), "1"); } catch { /* storage blocked */ } }
 
   applyToFigma(rebuild = false) {
-    // rebuild = the opt-in "Regroup" path: re-create the Color Modes collection so it adopts the
+    // rebuild = the opt-in "Regroup" path: re-create the Color Semantic collection so it adopts the
     // canonical grouped order (Figma keeps existing variables' positions on a normal update). It
     // re-creates the semantic variables — bound layers detach (warned in the apply gate).
     try {
@@ -14941,7 +15058,8 @@ class HctApp extends HTMLElement {
       // system is NOT written to the file. Color omits `dtcg` (code.js then skips the color collections);
       // Type/Geometry are filtered out of floatPlans below. The config embed travels regardless.
       const sys = this.exportSystems || {};
-      const msg = { type: "apply", config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans(), collections: figmaCollectionNames(this.doc), renames: { color: FIGMA_MIGRATIONS.color } };
+      const _colorSlugs = sys.color !== false ? (this.doc.palettes || []).filter((p) => p && p.on !== false).map((p) => slug(p.name)) : [];
+      const msg = { type: "apply", config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans(), collections: figmaCollectionNames(this.doc), renames: { color: { ...kebabWaveColorRenames(_colorSlugs), collections: FIGMA_MIGRATIONS.color.collections } } };
       if (sys.color !== false) msg.dtcg = this.figmaBundle();
       // STYLES (opt-out): the swatch layer bound to the variables — paint styles per semantic role
       // (color on), text styles per voice×step×weight (type on). Pure plans (style-plan.mjs); the
@@ -15077,12 +15195,18 @@ class HctApp extends HTMLElement {
     if (!ix) return [];
     try {
       if (validateModeInterchange(ix).length) return [];
-      // TKT-0012: stamp the active rename maps (id-preserving; empty maps = byte-identical no-op)
+      // TKT-0012: stamp the active rename maps (id-preserving; empty maps = byte-identical no-op).
+      // The ADR-016 var map derives from the LIVE plan's names (kebabWaveVarRenames reverses each to
+      // its frozen pre-wave form), so custom voices/steps are covered without a hand list.
       const plans = applyRenameMigrations(modeApplyPlan(ix), FIGMA_MIGRATIONS.floats);
+      for (const p of plans) {
+        const waveVars = kebabWaveVarRenames(p.variables.map((v) => v.name));
+        if (Object.keys(waveVars).length) p.renames = { ...waveVars, ...(p.renames || {}) };
+      }
       // the merged shape supersedes the two-collection era's moded "Typography" collection — mark it for
       // executor retirement (registry-tracked only) whenever this apply actually lands type/ variables.
       for (const p of plans) {
-        if (p.collection === "Geometry" && p.variables.some((v) => typeof v.name === "string" && v.name.startsWith("type/"))) p.retire = ["Typography"];
+        if (p.collection === COLLECTIONS.breakpoints && p.variables.some((v) => typeof v.name === "string" && v.name.startsWith("type/"))) p.retire = ["Typography"];
       }
       return plans;
     } catch { return []; }
@@ -15411,7 +15535,7 @@ class HctApp extends HTMLElement {
         // in the file keep their name (the apply-gate warning covers the overwrite semantics).
         this._settingsGroup("Figma collections", [
           collInput("raw", "Primitives collection", "Color Primitives"),
-          collInput("semantic", "Semantic collection", "Color Modes"),
+          collInput("semantic", "Semantic collection", "Color Semantic"),
           ...(collNames.raw.toLowerCase() === collNames.semantic.toLowerCase()
             ? [h("p", { class: "settings-note settings-warn" }, "The two collections need distinct names — identical names would merge the primitives and roles into one collection on apply.")]
             : []),

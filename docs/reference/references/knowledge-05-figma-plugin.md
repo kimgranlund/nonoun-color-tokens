@@ -1,6 +1,6 @@
 # Knowledge 05 — Figma Plugin (Cascade Binder)
 
-> Topic: the companion Figma plugin that binds a `Color Modes` collection to existing raw
+> Topic: the companion Figma plugin that binds a `Color Semantic` collection (ADR-016; was `Color Modes`) to existing raw
 > variables by reference, providing the live cascade that JSON import cannot.
 
 ## Table of Contents
@@ -36,27 +36,27 @@ variable APIs.
 
 ## 3. What it does
 
-Constants: `RAW_COLLECTION = "Color Primitives"`, `SEMANTIC_COLLECTION = "Color Modes"`,
+Constants: `RAW_COLLECTION = "Color Primitives"`, `SEMANTIC_COLLECTION = "Color Semantic"` (ADR-016),
 `PALETTES = [neutral, primary, secondary, tertiary, info, success, danger, warning]`.
 
 Steps:
 1. Find the raw collection by name; index its variables by name into `rawVars`.
-2. Create or find the `Color Modes` collection; ensure it has `Light` and `Dark` modes.
+2. Create or find the `Color Semantic` collection; ensure it has `Light` and `Dark` modes.
 3. For each palette and each role in `semanticRoles(n)`:
-   - resolve `lt = rawVars["{n}/{refKey(r.light)}"]`, `dt = rawVars["{n}/{refKey(r.dark)}"]`
+   - resolve `lt = rawVars["{n}/{refPath(r.light)}"]`, `dt = rawVars["{n}/{refPath(r.dark)}"]`
    - create/find the semantic variable `"{n}/{r.key}"`
    - `setValueForMode(lightId, createVariableAlias(lt))` and likewise for dark.
 4. Report bound count and any missing raw targets.
 
 On-colors and scrims follow the same fixed role table as the generator (on `050`/`200`,
-scrims on the 500 ramp, `500-{step}`) — the plugin contains **no** contrast computation (that
+scrims on the 500 ramp, emitted `scrim/{step}`) — the plugin contains **no** contrast computation (that
 logic was removed; see ADR-003).
 
 ## 4. Role-table parity
 
 The plugin's `roleTable(n)` must equal the artifact's and `semantic.js`'s `semanticRoles(n)` exactly. Validate
-every `{n}/{refKey}` target resolves against the real `Color Primitives` variable names (which use
-3-digit padding and `500-{step}` scrim suffixes). See `rubrics/parity-checklist.md`.
+every `{n}/{refPath}` target resolves against the real `Color Primitives` variable names (which use
+3-digit padding and nested `scrim/{step}` paths — ADR-016). See `rubrics/parity-checklist.md`.
 
 ## 5. Run instructions and failure modes
 
@@ -67,4 +67,4 @@ Failure modes:
 - **Raw collection not found** — the `Color Primitives` collection must exist with that exact name.
 - **Missing raw target** — a role references a stop/scrim not present in the primitives; the
   plugin lists the first missing name. Check 3-digit padding and that scrim primitives
-  (`{n}/500-{step}`) exist.
+  (`{n}/scrim/{step}`) exist.

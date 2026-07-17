@@ -765,7 +765,7 @@ ok(!posted.pluginMessage.rebuildSemantic, "(x) a normal apply does NOT set rebui
 // applyFloatPlans creates the Typography/Geometry breakpoint collections from this, alongside dtcg.
 ok(Array.isArray(posted.pluginMessage.floatPlans), "(x) applyToFigma's posted message carries a floatPlans array (the live Type/Geometry apply path)");
 // the Settings-overridable collection names ride the apply message (defaults when no override set).
-ok(posted.pluginMessage.collections && posted.pluginMessage.collections.raw === "Color Primitives" && posted.pluginMessage.collections.semantic === "Color Modes",
+ok(posted.pluginMessage.collections && posted.pluginMessage.collections.raw === "Color Primitives" && posted.pluginMessage.collections.semantic === "Color Semantic",
   `(x) the apply message carries the default collection names (got ${JSON.stringify(posted.pluginMessage.collections)})`);
 // with a doc override, the message AND the bundle's aliasData follow the custom raw name.
 app.commit((d) => { d.figmaCollections = { raw: "Brand Primitives", semantic: "Brand Modes" }; }); flushRaf();
@@ -914,7 +914,9 @@ app.liveVars = null;
 ok(app.driftStatus("neutral/550", "#ABCDEF") === null, "(cc) driftStatus is null before a live variable read");
 const rawTreeCC = app.figmaBundle()["palette.tokens.json"];
 const liveCC = {};
-for (const nn of Object.keys(rawTreeCC)) { if (nn[0] === "$") continue; for (const k of Object.keys(rawTreeCC[nn])) if (k[0] !== "$") liveCC[nn + "/" + k] = rawTreeCC[nn][k].$value.hex; }
+// recursive: ADR-016 nested the raw scrims ({n}/scrim/{step})
+const walkCC = (node, prefix) => { for (const k of Object.keys(node)) { if (k[0] === "$") continue; const c = node[k]; const path = prefix ? prefix + "/" + k : k; if (c && typeof c === "object" && "$value" in c) liveCC[path] = c.$value.hex; else if (c && typeof c === "object") walkCC(c, path); } };
+walkCC(rawTreeCC, "");
 const firstCC = Object.keys(liveCC)[0];
 const genCC = liveCC[firstCC];
 liveCC[firstCC] = "#000000"; // force exactly one token to drift
@@ -1170,7 +1172,7 @@ const wantPaths = ["css-hex/", "css-oklch/", "json/", "dtcg/", "figma/Light_toke
   "typography/type.css", "typography/type.tokens.json", "figma/type.tokens.json", "figma/tokens.modes.variables.json", "figma/typography.primitives.variables.json", "geometry/geometry.css", "geometry/geometry.tokens.json", "figma/dimension.variables.json"];
 ok(wantPaths.every((p) => zipText.includes(p)), "(ee) every colour format + typography/ + geometry/ + the moded Figma-variable files + the config + the figma-aliased/ cascade variant is present in the archive");
 // the Figma dimension file is NUMBER-typed (FLOAT variables), not the px dimension strings — so Figma imports it as number variables
-ok(zipText.includes("dimension.variables.json") && /"\$type":\s*"number"/.test(zipText) && zipText.includes('"Geometry"'), "(ee) figma/dimension.variables.json is a Geometry collection of number ($type number) variables");
+ok(zipText.includes("dimension.variables.json") && /"\$type":\s*"number"/.test(zipText) && zipText.includes('"Breakpoints"'), "(ee) figma/dimension.variables.json is a Breakpoints collection of number ($type number) variables");
 // the moded Figma-variable files are single-collection, breakpoint-MODED (a "Base" mode + each mode), FLOAT-typed
 ok(zipText.includes('"Typography"') && zipText.includes('"FLOAT"') && /"modes":\s*\[\s*"Base"/.test(zipText), "(ee) figma/*.modes.variables.json are single moded collections (modes lead with \"Base\", FLOAT-typed variables)");
 // the aliased variant carries com.figma.aliasData (the cascade); the default figma/ does not (ADR-002 resolved).
@@ -1722,7 +1724,7 @@ ok(app._typeModeDTCGFiles().length === 1 && app._typeModeDTCGFiles()[0].name ===
 // INTRINSIC standard set (no geometry modes configured ⇒ Desktop · Tablet · Mobile · Lg · Xl synthesized),
 // each half back-filled with its own base values at the modes it doesn't define.
 const _fplans = app._figmaFloatPlans();
-ok(_fplans.length === 1 && _fplans[0].collection === "Geometry", `(ty-fig) _figmaFloatPlans yields ONE merged Geometry apply plan (TKT-0009 — got ${_fplans.map((p) => p.collection).join()})`);
+ok(_fplans.length === 1 && _fplans[0].collection === "Breakpoints", `(ty-fig) _figmaFloatPlans yields ONE merged Geometry apply plan (TKT-0009 — got ${_fplans.map((p) => p.collection).join()})`);
 const _mplan = _fplans[0];
 ok(_mplan && _mplan.modes[0] === "Base" && _mplan.defaultMode === "Base", `(ty-fig) the type half's configured shape leads: Base is the default mode (got ${_mplan && _mplan.modes.join()})`);
 ok(_mplan && ["Desktop", "Desktop Lg", "Desktop Xl", "Tablet", "Mobile"].every((m) => _mplan.modes.includes(m)) && _mplan.modes.length === 7, `(ty-fig) the merged plan unions the 768 breakpoint with geometry's INTRINSIC Desktop·Desktop Lg·Desktop Xl·Tablet·Mobile set (got ${_mplan && _mplan.modes.join()})`);
@@ -1733,7 +1735,7 @@ ok(_mplan && JSON.stringify(_mplan.retire) === JSON.stringify(["Typography"]), "
 app.exportSystems = { color: true, type: false, geometry: true };
 {
   const _gOnly = app._figmaFloatPlans();
-  ok(_gOnly.length === 1 && _gOnly[0].collection === "Geometry" && _gOnly[0].variables.every((v) => !v.name.startsWith("type/")), "(ty-fig) Type OFF → the type/ half is omitted, the geometry half stays");
+  ok(_gOnly.length === 1 && _gOnly[0].collection === "Breakpoints" && _gOnly[0].variables.every((v) => !v.name.startsWith("type/")), "(ty-fig) Type OFF → the type/ half is omitted, the geometry half stays");
   ok(_gOnly[0].retire === undefined, "(ty-fig) Type OFF → NO Typography retirement rides the plan (a partial apply must never strand still-bound styles)");
 }
 app.exportSystems = { color: true, type: false, geometry: false };
@@ -1795,7 +1797,7 @@ app.clearTypeTokenOverride("Display", "XL", "base"); flushRaf();
 }
 // a per-MODE override reaches that mode's DTCG file too.
 app.setTypeTokenOverride("Body", "MD", _bpId, 33); flushRaf();
-ok(app.doc.type.tokenOverrides["Body|MD|" + _bpId] === 33 && JSON.parse(app._typeModeDTCGFiles()[0].data).typography.Body.MD.$value.fontSize === "33px", "(ty-tok-ov) a per-breakpoint override reaches that mode's DTCG export (33px)");
+ok(app.doc.type.tokenOverrides["Body|MD|" + _bpId] === 33 && JSON.parse(app._typeModeDTCGFiles()[0].data).typography.body.md.$value.fontSize === "33px", "(ty-tok-ov) a per-breakpoint override reaches that mode's DTCG export (33px)");
 app.clearTypeTokenOverride("Body", "MD", _bpId); flushRaf();
 // ↺ reset clears the Base override and drops the key entirely (no overrides left).
 app.clearTypeTokenOverride("Body", "MD", "base"); flushRaf();
@@ -1943,7 +1945,7 @@ app.clearGeomTokenOverride("XS", "base"); flushRaf();
 }
 // a per-MODE override reaches that mode's DTCG file too.
 app.setGeomTokenOverride("MD", _gbpId, 44); flushRaf();
-ok(app.doc.geometry.tokenOverrides["MD|" + _gbpId] === 44 && JSON.parse(app._geomModeDTCGFiles()[0].data).size.MD.height.$value === "44px", "(geo-tok-ov) a per-breakpoint override reaches that mode's DTCG export (44px)");
+ok(app.doc.geometry.tokenOverrides["MD|" + _gbpId] === 44 && JSON.parse(app._geomModeDTCGFiles()[0].data).size.md.height.$value === "44px", "(geo-tok-ov) a per-breakpoint override reaches that mode's DTCG export (44px)");
 app.clearGeomTokenOverride("MD", _gbpId); flushRaf();
 app.clearGeomTokenOverride("MD", "base"); flushRaf();
 ok(!app.doc.geometry.tokenOverrides, "(geo-tok-ov) ↺ reset clears the override (and drops the now-empty tokenOverrides)");
@@ -2214,7 +2216,7 @@ app.addStandardGeomModes(); flushRaf();
   // the Figma float plans emit the desktop-first moded collections: Desktop (the designed scale) leads
   // as the base = Figma's default mode; Tablet · Mobile follow.
   const plans = app._figmaFloatPlans();
-  const geo = plans.find((p) => p.collection === "Geometry");
+  const geo = plans.find((p) => p.collection === "Breakpoints");
   ok(plans.length === 1 && !!geo, `(std) ONE merged Geometry float plan (TKT-0009 — got ${plans.map((p) => p.collection).join()})`);
   ok(geo && JSON.stringify(geo.modes) === JSON.stringify(["Desktop", "Tablet", "Mobile"]) && geo.defaultMode === "Desktop", `(std) the merged float plan is [Desktop, Tablet, Mobile], default Desktop — both standard sets align, no union residue (got ${geo && JSON.stringify(geo.modes)})`);
   ok(geo && geo.variables.some((v) => v.name.startsWith("type/")) && geo.variables.some((v) => v.name.startsWith("size/")), "(std) the merged plan carries both halves");

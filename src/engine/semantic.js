@@ -56,6 +56,30 @@ const SCRIM_KEYS = [
  * @param {string} ref e.g. "50", "550", "500-050"
  * @returns {string}
  */
+// ── ADR-016 (kebab wave) emitted-name helpers ─────────────────────────────────────────────────
+// roleLeaf — the kebab LEAF a semantic role emits on slash-path surfaces (Figma variables, UI3,
+// DTCG keys, JSON): suffix-derived, so every format shares CSS's own vocabulary ("-on-surface" →
+// "on-surface"); the prime accent role (empty suffix) keeps the palette name as its leaf
+// ("primary/primary" — structural, predates the wave). Internal `key` stays camelCase JS.
+export function roleLeaf(paletteName, role) {
+  return role.suffix ? role.suffix.slice(1) : paletteName;
+}
+// refPath / refSlug — the emitted form of a raw ref under ADR-016's scrim NESTING rule
+// ("{n}/scrim/{step}" — two segments, never a numeral-compound leaf; the 500 base is omitted while
+// SCRIM_BASES is the single canonical 500 — re-add "scrim/{base}/{step}" only if a second base ever
+// ships). refPath = slash surfaces (Figma/UI3/DTCG/JSON trees); refSlug = hyphen surfaces (CSS
+// custom properties). Solid stops stay the 3-digit padded literal on both.
+export function refPath(ref) {
+  const s = String(ref);
+  const dash = s.indexOf('-');
+  if (dash === -1) return s.padStart(3, '0');
+  const base = s.slice(0, dash), step = s.slice(dash + 1).padStart(3, '0');
+  return (base === '500' ? 'scrim/' : 'scrim/' + base.padStart(3, '0') + '/') + step;
+}
+export function refSlug(ref) {
+  return refPath(ref).replace(/\//g, '-');
+}
+
 export function refKey(ref) {
   const s = String(ref);
   const dash = s.indexOf('-');

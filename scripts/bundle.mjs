@@ -15,6 +15,7 @@ const categoryKey = (file) => (file === "index.js" ? "categoryIndex" : "category
 // dependency order; entry last. Category modules are pure data (no imports) — placed before the app,
 // which imports the index; the index's lazy thunks reference the category modules only at call time.
 const MODS = [
+  ["collections", "src/engine/collections.js"],
   ["hct", "src/engine/hct.js"], ["okhsl", "src/engine/okhsl.js"], ["semantic", "src/engine/semantic.js"],
   ["tonal", "src/engine/tonal.js"], ["derive", "src/engine/derive.mjs"], ["type", "src/engine/type.mjs"], ["geometry", "src/engine/geometry.mjs"], ["flags", "src/engine/flags.js"],
   ["iconSystems", "src/engine/icon-systems.mjs"], // pure registry; BEFORE persist (which imports it)
@@ -32,7 +33,7 @@ const MODS = [
   ["model", "src/ui/model.mjs"], ["app", "src/ui/app.js"],
 ];
 const KEY = { "hct.js": "hct", "okhsl.js": "okhsl", "semantic.js": "semantic", "tonal.js": "tonal", "derive.mjs": "derive", "type.mjs": "type", "geometry.mjs": "geometry", "flags.js": "flags", "persist.js": "persist",
-  "ds-gates.js": "dsGates", "exports.js": "exports", "figma-plugin-assets.js": "figmaPlugin", "mcp-assets.js": "mcpAssets", "type-fonts.js": "typeFonts", "zip.mjs": "zip", "mode-apply-plan.mjs": "modeApplyPlan", "migrations.mjs": "figmaMigrations", "style-plan.mjs": "stylePlan", "icon-systems.mjs": "iconSystems", "motion.mjs": "motion", "icons.js": "icons", "model.mjs": "model",
+  "ds-gates.js": "dsGates", "exports.js": "exports", "figma-plugin-assets.js": "figmaPlugin", "mcp-assets.js": "mcpAssets", "type-fonts.js": "typeFonts", "zip.mjs": "zip", "mode-apply-plan.mjs": "modeApplyPlan", "migrations.mjs": "figmaMigrations", "collections.js": "collections", "style-plan.mjs": "stylePlan", "icon-systems.mjs": "iconSystems", "motion.mjs": "motion", "icons.js": "icons", "model.mjs": "model",
   ...Object.fromEntries(CATEGORY_FILES.map((f) => [f, categoryKey(f)])) };
 
 function transform(src) {

@@ -16,7 +16,7 @@ const RT = JSON.parse(readFileSync(new URL("../../docs/reference/data/role-table
 const state = { palettes: RT.defaults, curve: "logistic", tension: 0, lmin: 5, lmax: 100, damp: 80, hueSpace: "cam16", theme: "auto" };
 
 // ── ground truth: the semantic variable name set, from exportUI3 (a different code path) ──
-const semVars = exportUI3(state).collections["Color / Semantic"].variables;
+const semVars = exportUI3(state).collections["Color Semantic"].variables;
 const varNames = new Set(Object.keys(semVars)); // "{n}/{key}"
 const families = [...new Set(Object.keys(semVars).map((k) => k.split("/")[0]))]
   .map((n) => ({ n, name: n.charAt(0).toUpperCase() + n.slice(1) }));
@@ -47,15 +47,15 @@ const plans = stylePlans({ families, scale });
   ok(styleGroupOf("onPrimary") === "" && styleGroupOf("outline") === "" && styleGroupOf("onSurface") === "", "on-colors/outlines/on-surface stay flat (onSurface is an on-color, not a surface)");
   const p = plans.paints.find((x) => x.varName === "primary/scrim");
   ok(p && p.name === "Primary/scrims/scrim", `scrim style name: ${p && p.name}`);
-  const s = plans.paints.find((x) => x.varName === "primary/surfaceBright");
+  const s = plans.paints.find((x) => x.varName === "primary/surface-bright");
   ok(s && s.name === "Primary/surfaces/surfaceBright", `surface style name: ${s && s.name}`);
-  const o = plans.paints.find((x) => x.varName === "primary/onPrimary");
+  const o = plans.paints.find((x) => x.varName === "primary/on-primary");
   ok(o && o.name === "Primary/onPrimary", `flat style name: ${o && o.name}`);
 }
 
 // ── text parity: every bind target exists in the merged Geometry (type/ half) or Font Primitives collections ──
 {
-  const typo = new Set(Object.keys(typeTokensFigmaModes(scale).collections["Geometry"].variables));
+  const typo = new Set(Object.keys(typeTokensFigmaModes(scale).collections.Breakpoints.variables));
   const prim = new Set(Object.keys(typeTokensFigmaPrimitives(scale).collections["Font Primitives"].variables));
   const bad = [];
   for (const t of plans.texts) for (const [field, target] of Object.entries(t.bind)) {
@@ -77,12 +77,12 @@ const plans = stylePlans({ families, scale });
   // Display's siblings (siblingWeightDefaults(700) around a custom-named 700 core): 500/600/700/800 —
   // 4 distinct weights, rank 0..3 map 1:1 onto Lighter/Light/Heavy/Heavier. Core (700) ranks 3rd → "heavy".
   const coreNamed = plans.texts.find((t) => t.name === "Display/md/heavy •");
-  ok(!!coreNamed && coreNamed.literal.styleName === "Bold Condensed" && coreNamed.bind.fontStyle === "weight-style/Display/bold" && coreNamed.bind.fontWeight === undefined, "core style (WITH siblings + a custom style name): Voice/step/• {relative label, by rank}, literal.styleName keeps the real templated name + casing, ONLY fontStyle binds (nested under the core's own weight-name slug) — fontWeight stays unbound so real Figma's closest-valid-weight snap can never override the named cut");
+  ok(!!coreNamed && coreNamed.literal.styleName === "Bold Condensed" && coreNamed.bind.fontStyle === "weight-style/display/bold" && coreNamed.bind.fontWeight === undefined, "core style (WITH siblings + a custom style name): Voice/step/• {relative label, by rank}, literal.styleName keeps the real templated name + casing, ONLY fontStyle binds (nested under the core's own weight-name slug) — fontWeight stays unbound so real Figma's closest-valid-weight snap can never override the named cut");
   // siblings: 800 ranks heaviest (4th) → "heavier"; 600 ranks 2nd → "light"; 500 ranks lightest → "lighter".
   const sib800 = plans.texts.find((t) => t.name === "Display/md/heavier");
   const sib600 = plans.texts.find((t) => t.name === "Display/md/light");
   const sib500 = plans.texts.find((t) => t.name === "Display/md/lighter");
-  ok(!!sib800 && sib800.literal.weight === 800 && sib800.literal.styleName === "Extra-bold Condensed" && sib800.bind.fontStyle === "weight-style/Display/extra-bold" && sib800.bind.fontWeight === undefined, `sibling style: Voice/step/{relative label} with fontStyle keyed on the plain slug — fontWeight stays unbound (same reasoning as the core) — no dot prefix, only the core gets one (got weight ${sib800 && sib800.literal.weight}, styleName ${sib800 && sib800.literal.styleName})`);
+  ok(!!sib800 && sib800.literal.weight === 800 && sib800.literal.styleName === "Extra-bold Condensed" && sib800.bind.fontStyle === "weight-style/display/extra-bold" && sib800.bind.fontWeight === undefined, `sibling style: Voice/step/{relative label} with fontStyle keyed on the plain slug — fontWeight stays unbound (same reasoning as the core) — no dot prefix, only the core gets one (got weight ${sib800 && sib800.literal.weight}, styleName ${sib800 && sib800.literal.styleName})`);
   ok(!!sib600 && sib600.literal.weight === 600 && sib600.literal.styleName === "Semi-bold Condensed", `a MIDDLE-rank sibling gets "light", not "heavy" (got weight ${sib600 && sib600.literal.weight}, styleName ${sib600 && sib600.literal.styleName})`);
   // the literal.styleName must still follow the core's custom naming convention (full templated name,
   // real casing) — resolveFace (figma/plugin/code.js) exact-matches styleName against the family's real
@@ -150,9 +150,9 @@ const plans = stylePlans({ families, scale });
   const labelScale = typeScale({ treatment: "product" });
   const labelPlans = stylePlans({ families, scale: labelScale });
   const ucSingle = labelPlans.texts.find((t) => t.name === "UI-control/md/regular-single •");
-  ok(!!ucSingle && ucSingle.bind.lineHeight === "type/UI-control/MD/singleLineHeight", "UI-control's -single style BINDS live to its real singleLineHeight variable (a box voice)");
+  ok(!!ucSingle && ucSingle.bind.lineHeight === "type/ui-control/md/single-line-height", "UI-control's -single style BINDS live to its real singleLineHeight variable (a box voice)");
   const uwSingle = labelPlans.texts.find((t) => t.name === "UI-widget/md/regular-single •");
-  ok(!!uwSingle && uwSingle.bind.lineHeight === "type/UI-widget/MD/singleLineHeight", "UI-widget's -single style BINDS live to its real singleLineHeight variable");
+  ok(!!uwSingle && uwSingle.bind.lineHeight === "type/ui-widget/md/single-line-height", "UI-widget's -single style BINDS live to its real singleLineHeight variable");
   ok(!labelPlans.texts.some((t) => /-single/.test(t.name) && ["Body", "Body-mono", "Label", "Label-mono"].includes(t.voice)), "the Body*/Label* -single variants are RETIRED (2026-07-16) — none emitted");
   // sibling weights get the SAME -single suffix, flat next to their own multi-line style (the exact ask:
   // every configured sibling gets its own "-single" variant, not just the core).
@@ -186,7 +186,7 @@ const plans = stylePlans({ families, scale });
   const ovPlans = stylePlans({ families, scale: ovScale });
   const subMd = ovPlans.texts.find((t) => t.voice === "Sub-heading" && t.step === "MD");
   ok(!!subMd && subMd.literal.family === "Custom Voice Font", `an overridden voice's literal fallback family resolves its OWN font (got ${subMd && subMd.literal.family})`);
-  ok(subMd.bind.fontFamily === "font/Sub-heading", "the BINDING target is unchanged — already per-voice (font/<voice>)");
+  ok(subMd.bind.fontFamily === "font/sub-heading", "the BINDING target is per-voice (font/<kebab-voice>, ADR-016)");
   // an un-overridden voice sharing the SAME role (Headline rides `heading`, like Sub-heading) still gets the
   // role's shared family — the override doesn't leak to its role-mates.
   const headMd = ovPlans.texts.find((t) => t.voice === "Headline" && t.step === "MD");
@@ -203,8 +203,8 @@ const plans = stylePlans({ families, scale });
   const names = plan.variables.map((v) => v.name);
   const idx = (n) => names.indexOf(n);
   ok(plan.variables.every((v) => v.type !== "ALIAS" || idx(v.target) > -1 && idx(v.target) < idx(v.name)), "every alias follows its target (literals first)");
-  ok(names.includes("weight/Display/medium") && names.includes("weight-style/Display/medium"), "sibling primitives ride the plan");
-  const fontAlias = plan.variables.find((v) => v.name === "font/Display");
+  ok(names.includes("weight/display/medium") && names.includes("weight-style/display/medium"), "sibling primitives ride the plan");
+  const fontAlias = plan.variables.find((v) => v.name === "font/display");
   ok(!!fontAlias && fontAlias.type === "ALIAS" && typeof fontAlias.target === "string", "font/<voice> aliases survive the flatten");
   const dangling = primitivesApplyPlan({ collections: { "Font Primitives": { modes: ["Value"], variables: { "font/X": { type: "ALIAS", target: "family/missing" } } } } });
   ok(dangling === null, "an alias with no target is dropped planner-side (nothing left ⇒ null)");

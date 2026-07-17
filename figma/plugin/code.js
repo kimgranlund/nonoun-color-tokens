@@ -15,7 +15,7 @@
 // so this file is palette-agnostic: it walks the tree, it does NOT hard-code the role table.
 
 const RAW_COLLECTION = "Color Primitives";   // the raw color primitives (one "Value" mode) — the DEFAULT name
-const SEMANTIC_COLLECTION = "Color Modes";   // the semantic Light/Dark tokens — the DEFAULT name
+const SEMANTIC_COLLECTION = "Color Semantic"; // the semantic Light/Dark tokens — the DEFAULT name (ADR-016; was "Color Modes")
 // COLL — the ACTIVE color-collection names. Settings › Token mapping can override the defaults
 // (doc.figmaCollections); the apply message carries the override and sets these before any write, and
 // readRawColors resolves them from the SAVED config so a renamed file still round-trips at boot. An
@@ -471,8 +471,9 @@ async function applyStylePlans(sp) {
       return (id && cols.find(function (c) { return c.id === id; })) || cols.find(function (c) { return c.name === name; });
     };
     // the METRIC pool (fontSize/lineHeight/letterSpacing/paragraphSpacing) lives in the merged
-    // "Geometry" collection's type/ group since TKT-0009 — the plan's bind keys carry the prefix.
-    const typoColl = byRegistry("Geometry");
+    // "Breakpoints" collection's type/ group (TKT-0009 merge; ADR-016 rename) — the plan's bind
+    // keys carry the type/ prefix.
+    const typoColl = byRegistry("Breakpoints");
     const primColl = byRegistry("Font Primitives");
     const typoVars = typoColl ? await varsByName(typoColl.id) : {};
     const primVars = primColl ? await varsByName(primColl.id) : {};
@@ -568,7 +569,7 @@ async function applyStylePlans(sp) {
     // diagnostics — the console is the debugging surface (figma.notify races and truncates):
     if (out.substitutedFonts.length) console.warn("[Ultimate Tokens]", out.substituted, "text style(s) built on a placeholder face — these families are not in this Figma:", out.substitutedFonts.join(", "), "· their fontFamily stays BOUND to the Font Primitives variable, so installing the font adopts it.");
     if (out.missingFonts.length) console.warn("[Ultimate Tokens] text styles skipped — no usable face at all:", out.missingFonts.join(", "), "(font list size:", Object.keys(fontsByFamily).length, "families)");
-    if (!Object.keys(typoVars).length) console.warn("[Ultimate Tokens] Geometry collection empty/missing at styles time — fontSize/leading/tracking bindings degraded to literals");
+    if (!Object.keys(typoVars).length) console.warn("[Ultimate Tokens] Breakpoints collection empty/missing at styles time — fontSize/leading/tracking bindings degraded to literals");
     if (!Object.keys(primVars).length) console.warn("[Ultimate Tokens] Font Primitives collection empty/missing at styles time — family/weight bindings degraded to literals");
   }
 
@@ -594,6 +595,19 @@ function renameInPool(pool, renames) {
     }
   }
 }
+// leafEntries — flatten a DTCG (sub)tree to [path, leaf] pairs, path segments joined "/". A LEAF is a
+// node with $value; anything else non-$-keyed is a GROUP to recurse (ADR-016 nested the raw scrims
+// under "{n}/scrim/{step}", so the raw tree is no longer uniformly two levels deep).
+function leafEntries(node, prefix) {
+  const out = [];
+  for (const key of childKeys(node)) {
+    const child = node[key];
+    const path = prefix ? prefix + "/" + key : key;
+    if (child && typeof child === "object" && "$value" in child) out.push([path, child]);
+    else if (child && typeof child === "object") out.push.apply(out, leafEntries(child, path));
+  }
+  return out;
+}
 async function applyBundle(dtcg, opts) {
   opts = opts || {};
   const renames = opts.renames || {};
@@ -611,15 +625,12 @@ async function applyBundle(dtcg, opts) {
   renameInPool(rawByName, renames.raw);
   const currentRaw = new Set(); // names this bundle WANTS in Color Primitives — everything else is stale
   let rawCount = 0;
-  for (const n of childKeys(rawTree)) {
-    for (const key of childKeys(rawTree[n])) {
-      const name = n + "/" + key;
-      const v = rawByName[name] || figma.variables.createVariable(name, raw, "COLOR");
-      v.setValueForMode(rawMode, rgbaOf(rawTree[n][key]));
-      rawByName[name] = v;
-      currentRaw.add(name);
-      rawCount++;
-    }
+  for (const [name, leaf] of leafEntries(rawTree, "")) {
+    const v = rawByName[name] || figma.variables.createVariable(name, raw, "COLOR");
+    v.setValueForMode(rawMode, rgbaOf(leaf));
+    rawByName[name] = v;
+    currentRaw.add(name);
+    rawCount++;
   }
 
   // 2) SEMANTIC collection — "Light" + "Dark" modes, each role ALIASED to its raw var.
@@ -641,16 +652,17 @@ async function applyBundle(dtcg, opts) {
   renameInPool(semByName, renames.semantic);
   const currentSem = new Set(); // names this bundle WANTS in Color Modes — everything else is stale
   let semCount = 0;
-  for (const n of childKeys(semLight)) {
-    for (const key of childKeys(semLight[n])) {
-      const name = n + "/" + key;
+  const darkLeaves = {};
+  for (const [name, leaf] of leafEntries(semDark, "")) darkLeaves[name] = leaf;
+  for (const [name, leaf] of leafEntries(semLight, "")) {
+    {
       const v = semByName[name] || figma.variables.createVariable(name, sem, "COLOR");
-      const lt = rawByName[aliasTarget(semLight[n][key])];
-      const dt = rawByName[aliasTarget(semDark[n][key])];
+      const lt = rawByName[aliasTarget(leaf)];
+      const dt = rawByName[aliasTarget(darkLeaves[name])];
       // Alias to the raw var (the cascade). Fall back to the resolved color if the raw
       // target is somehow absent, so a role is never left unset.
-      v.setValueForMode(lightMode, lt ? figma.variables.createVariableAlias(lt) : rgbaOf(semLight[n][key]));
-      v.setValueForMode(darkMode, dt ? figma.variables.createVariableAlias(dt) : rgbaOf(semDark[n][key]));
+      v.setValueForMode(lightMode, lt ? figma.variables.createVariableAlias(lt) : rgbaOf(leaf));
+      v.setValueForMode(darkMode, dt ? figma.variables.createVariableAlias(dt) : rgbaOf(darkLeaves[name]));
       semByName[name] = v;
       currentSem.add(name);
       semCount++;

@@ -49,16 +49,17 @@ const dtcgA = X.exportDTCG(C(ALL), { rawColl: "Color Primitives" });
 const sa = semLeaves(dtcgA);
 const aliasOf = (l) => l.$extensions && l.$extensions["com.figma.aliasData"];
 // rawColl set → every leaf carries the FULL documented name+collection alias shape:
-// targetVariableName "{n}/{refKey}" (e.g. neutral/550, neutral/500-200) AND targetVariableSetName
+// targetVariableName "{n}/{refPath}" (e.g. neutral/550, neutral/scrim/200) AND targetVariableSetName
 // === the Color Primitives collection. That is the shape Figma's documented aliasData fallback hierarchy
 // resolves on NATIVE import when the Color Primitives collection pre-exists in the file (OD-004 spike;
 // ADR-002 re-verify 2026-06-15). The native-import cascade itself is validated end-to-end in Figma,
 // NOT here — this gate only proves the emitted SHAPE so the spike can't silently regress.
 if (sa.length === 0 || !sa.every((l) => {
   const a = aliasOf(l);
-  return a && /^[a-z0-9-]+\/[a-z0-9-]+$/.test(a.targetVariableName || "") && a.targetVariableSetName === "Color Primitives";
+  // ADR-016: solid targets "{n}/{pad3}" (2 segments), scrim targets NEST "{n}/scrim/{step}" (3)
+  return a && /^[a-z0-9-]+\/(?:[a-z0-9-]+|scrim\/[0-9]{3})$/.test(a.targetVariableName || "") && a.targetVariableSetName === "Color Primitives";
 }))
-  FAIL("resolved", "rawColl set: not every semantic leaf carries aliasData {targetVariableName '{n}/{refKey}', targetVariableSetName 'Color Primitives'}");
+  FAIL("resolved", "rawColl set: not every semantic leaf carries aliasData {targetVariableName '{n}/{refPath}', targetVariableSetName 'Color Primitives'}");
 
 // ── hpg-export-css-resolves (every --c-* is light-dark(var,var) over existing raw vars) ───
 const css = X.exportCSS(C(ALL));
@@ -136,7 +137,7 @@ if (!p0 || !p0.stops || !p0.scrims || !p0.semantic) FAIL("nonempty", "JSON palet
   if (!mdCss.includes(`--md-sys-color-dialog-backdrop: ${WANT_HEX};`)) FAIL("dialog-backdrop", "a custom prefix must cover --{prefix}-dialog-backdrop too");
   // JSON — a top-level `constants` sibling to the palette-name keys (never itself a palette).
   const jc = X.exportJSON(C(ALL));
-  if (!jc.constants || jc.constants.dialogBackdrop?.hex !== WANT_HEX) FAIL("dialog-backdrop", `JSON constants.dialogBackdrop.hex = ${jc.constants && jc.constants.dialogBackdrop && jc.constants.dialogBackdrop.hex}, want ${WANT_HEX}`);
+  if (!jc.constants || jc.constants["dialog-backdrop"]?.hex !== WANT_HEX) FAIL("dialog-backdrop", `JSON constants.dialog-backdrop.hex = ${jc.constants && jc.constants["dialog-backdrop"] && jc.constants["dialog-backdrop"].hex}, want ${WANT_HEX}`);
   // DTCG — RAW tree only (palette.tokens.json), under a "constants" group. Deliberately ABSENT from
   // the SEMANTIC tree (Light/Dark): every top-level key there is treated elsewhere (style-plan family
   // derivation, regroup ordering) as a real, fully-roled palette positionally zipped against
@@ -154,9 +155,9 @@ if (!p0 || !p0.stops || !p0.scrims || !p0.semantic) FAIL("nonempty", "JSON palet
   if (rawLeafAliased.$extensions && rawLeafAliased.$extensions["com.figma.aliasData"]) FAIL("dialog-backdrop", "the raw constants leaf must never carry aliasData");
   // UI3 (Figma interchange) — Primitives collection ONLY, same reasoning as DTCG above.
   const ui3 = X.exportUI3(C(ALL));
-  const ui3Prim = ui3.collections["Color / Primitives"].variables["raw/constants/dialog-backdrop"];
+  const ui3Prim = ui3.collections["Color Primitives"].variables["raw/constants/dialog-backdrop"];
   if (!ui3Prim || ui3Prim.type !== "COLOR" || ui3Prim.values.Base !== WANT_HEX) FAIL("dialog-backdrop", `UI3 Primitives raw/constants/dialog-backdrop malformed: ${JSON.stringify(ui3Prim)}`);
-  if (ui3.collections["Color / Semantic"].variables["constants/dialog-backdrop"]) FAIL("dialog-backdrop", "UI3 Semantic collection must NOT carry constants/dialog-backdrop");
+  if (ui3.collections["Color Semantic"].variables["constants/dialog-backdrop"]) FAIL("dialog-backdrop", "UI3 Semantic collection must NOT carry constants/dialog-backdrop");
   // Tailwind @theme — one line, outside any palette's scale/role blocks.
   if (!X.exportTailwind(C(ALL)).includes(`--color-dialog-backdrop: ${WANT_OKLCH};`)) FAIL("dialog-backdrop", "exportTailwind missing --color-dialog-backdrop");
   // ShadCN — the one fixed, non-role token (--overlay), outside SHADCN_ORDER/MAP: present in BOTH
@@ -209,7 +210,7 @@ const withKey = C(ALL.map((p, i) => (i === 0 ? { ...p, keyColors: [{ role: "domi
 const kcss = X.exportCSS(withKey);
 if (!/--c-[a-z0-9-]+-key-dominant:\s*oklch\(/.test(kcss)) FAIL("keycolors", "dominant key token (oklch) missing");
 if (!/--c-[a-z0-9-]+-key-supportive:\s*oklch\(/.test(kcss)) FAIL("keycolors", "supportive key token (oklch) missing");
-const kp = X.exportJSON(withKey)[ALL[0].name];
+const kp = X.exportJSON(withKey)[ALL[0].name.toLowerCase()]; // ADR-016: JSON keys by slug
 if (!kp.keyColors || kp.keyColors.length !== 2 || kp.keyColors[0].role !== "dominant" || !Array.isArray(kp.keyColors[0].oklch) || kp.keyColors[0].oklch.length !== 3) FAIL("keycolors", "JSON keyColors block missing/wrong");
 // a palette with no key colors emits no key tokens (opt-in only)
 if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present when none set");

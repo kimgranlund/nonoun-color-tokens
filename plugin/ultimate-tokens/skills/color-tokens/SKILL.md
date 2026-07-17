@@ -37,7 +37,7 @@ properties. Your job is never to invent a color — it is to pick the right **ro
    reserved for meaning — never decoration. Remaining palettes are supporting accents.
 4. **Know the grammar.** Semantic = `--c-{p}{suffix}` (the accent itself is bare `--c-{p}`; e.g.
    `--c-neutral-on-surface`, `--c-primary-hover`). Raw = `--c-{p}-050…950` solids and
-   `--c-{p}-500-{step}` translucents — **never use raws in UI code**.
+   `--c-{p}-scrim-{step}` translucents (ADR-016) — **never use raws in UI code**.
 
 ## The laws (violating any of these is a defect)
 

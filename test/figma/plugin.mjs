@@ -141,15 +141,21 @@ try {
 
 if (applyBundle) {
   const bundle = figmaBundle(defaultDocument());
-  const expect = (tree) => Object.keys(tree).filter((n) => n[0] !== "$")
-    .reduce((a, n) => a + Object.keys(tree[n]).filter((k) => k[0] !== "$").length, 0);
+  // recursive: ADR-016 nested the raw scrims ({n}/scrim/{step}), so leaves are counted by $value.
+  const expect = (tree) => {
+    const walk = (node) => Object.keys(node).filter((k) => k[0] !== "$").reduce((a, k) => {
+      const c = node[k];
+      return a + (c && typeof c === "object" && ("$value" in c) ? 1 : (c && typeof c === "object" ? walk(c) : 0));
+    }, 0);
+    return walk(tree);
+  };
   const rawExpect = expect(bundle["palette.tokens.json"]);
   const semExpect = expect(bundle["Light_tokens.json"]);
 
   try {
     const res = await applyBundle(bundle);
     const raw = F.collections.find((c) => c.name === "Color Primitives");
-    const sem = F.collections.find((c) => c.name === "Color Modes");
+    const sem = F.collections.find((c) => c.name === "Color Semantic");
     if (!raw) FAIL("apply", "no Color Primitives collection created");
     if (!sem) FAIL("apply", "no Color Modes collection created");
     if (sem && sem.modes.map((m) => m.name).join() !== "Light,Dark") FAIL("apply", `Color Modes modes = ${sem && sem.modes.map((m) => m.name)}, want Light,Dark`);
@@ -176,7 +182,7 @@ if (applyBundle) {
     //  modes would corrupt the variable panel). Proven, not assumed.
     const res2 = await applyBundle(bundle);
     const rawColls = F.collections.filter((c) => c.name === "Color Primitives").length;
-    const semColls = F.collections.filter((c) => c.name === "Color Modes").length;
+    const semColls = F.collections.filter((c) => c.name === "Color Semantic").length;
     if (rawColls !== 1) FAIL("idempotent", `re-apply made ${rawColls} Color Primitives collections, want 1`);
     if (semColls !== 1) FAIL("idempotent", `re-apply made ${semColls} Color Modes collections, want 1`);
     const rawVars2 = F.variables.filter((v) => raw && v.variableCollectionId === raw.id).length;
@@ -205,10 +211,10 @@ if (applyBundle) {
     // ── REGROUP: apply with {rebuildSemantic} DELETES + re-creates the Color Modes collection (so it
     //    adopts the bundle's canonical order), leaving Color Primitives + the var counts intact and
     //    NOT duplicating the collection. The fresh semantic vars created in the bundle's role order. ──
-    const semColl0 = F.collections.find((c) => c.name === "Color Modes");
+    const semColl0 = F.collections.find((c) => c.name === "Color Semantic");
     const res4 = await applyBundle(bundle, { rebuildSemantic: true });
     if (!res4.rebuilt) FAIL("regroup", "applyBundle({rebuildSemantic:true}) did not report rebuilt");
-    const semColls4 = F.collections.filter((c) => c.name === "Color Modes");
+    const semColls4 = F.collections.filter((c) => c.name === "Color Semantic");
     if (semColls4.length !== 1) FAIL("regroup", `after regroup there are ${semColls4.length} Color Modes collections, want 1`);
     if (semColls4[0] === semColl0) FAIL("regroup", "regroup reused the old Color Modes collection (should be a fresh one)");
     if (res4.semantic !== semExpect) FAIL("regroup", `regroup created ${res4.semantic} semantic vars, want ${semExpect}`);
@@ -300,40 +306,40 @@ if (applyFloatPlans) {
     if (mergedPlans.length !== 1) FAIL("floatapply", `merged plan count = ${mergedPlans.length}, want 1 (one collection)`);
     const fr = await applyFloatPlans(mergedPlans);
 
-    const geo = F.collections.find((c) => c.name === "Geometry");
+    const geo = F.collections.find((c) => c.name === "Breakpoints");
     if (F.collections.some((c) => c.name === "Typography")) FAIL("floatapply", "the merged apply minted a Typography collection (the pre-TKT-0009 shape)");
-    if (!geo) FAIL("floatapply", "no Geometry collection created");
-    if (geo && geo.modes.map((m) => m.name).join() !== "Base,Mobile") FAIL("floatapply", `Geometry modes = ${geo && geo.modes.map((m) => m.name)}, want Base,Mobile`);
+    if (!geo) FAIL("floatapply", "no Breakpoints collection created");
+    if (geo && geo.modes.map((m) => m.name).join() !== "Base,Mobile") FAIL("floatapply", `Breakpoints modes = ${geo && geo.modes.map((m) => m.name)}, want Base,Mobile`);
     if (fr.collections !== 1) FAIL("floatapply", `applyFloatPlans reported ${fr.collections} collections, want 1 (merged)`);
 
     // every var is FLOAT + value-complete across both modes; per-mode TYPE values DIFFER (16 vs 13); both halves present.
     if (geo) {
       const gVars = F.variables.filter((v) => v.variableCollectionId === geo.id);
       const planLen = mergedPlans[0].variables.length;
-      if (gVars.length !== planLen) FAIL("floatapply", `Geometry has ${gVars.length} vars, want ${planLen}`);
-      if (!gVars.every((v) => v.type === "FLOAT")) FAIL("floatapply", "a Geometry variable is not FLOAT");
+      if (gVars.length !== planLen) FAIL("floatapply", `Breakpoints has ${gVars.length} vars, want ${planLen}`);
+      if (!gVars.every((v) => v.type === "FLOAT")) FAIL("floatapply", "a Breakpoints variable is not FLOAT");
       if (!gVars.some((v) => v.name.startsWith("type/"))) FAIL("floatapply", "the type/ half is missing from the merged collection");
       if (!gVars.some((v) => v.name.startsWith("size/"))) FAIL("floatapply", "the box-geometry half is missing from the merged collection");
       const baseId = geo.modes[0].modeId, mobId = geo.modes[1].modeId;
-      const bodyMd = gVars.find((v) => v.name === "type/Body/MD/size");
-      if (!bodyMd) FAIL("floatapply", "type/Body/MD/size variable missing");
+      const bodyMd = gVars.find((v) => v.name === "type/body/md/size");
+      if (!bodyMd) FAIL("floatapply", "type/body/md/size variable missing");
       else if (!Number.isFinite(bodyMd.valuesByMode[baseId]) || !Number.isFinite(bodyMd.valuesByMode[mobId])) FAIL("floatapply", "type/Body/MD/size not value-complete across modes");
-      else if (bodyMd.valuesByMode[baseId] === bodyMd.valuesByMode[mobId]) FAIL("floatapply", "type/Body/MD/size Base == Mobile (per-mode values should differ at bodyBase 16 vs 13)");
+      else if (bodyMd.valuesByMode[baseId] === bodyMd.valuesByMode[mobId]) FAIL("floatapply", "type/body/md/size Base == Mobile (per-mode values should differ at bodyBase 16 vs 13)");
     }
 
     // IDEMPOTENT re-apply — no duplicate collection / modes / variables.
     await applyFloatPlans(modeApplyPlan(mergeModeInterchanges(typeIx, geomIx)));
-    if (F.collections.filter((c) => c.name === "Geometry").length !== 1) FAIL("floatidem", "re-apply duplicated the Geometry collection");
-    if (geo && geo.modes.length !== 2) FAIL("floatidem", `re-apply left ${geo && geo.modes.length} Geometry modes, want 2`);
+    if (F.collections.filter((c) => c.name === "Breakpoints").length !== 1) FAIL("floatidem", "re-apply duplicated the Breakpoints collection");
+    if (geo && geo.modes.length !== 2) FAIL("floatidem", `re-apply left ${geo && geo.modes.length} Breakpoints modes, want 2`);
     const gVars2 = geo ? F.variables.filter((v) => v.variableCollectionId === geo.id).length : 0;
-    if (gVars2 !== mergedPlans[0].variables.length) FAIL("floatidem", `re-apply left ${gVars2} Geometry vars (duplicates)`);
+    if (gVars2 !== mergedPlans[0].variables.length) FAIL("floatidem", `re-apply left ${gVars2} Breakpoints vars (duplicates)`);
 
     // BREAKPOINT REMOVED ⇒ the stale mode is pruned (re-apply the merged no-breakpoints plan ⇒ Base only).
     await applyFloatPlans(modeApplyPlan(mergeModeInterchanges(
       TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), []),
       GEOM.geomTokensFigmaModes(GEOM.geomScale({ treatment: "comfortable", baseHeight: 28 }), []),
     )));
-    if (geo && geo.modes.map((m) => m.name).join() !== "Base") FAIL("floatprune", `after removing the breakpoint, Geometry modes = ${geo && geo.modes.map((m) => m.name)}, want Base`);
+    if (geo && geo.modes.map((m) => m.name).join() !== "Base") FAIL("floatprune", `after removing the breakpoint, Breakpoints modes = ${geo && geo.modes.map((m) => m.name)}, want Base`);
 
     // ORPHAN VAR pruned — a synthetic collection: apply {a,b} then {a} ⇒ b removed, a updated to 9.
     const synthVar = (name, value) => ({ name, type: "FLOAT", values: [{ mode: "Base", value }] });
@@ -351,14 +357,14 @@ if (applyFloatPlans) {
     // "Geometry" is the only one until apply runs.
     const F2 = mockFigma();
     const a2 = new Function("figma", "__html__", "module", code + "\nreturn { applyFloatPlans };")(F2.figma, "<html>", undefined).applyFloatPlans;
-    const userColl = F2.figma.variables.createVariableCollection("Geometry"); // the user's own, pre-existing
+    const userColl = F2.figma.variables.createVariableCollection("Breakpoints"); // the user's own, pre-existing
     F2.figma.variables.createVariable("user/keepme", userColl, "FLOAT").setValueForMode(userColl.modes[0].modeId, 123);
     await a2(modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), [])));
-    if (F2.collections.filter((c) => c.name === "Geometry").length !== 2) FAIL("floatprov", `expected the user's Geometry + a separate plugin-created one (2), got ${F2.collections.filter((c) => c.name === "Geometry").length}`);
-    if (!F2.variables.some((v) => v.variableCollectionId === userColl.id && v.name === "user/keepme")) FAIL("floatprov", "apply pruned a variable from the user's OWN Geometry collection");
-    if (userColl.modes[0].name !== "Mode 1") FAIL("floatprov", "apply renamed the default mode of the user's OWN Geometry collection");
+    if (F2.collections.filter((c) => c.name === "Breakpoints").length !== 2) FAIL("floatprov", `expected the user's Breakpoints + a separate plugin-created one (2), got ${F2.collections.filter((c) => c.name === "Breakpoints").length}`);
+    if (!F2.variables.some((v) => v.variableCollectionId === userColl.id && v.name === "user/keepme")) FAIL("floatprov", "apply pruned a variable from the user's OWN Breakpoints collection");
+    if (userColl.modes[0].name !== "Mode 1") FAIL("floatprov", "apply renamed the default mode of the user's OWN Breakpoints collection");
     await a2(modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), []))); // re-apply: reconcile OURS by id, not the user's
-    if (F2.collections.filter((c) => c.name === "Geometry").length !== 2) FAIL("floatprov", "re-apply made a 3rd Geometry (provenance registry not persisted to root pluginData)");
+    if (F2.collections.filter((c) => c.name === "Breakpoints").length !== 2) FAIL("floatprov", "re-apply made a 3rd Breakpoints (provenance registry not persisted to root pluginData)");
 
     // RETIREMENT (TKT-0009 migration): a registry-tracked two-collection-era "Typography" is removed by a
     // merged plan carrying retire:["Typography"] (what _figmaFloatPlans attaches) — while a user's OWN
@@ -375,7 +381,7 @@ if (applyFloatPlans) {
     const typosLeft = F8.collections.filter((c) => c.name === "Typography");
     if (typosLeft.length !== 1) FAIL("floatretire", `expected ONLY the user's own Typography to survive retirement, got ${typosLeft.length}`);
     if (!F8.variables.some((v) => v.variableCollectionId === userTypo.id && v.name === "user/keepme")) FAIL("floatretire", "retirement removed the user's OWN Typography collection (provenance violated)");
-    if (!F8.variables.some((v) => v.name === "type/Body/MD/size")) FAIL("floatretire", "the merged Geometry collection missing after retirement");
+    if (!F8.variables.some((v) => v.name === "type/body/md/size")) FAIL("floatretire", "the merged Breakpoints collection missing after retirement");
     await a8(retirePlans); // idempotent: a retire with no registry entry left is a no-op
     if (F8.collections.filter((c) => c.name === "Typography").length !== 1) FAIL("floatretire", "re-applying a retire-carrying plan touched the user's own Typography");
   } catch (e) { FAIL("floatapply", "applyFloatPlans threw: " + e.message); }
@@ -391,14 +397,16 @@ if (applyFloatPlans) {
   try {
     const F9 = mockFigma();
     const a9 = new Function("figma", "__html__", "module", code + "\nreturn { applyFloatPlans };")(F9.figma, "<html>", undefined).applyFloatPlans;
-    const oldIx = TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), []);
+    // era 1: a synthetic OLD-shape interchange ("Geometry" collection, camel var names) — hand-built,
+    // since the live emitters now speak the ADR-016 grammar.
+    const oldIx = JSON.parse(JSON.stringify(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), [])).replaceAll("Breakpoints", "Geometry").replaceAll("type/body/md/", "type/Body/MD/").replaceAll("line-height", "lineHeight").replaceAll("letter-spacing", "letterSpacing").replaceAll("paragraph-spacing", "paragraphSpacing").replaceAll("single-lineHeight", "singleLineHeight"));
     await a9(modeApplyPlan(oldIx)); // era 1: the old-shape collection ("Geometry", camel var names)
     const geoOld = F9.collections.find((c) => c.name === "Geometry");
     const oldVar = F9.variables.find((v) => v.variableCollectionId === geoOld.id && v.name === "type/Body/MD/size");
     const keepCollId = geoOld.id, keepVarId = oldVar.id, varCountBefore = F9.variables.filter((v) => v.variableCollectionId === geoOld.id).length;
     // era 2: the renamed shape — collection "Breakpoints-Test", var "type/body/md/size" — via the capability
     const renamedIx = JSON.parse(JSON.stringify(oldIx).replaceAll("type/Body/MD/", "type/body/md/"));
-    const plans9 = modeApplyPlan({ collections: { "Breakpoints-Test": renamedIx.collections["Geometry"] } });
+    const plans9 = modeApplyPlan({ collections: { "Breakpoints-Test": renamedIx.collections.Geometry } });
     plans9[0].renameFrom = ["Geometry"];
     plans9[0].renames = { "type/Body/MD/size": "type/body/md/size", "type/Body/MD/lineHeight": "type/body/md/lineHeight" };
     await a9(plans9);
@@ -406,7 +414,7 @@ if (applyFloatPlans) {
     if (!bp) FAIL("renamecap", "renameFrom did not produce the renamed collection");
     else {
       if (bp.id !== keepCollId) FAIL("renamecap", "collection rename minted a NEW collection (id changed — bindings would orphan)");
-      if (F9.collections.filter((c) => c.name === "Geometry").length !== 0) FAIL("renamecap", "the old-name collection lingers after renameFrom");
+      if (F9.collections.filter((c) => c.name === "Breakpoints").length !== 0) FAIL("renamecap", "the old-name collection lingers after renameFrom");
       const nv = F9.variables.find((v) => v.variableCollectionId === bp.id && v.name === "type/body/md/size");
       if (!nv) FAIL("renamecap", "renamed variable missing");
       else if (nv.id !== keepVarId) FAIL("renamecap", "variable rename minted a NEW variable (id changed — bindings would orphan)");
@@ -429,8 +437,8 @@ if (applyFloatPlans) {
   else {
     const typePlan = modeApplyPlan(TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product" }), []));
     await F3.figma.ui._h({ type: "apply", floatPlans: typePlan, config: { name: "x" } }); // Color OFF → no dtcg
-    if (F3.collections.some((c) => c.name === "Color Primitives" || c.name === "Color Modes")) FAIL("applysys", "apply with no dtcg still created a Color collection (the Color toggle was ignored)");
-    if (!F3.collections.some((c) => c.name === "Geometry")) FAIL("applysys", "apply with no dtcg did not apply the merged Geometry float plan");
+    if (F3.collections.some((c) => c.name === "Color Primitives" || c.name === "Color Semantic")) FAIL("applysys", "apply with no dtcg still created a Color collection (the Color toggle was ignored)");
+    if (!F3.collections.some((c) => c.name === "Breakpoints")) FAIL("applysys", "apply with no dtcg did not apply the merged Breakpoints float plan");
     // COMPLETION FEEDBACK: a finished apply posts {apply-done} back to the UI (its counts drive the "Applied N…" toast).
     const done = F3.figma.ui._posted.find((m) => m && m.type === "apply-done");
     if (!done) FAIL("applydone", "a completed apply posted no {apply-done} message to the UI (no done-feedback)");
@@ -443,15 +451,15 @@ if (applyBundle && applyStylePlans) {
   try {
     const FA = mockFigma();
     const la = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyStylePlans };")(FA.figma, "<html>", undefined);
-    const bundleA = figmaBundle(defaultDocument());
-    await la.applyBundle(bundleA, {});
-    const semA = FA.collections.find((c) => c.name === "Color Modes");
+    const bundleB = figmaBundle(defaultDocument()); // the CURRENT (kebab) grammar
+    // era 1: a synthetic OLD-grammar bundle (camel role leaves) — hand-built, the live export is kebab now.
+    const bundleOld = JSON.parse(JSON.stringify(bundleB).replaceAll('"on-surface"', '"onSurface"'));
+    await la.applyBundle(bundleOld, {});
+    const semA = FA.collections.find((c) => c.name === "Color Semantic");
     const oldSem = FA.variables.find((v) => v.variableCollectionId === semA.id && v.name === "neutral/onSurface");
-    if (!oldSem) { FAIL("renamecap", "fixture: neutral/onSurface missing from the first color apply"); }
+    if (!oldSem) { FAIL("renamecap", "fixture: neutral/onSurface missing from the era-1 color apply"); }
     else {
       const keepId = oldSem.id;
-      // second apply: the bundle now names it neutral/on-surface + the semantic collection renames
-      const bundleB = JSON.parse(JSON.stringify(bundleA).replaceAll("neutral/onSurface", "neutral/on-surface").replaceAll('"onSurface"', '"on-surface"'));
       await la.applyBundle(bundleB, { renames: { semantic: { "neutral/onSurface": "neutral/on-surface" } } });
       const nv = FA.variables.find((v) => v.variableCollectionId === semA.id && v.name === "neutral/on-surface");
       if (!nv) FAIL("renamecap", "color semantic rename missing");
@@ -604,13 +612,13 @@ if (applyStylePlans && applyFontPrimitives) {
     const prim = F.collections.find((c) => c.name === "Font Primitives");
     if (!prim) FAIL("styles", "no Font Primitives collection created");
     else {
-      const fontAlias = F.variables.find((v) => v.variableCollectionId === prim.id && v.name === "font/Display");
+      const fontAlias = F.variables.find((v) => v.variableCollectionId === prim.id && v.name === "font/display");
       const target = fontAlias && Object.values(fontAlias.values)[0];
-      if (!fontAlias || !target || target.type !== "VARIABLE_ALIAS") FAIL("styles", "font/Display is not aliased to its family primitive");
+      if (!fontAlias || !target || target.type !== "VARIABLE_ALIAS") FAIL("styles", "font/display is not aliased to its family primitive");
     }
 
     const sr = await applyStylePlans(plans);
-    const sem = F.collections.find((c) => c.name === "Color Modes");
+    const sem = F.collections.find((c) => c.name === "Color Semantic");
     const semIds = new Set(F.variables.filter((v) => v.variableCollectionId === sem.id).map((v) => v.id));
     const paintStyles = F.figma._styles.filter((x) => x._kind === "PAINT");
     if (sr.paints !== plans.paints.length || paintStyles.length !== plans.paints.length) FAIL("styles", `paint styles ${paintStyles.length}/${sr.paints}, expected ${plans.paints.length}`);

@@ -25,17 +25,17 @@
 //     followed by the role's suffix, e.g. "primary" for the prime role, "primary-dim",
 //     "neutral-scrim").
 
-import { semanticRoles, refKey } from "../../src/engine/semantic.js";
+import { semanticRoles, refPath, roleLeaf } from "../../src/engine/semantic.js";
 
 /**
- * The raw-colors target a single ref resolves to for a palette: "{n}/{refKey(ref)}".
+ * The raw-colors target a single ref resolves to for a palette: "{n}/{refPath(ref)}".
  * Centralised so light and dark targets are normalised identically.
  * @param {string} paletteName lowercase palette name (e.g. "primary")
  * @param {string} ref a role ref: a solid stop ("550") or a scrim ("500-200")
  * @returns {string}
  */
 function targetName(paletteName, ref) {
-  return `${paletteName}/${refKey(ref)}`;
+  return `${paletteName}/${refPath(ref)}`;  // ADR-016: scrims nest ("neutral/scrim/200")
 }
 
 /**

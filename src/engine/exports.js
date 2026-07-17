@@ -18,7 +18,8 @@
 // theme light/dark/auto.
 
 import { paletteStops, EXPORT_STOPS, DEFAULT_CONTROLS } from "./tonal.js";
-import { semanticRoles, refKey, applyRoleOverrides, applyOnColorContrast, applyAccentRef } from "./semantic.js";
+import { semanticRoles, refKey, refPath, refSlug, roleLeaf, applyRoleOverrides, applyOnColorContrast, applyAccentRef } from "./semantic.js";
+import { COLLECTIONS } from "./collections.js";
 import { iconSystem, iconSystemLabel } from "./icon-systems.mjs";
 import { motionTokens, MOTION_EASING, MOTION_DURATION, MOTION_NEVER } from "./motion.mjs";
 import { oklchToSrgb8, hexToSrgb8, pyRound, dsBundleGates } from "./ds-gates.js"; // §8 carrier primitives + the gate itself — the receipt cites the SAME run the gate measures
@@ -311,19 +312,20 @@ function cssFrom(palettes, oklch, pfx = "c") {
       const val = oklch ? oklchStr(rgbToOklch(rgb)) : hexOf(rgb);
       lines.push(`  --${pfx}-${p.n}-${key}: ${val};`);
     }
-    // scrim RAW vars: --{pfx}-{n}-500-{step}  (the 500 color at alpha% = step/10)
+    // scrim RAW vars: --{pfx}-{n}-scrim-{step} (ADR-016 nesting, hyphen surface; the canonical 500
+    // base is omitted while SCRIM_BASES is single — refSlug re-adds it if a second base ever ships)
     for (const base of SCRIM_BASES) {
       for (const step of SCRIM_STEPS) {
         const sc = p.scrims[base][step];
         const val = oklch ? oklchStrA(rgbToOklch(sc.rgb), sc.alphaPct) : sc.hex;
-        lines.push(`  --${pfx}-${p.n}-${pad3(base)}-${pad3(step)}: ${val};`);
+        lines.push(`  --${pfx}-${p.n}-${refSlug(`${base}-${step}`)}: ${val};`);
       }
     }
     // SEMANTIC --{pfx}-{n}-{role} vars: light-dark(var(light raw), var(dark raw)) (ADR-005)
     lines.push(`  /* ${p.name} — semantic roles */`);
     for (const r of p.roles) {
-      const lv = `var(--${pfx}-${p.n}-${refKey(r.lightRef)})`;
-      const dv = `var(--${pfx}-${p.n}-${refKey(r.darkRef)})`;
+      const lv = `var(--${pfx}-${p.n}-${refSlug(r.lightRef)})`;
+      const dv = `var(--${pfx}-${p.n}-${refSlug(r.darkRef)})`;
       lines.push(`  --${pfx}-${p.n}${r.suffix}: light-dark(${lv}, ${dv});`);
     }
     // KEY COLORS — retained brand values by expression (dominant/supportive), exact in OKLCH
@@ -342,8 +344,10 @@ function cssFrom(palettes, oklch, pfx = "c") {
 // ──────────────────────────────────────────────────────────────────────────────
 // 3. JSON
 // ──────────────────────────────────────────────────────────────────────────────
-// { meta..., [paletteName]: { stops:{pad3:hex}, scrims:{base-i:{hex,alpha}}, semantic:[{key,light,dark}] } }
-// Keyed by the original palette NAME; disabled palettes are absent.
+// { meta..., [paletteSlug]: { stops:{pad3:hex}, scrims:{step:{hex,alpha}}, semantic:[{key,light,dark}] } }
+// Keyed by the palette SLUG (ADR-016 — every other format keys by slug; the display name rides
+// nowhere in JSON, by design). Scrims key by their 3-digit STEP (the single canonical 500 base is
+// implicit); semantic `key` is the kebab leaf shared with every surface. Disabled palettes absent.
 export function exportJSON(state) {
   const palettes = derivedAll(state);
   const out = {};
@@ -352,18 +356,18 @@ export function exportJSON(state) {
     const stops = {};
     for (const key of Object.keys(p.stops)) stops[key] = p.stops[key].hex;
 
-    // scrims: { "500-200": {hex, alpha}, ... } — "500-{step}", alpha% = step/10.
+    // scrims: { "200": {hex, alpha}, ... } — keyed by padded STEP, alpha% = step/10 (500 base implicit).
     const scrims = {};
     for (const base of SCRIM_BASES) {
       for (const step of SCRIM_STEPS) {
         const sc = p.scrims[base][step];
-        scrims[`${pad3(base)}-${pad3(step)}`] = { hex: sc.hex, alpha: sc.alphaPct };
+        scrims[pad3(step)] = { hex: sc.hex, alpha: sc.alphaPct };
       }
     }
 
-    // semantic: [{ key, light:"#hex", dark:"#hex" }, ...] — both refs resolved.
+    // semantic: [{ key, light:"#hex", dark:"#hex" }, ...] — `key` is the kebab leaf (ADR-016).
     const semantic = p.roles.map((r) => ({
-      key: r.key,
+      key: roleLeaf(p.n, r),
       light: r.light.hex,
       dark: r.dark.hex,
     }));
@@ -371,11 +375,11 @@ export function exportJSON(state) {
     const palette = { stops, scrims, semantic };
     // keyColors: [{ role, oklch:[L,C,H], name? }] — retained exact brand colors (present only when set).
     if (p.keyColors.length) palette.keyColors = p.keyColors.map((kc) => ({ role: kc.role, oklch: kc.oklch, ...(kc.name ? { name: kc.name } : {}) }));
-    out[p.name] = palette;
+    out[p.n] = palette;
   }
-  // constants — fixed, non-palette tokens (currently just dialogBackdrop). A sibling key to the
-  // palette names, never itself a palette.
-  out.constants = { dialogBackdrop: { hex: dialogBackdropHex() } };
+  // constants — fixed, non-palette tokens (currently just dialog-backdrop). A sibling key to the
+  // palette slugs, never itself a palette.
+  out.constants = { "dialog-backdrop": { hex: dialogBackdropHex() } };
   return out;
 }
 
@@ -390,7 +394,7 @@ export function exportJSON(state) {
 //   BLANK/undefined -> NO semantic leaf carries com.figma.aliasData (resolved-only;
 //                      always imports natively).
 //   SET             -> EVERY semantic leaf carries com.figma.aliasData =
-//                      { targetVariableName: "{n}/{refKey(ref)}", targetVariableSetName: rawColl }
+//                      { targetVariableName: "{n}/{refPath(ref)}", targetVariableSetName: rawColl }
 //                      (the per-mode ref: light's ref for Light, dark's ref for Dark).
 export function exportDTCG(state, opts) {
   const rawColl = opts && opts.rawColl ? opts.rawColl : "";
@@ -403,12 +407,15 @@ export function exportDTCG(state, opts) {
     for (const key of Object.keys(p.stops)) {
       grp[key] = colorLeaf(p.stops[key].rgb, 1, null);
     }
+    // scrims NEST under a scrim/ group (ADR-016 — two segments, never a numeral-compound leaf).
+    const scrimGrp = {};
     for (const base of SCRIM_BASES) {
       for (const step of SCRIM_STEPS) {
         const sc = p.scrims[base][step];
-        grp[`${pad3(base)}-${pad3(step)}`] = colorLeaf(sc.rgb, sc.frac, null);
+        scrimGrp[pad3(step)] = colorLeaf(sc.rgb, sc.frac, null);
       }
     }
+    grp.scrim = scrimGrp;
     rawTree[p.n] = grp;
   }
   // constants — fixed, non-palette raw primitives (currently just dialog-backdrop), a sibling GROUP
@@ -425,9 +432,9 @@ export function exportDTCG(state, opts) {
         const side = mode === "light" ? r.light : r.dark;
         const ref = mode === "light" ? r.lightRef : r.darkRef;
         const alias = rawColl
-          ? { targetVariableName: `${p.n}/${refKey(ref)}`, targetVariableSetName: rawColl }
+          ? { targetVariableName: `${p.n}/${refPath(ref)}`, targetVariableSetName: rawColl }
           : null;
-        grp[r.key] = colorLeaf(side.rgb, side.frac, alias);
+        grp[roleLeaf(p.n, r)] = colorLeaf(side.rgb, side.frac, alias);
       }
       tree[p.n] = grp;
     }
@@ -472,16 +479,16 @@ export function exportUI3(state) {
     for (const base of SCRIM_BASES) {
       for (const step of SCRIM_STEPS) {
         const sc = p.scrims[base][step];
-        primVars[`raw/${p.n}/${pad3(base)}-${pad3(step)}`] = { type: "COLOR", values: { Base: sc.hex } };
+        primVars[`raw/${p.n}/${refPath(`${base}-${step}`)}`] = { type: "COLOR", values: { Base: sc.hex } };
       }
     }
-    // semantic: "{n}/{key}" -> in-file aliases to the raw key paths per mode.
+    // semantic: "{n}/{kebab leaf}" -> in-file aliases to the raw key paths per mode (ADR-016).
     for (const r of p.roles) {
-      semVars[`${p.n}/${r.key}`] = {
+      semVars[`${p.n}/${roleLeaf(p.n, r)}`] = {
         type: "COLOR",
         values: {
-          Light: `{raw/${p.n}/${refKey(r.lightRef)}}`,
-          Dark: `{raw/${p.n}/${refKey(r.darkRef)}}`,
+          Light: `{raw/${p.n}/${refPath(r.lightRef)}}`,
+          Dark: `{raw/${p.n}/${refPath(r.darkRef)}}`,
         },
       };
     }
@@ -495,8 +502,8 @@ export function exportUI3(state) {
   return {
     $schema: "figma-ui3-variables.color.schema.v1",
     collections: {
-      "Color / Primitives": { modes: ["Base"], variables: primVars },
-      "Color / Semantic": { modes: ["Light", "Dark"], variables: semVars },
+      [COLLECTIONS.colorRaw]: { modes: ["Base"], variables: primVars },
+      [COLLECTIONS.colorSemantic]: { modes: ["Light", "Dark"], variables: semVars },
     },
   };
 }

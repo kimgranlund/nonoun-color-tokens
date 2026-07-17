@@ -27,7 +27,7 @@ The non-obvious do/don'ts (each cost a real bug or a review cycle), then a worke
 ### The binder
 
 - **A "skipped N roles" report is a missing RAW target, not a binder bug.** The binder pushes the
-  un-resolvable `"{n}/{refKey}"` name into `missing` and continues. The cause is almost always (a) the raw
+  un-resolvable `"{n}/{refPath}"` name into `missing` and continues. The cause is almost always (a) the raw
   `Color Primitives` weren't applied/regenerated first, or (b) a pad3 / scrim-grammar mismatch (`"{n}/50"`
   instead of `"{n}/050"`, or a scrim step not in the primitives). Check the first `missing` name against the
   actual raw var names before touching `roleTable`.
@@ -51,10 +51,10 @@ The non-obvious do/don'ts (each cost a real bug or a review cycle), then a worke
   prune still reaches them (the `prune` gate seeds dead vars and asserts they're gone AND reported in the
   returned `pruned` count).
 - **Regroup is destructive — keep it behind the always-warn gate.** `rebuildSemantic` deletes + re-creates
-  `Color Modes`, detaching bound layers. `renderApplyGate` must NOT offer "don't show again" for the rebuild
+  `Color Semantic`, detaching bound layers. `renderApplyGate` must NOT offer "don't show again" for the rebuild
   path (`rebuild ? false : <checkbox>`), and `confirmApplyGate` must persist consent only when `!rebuild`.
   Don't make Regroup cookieable. Regroup must leave Color Primitives untouched and not duplicate the
-  collection (the `regroup` gate asserts a fresh-but-single `Color Modes` with scrims last).
+  collection (the `regroup` gate asserts a fresh-but-single `Color Semantic` with scrims last).
 - **Apply embeds the config in `figma.root` pluginData.** A read-back must reproduce the params losslessly —
   don't drop the `config` from the `apply` message or recover state approximately from colors when the exact
   config is available. The `config` gate proves apply embeds it under `ultimate-tokens-config`, that

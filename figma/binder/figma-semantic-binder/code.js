@@ -18,7 +18,7 @@
 // the canonical raw-colors name set — no unpadded "{n}/50", no out-of-range "{n}/500-999".
 
 const RAW_COLLECTION = "Color Primitives";
-const SEMANTIC_COLLECTION = "Color Modes";
+const SEMANTIC_COLLECTION = "Color Semantic"; // ADR-016 (was "Color Modes")
 
 // The 8 default palettes (knowledge-05 §3; defaults[].name in data/role-table.json).
 const PALETTES = [
@@ -151,19 +151,22 @@ async function applyFloatPlans(plans) {
   return { collections: collections, variables: variables };
 }
 
-// refKey: mirror of semantic.js / bind-plan.mjs. Solid stops zero-pad to 3 digits
-// ("50" -> "050"); scrim refs ("500-200") keep the "-step" suffix and pad the base stop.
+// refKey: mirror of semantic.js refPath / bind-plan.mjs targetName (ADR-016). Solid stops zero-pad
+// to 3 digits ("50" -> "050"); scrim refs NEST — "500-200" -> "scrim/200" (the canonical 500 base is
+// omitted; a non-500 base would emit "scrim/{base}/{step}").
 function refKey(ref) {
   const s = String(ref);
   const dash = s.indexOf("-");
   if (dash === -1) return s.padStart(3, "0");
-  return s.slice(0, dash).padStart(3, "0") + s.slice(dash);
+  const base = s.slice(0, dash);
+  const step = s.slice(dash + 1).padStart(3, "0");
+  return (base === "500" ? "scrim/" : "scrim/" + base.padStart(3, "0") + "/") + step;
 }
 
 // roleTable(n) — the 53 roles for a palette, name-substituted exactly as semantic.js /
 // bind-plan.mjs produce them: accent + on-accent keys carry the palette name; shared roles do
 // not. Refs are the canonical values from data/role-table.json (validated semantic-mapping).
-// `key` is the semantic variable name part ("{n}/{key}"); `light`/`dark` feed targetName.
+// The semantic variable name is "{n}/{kebab leaf}" (suffix-derived, ADR-016); `light`/`dark` feed targetName.
 function roleTable(n) {
   const N = n.charAt(0).toUpperCase() + n.slice(1);
   return [
@@ -301,7 +304,7 @@ async function main() {
         if (!lt) { missing.push(ltName); continue; }
         if (!dt) { missing.push(dtName); continue; }
 
-        const semName = n + "/" + r.key;
+        const semName = n + "/" + (r.suffix ? r.suffix.slice(1) : n); // ADR-016 kebab leaf
         const refreshed = await figma.variables.getLocalVariablesAsync();
         const semVar =
           refreshed.find((v) => v.variableCollectionId === sem.id && v.name === semName) ||

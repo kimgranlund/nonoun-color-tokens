@@ -31,6 +31,8 @@
 // icon/caret remain rule-derived — they reproduce the hand-tuned reference ramp (20·24·28·36·48·64)
 // to ±1px and generalize to any scaled baseHeight.
 
+import { COLLECTIONS } from "./collections.js";
+
 const round = (v) => Math.round(v);
 const roundEven = (v) => 2 * Math.round(v / 2);
 
@@ -290,11 +292,12 @@ export function geomTokensDTCG(scale, { unit = "px" } = {}) {
   const dim = (px) => ({ $type: "dimension", $value: dimUnit(px, unit) });
   const size = {};
   for (const [name, s] of Object.entries(scale.sizes)) {
-    size[name] = {
+    // ADR-016: kebab field names, lowercase step keys, the icon-gap/pill-radius homonym renames.
+    size[name.toLowerCase()] = {
       height: dim(s.height), icon: dim(s.icon), caret: dim(s.caret), font: dim(s.font),
-      gap: dim(s.gap), paddingNarrow: dim(s.paddingNarrow), paddingWide: dim(s.paddingWide),
-      paddingNarrowCompact: dim(s.paddingNarrowCompact), paddingWideCompact: dim(s.paddingWideCompact),
-      radius: dim(s.radiusPill), minWidth: dim(s.minWidth),
+      "icon-gap": dim(s.gap), "padding-narrow": dim(s.paddingNarrow), "padding-wide": dim(s.paddingWide),
+      "padding-narrow-compact": dim(s.paddingNarrowCompact), "padding-wide-compact": dim(s.paddingWideCompact),
+      "pill-radius": dim(s.radiusPill), "min-width": dim(s.minWidth),
     };
   }
   const radius = {};
@@ -316,11 +319,11 @@ export function geomTokensFigma(scale) {
   const num = (v) => ({ $type: "number", $value: v });
   const size = {};
   for (const [name, s] of Object.entries(scale.sizes)) {
-    size[name] = {
+    size[name.toLowerCase()] = {
       height: num(s.height), icon: num(s.icon), caret: num(s.caret),
-      gap: num(s.gap), paddingNarrow: num(s.paddingNarrow), paddingWide: num(s.paddingWide),
-      paddingNarrowCompact: num(s.paddingNarrowCompact), paddingWideCompact: num(s.paddingWideCompact),
-      radius: num(s.radiusPill), minWidth: num(s.minWidth),
+      "icon-gap": num(s.gap), "padding-narrow": num(s.paddingNarrow), "padding-wide": num(s.paddingWide),
+      "padding-narrow-compact": num(s.paddingNarrowCompact), "padding-wide-compact": num(s.paddingWideCompact),
+      "pill-radius": num(s.radiusPill), "min-width": num(s.minWidth),
     };
   }
   const radius = {};
@@ -328,7 +331,7 @@ export function geomTokensFigma(scale) {
   const space = {};
   for (const [k, v] of Object.entries(scale.space)) space[k] = num(v);
   const group = (src) => { const g = {}; for (const [k, v] of Object.entries(src || {})) g[camelKebab(k)] = num(v); return g; };
-  return { Geometry: { size, radius, space, inset: group(scale.insets), gap: group(scale.gaps), border: group(scale.borders), focus: group(scale.focus) } };
+  return { [COLLECTIONS.breakpoints]: { size, radius, space, inset: group(scale.insets), gap: group(scale.gaps), border: group(scale.borders), focus: group(scale.focus) } };
 }
 
 // geomTokensFigmaModes — the geometry as a single Figma-variable COLLECTION ("Geometry") with one MODE per
@@ -342,7 +345,10 @@ export function geomTokensFigma(scale) {
 // named, not media-queried). IDENTITY: `modes = []` ⇒ a single base mode whose values equal the base.
 // `opts.baseName` (default "Base") NAMES the synthetic base layer (e.g. "Mobile" — the standard set);
 // `opts.baseLast` (default false) places it AFTER the breakpoints (Figma's default mode = the FIRST mode).
-const GEOM_SIZE_FIELDS = [["height", "height"], ["icon", "icon"], ["caret", "caret"], ["gap", "gap"], ["paddingNarrow", "paddingNarrow"], ["paddingWide", "paddingWide"], ["paddingNarrowCompact", "paddingNarrowCompact"], ["paddingWideCompact", "paddingWideCompact"], ["radius", "radiusPill"], ["minWidth", "minWidth"]];
+// ADR-016: emitted field names are kebab; the two homonyms rename at the leaf — `icon-gap` (the
+// control-internal icon↔label gap, vs the container gap/ scale) and `pill-radius` (the height-linked
+// pill corner, vs the radius/ ladder).
+const GEOM_SIZE_FIELDS = [["height", "height"], ["icon", "icon"], ["caret", "caret"], ["icon-gap", "gap"], ["padding-narrow", "paddingNarrow"], ["padding-wide", "paddingWide"], ["padding-narrow-compact", "paddingNarrowCompact"], ["padding-wide-compact", "paddingWideCompact"], ["pill-radius", "radiusPill"], ["min-width", "minWidth"]];
 // Figma requires DISTINCT mode names per collection; the synthetic base layer (`baseName`) is reserved +
 // de-dup (case-insensitively) so a breakpoint sharing its name / two same-named modes can't collide on import.
 function disambiguateModeNames(names, baseName = "Base") {
@@ -368,7 +374,7 @@ export function geomTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
   // baseHeight; radii/space are treatment-derived (mode-independent), but we emit per-mode for completeness.
   const layer = (scale, mode) => {
     for (const [name, s] of Object.entries(scale.sizes))
-      for (const [field, src] of GEOM_SIZE_FIELDS) set(`size/${name}/${field}`, mode, s[src]);
+      for (const [field, src] of GEOM_SIZE_FIELDS) set(`size/${name.toLowerCase()}/${field}`, mode, s[src]);
     for (const [k, v] of Object.entries(scale.radii)) set(`radius/${k}`, mode, v);
     for (const [k, v] of Object.entries(scale.space)) set(`space/${k}`, mode, v);
     for (const [k, v] of Object.entries(scale.insets || {})) set(`inset/${camelKebab(k)}`, mode, v);
@@ -380,6 +386,6 @@ export function geomTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
   list.forEach((m, i) => layer(m.scale, names[i]));
   return {
     $schema: "figma-ui3-variables.float.schema.v1",
-    collections: { "Geometry": { modes: modeNames, variables } },
+    collections: { [COLLECTIONS.breakpoints]: { modes: modeNames, variables } },
   };
 }

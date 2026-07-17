@@ -41,7 +41,8 @@ import { typeScale, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, type
 import { geomScale, geomTokensCSS, geomTokensBreakpointCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
 import { modeApplyPlan, validateModeInterchange, mergeModeInterchanges, applyRenameMigrations } from "../../figma/binder/mode-apply-plan.mjs";
-import { FIGMA_MIGRATIONS } from "../../figma/binder/migrations.mjs";
+import { FIGMA_MIGRATIONS, kebabWaveVarRenames, kebabWaveColorRenames } from "../../figma/binder/migrations.mjs";
+import { COLLECTIONS } from "../engine/collections.js";
 import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
 import { ICON_SYSTEMS, iconSystem, iconSystemById, iconSystemLabel } from "../engine/icon-systems.mjs";
 import { icon } from "./icons.js";
@@ -93,7 +94,7 @@ native import, and import the primitives FIRST.
 
 To test (Figma → Local variables → Import):
   1. Import palette.tokens.json   → creates the "Color Primitives" collection.
-  2. Import Light_tokens.json then Dark_tokens.json → creates "Color Modes".
+  2. Import Light_tokens.json then Dark_tokens.json → creates "Color Semantic".
   3. Open a semantic variable (e.g. primary). It should show as an ALIAS to a
      Color Primitives variable (not a flat color), and editing that primitive should
      update it. If it imports as resolved colors (no alias) or errors on import, the
@@ -5659,14 +5660,14 @@ class HctApp extends HTMLElement {
                   title: "Download the Color Tokens Semantic Binder plugin (manifest.json + code.js). In Figma: Plugins → Development → Import plugin from manifest — it aliases each semantic role to its raw variable so editing a raw color cascades.",
                   onclick: () => this.downloadFigmaPlugin(),
                 }),
-                // Opt-in (inside Figma only): re-create Color Modes so it adopts the grouped order
+                // Opt-in (inside Figma only): re-create Color Semantic so it adopts the grouped order
                 // (Figma won't reorder existing variables on a normal apply). Lives here, beside the
                 // Binder plugin, because it's a Figma-tab action — re-creates vars, so bound layers
                 // need reconnecting.
                 this.inFigma
                   ? btn([icon("arrows-clockwise"), "Regroup"], {
                       cls: "figma-regroup",
-                      title: "Rebuild the Color Modes variables in grouped order (regular · containers · surfaces · scrims). Re-creates them, so layers bound to them will need reconnecting. Color Primitives are untouched.",
+                      title: "Rebuild the Color Semantic variables in grouped order (regular · containers · surfaces · scrims). Re-creates them, so layers bound to them will need reconnecting. Color Primitives are untouched.",
                       onclick: () => this.requestApplyToFigma(true),
                     })
                   : false,
@@ -5712,7 +5713,7 @@ class HctApp extends HTMLElement {
               ? btn([icon("flag"), "Apply Variables"], {
                   variant: "primary",
                   cls: "figma-apply",
-                  title: "Create/update the Color Primitives + Color Modes (Light/Dark) variable collections directly in this Figma file",
+                  title: "Create/update the Color Primitives + Color Semantic (Light/Dark) variable collections directly in this Figma file",
                   onclick: () => this.requestApplyToFigma(),
                 })
               : false,
@@ -5846,7 +5847,7 @@ class HctApp extends HTMLElement {
     // figma/styles.plan.json — the plugin-free STYLES import artifact (rides the Styles opt-out chip,
     // compositional with the system toggles like the apply path): the same pure plans the in-Figma
     // apply executes, so external tooling (or a later plugin-free import) can create the bound
-    // swatches without re-deriving anything. paints → Color Modes bindings; texts → Typography/Font
+    // swatches without re-deriving anything. paints → Color Semantic bindings; texts → Breakpoints (type/)/Font
     // Primitives bindings + literal fallbacks; fontPrimitives → the ordered ensure-plan.
     if (sys.styles !== false && (sys.color || sys.type)) {
       const stScale = sys.type ? this._typeScaleFor("base") : null;
@@ -5888,7 +5889,7 @@ class HctApp extends HTMLElement {
         "| `tailwind/` · `shadcn/` | Framework presets |",
       );
       const collNames = figmaCollectionNames(this.doc);
-      const customColl = collNames.raw !== "Color Primitives" || collNames.semantic !== "Color Modes";
+      const customColl = collNames.raw !== COLLECTIONS.colorRaw || collNames.semantic !== COLLECTIONS.colorSemantic;
       rows.push(
         "| `figma/` | Importable Figma variable files (Light/Dark semantic + primitives" + (sys.type !== false || sys.geometry !== false ? " + the breakpoint-moded Typography/Geometry collections" : "") + ") |",
         "| `figma-aliased/` | The raw→semantic aliased variant (plugin-free import path)" + (customColl ? ` — targets collections named \`${collNames.raw}\` / \`${collNames.semantic}\` (renamed in Settings › Token mapping)` : "") + " |",
@@ -6041,7 +6042,7 @@ class HctApp extends HTMLElement {
   _setApplyConsent() { try { localStorage.setItem(this._applyConsentKey(), "1"); } catch { /* storage blocked */ } }
 
   applyToFigma(rebuild = false) {
-    // rebuild = the opt-in "Regroup" path: re-create the Color Modes collection so it adopts the
+    // rebuild = the opt-in "Regroup" path: re-create the Color Semantic collection so it adopts the
     // canonical grouped order (Figma keeps existing variables' positions on a normal update). It
     // re-creates the semantic variables — bound layers detach (warned in the apply gate).
     try {
@@ -6049,7 +6050,8 @@ class HctApp extends HTMLElement {
       // system is NOT written to the file. Color omits `dtcg` (code.js then skips the color collections);
       // Type/Geometry are filtered out of floatPlans below. The config embed travels regardless.
       const sys = this.exportSystems || {};
-      const msg = { type: "apply", config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans(), collections: figmaCollectionNames(this.doc), renames: { color: FIGMA_MIGRATIONS.color } };
+      const _colorSlugs = sys.color !== false ? (this.doc.palettes || []).filter((p) => p && p.on !== false).map((p) => slug(p.name)) : [];
+      const msg = { type: "apply", config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans(), collections: figmaCollectionNames(this.doc), renames: { color: { ...kebabWaveColorRenames(_colorSlugs), collections: FIGMA_MIGRATIONS.color.collections } } };
       if (sys.color !== false) msg.dtcg = this.figmaBundle();
       // STYLES (opt-out): the swatch layer bound to the variables — paint styles per semantic role
       // (color on), text styles per voice×step×weight (type on). Pure plans (style-plan.mjs); the
@@ -6185,12 +6187,18 @@ class HctApp extends HTMLElement {
     if (!ix) return [];
     try {
       if (validateModeInterchange(ix).length) return [];
-      // TKT-0012: stamp the active rename maps (id-preserving; empty maps = byte-identical no-op)
+      // TKT-0012: stamp the active rename maps (id-preserving; empty maps = byte-identical no-op).
+      // The ADR-016 var map derives from the LIVE plan's names (kebabWaveVarRenames reverses each to
+      // its frozen pre-wave form), so custom voices/steps are covered without a hand list.
       const plans = applyRenameMigrations(modeApplyPlan(ix), FIGMA_MIGRATIONS.floats);
+      for (const p of plans) {
+        const waveVars = kebabWaveVarRenames(p.variables.map((v) => v.name));
+        if (Object.keys(waveVars).length) p.renames = { ...waveVars, ...(p.renames || {}) };
+      }
       // the merged shape supersedes the two-collection era's moded "Typography" collection — mark it for
       // executor retirement (registry-tracked only) whenever this apply actually lands type/ variables.
       for (const p of plans) {
-        if (p.collection === "Geometry" && p.variables.some((v) => typeof v.name === "string" && v.name.startsWith("type/"))) p.retire = ["Typography"];
+        if (p.collection === COLLECTIONS.breakpoints && p.variables.some((v) => typeof v.name === "string" && v.name.startsWith("type/"))) p.retire = ["Typography"];
       }
       return plans;
     } catch { return []; }
@@ -6519,7 +6527,7 @@ class HctApp extends HTMLElement {
         // in the file keep their name (the apply-gate warning covers the overwrite semantics).
         this._settingsGroup("Figma collections", [
           collInput("raw", "Primitives collection", "Color Primitives"),
-          collInput("semantic", "Semantic collection", "Color Modes"),
+          collInput("semantic", "Semantic collection", "Color Semantic"),
           ...(collNames.raw.toLowerCase() === collNames.semantic.toLowerCase()
             ? [h("p", { class: "settings-note settings-warn" }, "The two collections need distinct names — identical names would merge the primitives and roles into one collection on apply.")]
             : []),

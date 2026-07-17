@@ -22,9 +22,9 @@ let failed = false;
 const err = (f, tok, why) => { console.error(`✗ ${f}: ${tok} — ${why}`); failed = true; };
 
 // a token is legal iff, after removing the palette part, the remainder is a known role suffix or a
-// raw pattern (-NNN solid · -500-NNN scrim; the skill names raws only to forbid them).
-const META = new Set(["{suffix}", "-500-{step}", "-050…950"]); // the grammar-explanation forms in SKILL.md
-const legalRest = (rest) => SUFFIXES.has(rest) || META.has(rest) || /^-\d{3}$/.test(rest) || /^-500-\d{2,3}$/.test(rest) || /^-\d{3}…\d{3}$/.test(rest);
+// raw pattern (-NNN solid · -scrim-NNN scrim, ADR-016; the skill names raws only to forbid them).
+const META = new Set(["{suffix}", "-scrim-{step}", "-050…950"]); // the grammar-explanation forms in SKILL.md
+const legalRest = (rest) => SUFFIXES.has(rest) || META.has(rest) || /^-\d{3}$/.test(rest) || /^-scrim-\d{2,3}$/.test(rest) || /^-\d{3}…\d{3}$/.test(rest);
 
 for (const f of files) {
   const text = readFileSync(join(SKILL_DIR, f), "utf8");

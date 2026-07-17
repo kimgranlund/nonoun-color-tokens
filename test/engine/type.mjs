@@ -193,7 +193,7 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(md.includes("--md-sys-typescale-body-md-size:") && md.includes(".md-sys-typescale-body-md {") && !md.includes("--type-body-md"), "prefix rewrites --type-*/.type-* to the scheme prefix (no stray --type-*)");
   ok(md.includes("--font-body:") && md.includes("var(--font-voice-body)"), "font families stay --font-*/--font-voice-* under a scale prefix (utility classes bind to the per-voice prop, TKT-0006)");
   ok(T.typeTokensCSS(s, { prefix: "type" }) === T.typeTokensCSS(s), "prefix 'type' is byte-identical to the default (identity gate)");
-  ok(T.typeTokensDTCG(s, { unit: "rem" }).typography.Body.MD.$value.fontSize === "1rem" && T.typeTokensDTCG(s).typography.Body.MD.$value.fontSize === "16px", "DTCG carries the unit (fontSize 1rem) + defaults to px");
+  ok(T.typeTokensDTCG(s, { unit: "rem" }).typography.body.md.$value.fontSize === "1rem" && T.typeTokensDTCG(s).typography.body.md.$value.fontSize === "16px", "DTCG carries the unit (fontSize 1rem) + defaults to px");
 }
 
 // ── breakpoint CSS: SEPARATE, self-contained per-mode override FILES (not one @media-embedded file) —
@@ -252,9 +252,9 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
 // ── DTCG emit: fontFamily group + composite typography tokens ──
 {
   const d = T.typeTokensDTCG(T.typeScale({ treatment: "editorial" }));
-  ok(d.fontFamily && d.fontFamily.Display.$type === "fontFamily", "DTCG fontFamily group (voice-keyed, TKT-0006)");
+  ok(d.fontFamily && d.fontFamily.display.$type === "fontFamily", "DTCG fontFamily group (kebab voice-keyed, TKT-0006/ADR-016)");
   ok(Object.keys(d.fontFamily).length === 15, `DTCG fontFamily group carries all 15 voices (got ${Object.keys(d.fontFamily).length})`);
-  const tok = d.typography.Body.MD;
+  const tok = d.typography.body.md;
   ok(tok.$type === "typography" && /px$/.test(tok.$value.fontSize) && typeof tok.$value.fontWeight === "number", "DTCG composite typography token (px sizes + numeric weight)");
 }
 
@@ -264,29 +264,29 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const base = T.typeScale({ treatment: "product", bodyBase: 16 });
   const mobile = T.typeScale({ treatment: "product", bodyBase: 13 });
   const out = T.typeTokensFigmaModes(base, [{ name: "Mobile", minWidth: 768, scale: mobile }]);
-  const col = out.collections.Geometry;
+  const col = out.collections.Breakpoints;
   ok(col && JSON.stringify(col.modes) === JSON.stringify(["Base", "Mobile"]), `modes = [Base, Mobile] (got ${JSON.stringify(col && col.modes)})`);
   // four FLOAT variables per voice×step: size/lineHeight/letterSpacing/weight (weight too — Figma numbers).
-  const v = col.variables["type/Body/MD/size"];
-  ok(v && v.type === "FLOAT" && typeof v.values.Base === "number" && typeof v.values.Mobile === "number", "type/Body/MD/size is a FLOAT variable with Base + Mobile values");
-  ok(col.variables["type/Body/MD/weight"] && col.variables["type/Body/MD/weight"].type === "FLOAT" && typeof col.variables["type/Body/MD/weight"].values.Base === "number", "weight is emitted as a FLOAT variable too (Figma numbers)");
-  ok(["size", "lineHeight", "letterSpacing", "weight"].every((p) => col.variables[`type/Body/MD/${p}`]), "every voice×step emits size/lineHeight/letterSpacing/weight (type/-prefixed)");
+  const v = col.variables["type/body/md/size"];
+  ok(v && v.type === "FLOAT" && typeof v.values.Base === "number" && typeof v.values.Mobile === "number", "type/body/md/size is a FLOAT variable with Base + Mobile values");
+  ok(col.variables["type/body/md/weight"] && col.variables["type/body/md/weight"].type === "FLOAT" && typeof col.variables["type/body/md/weight"].values.Base === "number", "weight is emitted as a FLOAT variable too (Figma numbers)");
+  ok(["size", "line-height", "letter-spacing", "weight"].every((p) => col.variables[`type/body/md/${p}`]), "every voice×step emits size/lineHeight/letterSpacing/weight (type/-prefixed)");
   // per-mode values DIFFER for a breakpoint with a different bodyBase (13 vs 16) — the Mobile size is smaller.
   ok(v.values.Base === base.categories.Body.MD.size && v.values.Mobile === mobile.categories.Body.MD.size, "Base value = base scale; Mobile value = that mode's scale (per-mode values DIFFER)");
   ok(v.values.Mobile !== v.values.Base, `the breakpoint's value differs from Base (Base ${v.values.Base}, Mobile ${v.values.Mobile})`);
   // IDENTITY: with no modes, a single "Base" mode whose values equal the base export.
   const idn = T.typeTokensFigmaModes(base, []);
-  const idCol = idn.collections.Geometry;
+  const idCol = idn.collections.Breakpoints;
   ok(JSON.stringify(idCol.modes) === JSON.stringify(["Base"]), "no modes ⇒ a single \"Base\" mode");
   ok(Object.values(idCol.variables).every((x) => x.type === "FLOAT" && Object.keys(x.values).join() === "Base"), "no modes ⇒ every variable has exactly one Base value");
   const dlg = base.categories.Display.LG;
-  ok(idCol.variables["type/Body/MD/size"].values.Base === base.categories.Body.MD.size && idCol.variables["type/Display/LG/letterSpacing"].values.Base === dlg.letterSpacing, "no-modes Base values equal the base scale (size + letterSpacing both raw px — Figma's own relative-units rule)");
+  ok(idCol.variables["type/body/md/size"].values.Base === base.categories.Body.MD.size && idCol.variables["type/display/lg/letter-spacing"].values.Base === dlg.letterSpacing, "no-modes Base values equal the base scale (size + letterSpacing both raw px — Figma's own relative-units rule)");
   // DISTINCT mode names: a breakpoint named "Base" (reserved) and duplicate names are disambiguated, so
   // Figma never sees modes:["Base","Base"] (which it rejects on import) or a silently-shadowed mode.
-  const dup = T.typeTokensFigmaModes(base, [{ name: "Base", scale: mobile }, { name: "Wide", scale: base }, { name: "Wide", scale: mobile }]).collections.Geometry;
+  const dup = T.typeTokensFigmaModes(base, [{ name: "Base", scale: mobile }, { name: "Wide", scale: base }, { name: "Wide", scale: mobile }]).collections.Breakpoints;
   ok(JSON.stringify(dup.modes) === JSON.stringify(["Base", "Base 2", "Wide", "Wide 2"]), `clashing/duplicate mode names are disambiguated (got ${JSON.stringify(dup.modes)})`);
   ok(new Set(dup.modes.map((s) => s.toLowerCase())).size === dup.modes.length, "every mode name is distinct (case-insensitively)");
-  ok(dup.variables["type/Body/MD/size"].values["Base 2"] === mobile.categories.Body.MD.size, "the breakpoint renamed off \"Base\" keeps its own value (didn't overwrite the synthetic Base)");
+  ok(dup.variables["type/body/md/size"].values["Base 2"] === mobile.categories.Body.MD.size, "the breakpoint renamed off \"Base\" keeps its own value (didn't overwrite the synthetic Base)");
 }
 
 // ── paragraphSpacing (box=1.0 / prose factor) + singleLineHeight (BOX voices only) — the schema-parity props ──
@@ -304,9 +304,9 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   const css = T.typeTokensCSS(T.typeScale({ treatment: "product" }));
   ok(css.includes("-para:") && css.includes("--type-ui-control-md-line-single:") && !css.includes("--type-label-md-line-single") && !css.includes("--type-display-md-line-single"), "CSS emits -para everywhere and -line-single only on the BOX voices (gone from Label since 2026-07-16)");
   const dt = T.typeTokensDTCG(T.typeScale({ treatment: "product" })).typography;
-  ok(dt["UI-control"].MD.$value.singleLineHeight && !dt.Label.MD.$value.singleLineHeight && !dt.Display.MD.$value.singleLineHeight && /px$/.test(dt.Display.MD.$value.paragraphSpacing), "DTCG composite carries paragraphSpacing (px) + singleLineHeight on the box voices only");
-  const fv = T.typeTokensFigmaModes(T.typeScale({ treatment: "product" }), []).collections.Geometry.variables;
-  ok(fv["type/Display/MD/paragraphSpacing"] && fv["type/UI-control/MD/singleLineHeight"] && !fv["type/Label/MD/singleLineHeight"] && !fv["type/Display/MD/singleLineHeight"], "Figma modes carry paragraphSpacing (all) + singleLineHeight (box voices only — gone from Label)");
+  ok(dt["ui-control"].md.$value.singleLineHeight && !dt.label.md.$value.singleLineHeight && !dt.display.md.$value.singleLineHeight && /px$/.test(dt.display.md.$value.paragraphSpacing), "DTCG composite carries paragraphSpacing (px) + singleLineHeight on the box voices only");
+  const fv = T.typeTokensFigmaModes(T.typeScale({ treatment: "product" }), []).collections.Breakpoints.variables;
+  ok(fv["type/display/md/paragraph-spacing"] && fv["type/ui-control/md/single-line-height"] && !fv["type/label/md/single-line-height"] && !fv["type/display/md/single-line-height"], "Figma modes carry paragraphSpacing (all) + singleLineHeight (box voices only — gone from Label)");
 }
 
 // ── leading + tracking are ALWAYS relative — never px — in every emitter (the units rule; overhaul P1) ──
@@ -324,20 +324,20 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // the SIZE / paragraph dims are still absolute px (only leading/tracking go relative).
   ok(/--type-body-md-size: \d+px;/.test(css) && /--type-body-md-para: \d+px;/.test(css), "size + paragraph spacing stay absolute px (box metrics, not leading)");
   // DTCG: lineHeight a unitless NUMBER (multiplier), letterSpacing an `em` string, size/para still px.
-  const dt = T.typeTokensDTCG(s).typography.Body.MD.$value;
+  const dt = T.typeTokensDTCG(s).typography.body.md.$value;
   ok(typeof dt.lineHeight === "number" && dt.lineHeight === relLine(b.leadingRatio), "DTCG lineHeight is a unitless number (= the exact leadingRatio)");
   ok(typeof dt.letterSpacing === "string" && /em$/.test(dt.letterSpacing), "DTCG letterSpacing is an em string (relative)");
   ok(/px$/.test(dt.fontSize) && /px$/.test(dt.paragraphSpacing), "DTCG fontSize + paragraphSpacing stay px (absolute dims)");
-  ok(typeof T.typeTokensDTCG(s).typography["UI-control"].MD.$value.singleLineHeight === "number", "DTCG singleLineHeight is a unitless number too");
+  ok(typeof T.typeTokensDTCG(s).typography["ui-control"].md.$value.singleLineHeight === "number", "DTCG singleLineHeight is a unitless number too");
   // Figma: leading + tracking ride as ABSOLUTE PIXELS (unlike CSS/DTCG) — a Figma-bound percent FLOAT
   // displays as a bare, unit-less number in Figma's own Properties panel, indistinguishable from a pixel
   // value at a glance; an absolute pixel reads unambiguously there instead. size/weight/singleLineHeight
   // are raw px too (unchanged from before).
-  const gv = T.typeTokensFigmaModes(s, []).collections.Geometry.variables;
-  ok(gv["type/Body/MD/lineHeight"].values.Base === b.lineHeight, "Figma lineHeight is the absolute pixel value, not a %");
-  ok(gv["type/Body/MD/letterSpacing"].values.Base === b.letterSpacing, "Figma letterSpacing is the absolute pixel value, not a %");
-  ok(gv["type/UI-control/MD/singleLineHeight"].values.Base === s.categories["UI-control"].MD.singleLineHeight, "Figma singleLineHeight is the absolute pixel value too");
-  ok(gv["type/Body/MD/size"].values.Base === b.size && gv["type/Body/MD/weight"].values.Base === b.weight, "Figma size + weight stay raw (absolute)");
+  const gv = T.typeTokensFigmaModes(s, []).collections.Breakpoints.variables;
+  ok(gv["type/body/md/line-height"].values.Base === b.lineHeight, "Figma lineHeight is the absolute pixel value, not a %");
+  ok(gv["type/body/md/letter-spacing"].values.Base === b.letterSpacing, "Figma letterSpacing is the absolute pixel value, not a %");
+  ok(gv["type/ui-control/md/single-line-height"].values.Base === s.categories["UI-control"].MD.singleLineHeight, "Figma singleLineHeight is the absolute pixel value too");
+  ok(gv["type/body/md/size"].values.Base === b.size && gv["type/body/md/weight"].values.Base === b.weight, "Figma size + weight stay raw (absolute)");
   // CSS/DTCG still use the exact ratio (unaffected by Figma's pixel choice): a voice with ONE configured
   // leading ratio must show the SAME constant number at every step — never drift, because
   // round(size·leading)/size ≠ leading at most sizes. Sub-heading's fixed sizes (28/34/40) don't all
@@ -362,16 +362,17 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   ok(!col.variables["family/heading"], "a duplicate family dedupes into one primitive (no family/heading — Inter Tight is owned by display)");
   // every voice gets a font/<voice> ALIAS to its family primitive + a weight/<voice> FLOAT primitive.
   const voices = Object.keys(base.categories);
-  ok(voices.every((v) => col.variables[`font/${v}`] && col.variables[`font/${v}`].type === "ALIAS"), "every voice emits a font/<voice> ALIAS");
+  const kv = (v) => v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); // ADR-016 kebab segment
+  ok(voices.every((v) => col.variables[`font/${kv(v)}`] && col.variables[`font/${kv(v)}`].type === "ALIAS"), "every voice emits a font/<kebab-voice> ALIAS");
   // the core's weight/weight-style primitive key NESTS under the voice's own weight-name slug
   // (coreWeightKey) — the SAME per-voice group its siblings live in, so it's never bare (2026-07-13:
   // a bare core sat OUTSIDE the "Display" folder its siblings created in Figma's own "/" grouping).
   const coreKeyOf = (v) => T.coreWeightKey(v, T.weightNameFor(base.categories[v].MD.weight), base.weights && base.weights[v]);
   ok(voices.every((v) => col.variables[`weight/${coreKeyOf(v)}`] && col.variables[`weight/${coreKeyOf(v)}`].type === "FLOAT" && Number.isFinite(col.variables[`weight/${coreKeyOf(v)}`].values.Value)), "every voice emits a weight/<voice>/<slug> FLOAT primitive, nested under its own weight-name slug");
-  ok(voices.every((v) => col.variables[col.variables[`font/${v}`].target]), "every alias target resolves to a primitive in the same collection");
-  ok(col.variables["font/Headline"].target === "family/display", "Headline aliases the deduped Inter Tight primitive (family/display)");
-  ok(col.variables["font/Kicker"].target === col.variables["font/Body-mono"].target, "Kicker and Body-mono alias the SAME mono primitive (roleOf → mono)");
-  ok(col.variables[`weight/${coreKeyOf("Display")}`].values.Value === base.categories.Display.MD.weight, "weight/Display/<slug> carries the voice's uniform weight");
+  ok(voices.every((v) => col.variables[col.variables[`font/${kv(v)}`].target]), "every alias target resolves to a primitive in the same collection");
+  ok(col.variables["font/headline"].target === "family/display", "Headline aliases the deduped Inter Tight primitive (family/display)");
+  ok(col.variables["font/kicker"].target === col.variables["font/body-mono"].target, "Kicker and Body-mono alias the SAME mono primitive (roleOf → mono)");
+  ok(col.variables[`weight/${coreKeyOf("Display")}`].values.Value === base.categories.Display.MD.weight, "weight/display/<slug> carries the voice's uniform weight");
   // weight STYLE NAMES (slice 4): config.voices[v].styleName → scale.styleNames → weight-style/<voice>
   // STRING primitives; absent names ⇒ no styleNames key and no weight-style vars (the identity gate).
   ok(!("styleNames" in base) && !Object.keys(col.variables).some((k) => /^weight-style\/[^/]+$/.test(k)), "no styleName config ⇒ no styleNames on the scale, no BARE weight-style/<voice> var (sibling weight-style/<voice>/<slug> vars still exist — every voice auto-populates siblings, 2026-07-13)");
@@ -441,15 +442,15 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
 
   // DTCG — a weights group of fontWeight tokens
   const dtcg = T.typeTokensDTCG(sc);
-  ok(dtcg.weights && dtcg.weights.Display && dtcg.weights.Display.Bold && dtcg.weights.Display.Bold.$type === "fontWeight" && dtcg.weights.Display.Bold.$value === 700, "DTCG emits the weights group");
+  ok(dtcg.weights && dtcg.weights.display && dtcg.weights.display.bold && dtcg.weights.display.bold.$type === "fontWeight" && dtcg.weights.display.bold.$value === 700, "DTCG emits the weights group (kebab voice + slug keys, ADR-016)");
   ok("weights" in T.typeTokensDTCG(base) && Object.keys(T.typeTokensDTCG(base).weights).length === 15, "DTCG weights group covers every auto-populated voice by default (no siblings config needed)");
   ok(!("Display" in T.typeTokensDTCG(withEmpty).weights), "DTCG: a voice opted OUT (Display) carries no weights entry");
 
   // Figma primitives — FLOAT + STRING per sibling, core un-suffixed names unchanged
   const col = T.typeTokensFigmaPrimitives(sc).collections["Font Primitives"];
-  ok(col.variables["weight/Display/bold"] && col.variables["weight/Display/bold"].type === "FLOAT" && col.variables["weight/Display/bold"].values.Value === 700, "primitives emit weight/<voice>/<slug> FLOAT per sibling");
-  ok(col.variables["weight-style/Display/bold"] && col.variables["weight-style/Display/bold"].values.Value === "Bold", "primitives emit weight-style/<voice>/<slug> STRING per sibling (no custom styleName here ⇒ bare name, unaffected by templating)");
-  ok(col.variables["weight/Display"], "the core un-suffixed weight primitive is unchanged");
+  ok(col.variables["weight/display/bold"] && col.variables["weight/display/bold"].type === "FLOAT" && col.variables["weight/display/bold"].values.Value === 700, "primitives emit weight/<voice>/<slug> FLOAT per sibling");
+  ok(col.variables["weight-style/display/bold"] && col.variables["weight-style/display/bold"].values.Value === "Bold", "primitives emit weight-style/<voice>/<slug> STRING per sibling (no custom styleName here ⇒ bare name, unaffected by templating)");
+  ok(col.variables["weight/display"], "the core un-suffixed weight primitive is unchanged");
 
   // REGRESSION (found via BZZR's real Figma export): a sibling's weight-style/<voice>/<slug>
   // primitive must go through the SAME custom-face templating the text-style planner uses
@@ -458,9 +459,9 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // Italic"), because the two had their own separate, independently-drifting implementations.
   const bzzrDisplay = T.typeScale({ treatment: "statement", voices: { Display: { weight: 900, styleName: "Condensed Black Italic", weights: [{ name: "Extra-bold", weight: 800 }, { name: "Bold", weight: 700 }] } } });
   const bzzrCol = T.typeTokensFigmaPrimitives(bzzrDisplay).collections["Font Primitives"];
-  ok(bzzrCol.variables["weight-style/Display/black"].values.Value === "Condensed Black Italic", "core weight-style keeps the full custom name, nested under its own weight-name slug");
-  ok(bzzrCol.variables["weight-style/Display/extra-bold"].values.Value === "Condensed Extra-bold Italic", `sibling weight-style primitive templates the custom name, not a bare "Extra-bold" (got ${bzzrCol.variables["weight-style/Display/extra-bold"].values.Value})`);
-  ok(bzzrCol.variables["weight-style/Display/bold"].values.Value === "Condensed Bold Italic", `sibling weight-style primitive templates the custom name, not a bare "Bold" (got ${bzzrCol.variables["weight-style/Display/bold"].values.Value})`);
+  ok(bzzrCol.variables["weight-style/display/black"].values.Value === "Condensed Black Italic", "core weight-style keeps the full custom name, nested under its own weight-name slug");
+  ok(bzzrCol.variables["weight-style/display/extra-bold"].values.Value === "Condensed Extra-bold Italic", `sibling weight-style primitive templates the custom name, not a bare "Extra-bold" (got ${bzzrCol.variables["weight-style/display/extra-bold"].values.Value})`);
+  ok(bzzrCol.variables["weight-style/display/bold"].values.Value === "Condensed Bold Italic", `sibling weight-style primitive templates the custom name, not a bare "Bold" (got ${bzzrCol.variables["weight-style/display/bold"].values.Value})`);
 }
 
 // ── per-voice FONT overrides (TKT-0002): config.voices[v].font escapes a voice off its shared ROLE font
@@ -507,30 +508,30 @@ ok(T.typeScale({ treatment: "nope" }).treatment === T.TYPE_TREATMENTS[0].id, "un
   // DTCG: the composite fontFamily for the overridden voice carries its own family; the top-level
   // fontFamily group is voice-keyed (TKT-0006) — BOTH Sub-heading and Headline get their own entry.
   const dtOv = T.typeTokensDTCG(ov);
-  ok(dtOv.typography["Sub-heading"].MD.$value.fontFamily === "Fraunces", "DTCG composite fontFamily resolves the per-voice override");
-  ok(dtOv.typography.Headline.MD.$value.fontFamily === ov.fonts.heading, "DTCG composite fontFamily for an un-overridden voice still reads its role's family");
-  ok(dtOv.fontFamily["Sub-heading"].$value === "Fraunces", "the top-level fontFamily group carries the overridden voice's own family");
-  ok(dtOv.fontFamily.Headline.$value === ov.fonts.heading, "the top-level fontFamily group ALSO carries the un-overridden voice, at the role's value");
+  ok(dtOv.typography["sub-heading"].md.$value.fontFamily === "Fraunces", "DTCG composite fontFamily resolves the per-voice override");
+  ok(dtOv.typography.headline.md.$value.fontFamily === ov.fonts.heading, "DTCG composite fontFamily for an un-overridden voice still reads its role's family");
+  ok(dtOv.fontFamily["sub-heading"].$value === "Fraunces", "the top-level fontFamily group carries the overridden voice's own family");
+  ok(dtOv.fontFamily.headline.$value === ov.fonts.heading, "the top-level fontFamily group ALSO carries the un-overridden voice, at the role's value");
 
-  // Figma primitives: a genuinely distinct override family mints its OWN family/voice/<voice> primitive,
+  // Figma primitives: a genuinely distinct override family mints its OWN override/<voice> primitive (ADR-016 renamed the segment),
   // aliased by font/<voice>; two voices overridden to the SAME custom family share ONE primitive (dedupe by
   // VALUE); an override that happens to equal an EXISTING primitive's family aliases that one instead of
   // minting a redundant duplicate.
   const colOv = T.typeTokensFigmaPrimitives(ov).collections["Font Primitives"];
-  ok(colOv.variables["family/voice/sub-heading"] && colOv.variables["family/voice/sub-heading"].type === "STRING" && colOv.variables["family/voice/sub-heading"].values.Value === "Fraunces", "a distinct override family mints its own family/voice/<voice> primitive");
-  ok(colOv.variables["font/Sub-heading"].target === "family/voice/sub-heading", "font/Sub-heading aliases the new voice-specific primitive");
-  ok(colOv.variables["font/Headline"].target === "family/display", "font/Headline is UNCHANGED — still aliases the shared role primitive (Inter Tight, product treatment)");
+  ok(colOv.variables["override/sub-heading"] && colOv.variables["override/sub-heading"].type === "STRING" && colOv.variables["override/sub-heading"].values.Value === "Fraunces", "a distinct override family mints its own override/<voice> primitive");
+  ok(colOv.variables["font/sub-heading"].target === "override/sub-heading", "font/Sub-heading aliases the new voice-specific primitive");
+  ok(colOv.variables["font/headline"].target === "family/display", "font/Headline is UNCHANGED — still aliases the shared role primitive (Inter Tight, product treatment)");
 
   const twoSame = T.typeScale({ treatment: "product", voices: { "Sub-heading": { font: "Fraunces" }, Title: { font: "Fraunces" } } });
   const colTwo = T.typeTokensFigmaPrimitives(twoSame).collections["Font Primitives"];
-  ok(colTwo.variables["font/Sub-heading"].target === colTwo.variables["font/Title"].target, "two voices overridden to the SAME custom family share ONE primitive (dedupe by value)");
-  ok(!colTwo.variables["family/voice/title"], "the second voice with the same override family does NOT mint a redundant duplicate primitive");
+  ok(colTwo.variables["font/sub-heading"].target === colTwo.variables["font/title"].target, "two voices overridden to the SAME custom family share ONE primitive (dedupe by value)");
+  ok(!colTwo.variables["override/title"], "the second voice with the same override family does NOT mint a redundant duplicate primitive");
 
   // an override that happens to equal an EXISTING role's family aliases that primitive — no duplicate.
   const eqRole = T.typeScale({ treatment: "product", voices: { "Sub-heading": { font: baseline.fonts.body } } }); // body="Inter", distinct from heading's "Inter Tight"
   const colEq = T.typeTokensFigmaPrimitives(eqRole).collections["Font Primitives"];
-  ok(colEq.variables["font/Sub-heading"].target === "family/body", "an override matching an EXISTING role's family aliases THAT primitive (dedupe by value, not just by source)");
-  ok(!colEq.variables["family/voice/sub-heading"], "no redundant primitive is minted when the override equals an existing family's value");
+  ok(colEq.variables["font/sub-heading"].target === "family/body", "an override matching an EXISTING role's family aliases THAT primitive (dedupe by value, not just by source)");
+  ok(!colEq.variables["override/sub-heading"], "no redundant primitive is minted when the override equals an existing family's value");
 }
 
 // ── genericFor: the CSS generic a font stack falls back to (serif/sans/mono) when the face isn't loaded/

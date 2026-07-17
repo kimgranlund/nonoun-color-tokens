@@ -11,6 +11,7 @@
 // The document is the single source of truth. Every value on the right of the
 // app is projectView(document) — recomputed, never persisted.
 
+import { COLLECTIONS } from "../engine/collections.js";
 import {
   hctToRgb,
   hctToOklch,
@@ -236,12 +237,12 @@ function stateOf(doc) {
 // figmaBundle — the DTCG export with raw-collection aliasing ON: the exact shape the Figma plugin's
 // code.js turns into a raw-primitives collection + a semantic Light/Dark collection aliased to it.
 // Each semantic leaf carries com.figma.aliasData.targetVariableName/targetVariableSetName so the
-// plugin can build the cascade. Collection names default to "Color Primitives"/"Color Modes" and are
+// plugin can build the cascade. Collection names default to "Color Primitives"/"Color Semantic" (ADR-016) and are
 // overridable per-doc (Settings › Token mapping → doc.figmaCollections; figmaCollectionNames resolves).
 export function figmaCollectionNames(doc) {
   const fc = (doc && doc.figmaCollections) || {};
   const pick = (v, dflt) => (typeof v === "string" && v.trim() ? v.trim() : dflt);
-  return { raw: pick(fc.raw, "Color Primitives"), semantic: pick(fc.semantic, "Color Modes") };
+  return { raw: pick(fc.raw, COLLECTIONS.colorRaw), semantic: pick(fc.semantic, COLLECTIONS.colorSemantic) };
 }
 export function figmaBundle(doc) {
   return exportDTCG(stateOf(doc), { rawColl: figmaCollectionNames(doc).raw });

@@ -47,9 +47,9 @@ semantic role does not surface in it unless explicitly wired into `MAP`.
      semantic names end in a WORD, so both share the --c- prefix with no collision. */
   --c-{n}-050: {hex};            ... --c-{n}-950: {hex};
   /* scrims (the 500 ramp; alpha% = step/10) */
-  --c-{n}-500-050: {hex8};  ...  --c-{n}-500-950: {hex8};
+  --c-{n}-scrim-050: {hex8};  ...  --c-{n}-scrim-950: {hex8};   (ADR-016 nesting — 500 base implicit)
   /* SEMANTIC roles -> light-dark of two raw primitives */
-  --c-{n}{suffix}: light-dark(var(--c-{n}-{refKey(light)}), var(--c-{n}-{refKey(dark)}));
+  --c-{n}{suffix}: light-dark(var(--c-{n}-{refSlug(light)}), var(--c-{n}-{refSlug(dark)}));
 }
 ```
 
@@ -68,7 +68,7 @@ semantic role does not surface in it unless explicitly wired into `MAP`.
   "palettes": [
     { "name", "hue", "chromaPct", "skew",
       "stops":   { "050": {hex, lstar, chroma}, ... },
-      "scrims":  { "500-050": {hex,alpha}, "500-100":{...}, ... "500-950":{...} },
+      "scrims":  { "050": {hex,alpha}, "100":{...}, ... "950":{...} },   (keyed by padded step; palette keys are SLUGS; semantic `key` is the kebab leaf — ADR-016)
       "semantic":{ "<roleKey>": {css, light, dark, lightHex, darkHex}, ... }
     }
   ]
@@ -99,7 +99,7 @@ The zip is built by a dependency-free **store/deflate writer** (`makeZip`, with 
 works fully offline.
 
 **Optional aliasData**: a `rawColl` input (blank by default). When filled, semantic leaves
-gain `$extensions["com.figma.aliasData"] = {targetVariableName:"{n}/{refKey}", targetVariableSetName:coll}`.
+gain `$extensions["com.figma.aliasData"] = {targetVariableName:"{n}/{refPath}", targetVariableSetName:coll}` (scrims nest: "{n}/scrim/{step}").
 Blank → plain resolved colors that always import (default). See §7.
 
 ## 5. Collections (UI3)
@@ -108,11 +108,11 @@ Single file `figma-ui3-variables.json`:
 ```
 { "$schema":"figma-ui3-variables.color.schema.v1",
   "collections":{
-    "Color / Primitives":{ "modes":["Base"],
+    "Color Primitives":{ "modes":["Base"],
       "variables":{ "raw/{n}/{050}":{type:"COLOR",values:{Base:"#HEX"}}, ... } },
-    "Color / Semantic":{ "modes":["Light","Dark"],
+    "Color Semantic":{ "modes":["Light","Dark"],
       "variables":{ "{n}/{roleKey}":{type:"COLOR",
-        values:{Light:"{raw/{n}/{refKey light}}", Dark:"{raw/{n}/{refKey dark}}"}}, ... } }
+        values:{Light:"{raw/{n}/{refPath light}}", Dark:"{raw/{n}/{refPath dark}}"}}, ... } }   (semantic keys = "{n}/{kebab leaf}", ADR-016)
   } }
 ```
 Semantic values are **in-file key-path aliases** the importer resolves.
@@ -127,7 +127,7 @@ Semantic values are **in-file key-path aliases** the importer resolves.
 - `pad3(stop)` → 3 digits (`"50"→"050"`); applied to all stop keys and var refs.
 - `slug(name)` → lowercase, non-alphanumeric → `-`, trimmed. Palette name → token namespace.
 - `hex8(rgb, frac)` → `#RRGGBBAA` for scrims.
-- `SCRIM_BASES=[500]`, `SCRIM_STEPS=[50,100,200,300,400,500,600,700,800,900,950]`; a scrim `500-{step}` is the 500 color at alpha% = step/10.
+- `SCRIM_BASES=[500]`, `SCRIM_STEPS=[50,100,200,300,400,500,600,700,800,900,950]`; a scrim ref `500-{step}` is the 500 color at alpha% = step/10, EMITTED as the nested `scrim/{step}` path (`refPath`) / `scrim-{step}` slug (`refSlug`) — ADR-016.
 
 ## 7. Figma import constraints (why resolved, not aliased)
 
@@ -160,11 +160,11 @@ every other token, so a renamed namespace covers it too.
 | CSS (hex/oklch) | One `--{pfx}-dialog-backdrop` line in `:root`, before any palette (`cssFrom`) |
 | JSON | A top-level `constants` object, sibling to the palette-name keys |
 | DTCG | A `constants` group in `palette.tokens.json` (RAW) **only** |
-| UI3 (Figma) | `raw/constants/dialog-backdrop` in `Color / Primitives` **only** |
+| UI3 (Figma) | `raw/constants/dialog-backdrop` in `Color Primitives` **only** |
 | Tailwind `@theme` | One `--color-dialog-backdrop` line, outside any palette's scale/role blocks |
 | ShadCN | `--overlay` in both `:root`/`.dark` (literal, or `var(--{aliasPrefix}-dialog-backdrop)` when aliased), mapped in `@theme inline` |
 
-**Why it is absent from the DTCG/UI3 *semantic* tree (Light/Dark · Color / Semantic) — load-bearing,
+**Why it is absent from the DTCG/UI3 *semantic* tree (Light/Dark · Color Semantic) — load-bearing,
 don't "fix" this:** every top-level key of that tree is treated elsewhere as a REAL PALETTE with a
 full 53-role set, positionally zipped against `doc.palettes` (the app's style-plan family
 derivation; `figma/binder/style-plan.mjs`'s paint/text-style generation). A synthetic non-palette

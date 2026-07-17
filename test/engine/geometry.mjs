@@ -35,7 +35,7 @@ ok(["comfortable", "compact", "spacious", "touch", "pill"].every((id) => G.GEOME
     ok(sz.paddingNarrowCompact === (sz.height - sz.gap - sz.icon) / 2, `${name}: paddingNarrowCompact = (h−gap−icon)/2 (got ${sz.paddingNarrowCompact})`);
     ok(sz.paddingWideCompact === (sz.height - sz.gap - sz.caret) / 2, `${name}: paddingWideCompact = (h−gap−caret)/2 (got ${sz.paddingWideCompact})`);
     ok(sz.radiusPill === Math.round(sz.height / 2), `${name}: pill radius = h/2 (got ${sz.radiusPill})`);
-    ok(sz.minWidth === sz.height, `${name}: min-width = height (the square floor)`);
+    ok(sz.minWidth === sz.height, `${name}: minWidth = height (the square floor)`);
     ok(sz.icon > 0 && sz.icon <= sz.height, `${name}: 0 < icon ≤ height`);
   }
 }
@@ -109,7 +109,7 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   const g = G.geomScale({ treatment: "comfortable", baseHeight: 32 }); // MD height = 32
   ok(/--size-md-height: 32px;/.test(G.geomTokensCSS(g)), "geomTokensCSS defaults to px");
   ok(/--size-md-height: 2rem;/.test(G.geomTokensCSS(g, { unit: "rem" })), "unit:rem → 32px = 2rem (radii/space convert too)");
-  ok(G.geomTokensDTCG(g, { unit: "rem" }).size.MD.height.$value === "2rem" && G.geomTokensDTCG(g).size.MD.height.$value === "32px", "geometry DTCG carries the unit + defaults to px");
+  ok(G.geomTokensDTCG(g, { unit: "rem" }).size.md.height.$value === "2rem" && G.geomTokensDTCG(g).size.md.height.$value === "32px", "geometry DTCG carries the unit + defaults to px");
 }
 
 // ── breakpoint CSS: SEPARATE, self-contained per-mode override FILES (not one @media-embedded file) —
@@ -136,8 +136,8 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
 {
   const d = G.geomTokensDTCG(G.geomScale({ treatment: "spacious" }));
   ok(d.size && d.radius && d.space, "DTCG has size/radius/space groups");
-  ok(d.size.MD.height.$type === "dimension" && /px$/.test(d.size.MD.height.$value), "DTCG dimension token (px value)");
-  ok(d.size.MD.paddingNarrow.$type === "dimension" && d.size.MD.paddingWideCompact.$type === "dimension" && d.radius.full.$type === "dimension", "DTCG pads (incl. compacts) + radius are dimension tokens");
+  ok(d.size.md.height.$type === "dimension" && /px$/.test(d.size.md.height.$value), "DTCG dimension token (px value)");
+  ok(d.size.md["padding-narrow"].$type === "dimension" && d.size.md["padding-wide-compact"].$type === "dimension" && d.radius.full.$type === "dimension", "DTCG pads (incl. compacts) + radius are dimension tokens");
 }
 
 // ── CONTROL TEXT (2026-07-16): the per-step `font` is the fixed CONTROL_FONT ramp (12·13·15·16·18·20 at
@@ -212,9 +212,9 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
 // ── Figma number-variable emit: a "Geometry" collection of unitless FLOAT tokens ──
 {
   const f = G.geomTokensFigma(G.geomScale({ treatment: "comfortable" }));
-  ok(f.Geometry && f.Geometry.size && f.Geometry.radius && f.Geometry.space, "Figma export wraps a Geometry collection (size/radius/space)");
-  ok(f.Geometry.size.MD.height.$type === "number" && typeof f.Geometry.size.MD.height.$value === "number", "Figma tokens are number ($type number, numeric unitless value)");
-  ok(f.Geometry.radius.full.$type === "number" && f.Geometry.space["4"].$type === "number", "radius + space are number variables too");
+  ok(f.Breakpoints && f.Breakpoints.size && f.Breakpoints.radius && f.Breakpoints.space, "Figma export wraps the Breakpoints collection (size/radius/space, ADR-016)");
+  ok(f.Breakpoints.size.md.height.$type === "number" && typeof f.Breakpoints.size.md.height.$value === "number", "Figma tokens are number ($type number, numeric unitless value)");
+  ok(f.Breakpoints.radius.full.$type === "number" && f.Breakpoints.space["4"].$type === "number", "radius + space are number variables too");
 }
 
 // ── Figma breakpoint-MODED variables: a single "Geometry" collection, one MODE per breakpoint (5.4b) ──
@@ -222,21 +222,21 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   const base = G.geomScale({ treatment: "comfortable", baseHeight: 28 });
   const wide = G.geomScale({ treatment: "comfortable", baseHeight: 40 }); // a taller mode → bigger size heights
   const out = G.geomTokensFigmaModes(base, [{ name: "Desktop", minWidth: 1024, scale: wide }]);
-  const col = out.collections.Geometry;
+  const col = out.collections.Breakpoints;
   ok(col && JSON.stringify(col.modes) === JSON.stringify(["Base", "Desktop"]), `modes = [Base, Desktop] (got ${JSON.stringify(col && col.modes)})`);
-  const v = col.variables["size/MD/height"];
-  ok(v && v.type === "FLOAT" && typeof v.values.Base === "number" && typeof v.values.Desktop === "number", "size/MD/height is a FLOAT variable with Base + Desktop values");
-  ok(["height", "icon", "paddingNarrow", "paddingWide", "paddingNarrowCompact", "paddingWideCompact", "radius", "gap"].every((f) => col.variables[`size/MD/${f}`]) && !col.variables["size/MD/font"] && !col.variables["size/MD/padding"] && !col.variables["size/MD/edgePadding"], "size emits height/icon/the four pads/radius/gap and NO font/padding/edgePadding rows (TKT-0010 rename)");
+  const v = col.variables["size/md/height"];
+  ok(v && v.type === "FLOAT" && typeof v.values.Base === "number" && typeof v.values.Desktop === "number", "size/md/height is a FLOAT variable with Base + Desktop values");
+  ok(["height", "icon", "padding-narrow", "padding-wide", "padding-narrow-compact", "padding-wide-compact", "pill-radius", "icon-gap"].every((f) => col.variables[`size/md/${f}`]) && !col.variables["size/md/font"] && !col.variables["size/md/gap"] && !col.variables["size/md/radius"] && !col.variables["size/md/padding"] && !col.variables["size/md/edgePadding"], "size emits height/icon/the four pads/pill-radius/icon-gap and NO font/gap/radius/padding/edgePadding rows (TKT-0010 + ADR-016 homonym renames)");
   ok(col.variables["radius/full"] && col.variables["radius/full"].type === "FLOAT" && col.variables["space/4"], "radius + space land as FLOAT variables too");
   // per-mode values DIFFER for a breakpoint with a different baseHeight (40 vs 28) — the Desktop height is taller.
   ok(v.values.Base === base.sizes.MD.height && v.values.Desktop === wide.sizes.MD.height, "Base value = base scale; Desktop value = that mode's scale");
   ok(v.values.Desktop !== v.values.Base, `the breakpoint's height differs from Base (Base ${v.values.Base}, Desktop ${v.values.Desktop})`);
   // IDENTITY: with no modes, a single "Base" mode whose values equal the base export.
   const idn = G.geomTokensFigmaModes(base, []);
-  const idCol = idn.collections.Geometry;
+  const idCol = idn.collections.Breakpoints;
   ok(JSON.stringify(idCol.modes) === JSON.stringify(["Base"]), "no modes ⇒ a single \"Base\" mode");
   ok(Object.values(idCol.variables).every((x) => x.type === "FLOAT" && Object.keys(x.values).join() === "Base"), "no modes ⇒ every variable has exactly one Base value");
-  ok(idCol.variables["size/MD/height"].values.Base === base.sizes.MD.height && idCol.variables["radius/full"].values.Base === base.radii.full, "no-modes Base values equal the base scale");
+  ok(idCol.variables["size/md/height"].values.Base === base.sizes.MD.height && idCol.variables["radius/full"].values.Base === base.radii.full, "no-modes Base values equal the base scale");
 }
 
 // ── rampContrast — the responsive-ramp knob (expressive band: geometric ×4/3 ⇄ linear +4) ──
@@ -270,7 +270,7 @@ ok(G.geomScale({ treatment: "nope" }).treatment === G.GEOMETRY_TREATMENTS[0].id,
   ok(["--inset-control-group: 8px", "--gap-stack-loose: 24px", "--border-thin: 1px", "--focus-ring-offset: 2px"].every((t) => css.includes(t)), "CSS emits the tier as kebab-case custom properties");
   const d = G.geomTokensDTCG(s);
   ok(d.inset && d.inset["control-group"] && d.gap["stack-tight"].$type === "dimension" && d.border.thin.$value === "1px", "DTCG carries inset/gap/border/focus groups as dimension tokens");
-  const fm = G.geomTokensFigmaModes(s, []).collections.Geometry.variables;
+  const fm = G.geomTokensFigmaModes(s, []).collections.Breakpoints.variables;
   ok(fm["inset/card"] && fm["gap/section"].values.Base === 48 && fm["focus/ring-width"], "the Figma-modes collection carries inset/gap/border/focus variables");
 }
 

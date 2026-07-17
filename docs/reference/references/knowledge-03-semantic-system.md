@@ -21,7 +21,7 @@
 ```
 RAW / PRIMITIVES  (mode-independent)         SEMANTIC  (--c-* / role keys)
   {n}-050 .. {n}-950   solid stops             carries the light/dark FLIP
-  {n}-500-{step}              scrims           via light-dark(var(light), var(dark))
+  {n}-scrim-{step}            scrims           via light-dark(var(light), var(dark))   (ADR-016)
 ```
 
 - **Raw primitives are mode-independent.** A raw token is a single value; it does not flip
@@ -41,11 +41,12 @@ RAW / PRIMITIVES  (mode-independent)         SEMANTIC  (--c-* / role keys)
 A role's `light` / `dark` field is a **ref**, one of:
 
 - **Solid stop**: `"550"` → the palette's stop-550 color (opaque).
-- **Scrim**: `"500-200"` → the palette's 500 color at alpha% = step/10 (here 20%). A scrim
+- **Scrim**: ref `"500-200"` → the palette's 500 color at alpha% = step/10 (here 20%), emitted as the nested `scrim/200` path (`refPath`) or `scrim-200` slug (`refSlug`) — ADR-016. A scrim
   is a translucency sub-variant of the 500 stop.
 
-`refKey(ref)` pads to 3 digits and preserves the scrim suffix: `"50"→"050"`,
-`"500-200"→"500-200"`. Used for token names and CSS `var()` references everywhere.
+`refKey(ref)` pads to 3 digits (the internal normalizer); the EMITTED forms are `refPath` (slash
+surfaces — `"50"→"050"`, `"500-200"→"scrim/200"`) and `refSlug` (hyphen surfaces — `"scrim-200"`).
+Internal role `key`s stay camelCase; every emitted role name is the kebab leaf (`roleLeaf`).
 
 ## 3. The 53 roles (groups)
 

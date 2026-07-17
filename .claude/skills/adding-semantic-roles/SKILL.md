@@ -20,7 +20,7 @@ exact parity sites. The taxonomy/rationale is owned by `docs/reference` — poin
 ## The role model (depth in `references/foundations.md`)
 
 `semanticRoles(n)` pushes rows via a local `role(key, suffix, light, dark)`. A **ref** is a stop name:
-`'550'` (solid) or `'500-200'` (the 500 color at alpha% = step/10, so `500-200` = 500 @ 20% — a scrim
+`'550'` (solid) or `'500-200'` (the 500 color at alpha% = step/10, so `500-200` = 500 @ 20%, EMITTED as the nested `scrim/200` path / `scrim-200` slug since ADR-016 — a scrim
 ramp). Two row shapes:
 
 - **Name-prefixed** (accent + on-accent): `key` carries the palette name — `${n}Hover`, `on${N}Active`;

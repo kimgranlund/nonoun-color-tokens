@@ -6,12 +6,12 @@ assumes, grounded in the actual `code.js` files.
 
 ### 1. Two plugins, one vocabulary, different jobs
 
-Both speak `RAW_COLLECTION = "Color Primitives"` and `SEMANTIC_COLLECTION = "Color Modes"`. They differ in
+Both speak `RAW_COLLECTION = "Color Primitives"` and `SEMANTIC_COLLECTION = "Color Semantic"`. They differ in
 who builds what:
 
 - **The standalone Binder** (`figma/binder/figma-semantic-binder/`) is alias-only. It assumes the raw
   `Color Primitives` collection already exists (the user ran the app's Apply first, or imported the raw JSON)
-  and ONLY creates the aliased `Color Modes` collection on top. If `Color Primitives` is absent it notifies
+  and ONLY creates the aliased `Color Semantic` collection on top. If `Color Primitives` is absent it notifies
   *"No 'Color Primitives' collection found — apply your palette in Color Tokens first, then run the Binder."*
   and closes. It has no UI and no `figmaBundle` — its inputs are purely the live variables in the open file.
 - **The app-as-plugin** (`figma/plugin/`) is the whole generator running inside Figma. `ui.html` embeds
@@ -36,7 +36,7 @@ role table.
 ### 3. The binder bind loop, exactly (read `figma-semantic-binder/code.js`)
 
 `main()` is: `getLocalVariableCollectionsAsync` → find `Color Primitives` (bail with a friendly notify if
-absent) → `getLocalVariablesAsync` and index by name into `rawVars` → find/create `Color Modes` with mode 0
+absent) → `getLocalVariablesAsync` and index by name into `rawVars` → find/create `Color Semantic` with mode 0
 as Light and mode 1 (or a fresh `addMode("Dark")`) as Dark → loop the 8 `PALETTES` × `roleTable(n)`:
 
 ```
@@ -44,14 +44,14 @@ ltName = targetName(n, r.light) = "{n}/" + refKey(r.light);  lt = rawVars[ltName
 dtName = targetName(n, r.dark)  = "{n}/" + refKey(r.dark);    dt = rawVars[dtName]
 if (!lt) { missing.push(ltName); continue }   // a raw target that doesn't exist
 if (!dt) { missing.push(dtName); continue }
-semVar = (existing "{n}/{r.key}" in Color Modes) || createVariable("{n}/{r.key}", sem, "COLOR")
+semVar = (existing "{n}/{kebab leaf}" in Color Semantic) || createVariable("{n}/{kebab leaf}", sem, "COLOR")   // ADR-016: leaf = suffix-derived
 semVar.setValueForMode(lightMode, createVariableAlias(lt))
 semVar.setValueForMode(darkMode,  createVariableAlias(dt))
 ```
 
 `refKey(ref)` is the single normaliser (mirrors `semantic.js`): a solid stop zero-pads to 3 digits
-(`"50"→"050"`); a scrim `"500-200"` pads the base and keeps `-step` verbatim. Because every `r.light`/`r.dark`
-is a ref from the validated role table, every `"{n}/{refKey}"` is GUARANTEED a member of the canonical
+(`"50"→"050"`); a scrim ref `"500-200"` emits the nested `scrim/200` path (ADR-016). Because every `r.light`/`r.dark`
+is a ref from the validated role table, every `"{n}/{refPath}"` is GUARANTEED a member of the canonical
 raw-colors name set — that is why the binder can't construct a dangling target by hand. `targetName(n, ref)`
 centralises this grammar identically to `bind-plan.mjs#targetName`. (Note: the semantic var name uses `r.key`
 — `"{n}/{r.key}"`, e.g. `"primary/primaryDim"` — distinct from `bind-plan.mjs`'s `bindingPlan` which names
@@ -82,13 +82,13 @@ stops, so targets < canonical is expected, not a miss.)
 `applyBundle(dtcg, opts)` is find-or-create + full-mirror prune:
 
 - builds the `Color Primitives` (one "Value" mode) collection — one COLOR var per stop/scrim — and the
-  `Color Modes` (Light/Dark) collection — one COLOR var per role, each mode aliased to the matching raw var.
+  `Color Semantic` (Light/Dark) collection — one COLOR var per role, each mode aliased to the matching raw var.
 - **idempotent**: a second run finds-and-updates in place; it never makes duplicate collections, vars, or
   modes (the user re-applies on the same file repeatedly).
 - **prune**: any var NOT in the current bundle is removed from BOTH collections (old-format scrims, removed
   palettes) so the file mirrors the generator exactly. Semantic orphans are deleted FIRST (a stale semantic
   var may alias a stale raw var about to be removed). Returns `{raw, semantic, pruned, rebuilt}`.
-- **`rebuildSemantic`** (the opt-in Regroup): DELETES + re-creates the `Color Modes` collection so it adopts
+- **`rebuildSemantic`** (the opt-in Regroup): DELETES + re-creates the `Color Semantic` collection so it adopts
   the bundle's canonical order (regular → containers → surfaces → scrims; the verifier asserts the last 7
   vars are scrims). Color Primitives untouched; bindings to the dropped semantic vars detach — *why the
   Regroup gate always warns*.

@@ -56,7 +56,7 @@
 // Deterministic: paints in families×roles order, texts in the scale's voice/step order, siblings after
 // their core in list order. Same inputs ⇒ byte-identical plan (the executor's idempotency rides on it).
 
-import { semanticRoles } from "../../src/engine/semantic.js";
+import { semanticRoles, roleLeaf } from "../../src/engine/semantic.js";
 import { weightNameFor, resolvedFontFor, siblingStyleName, coreWeightKey, relativeWeightLabel, BODY_CLASS_VOICES, BODY_WEIGHT_LABELS } from "../../src/engine/type.mjs";
 
 // SINGLE_LINE_VOICES — voices that additionally get a "-single"-suffixed text-style sibling (1.0
@@ -85,7 +85,9 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
     for (const f of families) {
       if (!f || typeof f.n !== "string" || !f.n || typeof f.name !== "string" || !f.name) continue;
       for (const r of semanticRoles(f.n)) {
-        paints.push({ name: `${f.name}/${styleGroupOf(r.key)}${r.key}`, varName: `${f.n}/${r.key}` });
+        // style NAME keeps the display vocabulary (camel key — TKT-0025 owns that seam); the bound
+        // VARIABLE rides the ADR-016 kebab leaf.
+        paints.push({ name: `${f.name}/${styleGroupOf(r.key)}${r.key}`, varName: `${f.n}/${roleLeaf(f.n, r)}` });
       }
     }
   }
@@ -125,12 +127,13 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         const stepSlug = String(step).toLowerCase();
         // paragraphSpacing rides only where the engine emits it (prose voices); a 0 is still a value.
         const hasPara = Number.isFinite(s.paragraphSpacing);
+        const kv = voice.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); // ADR-016 kebab segment
         const bindBase = {
-          fontSize: `type/${voice}/${step}/size`,
-          lineHeight: `type/${voice}/${step}/lineHeight`,
-          letterSpacing: `type/${voice}/${step}/letterSpacing`,
-          ...(hasPara ? { paragraphSpacing: `type/${voice}/${step}/paragraphSpacing` } : {}),
-          fontFamily: `font/${voice}`,
+          fontSize: `type/${kv}/${stepSlug}/size`,
+          lineHeight: `type/${kv}/${stepSlug}/line-height`,
+          letterSpacing: `type/${kv}/${stepSlug}/letter-spacing`,
+          ...(hasPara ? { paragraphSpacing: `type/${kv}/${stepSlug}/paragraph-spacing` } : {}),
+          fontFamily: `font/${kv}`,
         };
         const litBase = {
           family,
@@ -187,7 +190,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           texts.push({
             name: `${voice}/${stepSlug}/${wvLabel}`,
             voice, step,
-            bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${voice}/${wv.slug}` } : { fontWeight: `weight/${voice}/${wv.slug}` }) },
+            bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${kv}/${wv.slug}` } : { fontWeight: `weight/${kv}/${wv.slug}` }) },
             literal: { ...litBase, styleName: wvStyleName, weight: wv.weight },
           });
         }
@@ -207,7 +210,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         // the literal fallback below survives for any prose voice a future config might opt in.
         if (SINGLE_LINE_VOICES.has(voice)) {
           const singleLineHeight = s.singleLineHeight ?? s.size;
-          const singleBindBase = { ...bindBase, ...(s.singleLineHeight != null ? { lineHeight: `type/${voice}/${step}/singleLineHeight` } : {}) };
+          const singleBindBase = { ...bindBase, ...(s.singleLineHeight != null ? { lineHeight: `type/${kv}/${stepSlug}/single-line-height` } : {}) };
           if (s.singleLineHeight == null) delete singleBindBase.lineHeight; // no live variable for Body — literal only
           const singleLitBase = { ...litBase, lineHeight: singleLineHeight };
           texts.push({
@@ -222,7 +225,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
             texts.push({
               name: `${voice}/${stepSlug}/${wvLabel}-single`,
               voice, step,
-              bind: { ...singleBindBase, ...(coreStyleName ? { fontStyle: `weight-style/${voice}/${wv.slug}` } : { fontWeight: `weight/${voice}/${wv.slug}` }) },
+              bind: { ...singleBindBase, ...(coreStyleName ? { fontStyle: `weight-style/${kv}/${wv.slug}` } : { fontWeight: `weight/${kv}/${wv.slug}` }) },
               literal: { ...singleLitBase, styleName: wvStyleName, weight: wv.weight },
             });
           }

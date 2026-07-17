@@ -272,7 +272,7 @@ function clampFigmaCollections(fc) {
     return s && s !== dflt ? s : "";
   };
   const raw = pick(fc.raw, "Color Primitives");
-  const semantic = pick(fc.semantic, "Color Modes");
+  const semantic = pick(fc.semantic, "Color Semantic"); // ADR-016 (was "Color Modes")
   if (!raw && !semantic) return {};
   return { figmaCollections: { ...(raw ? { raw } : {}), ...(semantic ? { semantic } : {}) } };
 }

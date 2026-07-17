@@ -481,12 +481,14 @@ export function siblingStyleName(coreStyleName, coreWeightName, siblingName) {
 // text-style planner (figma/binder/style-plan.mjs, which binds the CORE style to it) — they must
 // never independently recompute this, the same drift class siblingStyleName above already fixed once.
 export function coreWeightKey(voice, coreWeightName, sibs) {
-  if (!coreWeightName) return voice;
+  const v = String(voice).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); // ADR-016 kebab segment
+  if (!coreWeightName) return v;
   const taken = Array.isArray(sibs) && sibs.some((wv) => wv.slug === coreWeightName.slug);
-  return taken ? voice : `${voice}/${coreWeightName.slug}`;
+  return taken ? v : `${v}/${coreWeightName.slug}`;
 }
 
 // ── emitters ───────────────────────────────────────────────────────────────────────────────────
+import { COLLECTIONS } from "./collections.js";
 const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 // typeTokensCSS — CSS custom properties (font families + per-step size/line/tracking/weight) plus a
@@ -618,12 +620,12 @@ export function typeTokensDTCG(scale, { unit = "px" } = {}) {
   // just the 5 shared defaults. Un-overridden voices repeat their role's family — same value the
   // composite typography tokens below already carry.
   const fontFamily = {};
-  for (const voice of Object.keys(scale.categories)) fontFamily[voice] = { $type: "fontFamily", $value: resolvedFontFor(scale, voice) };
+  for (const voice of Object.keys(scale.categories)) fontFamily[kebab(voice)] = { $type: "fontFamily", $value: resolvedFontFor(scale, voice) };
   const typography = {};
   for (const [cName, steps] of Object.entries(scale.categories)) {
-    typography[cName] = {};
+    typography[kebab(cName)] = {};
     for (const [sName, s] of Object.entries(steps)) {
-      typography[cName][sName] = {
+      typography[kebab(cName)][sName.toLowerCase()] = {
         $type: "typography",
         // fontFamily resolves the per-voice override (if any) — an overridden voice's DTCG carries its own
         // family; an un-overridden voice still reads its role's family (identical to before this channel).
@@ -635,8 +637,8 @@ export function typeTokensDTCG(scale, { unit = "px" } = {}) {
   // ({ Display: { Bold: { $type:"fontWeight", $value:700 } } }). Absent when none (identity gate).
   const weights = {};
   if (scale.weights) for (const [cName, list] of Object.entries(scale.weights)) {
-    weights[cName] = {};
-    for (const wv of list) weights[cName][wv.name] = { $type: "fontWeight", $value: wv.weight };
+    weights[kebab(cName)] = {};
+    for (const wv of list) weights[kebab(cName)][wv.slug] = { $type: "fontWeight", $value: wv.weight };
   }
   return { fontFamily, typography, ...(Object.keys(weights).length ? { weights } : {}) };
 }
@@ -660,7 +662,8 @@ export function typeTokensDTCG(scale, { unit = "px" } = {}) {
 // `opts.baseName` (default "Base") NAMES the synthetic base layer (e.g. "Mobile" — the standard set);
 // `opts.baseLast` (default false) places it AFTER the breakpoints: Figma's default mode is the FIRST mode,
 // so a desktop-first collection stores modes [Desktop, Tablet] and emits [Desktop, Tablet, Mobile].
-const TYPE_FIGMA_PROPS = ["size", "lineHeight", "letterSpacing", "weight", "paragraphSpacing"];
+// ADR-016: emitted prop leaves are kebab ([engine field, emitted leaf]).
+const TYPE_FIGMA_PROPS = [["size", "size"], ["lineHeight", "line-height"], ["letterSpacing", "letter-spacing"], ["weight", "weight"], ["paragraphSpacing", "paragraph-spacing"]];
 // disambiguateModeNames — Figma requires DISTINCT mode names per collection. The synthetic base layer
 // (named `baseName`, default "Base") is reserved, so a breakpoint sharing its name (or any duplicate of
 // another breakpoint) is renamed ("Mobile 2", …) before it would silently shadow another mode / emit
@@ -688,9 +691,9 @@ export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
   const layer = (scale, mode) => {
     for (const [cName, steps] of Object.entries(scale.categories)) {
       for (const [sName, s] of Object.entries(steps)) {
-        for (const prop of TYPE_FIGMA_PROPS) set(`type/${cName}/${sName}/${prop}`, mode, s[prop]);
+        for (const [field, leaf] of TYPE_FIGMA_PROPS) set(`type/${kebab(cName)}/${sName.toLowerCase()}/${leaf}`, mode, s[field]);
         // singleLineHeight exists only on the BOX voices (Kicker · UI-control · UI-widget) — pixels too.
-        if (s.singleLineHeight != null) set(`type/${cName}/${sName}/singleLineHeight`, mode, s.singleLineHeight);
+        if (s.singleLineHeight != null) set(`type/${kebab(cName)}/${sName.toLowerCase()}/single-line-height`, mode, s.singleLineHeight);
       }
     }
   };
@@ -698,12 +701,12 @@ export function typeTokensFigmaModes(baseScale, modes = [], { baseName = "Base",
   list.forEach((m, i) => layer(m.scale, names[i]));
   return {
     $schema: "figma-ui3-variables.float.schema.v1",
-    collections: { "Geometry": { modes: modeNames, variables } },
+    collections: { [COLLECTIONS.breakpoints]: { modes: modeNames, variables } },
   };
 }
 
 // typeTokensFigmaPrimitives — the "Font Primitives" COMPANION collection to typeTokensFigmaModes: the
-// distinct font families deduped into `family/<role>` STRING primitives (plus a `family/voice/<voice>`
+// distinct font families deduped into `family/<role>` STRING primitives (plus an `override/<voice>`
 // primitive for a family that's ONLY reached via a per-voice override — never shared with a role or
 // another voice), a `font/<voice>` ALIAS per voice pointing at its resolved family primitive (edit the
 // primitive; every voice sharing it follows), and a `weight/<voice>` FLOAT primitive (the voice's uniform
@@ -728,11 +731,11 @@ export function typeTokensFigmaPrimitives(scale) {
       // genuinely distinct override family (matching no existing primitive's value) mints its own —
       // dedupe by VALUE, not by source, so two voices overridden to the same custom family share one.
       if (!famKey[fam]) {
-        const key = `family/voice/${kebab(voice)}`;
+        const key = `override/${kebab(voice)}`;
         famKey[fam] = key;
         variables[key] = { type: "STRING", values: { Value: fam } };
       }
-      variables[`font/${voice}`] = { type: "ALIAS", target: famKey[fam] };
+      variables[`font/${kebab(voice)}`] = { type: "ALIAS", target: famKey[fam] };
     }
     const first = Object.values(steps)[0];
     const coreWeightName = first && Number.isFinite(first.weight) ? weightNameFor(first.weight) : null;
@@ -750,8 +753,8 @@ export function typeTokensFigmaPrimitives(scale) {
     // "Condensed Bold Italic") is a REAL font-loading bug, not cosmetic: this primitive is what a
     // non-variable face's sibling text style binds `fontStyle` to.
     if (sibs) for (const wv of sibs) {
-      variables[`weight/${voice}/${wv.slug}`] = { type: "FLOAT", values: { Value: wv.weight } };
-      variables[`weight-style/${voice}/${wv.slug}`] = { type: "STRING", values: { Value: siblingStyleName(sn, coreWeightName, wv.name) } };
+      variables[`weight/${kebab(voice)}/${wv.slug}`] = { type: "FLOAT", values: { Value: wv.weight } };
+      variables[`weight-style/${kebab(voice)}/${wv.slug}`] = { type: "STRING", values: { Value: siblingStyleName(sn, coreWeightName, wv.name) } };
     }
   }
   return {
