@@ -6076,7 +6076,7 @@ class HctApp extends HTMLElement {
       parent.postMessage({ pluginMessage: msg }, "*");
       // Optimistic "in progress" toast; the sandbox posts {apply-done} back when the write actually completes
       // (→ onApplyDone → a "done" toast), or {apply-error} on failure (→ onApplyError). See the ui.html bridge.
-      this.toast(rebuild ? "Regrouping Color Modes…" : "Applying to Figma…");
+      this.toast(rebuild ? "Regrouping Color Semantic…" : "Applying to Figma…");
     } catch {
       /* not in a frame / blocked — nothing to apply to */
     }
@@ -6222,14 +6222,14 @@ class HctApp extends HTMLElement {
       "dialog",
       {
         class: "apply-gate",
-        "aria-label": rebuild ? "Regroup Color Modes" : "Apply variables to Figma",
+        "aria-label": rebuild ? "Regroup Color Semantic" : "Apply variables to Figma",
         onclick: (e) => { if (e.target === e.currentTarget) this.closeApplyGate(); },
         oncancel: (e) => { e.preventDefault(); this.closeApplyGate(); },
       },
       h(
         "div",
         { class: "drawer-head" },
-        h("h3", {}, icon("warning"), rebuild ? "Regroup Color Modes" : "Apply variables to this file"),
+        h("h3", {}, icon("warning"), rebuild ? "Regroup Color Semantic" : "Apply variables to this file"),
         h("div", { class: "spacer" }),
         btn(icon("x"), { ariaLabel: "Close", onclick: () => this.closeApplyGate() }),
       ),
@@ -6237,10 +6237,10 @@ class HctApp extends HTMLElement {
         "div",
         { class: "apply-gate-body" },
         h("p", { class: "apply-gate-lede" }, rebuild
-          ? "Regroup deletes and re-creates the Color Modes variables so they adopt the grouped order. Any layers or styles bound to them will detach and need reconnecting — the Ultimate Tokens style swatches are re-bound automatically on this same apply. (Color Primitives are untouched.)"
+          ? "Regroup deletes and re-creates the Color Semantic variables so they adopt the grouped order. Any layers or styles bound to them will detach and need reconnecting — the Ultimate Tokens style swatches are re-bound automatically on this same apply. (Color Primitives are untouched.)"
           : (this.exportSystems && this.exportSystems.styles === false
-              ? "This creates or updates the Color Primitives + Color Modes variable collections in this file. Variables with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want)."
-              : "This creates or updates the Color Primitives + Color Modes variable collections in this file, plus the STYLE swatches bound to them (paint styles per semantic role, text styles per type step — toggle \u201CStyles\u201D in the drawer to opt out). Variables and Ultimate Tokens styles with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want).")),
+              ? "This creates or updates the Color Primitives + Color Semantic variable collections in this file. Variables with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want)."
+              : "This creates or updates the Color Primitives + Color Semantic variable collections in this file, plus the STYLE swatches bound to them (paint styles per semantic role, text styles per type step — toggle \u201CStyles\u201D in the drawer to opt out). Variables and Ultimate Tokens styles with the same names are overwritten — which can re-skin components already bound to them (sometimes exactly what you want).")),
         h(
           "div",
           { class: "apply-gate-warn" },

@@ -71,7 +71,7 @@ fallbacks, and `readRawColors` resolves a renamed file from the SAVED config at 
 Binder still looks up the DEFAULT names only. **STYLES (2026-07-09, PRs #231–#236):** when the drawer's Styles chip is on
 (opt-OUT), `msg.stylePlans` + `msg.fontPrimitives` ride the same apply — pure plans from
 `figma/binder/style-plan.mjs` (the THIRD planner sibling: paint styles per semantic role bound to Color
-Modes via `setBoundVariableForPaint`; text styles per voice×step×sibling-weight bound to
+Semantic via `setBoundVariableForPaint`; text styles per voice×step×sibling-weight bound to
 Typography/Font Primitives; `primitivesApplyPlan` = the ordered Font Primitives ensure-plan) →
 `code.js#applyStylePlans` + `applyFontPrimitives` execute them verbatim, provenance-pruned via
 `STYLE_REGISTRY_KEY` (user styles untouchable). Binds fontSize/fontFamily/paragraphSpacing/
@@ -84,8 +84,8 @@ list found live against real files: `references/figma-styles-hard-constraints.md
 Sibling weights: `doc.type.voices[v].weights`, edited in the per-voice panel (Suggest =
 `siblingWeightDefaults`, or `bodyClassSiblingDefaults` for Body*/Label*/Tiny*/Lead — #303/#307). Round-trip OUT: `configFromVariables` (`src/ui/model.mjs`) recovers each family's
 500 hue/chroma from the live raw vars (the APPROXIMATE fallback when no config is embedded); `read-variables`
-→ `receiveLiveVariables` feeds the drift diff. Geometry rides a separate `Geometry` collection of Figma
-NUMBER (FLOAT) vars via `geomTokensFigma` (`src/engine/geometry.mjs`).
+→ `receiveLiveVariables` feeds the drift diff. Geometry rides the `Breakpoints` collection (was
+`Geometry`, ADR-016) of Figma NUMBER (FLOAT) vars via `geomTokensFigma` (`src/engine/geometry.mjs`).
 
 ## Procedure
 

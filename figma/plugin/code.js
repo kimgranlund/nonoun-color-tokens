@@ -7,7 +7,7 @@
 // into two Figma variable COLLECTIONS:
 //
 //   Color Primitives  (mode "Value")        — one COLOR var per stop/scrim, the concrete colors
-//   Color Modes        (modes "Light","Dark")— one COLOR var per role, each mode ALIASED to the
+//   Color Semantic      (modes "Light","Dark")— one COLOR var per role, each mode ALIASED to the
 //                                        raw var named by the leaf's com.figma.aliasData
 //                                        (the live raw→semantic cascade native import can't do)
 //
@@ -402,7 +402,7 @@ function sweepCandidates(knownTextNames, knownPaintNames, localTexts, localPaint
   return { texts: texts, paints: paints };
 }
 
-// applyStylePlans — paint styles bound to the Color Modes variables; text styles set from the plan's
+// applyStylePlans — paint styles bound to the Color Semantic variables; text styles set from the plan's
 // literals then BOUND per field to the Geometry (type/) / Font Primitives variables where the target exists
 // (per-field graceful fallback: an absent variable or an unsupported binding leaves the literal value).
 // lineHeight/letterSpacing stay LITERAL PERCENT in v1 — the type/ vars carry them as % of size,
@@ -430,7 +430,7 @@ async function applyStylePlans(sp) {
   writeStyleRegistry(regEarly);
   const reg = readStyleRegistry();
 
-  // ── paint styles → Color Modes variables ──
+  // ── paint styles → Color Semantic variables ──
   const paints = Array.isArray(sp.paints) ? sp.paints : [];
   if (paints.length) {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
@@ -578,10 +578,10 @@ async function applyStylePlans(sp) {
 }
 
 // ── the apply ───────────────────────────────────────────────────────────────────
-// opts.rebuildSemantic — the opt-in "Regroup": delete the existing Color Modes collection so it is
+// opts.rebuildSemantic — the opt-in "Regroup": delete the existing Color Semantic collection so it is
 // re-created fresh and adopts the bundle's (canonical, grouped) variable order. Figma keeps an
 // existing variable's position on update, so a normal apply never reorders; only a fresh collection
-// does. Color Primitives are untouched; bindings to the dropped Color Modes variables detach.
+// does. Color Primitives are untouched; bindings to the dropped Color Semantic variables detach.
 // TKT-0012 — id-preserving rename pass: `renames` = { "<old>": "<new>" } applied to a varsByName pool
 // BEFORE the reconcile loop, so a renamed variable is adopted (v.name =) instead of pruned+recreated
 // (which would orphan every consumer binding). Skipped when the new name already exists.
@@ -634,7 +634,7 @@ async function applyBundle(dtcg, opts) {
   }
 
   // 2) SEMANTIC collection — "Light" + "Dark" modes, each role ALIASED to its raw var.
-  // Regroup: drop the existing Color Modes collection first so the rebuild creates every variable
+  // Regroup: drop the existing Color Semantic collection first so the rebuild creates every variable
   // fresh, in the bundle's canonical order (regular · containers · surfaces · scrims).
   let rebuilt = false;
   if (opts.rebuildSemantic) {
@@ -650,7 +650,7 @@ async function applyBundle(dtcg, opts) {
   if (sem.modes[1]) sem.renameMode(darkMode, "Dark");
   const semByName = await varsByName(sem.id);
   renameInPool(semByName, renames.semantic);
-  const currentSem = new Set(); // names this bundle WANTS in Color Modes — everything else is stale
+  const currentSem = new Set(); // names this bundle WANTS in Color Semantic — everything else is stale
   let semCount = 0;
   const darkLeaves = {};
   for (const [name, leaf] of leafEntries(semDark, "")) darkLeaves[name] = leaf;

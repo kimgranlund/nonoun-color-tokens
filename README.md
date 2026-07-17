@@ -129,7 +129,7 @@ Two plugins live under `figma/`:
 
 - **`figma/plugin/`** — the generator itself, running inside Figma. In Figma: *Plugins → Development →
   Import plugin from manifest…* and pick `figma/plugin/manifest.json`. Its **Add Variables → Figma**
-  action writes a **`Color Primitives`** collection (the raw colors) + a **`Color Modes`** collection
+  action writes a **`Color Primitives`** collection (the raw colors) + a **`Color Semantic`** collection
   (the semantic Light/Dark tokens, aliased to the primitives) and embeds the parametric config in the
   file (`root pluginData`) for a lossless round-trip.
 - **`figma/binder/`** — the standalone **Semantic Binder** (`figma/binder/figma-semantic-binder/`),

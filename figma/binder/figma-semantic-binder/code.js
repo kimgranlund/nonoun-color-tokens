@@ -287,7 +287,7 @@ async function main() {
       if (v.variableCollectionId === rawColl.id) rawVars[v.name] = v;
     }
 
-    // 2. Create/find the Color Modes collection with Light + Dark modes.
+    // 2. Create/find the Color Semantic collection with Light + Dark modes.
     let sem = collections.find((c) => c.name === SEMANTIC_COLLECTION);
     if (!sem) sem = figma.variables.createVariableCollection(SEMANTIC_COLLECTION);
     const lightMode = sem.modes[0].modeId;
