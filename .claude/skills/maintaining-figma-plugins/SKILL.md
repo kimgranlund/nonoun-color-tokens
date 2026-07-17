@@ -111,16 +111,18 @@ Run the two pure Figma verifiers first, then the full suite. Each prints `pass`/
 per-verifier gate-group list is owned by `references/rubric.md` (read it there):
 
 ```
-node test/figma/binder.mjs   # the standalone binder — owns the `parity` gate (roleTable ↔ bind-plan ref-set)
+node test/figma/binder.mjs   # the standalone binder — owns the `parity` gate (roleTable ↔ semantic.js, full role objects)
 node test/figma/plugin.mjs   # the app-as-plugin — owns the `vmsyntax` gate (NO `catch {`)
 npm test                     # test/run.mjs runs both plus the engine/ui suite
 ```
 
-The two SILENT KILLERS a green Node run hides: **`parity`** in `binder.mjs` (it loads `roleTable`/`refKey`
-out of `code.js` via `new Function`, strips the top-level `main();`, and diffs the derived ref-target SET both
-directions against `bindingTargets(NAMES)` — the real 2026-06-18 scrim drift), and **`vmsyntax`** in
-`plugin.mjs` (a `catch {` that parses in Node but not in Figma's VM). Don't call it done until both pure
-verifiers and `npm test` are green.
+The two SILENT KILLERS a green Node run hides: **`parity`** in `binder.mjs` (it loads `roleTable` out of
+`code.js` via `new Function`, strips the top-level `main();`, and deep-equal-compares its FULL role objects
+— `{key, suffix, light, dark}`, in order, per default palette — against `src/engine/semantic.js`'s
+`semanticRoles(n)`, not just the derived ref-name set (TKT-0027 widened this from a set-diff, which could
+miss a `key`/`suffix` typo pointing at an unchanged ref — the real 2026-06-18 scrim drift was a ref change,
+which both shapes catch)), and **`vmsyntax`** in `plugin.mjs` (a `catch {` that parses in Node but not in
+Figma's VM). Don't call it done until both pure verifiers and `npm test` are green.
 
 ## References
 

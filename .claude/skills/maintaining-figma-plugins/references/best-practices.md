@@ -35,9 +35,10 @@ The non-obvious do/don'ts (each cost a real bug or a review cycle), then a worke
   strings drift; `refKey` is the single normaliser shared with the semantic layer and `bind-plan.mjs`.
 - **A role change is an `adding-semantic-roles` task, not a one-off binder edit.** The binder's `roleTable(n)`
   is ONE parity site of nine. Editing it alone leaves the answer key, `bind-plan.mjs`, and the count literals
-  drifted. Follow that skill's lockstep. The binder parity gate compares a SET, so a new role whose refs
-  already exist won't flag a missing row — add the row by discipline or the binder silently won't create that
-  variable.
+  drifted. Follow that skill's lockstep. The `parity` gate now deep-equal-compares FULL role objects
+  (`{key, suffix, light, dark}`, in order) against `semantic.js` (TKT-0027), so a row added to one copy but
+  not the other flags loudly as a length mismatch — but still add the binder row by discipline, per that
+  skill's step 4, rather than leaning on the gate to catch an omission after the fact.
 
 ### The app apply path
 
@@ -82,9 +83,11 @@ The symptom was the *binder skipping scrim roles* after the scrim model changed 
 
 1. **Routed it**: a `missing` list naming scrim targets the binder couldn't resolve → its hardcoded
    `roleTable(n)` had stale scrim steps that no longer matched the raw primitives the app now generates.
-2. **Confirmed with the gate**: `node test/figma/binder.mjs` → `parity` FAIL, naming a drifted target. The
-   gate had loaded `roleTable` out of `code.js` and diffed its ref-set against `bind-plan.bindingTargets` —
-   the steps had genuinely changed, so the set diff caught it (a count-only change would not have).
+2. **Confirmed with the gate**: `node test/figma/binder.mjs` → `parity` FAIL, naming a drifted target. At the
+   time, the gate loaded `roleTable` out of `code.js` and diffed its ref-set against `bind-plan.bindingTargets`
+   — the steps had genuinely changed, so the set diff caught it. (TKT-0027 later widened this gate to a
+   full-object, in-order comparison against `semantic.js` directly — the set-diff shape described here is
+   what caught THIS incident, but is no longer what `test/figma/binder.mjs` runs today.)
 3. **Fixed at the source of truth**: this was an `adding-semantic-roles`-shaped change — updated
    `semantic.js`'s scrim arrays, the `role-table.json` answer key, AND pasted the identical scrim rows into
    the binder's `roleTable(n)` with `refKey`-grammar refs (no hand-padding).

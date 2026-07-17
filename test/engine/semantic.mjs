@@ -111,7 +111,7 @@ for (const g of ["roles", "oncolors", "refs-canonical", "surface-mode"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
-console.log("  defer  hpg-parity-roletable — 3-impl identity (artifact/gen.js/plugin); validated at integration");
+console.log("  defer  hpg-parity-roletable — engine<->Figma-binder roleTable full-object identity is verified by test/figma/binder.mjs's `parity` gate; role-table.json<->semantic.js identity is the refs-canonical gate above (both already full-object)");
 if (fails.length) { console.error(`\nFAIL: ${fails.length} gate failure(s)`); process.exit(1); }
 console.log("\nPASS: semantic-mapping clears its checkable [gate] predicates (parity deferred)");
 process.exit(0);

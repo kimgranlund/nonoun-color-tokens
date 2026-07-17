@@ -8,6 +8,7 @@ import * as P from "../../figma/binder/bind-plan.mjs";
 import * as MAP from "../../figma/binder/mode-apply-plan.mjs";
 import * as TYPE from "../../src/engine/type.mjs";
 import * as GEOM from "../../src/engine/geometry.mjs";
+import { semanticRoles } from "../../src/engine/semantic.js";
 
 const HERE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "figma", "binder"); // the binder lives in figma/binder/
 const RT = JSON.parse(readFileSync(new URL("../../docs/reference/data/role-table.json", import.meta.url), "utf8"));
@@ -77,17 +78,40 @@ function loadBinder(src, figma) {
 }
 
 // ── PARITY GUARD: the runtime code.js HARDCODES roleTable() (the Figma sandbox can't import the
-//    .mjs), so it's a second copy of the validated role table that node --check can't catch drifting.
-//    Load it (without running main()) and assert its derived targets EQUAL bind-plan's canonical set,
-//    so a ref can't go stale silently. (Real incident 2026-06-18: the scrim refs drifted here.) ──
+//    .mjs), so it's a second, independently hand-typed copy of the engine's role table that
+//    `node --check` can't catch drifting. Load it (without running main()) and deep-equal-compare
+//    its FULL role objects — {key, suffix, light, dark}, in ORDER, per default palette — against
+//    src/engine/semantic.js's semanticRoles(n), the canonical in-repo table. This is the
+//    engine <-> Figma-binder leg of the role table's 3-impl identity; role-table.json's own
+//    identity with semantic.js (also full-object, key+suffix+light+dark) is a SEPARATE gate,
+//    `refs-canonical` in test/engine/semantic.mjs — the two gates together give transitive
+//    identity across all three implementations.
+//    A derived-ref-name-set diff (the previous shape of this gate) only proves every ref the
+//    binder emits resolves to a real raw-colors target — it CANNOT catch a `key` or `suffix`
+//    typo that happens to keep pointing at the same ref (e.g. a mis-copied semantic variable
+//    name), nor a role dropped from one copy whose refs are already produced by another role.
+//    Full-object, in-order comparison catches both: a length mismatch flags a missing/extra row,
+//    and a per-field mismatch flags a `key`/`suffix` drift even when `light`/`dark` still match.
+//    (Real incident 2026-06-18: the scrim refs drifted here.) ──
 try {
   const src = readFileSync(BINDER_PATH, "utf8");
-  const { roleTable, refKey: rk } = loadBinder(src, undefined);
-  const runtime = new Set();
-  for (const n of NAMES) for (const r of roleTable(n)) { runtime.add(`${n}/${rk(r.light)}`); runtime.add(`${n}/${rk(r.dark)}`); }
-  const canon = new Set(P.bindingTargets(NAMES));
-  const drift = [...runtime].filter((t) => !canon.has(t)).concat([...canon].filter((t) => !runtime.has(t)));
-  if (drift.length) FAIL("parity", `runtime code.js roleTable drifted from canonical (e.g. ${drift.slice(0, 3).join(", ")})`);
+  const { roleTable } = loadBinder(src, undefined);
+  const drift = [];
+  for (const n of NAMES) {
+    const runtimeRoles = roleTable(n);
+    const engineRoles = semanticRoles(n);
+    if (!Array.isArray(runtimeRoles) || runtimeRoles.length !== engineRoles.length) {
+      drift.push(`${n}: code.js roleTable has ${runtimeRoles && runtimeRoles.length} rows, semantic.js has ${engineRoles.length}`);
+      continue;
+    }
+    for (let i = 0; i < engineRoles.length; i++) {
+      const a = runtimeRoles[i], b = engineRoles[i];
+      if (!a || a.key !== b.key || a.suffix !== b.suffix || a.light !== b.light || a.dark !== b.dark) {
+        drift.push(`${n}[${i}] code.js ${JSON.stringify(a)} != semantic.js ${JSON.stringify(b)}`);
+      }
+    }
+  }
+  if (drift.length) FAIL("parity", `runtime code.js roleTable drifted from src/engine/semantic.js (e.g. ${drift.slice(0, 3).join("; ")})`);
 } catch (e) { FAIL("parity", `could not load/compare runtime roleTable: ${e.message}`); }
 
 // ── a mock figma: in-memory collections + variables (a trimmed copy of test/figma/plugin.mjs's mock —
@@ -242,7 +266,7 @@ for (const g of ["bindings", "offline", "parity", "floatanchor", "floatcreate", 
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
 console.log(`  (checked ${targets ? targets.length : 0} binding targets vs ${CANON.size} canonical raw-colors names)`);
-console.log("  defer  hpg-parity-roletable — role-table parity is verified by semantic-mapping");
+console.log("  defer  hpg-parity-roletable — this file's `parity` gate above verifies the engine<->Figma-binder leg (full role objects, in order, per default palette); the canonical role-table.json<->semantic.js leg is verified by semantic-mapping's own refs-canonical gate");
 if (fails.length) { console.error(`\nFAIL: ${fails.length} gate failure(s)`); process.exit(1); }
 console.log("\nPASS: figma-plugin clears its checkable [gate] predicates");
 process.exit(0);

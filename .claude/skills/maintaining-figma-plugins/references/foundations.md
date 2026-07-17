@@ -68,14 +68,20 @@ The Figma VM can't `import` the `.mjs`, so the binder's `roleTable(n)` is a **li
   **`rolesPerPalette` × palette names** (owned by `docs/reference/data/role-table.json` — 59 at the time
   of writing; 8 default palettes).
 
-The parity gate (`test/figma/binder.mjs`) loads `roleTable`/`refKey` straight out of `code.js` (strips the
-top-level `main();` call, evals via `new Function`), derives its ref-target set, and diffs it BOTH directions
-against `bindingTargets(NAMES)`. So a drift in any ref flags loudly — but a NEW role whose refs are already
-produced by another role will NOT flag a missing row (the set already contains those targets). That is why a
-role addition must add the binder row by discipline, per `adding-semantic-roles` step 4 — this skill does not
-re-own that procedure. (The verifier's summary line reports the live counts — `checked N binding targets vs
-M canonical raw-colors names`; the binder only aliases the stops referenced by roles, a subset of all raw
-stops, so targets < canonical is expected, not a miss.)
+The `parity` gate (`test/figma/binder.mjs`) loads `roleTable` straight out of `code.js` (strips the
+top-level `main();` call, evals via `new Function`) and, per default palette, deep-equal-compares its FULL
+role objects — `{key, suffix, light, dark}`, in ORDER — against `src/engine/semantic.js`'s `semanticRoles(n)`
+(TKT-0027; widened from a derived-ref-name-set diff, which could miss a `key`/`suffix` typo that still
+pointed at the right ref). A row count mismatch (a role present in one copy but not the other) now flags as
+loudly as a drifted ref or a mis-copied `key`/`suffix` — still add the binder row by discipline per
+`adding-semantic-roles` step 4 (this skill does not re-own that procedure), but a slip is no longer silent.
+The separate `bindings` gate checks something different: that `bindingTargets(NAMES)` never names a raw
+target outside the canonical raw-colors name set (no dangling `"{n}/50"`), and that `bindingPlan`'s length
+is `rolesPerPalette` × palette names. (Its summary line — `checked N binding targets vs M canonical
+raw-colors names` — is expected to show targets < canonical: the binder only aliases the stops referenced
+by roles, a subset of all raw stops.) `role-table.json`'s own identity with `semantic.js` (also full-object)
+is the THIRD leg, checked by `refs-canonical` in `test/engine/semantic.mjs` — together the two test files
+give transitive full-object identity across all three role-table implementations.
 
 ### 5. The app apply path — create, embed, prune, rebuild (read `figma/plugin/code.js#applyBundle`)
 
