@@ -69,7 +69,12 @@ export function kebabWaveColorRenames(paletteSlugs) {
 export const FIGMA_MIGRATIONS = {
   // floats: stamped by the app AFTER planning (the var map derives from the live plan's names via
   // kebabWaveVarRenames — see _figmaFloatPlans); the collection rename is static.
-  floats: { collections: { "Breakpoints": { renameFrom: ["Geometry"] } } },
+  // retire (TKT-0009, extracted to retirementsFor at TKT-0018): the merged "Breakpoints" collection
+  // supersedes the old two-collection era's "Typography" once it actually lands type/ variables.
+  floats: {
+    collections: { "Breakpoints": { renameFrom: ["Geometry"] } },
+    retire: [{ collection: "Breakpoints", ifVariablePrefix: "type/", retire: ["Typography"] }],
+  },
   color: { collections: { "Color Semantic": ["Color Modes"] } },
   styles: { paints: {}, texts: {} },
 };

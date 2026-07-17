@@ -47,10 +47,16 @@ colors→containers→surfaces→scrims); and on-color roles can be **re-pointed
    (keyed on the role's `suffix`, e.g. `-on-${n}-hover`) re-points it to the better-WCAG end vs its fill.
    A disabled/inert on-color stays OUT of `M` on purpose (it opts out of the contrast guarantee — see how
    `-on-${n}-disabled` is absent today).
-4. **`figma/binder/figma-semantic-binder/code.js`** — `roleTable(n)` HARDCODES the same rows (the Figma
-   sandbox can't import the `.mjs`). Add the identical row(s) so the binder CREATES the variable. The
-   binder parity gate (`test/figma/binder.mjs`) compares the derived ref-target SET, so a row whose refs are
-   already covered by another role will NOT flag a missing row — add it by discipline anyway.
+4. **`figma/binder/figma-semantic-binder/code.js`** — `roleTable(n)` carries the same rows (the Figma
+   sandbox can't import the `.mjs`). Since TKT-0019 this is GENERATED, not hand-typed: `roleTable(n)` is
+   `semanticRoles()`'s own function body spliced verbatim by `scripts/gen-figma-binder-code.mjs` between
+   `// === GENERATED:ROLE_TABLE ===` markers. Editing `semantic.js` in step 1 and regenerating
+   (`npm test`/`npm run build` run the splice for you; run it by hand with `node
+   scripts/gen-figma-binder-code.mjs`) is what puts the new row in `code.js` — there is no separate
+   binder-file edit to make, and hand-editing inside the markers is actively wrong (a regenerate
+   overwrites it). The binder parity gate (`test/figma/binder.mjs`) deep-equal-compares the FULL role
+   objects (`{key, suffix, light, dark}`, in order, TKT-0027) against `semantic.js` directly, so a
+   forgotten regenerate (a stale committed `code.js`) now flags as a row-count or per-field mismatch.
 5. **Count-gate literals** (grep the current count — `53` today): update every one —
    `test/engine/semantic.mjs` (`ROLES.length !== 53`), `test/engine/exports.mjs` (`< 53 * enabledCount`),
    `test/figma/binder.mjs` (`!== 53 * NAMES.length`), `test/figma/plugin.mjs` (the `53 roles ×…` failure

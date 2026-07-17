@@ -78,6 +78,45 @@ export function styleGroupOf(key) {
   return "";
 }
 
+// ── TKT-0025: the ONE shared formatters for the Styles-panel display vocabulary ──
+//
+// Figma's Styles panel and Figma's Variables panel are deliberately, ratifiedly (ADR-016) two
+// DIFFERENT naming vocabularies for the same underlying role/voice: variable PATHS are kebab-case
+// (`primary/on-primary`, `type/display/md/size`) — ADR-016's one emitted-path grammar — while STYLE
+// display names stay Title-case-family/camelCase-role (`Primary/onPrimary`) and Title-case-voice
+// (`Display/md/heavy •`). This is not an oversight to "fix" by kebabbing styles too — it's a
+// deliberate, ratified UI-convention split (Figma's Styles picker reads better in Title Case;
+// variable paths feed dev-mode/code) that used to be re-templated ad hoc at every call site below,
+// kept aligned only by this file's own test gate (test/figma/style-plan.mjs). These two functions
+// are the SINGLE SOURCE for that policy: every style display-name in this planner (paint or text) is
+// built by calling one of them, never by hand-templating `${voice}/${step}...` inline again.
+
+// paintStyleNameFor — a paint style's Styles-panel name: Title-case family / ratified sub-folder /
+// the role's own camelCase key (e.g. "Primary/scrims/scrim", "Primary/onPrimary"). `familyName` is
+// the display segment (families[].name, already Title-case); `roleKey` is the role's own key as
+// returned by semanticRoles (semantic.js) — NOT the kebab leaf the bound variable uses (roleLeaf).
+export function paintStyleNameFor(familyName, roleKey) {
+  return `${familyName}/${styleGroupOf(roleKey)}${roleKey}`;
+}
+
+// styleNameFor — a text style's Styles-panel name: `Voice/step-slug`, optionally followed by a
+// `/label` segment (a relative weight label — see relativeWeightLabel), an optional `-single` suffix
+// on the trailing token (never a new "/"-segment: see the SINGLE_LINE_VOICES comment below — a new
+// segment makes the plain leaf a PATH PREFIX of its own single variant, and Figma's Styles panel
+// folder-izes any name that is a prefix of another), and an optional trailing ` •` marking the CORE
+// style among its named siblings (always LAST, so it's never clipped by Figma's own truncation of a
+// long label). `voice` is used verbatim (Title-case, e.g. "Display"); `step` is lowercased here (the
+// ONE place that lowercasing happens, so every call site stays consistent). Options:
+//   label  — the relative weight label (a sibling's), or null for the bare `Voice/step` shape (a
+//            voice explicitly opted OUT of siblings via `weights: []` — the only way to get one).
+//   single — true for a `-single` sibling (UI-control/UI-widget's 1.0-leading box-voice variant).
+//   core   — true to append the ` •` default-pick marker (only ever paired with a non-null label).
+export function styleNameFor(voice, step, { label = null, single = false, core = false } = {}) {
+  const base = `${voice}/${String(step).toLowerCase()}`;
+  if (label == null) return single ? `${base}-single` : base;
+  return `${base}/${single ? `${label}-single` : label}${core ? " •" : ""}`;
+}
+
 export function stylePlans({ families = [], scale = null, include = {} } = {}) {
   const inc = { color: include.color !== false, type: include.type !== false };
   const paints = [];
@@ -85,9 +124,9 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
     for (const f of families) {
       if (!f || typeof f.n !== "string" || !f.n || typeof f.name !== "string" || !f.name) continue;
       for (const r of semanticRoles(f.n)) {
-        // style NAME keeps the display vocabulary (camel key — TKT-0025 owns that seam); the bound
-        // VARIABLE rides the ADR-016 kebab leaf.
-        paints.push({ name: `${f.name}/${styleGroupOf(r.key)}${r.key}`, varName: `${f.n}/${roleLeaf(f.n, r)}` });
+        // style NAME keeps the display vocabulary (paintStyleNameFor, TKT-0025's shared formatter);
+        // the bound VARIABLE rides the ADR-016 kebab leaf.
+        paints.push({ name: paintStyleNameFor(f.name, r.key), varName: `${f.n}/${roleLeaf(f.n, r)}` });
       }
     }
   }
@@ -172,7 +211,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
         // weight number alone — found live via BZZR's Display core not rendering its bound style. A
         // custom styleName is strictly more specific than a numeric weight, so it alone drives the bind.
         texts.push({
-          name: coreLabel ? `${voice}/${stepSlug}/${coreLabel} •` : `${voice}/${stepSlug}`,
+          name: styleNameFor(voice, step, { label: coreLabel, core: true }),
           voice, step,
           bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${coreKey}` } : { fontWeight: `weight/${coreKey}` }) },
           literal: { ...litBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
@@ -188,7 +227,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           const wvStyleName = siblingStyleName(coreStyleName, coreWeightName, wv.name);
           const wvLabel = (labelFor(wv.weight) || wv.name).toLowerCase();
           texts.push({
-            name: `${voice}/${stepSlug}/${wvLabel}`,
+            name: styleNameFor(voice, step, { label: wvLabel }),
             voice, step,
             bind: { ...bindBase, ...(coreStyleName ? { fontStyle: `weight-style/${kv}/${wv.slug}` } : { fontWeight: `weight/${kv}/${wv.slug}` }) },
             literal: { ...litBase, styleName: wvStyleName, weight: wv.weight },
@@ -214,7 +253,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
           if (s.singleLineHeight == null) delete singleBindBase.lineHeight; // no live variable for Body — literal only
           const singleLitBase = { ...litBase, lineHeight: singleLineHeight };
           texts.push({
-            name: coreLabel ? `${voice}/${stepSlug}/${coreLabel}-single •` : `${voice}/${stepSlug}-single`,
+            name: styleNameFor(voice, step, { label: coreLabel, single: true, core: true }),
             voice, step,
             bind: { ...singleBindBase, ...(coreStyleName ? { fontStyle: `weight-style/${coreKey}` } : { fontWeight: `weight/${coreKey}` }) },
             literal: { ...singleLitBase, ...(coreStyleName ? { styleName: coreStyleName } : {}) },
@@ -223,7 +262,7 @@ export function stylePlans({ families = [], scale = null, include = {} } = {}) {
             const wvStyleName = siblingStyleName(coreStyleName, coreWeightName, wv.name);
             const wvLabel = (labelFor(wv.weight) || wv.name).toLowerCase();
             texts.push({
-              name: `${voice}/${stepSlug}/${wvLabel}-single`,
+              name: styleNameFor(voice, step, { label: wvLabel, single: true }),
               voice, step,
               bind: { ...singleBindBase, ...(coreStyleName ? { fontStyle: `weight-style/${kv}/${wv.slug}` } : { fontWeight: `weight/${kv}/${wv.slug}` }) },
               literal: { ...singleLitBase, styleName: wvStyleName, weight: wv.weight },

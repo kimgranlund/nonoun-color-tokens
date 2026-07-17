@@ -5,7 +5,7 @@
 // semantic color vars; typeTokensFigmaModes/Primitives for the type vars) — so a drift in
 // either the planner or the emitters turns the gate red, whichever moved.
 import { readFileSync } from "node:fs";
-import { stylePlans, styleGroupOf, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
+import { stylePlans, styleGroupOf, styleNameFor, paintStyleNameFor, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
 import { exportUI3 } from "../../src/engine/exports.js";
 import { typeScale, typeTokensFigmaModes, typeTokensFigmaPrimitives, siblingWeightDefaults, weightNameFor, coreWeightKey } from "../../src/engine/type.mjs";
 
@@ -45,12 +45,22 @@ const plans = stylePlans({ families, scale });
   ok(styleGroupOf("scrimWeakest") === "scrims/" && styleGroupOf("scrim") === "scrims/", "scrim* roles group under scrims/");
   ok(styleGroupOf("surface") === "surfaces/" && styleGroupOf("surfaceBright") === "surfaces/" && styleGroupOf("containerHover") === "surfaces/", "surface*/container* roles group under surfaces/");
   ok(styleGroupOf("onPrimary") === "" && styleGroupOf("outline") === "" && styleGroupOf("onSurface") === "", "on-colors/outlines/on-surface stay flat (onSurface is an on-color, not a surface)");
+  // golden literals for the formatters THEMSELVES (independent of the plan) — the plan-derived
+  // assertions below compare against these same functions, which would otherwise make them
+  // tautological to a regression in the assembly (separator, family ordering) inside the formatter.
+  ok(paintStyleNameFor("Primary", "scrim") === "Primary/scrims/scrim", "paintStyleNameFor assembles Family/group/key verbatim (scrim)");
+  ok(paintStyleNameFor("Primary", "onPrimary") === "Primary/onPrimary", "paintStyleNameFor assembles Family/key verbatim when the group is flat");
+  ok(styleNameFor("Display", "MD", { label: "heavy", core: true }) === "Display/md/heavy •", "styleNameFor assembles Voice/step/label • verbatim");
+  ok(styleNameFor("Kicker", "MD") === "Kicker/md", "styleNameFor assembles the bare Voice/step shape verbatim");
+  ok(styleNameFor("UI-control", "MD", { label: "regular", single: true, core: true }) === "UI-control/md/regular-single •", "styleNameFor assembles the -single core shape verbatim");
+  // every paint name is asserted against paintStyleNameFor — TKT-0025's single-sourced formatter —
+  // rather than a hand-duplicated literal, so a drift in the planner's OWN naming call shows up here.
   const p = plans.paints.find((x) => x.varName === "primary/scrim");
-  ok(p && p.name === "Primary/scrims/scrim", `scrim style name: ${p && p.name}`);
+  ok(p && p.name === paintStyleNameFor("Primary", "scrim"), `scrim style name: ${p && p.name}`);
   const s = plans.paints.find((x) => x.varName === "primary/surface-bright");
-  ok(s && s.name === "Primary/surfaces/surfaceBright", `surface style name: ${s && s.name}`);
+  ok(s && s.name === paintStyleNameFor("Primary", "surfaceBright"), `surface style name: ${s && s.name}`);
   const o = plans.paints.find((x) => x.varName === "primary/on-primary");
-  ok(o && o.name === "Primary/onPrimary", `flat style name: ${o && o.name}`);
+  ok(o && o.name === paintStyleNameFor("Primary", "onPrimary"), `flat style name: ${o && o.name}`);
 }
 
 // ── text parity: every bind target exists in the merged Geometry (type/ half) or Font Primitives collections ──
@@ -76,12 +86,14 @@ const plans = stylePlans({ families, scale });
   ok(!core, "the Display core carries its styleName (set in this fixture)");
   // Display's siblings (siblingWeightDefaults(700) around a custom-named 700 core): 500/600/700/800 —
   // 4 distinct weights, rank 0..3 map 1:1 onto Lighter/Light/Heavy/Heavier. Core (700) ranks 3rd → "heavy".
-  const coreNamed = plans.texts.find((t) => t.name === "Display/md/heavy •");
+  // every expected name below is built via styleNameFor — TKT-0025's single-sourced formatter —
+  // rather than a hand-duplicated literal, so a drift in the planner's OWN naming call shows up here.
+  const coreNamed = plans.texts.find((t) => t.name === styleNameFor("Display", "MD", { label: "heavy", core: true }));
   ok(!!coreNamed && coreNamed.literal.styleName === "Bold Condensed" && coreNamed.bind.fontStyle === "weight-style/display/bold" && coreNamed.bind.fontWeight === undefined, "core style (WITH siblings + a custom style name): Voice/step/• {relative label, by rank}, literal.styleName keeps the real templated name + casing, ONLY fontStyle binds (nested under the core's own weight-name slug) — fontWeight stays unbound so real Figma's closest-valid-weight snap can never override the named cut");
   // siblings: 800 ranks heaviest (4th) → "heavier"; 600 ranks 2nd → "light"; 500 ranks lightest → "lighter".
-  const sib800 = plans.texts.find((t) => t.name === "Display/md/heavier");
-  const sib600 = plans.texts.find((t) => t.name === "Display/md/light");
-  const sib500 = plans.texts.find((t) => t.name === "Display/md/lighter");
+  const sib800 = plans.texts.find((t) => t.name === styleNameFor("Display", "MD", { label: "heavier" }));
+  const sib600 = plans.texts.find((t) => t.name === styleNameFor("Display", "MD", { label: "light" }));
+  const sib500 = plans.texts.find((t) => t.name === styleNameFor("Display", "MD", { label: "lighter" }));
   ok(!!sib800 && sib800.literal.weight === 800 && sib800.literal.styleName === "Extra-bold Condensed" && sib800.bind.fontStyle === "weight-style/display/extra-bold" && sib800.bind.fontWeight === undefined, `sibling style: Voice/step/{relative label} with fontStyle keyed on the plain slug — fontWeight stays unbound (same reasoning as the core) — no dot prefix, only the core gets one (got weight ${sib800 && sib800.literal.weight}, styleName ${sib800 && sib800.literal.styleName})`);
   ok(!!sib600 && sib600.literal.weight === 600 && sib600.literal.styleName === "Semi-bold Condensed", `a MIDDLE-rank sibling gets "light", not "heavy" (got weight ${sib600 && sib600.literal.weight}, styleName ${sib600 && sib600.literal.styleName})`);
   // the literal.styleName must still follow the core's custom naming convention (full templated name,
@@ -94,9 +106,9 @@ const plans = stylePlans({ families, scale });
   // Body is a BODY_CLASS_VOICE (2026-07-13, at request): its vocabulary is Regular/Bolder/Boldest, not
   // Lighter/Light/Heavy/Heavier — core (440, lighter of the two) ranks "regular"; the sibling (600)
   // ranks "boldest" (2 total ⇒ the two extremes of the 3-word scale, skipping "Bolder").
-  const bodyCore = plans.texts.find((t) => t.name === "Body/md/regular •");
+  const bodyCore = plans.texts.find((t) => t.name === styleNameFor("Body", "MD", { label: "regular", core: true }));
   ok(!!bodyCore, "Body core (WITH a sibling) also carries its own dot-prefixed relative label, lowercase");
-  const bodySib = plans.texts.find((t) => t.name === "Body/md/boldest");
+  const bodySib = plans.texts.find((t) => t.name === styleNameFor("Body", "MD", { label: "boldest" }));
   ok(!!bodySib && bodySib.literal.weight === 600, "Body sibling present with its weight, relative-labeled");
   // AUTO-POPULATE (2026-07-13): a voice with NO explicit weights config (Headline, here) still gets 3
   // siblings from siblingWeightDefaults on its own resolved core weight — dot-prefixed core included.
@@ -105,7 +117,7 @@ const plans = stylePlans({ families, scale });
   ok(headlineSibs.some((t) => t.name.includes(" •")), "the auto-populated core is ALSO dot-prefixed, same as an explicitly-configured one");
   // the ONE remaining bare path: a voice that explicitly opts OUT via weights:[] (Kicker, here).
   const bareCore = plans.texts.find((t) => t.voice === "Kicker" && t.step === "MD");
-  ok(!!bareCore && bareCore.name === "Kicker/md", "a voice that explicitly opts OUT (weights:[]) keeps the bare Voice/step name — the only way to still get one");
+  ok(!!bareCore && bareCore.name === styleNameFor("Kicker", "MD"), "a voice that explicitly opts OUT (weights:[]) keeps the bare Voice/step name — the only way to still get one");
   // the relative label is INDEPENDENT of styleName templating entirely now — even when a custom name
   // shares NO matchable weight word with the core (siblingStyleName's own fallback path, still exercised
   // for the LITERAL), the sibling's DISPLAY LABEL still resolves cleanly by rank (no "fallback to a bare
@@ -114,7 +126,7 @@ const plans = stylePlans({ families, scale });
     const noTemplateScale = typeScale({ treatment: "product", voices: { Headline: { styleName: "Brand Grotesk", weights: [{ name: "Medium", weight: 500 }] } } });
     const noTemplatePlans = stylePlans({ families, scale: noTemplateScale });
     // 2 distinct weights (core + 1 sibling): sibling (500) is the lighter of the two → "lighter".
-    const fallbackSib = noTemplatePlans.texts.find((t) => t.name === "Headline/md/lighter");
+    const fallbackSib = noTemplatePlans.texts.find((t) => t.name === styleNameFor("Headline", "MD", { label: "lighter" }));
     ok(!!fallbackSib && fallbackSib.literal.styleName === "Medium", `no matchable weight word in the custom name ⇒ literal.styleName still falls back to the sibling's own bare name, but the LABEL resolves by rank regardless (got ${fallbackSib && fallbackSib.literal.styleName})`);
   }
   ok(plans.texts.every((t) => /^[A-Za-z-]+\/[a-z0-9]+(\/[a-z0-9 -]+)?(-single)?( •)?$/.test(t.name)), "every text style name is Voice/lowerstep[/lower-kebab-slug OR relative-label OR /• relative-label][-single suffix on the leaf]");
@@ -149,19 +161,19 @@ const plans = stylePlans({ families, scale });
   // (they're BOX voices); the retired Body*/Label* voices emit NO -single style at all.
   const labelScale = typeScale({ treatment: "product" });
   const labelPlans = stylePlans({ families, scale: labelScale });
-  const ucSingle = labelPlans.texts.find((t) => t.name === "UI-control/md/regular-single •");
+  const ucSingle = labelPlans.texts.find((t) => t.name === styleNameFor("UI-control", "MD", { label: "regular", single: true, core: true }));
   ok(!!ucSingle && ucSingle.bind.lineHeight === "type/ui-control/md/single-line-height", "UI-control's -single style BINDS live to its real singleLineHeight variable (a box voice)");
-  const uwSingle = labelPlans.texts.find((t) => t.name === "UI-widget/md/regular-single •");
+  const uwSingle = labelPlans.texts.find((t) => t.name === styleNameFor("UI-widget", "MD", { label: "regular", single: true, core: true }));
   ok(!!uwSingle && uwSingle.bind.lineHeight === "type/ui-widget/md/single-line-height", "UI-widget's -single style BINDS live to its real singleLineHeight variable");
   ok(!labelPlans.texts.some((t) => /-single/.test(t.name) && ["Body", "Body-mono", "Label", "Label-mono"].includes(t.voice)), "the Body*/Label* -single variants are RETIRED (2026-07-16) — none emitted");
   // sibling weights get the SAME -single suffix, flat next to their own multi-line style (the exact ask:
   // every configured sibling gets its own "-single" variant, not just the core).
-  const ucBolderSingle = labelPlans.texts.find((t) => t.name === "UI-control/md/bolder-single");
+  const ucBolderSingle = labelPlans.texts.find((t) => t.name === styleNameFor("UI-control", "MD", { label: "bolder", single: true }));
   ok(!!ucBolderSingle, "UI-control's sibling weight carries its own -single variant, not just the core");
   // BODY_CLASS_VOICES auto-populate ONLY 2 siblings (never 3) — both heavier than the core, never
   // lighter, matching the Regular/Bolder/Boldest progression's one-directional meaning.
-  const labelBolder = labelPlans.texts.find((t) => t.name === "Label/md/bolder");
-  const labelBoldest = labelPlans.texts.find((t) => t.name === "Label/md/boldest");
+  const labelBolder = labelPlans.texts.find((t) => t.name === styleNameFor("Label", "MD", { label: "bolder" }));
+  const labelBoldest = labelPlans.texts.find((t) => t.name === styleNameFor("Label", "MD", { label: "boldest" }));
   ok(!!labelBolder && !!labelBoldest && labelBolder.literal.weight > labelScale.categories.Label.MD.weight && labelBoldest.literal.weight > labelBolder.literal.weight, `Label auto-populates exactly 2 siblings, BOTH heavier than the core (core ${labelScale.categories.Label.MD.weight}, got ${labelBolder && labelBolder.literal.weight}/${labelBoldest && labelBoldest.literal.weight})`);
   ok(!labelPlans.texts.some((t) => t.voice === "Label" && t.step === "MD" && /^Label\/md\/(lighter|light|heavy|heavier)(-single)?$/.test(t.name)), "Label (a BODY_CLASS_VOICE) never uses the Lighter/Light/Heavy/Heavier vocabulary");
 }

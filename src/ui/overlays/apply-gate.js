@@ -2,9 +2,8 @@ import { figmaCollectionNames, slug } from "../model.mjs";
 import { serialize } from "../persist.js";
 import { typeTokensFigmaModes, typeTokensFigmaPrimitives } from "../../engine/type.mjs";
 import { geomTokensFigmaModes } from "../../engine/geometry.mjs";
-import { applyRenameMigrations, mergeModeInterchanges, modeApplyPlan, validateModeInterchange } from "../../../figma/binder/mode-apply-plan.mjs";
+import { applyRenameMigrations, mergeModeInterchanges, modeApplyPlan, retirementsFor, validateModeInterchange } from "../../../figma/binder/mode-apply-plan.mjs";
 import { FIGMA_MIGRATIONS, kebabWaveColorRenames, kebabWaveVarRenames } from "../../../figma/binder/migrations.mjs";
-import { COLLECTIONS } from "../../engine/collections.js";
 import { primitivesApplyPlan, stylePlans } from "../../../figma/binder/style-plan.mjs";
 import { icon } from "../icons.js";
 import { REPO_URL, btn, h, swatch } from "../app-helpers.mjs";
@@ -212,12 +211,10 @@ export class ApplyGateMixinImpl {
         const waveVars = kebabWaveVarRenames(p.variables.map((v) => v.name));
         if (Object.keys(waveVars).length) p.renames = { ...waveVars, ...(p.renames || {}) };
       }
-      // the merged shape supersedes the two-collection era's moded "Typography" collection — mark it for
-      // executor retirement (registry-tracked only) whenever this apply actually lands type/ variables.
-      for (const p of plans) {
-        if (p.collection === COLLECTIONS.breakpoints && p.variables.some((v) => typeof v.name === "string" && v.name.startsWith("type/"))) p.retire = ["Typography"];
-      }
-      return plans;
+      // TKT-0018: the TKT-0009 retirement rule (the merged Breakpoints collection supersedes the old
+      // two-collection era's "Typography" once it actually lands type/ variables) is pure + unit-tested
+      // in mode-apply-plan.mjs — see FIGMA_MIGRATIONS.floats.retire for the declarative rule.
+      return retirementsFor(plans, FIGMA_MIGRATIONS.floats);
     } catch { return []; }
   }
 

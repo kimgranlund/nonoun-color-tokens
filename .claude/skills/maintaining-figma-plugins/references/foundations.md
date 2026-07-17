@@ -57,11 +57,14 @@ centralises this grammar identically to `bind-plan.mjs#targetName`. (Note: the s
 — `"{n}/{r.key}"`, e.g. `"primary/primaryDim"` — distinct from `bind-plan.mjs`'s `bindingPlan` which names
 its `semanticVar` as `"{n}{r.suffix}"`, e.g. `"primary-dim"`; both forms describe the same role.)
 
-### 4. Role-table parity — the hardcoded copy (owned by `adding-semantic-roles`)
+### 4. Role-table parity — the generated copy (owned by `adding-semantic-roles`)
 
-The Figma VM can't `import` the `.mjs`, so the binder's `roleTable(n)` is a **literal second copy** of
-`semanticRoles(n)`. The pure, importable source of truth is `figma/binder/bind-plan.mjs`, which imports
-`semanticRoles` + `refKey` from `src/engine/semantic.js` and exposes:
+The Figma VM can't `import` the `.mjs`, so the binder's `roleTable(n)` is a **second copy** of
+`semanticRoles(n)` baked into `code.js` — since TKT-0019, GENERATED (`scripts/gen-figma-binder-code.mjs`
+splices `semanticRoles()`'s function body verbatim between `// === GENERATED:ROLE_TABLE ===` markers at
+`npm test`/`npm run build` time), not hand-typed. Never hand-edit inside those markers. The pure,
+importable source of truth is `figma/binder/bind-plan.mjs`, which imports `semanticRoles` + `refKey` from
+`src/engine/semantic.js` and exposes:
 
 - `bindingTargets(names)` → de-duped, sorted set of every `"{n}/{refKey(ref)}"` target the binder aliases.
 - `bindingPlan(names)` → one `{semanticVar, lightTarget, darkTarget}` per (palette, role), length
@@ -72,9 +75,12 @@ The `parity` gate (`test/figma/binder.mjs`) loads `roleTable` straight out of `c
 top-level `main();` call, evals via `new Function`) and, per default palette, deep-equal-compares its FULL
 role objects — `{key, suffix, light, dark}`, in ORDER — against `src/engine/semantic.js`'s `semanticRoles(n)`
 (TKT-0027; widened from a derived-ref-name-set diff, which could miss a `key`/`suffix` typo that still
-pointed at the right ref). A row count mismatch (a role present in one copy but not the other) now flags as
-loudly as a drifted ref or a mis-copied `key`/`suffix` — still add the binder row by discipline per
-`adding-semantic-roles` step 4 (this skill does not re-own that procedure), but a slip is no longer silent.
+pointed at the right ref). Since roleTable is now generated (TKT-0019), this gate is mostly a TRIPWIRE
+proving the splice ran and landed correctly (a stale build or a hand-edit inside the GENERATED markers) —
+but a full-object, in-order compare is still the right shape for that tripwire: a row count mismatch
+flags as loudly as a drifted ref or a corrupted `key`/`suffix`. A role addition is still an
+`adding-semantic-roles` task (edit `semantic.js`, then regenerate — this skill does not re-own that
+procedure), and a slip is no longer silent either way.
 The separate `bindings` gate checks something different: that `bindingTargets(NAMES)` never names a raw
 target outside the canonical raw-colors name set (no dangling `"{n}/50"`), and that `bindingPlan`'s length
 is `rolesPerPalette` × palette names. (Its summary line — `checked N binding targets vs M canonical

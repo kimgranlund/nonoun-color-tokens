@@ -36,9 +36,13 @@ The conceptual model — *why* aliasing is the only thing giving a live raw→se
    AC-P3). No `fetch` / `XMLHttpRequest` / `WebSocket` / dynamic `import()`. This is *why* the app's fonts are
    base64-embedded in `ui.html` — there is no CDN. A network call is a hard gate failure, not a style choice.
 2. **The sandbox can't import `.mjs`.** Figma plugin code runs in a non-module VM, so the standalone binder's
-   `code.js` **HARDCODES** `roleTable(n)` — a verbatim copy of `semanticRoles(n)`. `figma/binder/bind-plan.mjs`
-   is the pure, importable planner the verifier tests; `code.js` mirrors it. They MUST stay in lockstep
-   (`adding-semantic-roles` step 4 owns the edit; the parity gate is in `references/foundations.md` §3/§4).
+   `code.js` carries `roleTable(n)` baked in — since TKT-0019, GENERATED (spliced verbatim from
+   `semanticRoles(n)`'s own function body by `scripts/gen-figma-binder-code.mjs`, between the
+   `// === GENERATED:ROLE_TABLE ===` markers) rather than hand-typed — a verbatim copy either way.
+   `figma/binder/bind-plan.mjs` is the pure, importable planner the verifier tests; `code.js` mirrors it.
+   Never hand-edit inside the GENERATED markers; regenerate instead (`npm test`/`npm run build` do this
+   for you). They MUST stay in lockstep (`adding-semantic-roles` step 4 owns the edit; the parity gate is
+   in `references/foundations.md` §3/§4).
 3. **The VM is jsvm-cpp, not modern V8.** Optional catch binding (`catch {` with no param, ES2019) PARSE-fails
    in Figma yet loads fine in Node — so a `node --check` (and the verifier's own `new Function` load) won't
    catch it. **Always write `catch (e) {`.** Both plugins follow this as a PRACTICE; the static guard is a
@@ -93,8 +97,11 @@ Sibling weights: `doc.type.voices[v].weights`, edited in the per-voice panel (Su
    bug is the binder's `missing` list (a raw target absent — check pad3 + scrim grammar). An "apply did
    nothing / duplicated" bug is the app's `applyBundle`.
 2. **If the role set changed**, this is an `adding-semantic-roles` task — the binder's `roleTable(n)` is one
-   of its parity sites. Do NOT hand-edit the role rows here in isolation; follow that skill's lockstep so the
-   answer key, the `.mjs` planner, the count literals, and this copy all move together.
+   of its parity sites, but since TKT-0019 it is GENERATED — never hand-edit the rows inside the
+   `// === GENERATED:ROLE_TABLE ===` markers (a regenerate overwrites them, and a hand-edit there is
+   invisible to the source of truth). Edit `semantic.js` per that skill's lockstep, then run
+   `scripts/gen-figma-binder-code.mjs` (or `npm test`/`npm run build`, which run it for you) so the answer
+   key, the `.mjs` planner, the count literals, and this copy all move together.
 3. **Keep it offline + VM-safe.** No network API; `catch (e) {` not `catch {`; no raw error in `figma.notify`;
    no remote `import()`. (The app verifier also requires the `ui.html` bridge — `figma-init` / `pluginMessage`
    / `figmaBundle` / `config-loaded`→`applyLoadedConfig` / `variables-read`→`receiveLiveVariables`.)

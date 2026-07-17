@@ -142,8 +142,64 @@ token** (generated in the app) is the documented fallback for any client that ca
   type, geometry, name) → KV `kit:<kitId>`; the metadata row (owner, name, updatedAt) → D1.
 - **Active kit:** the app marks one kit "active for MCP" (or all are exposed via `list_kits`). Single-brand
   users get their one kit; agencies/Studio scope with the `kit` arg.
-- **Conflict/versioning:** last-write-wins per kit (a single owner editing); store `updatedAt`. Multi-device
-  concurrent edits are out of scope for v1 (note it).
+- **Conflict/versioning:** governed by `storage-and-sync-spec.md` (SPEC-R15/R16) — LWW on `(version,
+  updatedAt, ownerRef)`, the losing write preserved as a recoverable conflict copy, never silently
+  discarded; multi-device concurrent edits **are** handled there (superseding this bullet's earlier
+  "out of scope for v1" note, written before that spec existed).
+- **First sync of a pre-existing local kit:** see §6a — `kit_id` is the client-minted id the kit already
+  carries from creation, not something the server assigns at sync time.
+
+---
+
+## 6a. First-sync identity: what `kit_id` *is*, and the conflict rule
+
+*(TKT-0029 — closes the gap: §8's `kits` table listed `kit_id` with no stated origin, leaving undefined
+whether a pre-existing local kit's first sync mints a fresh id, needs a client-side id to correlate
+against, or resolves a name collision against an existing hosted kit.)*
+
+- **Rule: `kit_id` is not server-minted — it's the doc id `storage-and-sync-spec.md` already mints
+  client-side.** That spec's `DocEnvelope.id` (§5.1: "stable doc id (client-minted UUID)") is assigned the
+  moment a kit is *created*, locally, before any account or sync exists for it — a `"brand-kit"`-typed doc
+  under that spec's `type` field. `kits.kit_id` (§8) **is that same id**, not a second identity system
+  layered on top: the D1 `kits` row is MCP-serving metadata (`name`, `active`, `updated_at`) keyed by the
+  id the doc already carries. §8 therefore needs no separate client-side-identifier column — there is
+  nothing to correlate. (Don't invent a parallel mint-vs-correlate mechanism here — this reuses the one
+  `storage-and-sync-spec.md` already decided. This holds regardless of which v1 push channel carries the
+  bytes — §6's `POST /api/kits/<kitId>` or the sibling spec's `/sync/push` `Mutation`; the id in the path
+  / `docId` is the same client-minted id either way. Which channel is canonical, and who resolves
+  `brandKit(doc, systems)` server-side if it's the latter, is the sibling spec's LLD to settle — not a
+  second decision this section needs to make.)
+- **What "first sync" actually is, then:** not an identity-assignment event — just the first push (a
+  `POST /api/kits/<kitId>`, or a `storage-and-sync-spec.md` §5.1 `Mutation`) whose id the server hasn't
+  seen before. The server creates the `kits` row + `kit:<kitId>` KV blob keyed by that id on first push,
+  exactly as SPEC-R2 already describes for any doc's first sync trigger (export / hosted-MCP use /
+  sign-in) — a kit new to the server is the ordinary case that mechanism handles, not a special one this
+  spec needs its own rule for.
+- **Cross-owner id collision (tenant isolation, ties to §9 Security):** a client-minted id is a string the
+  server did not choose, so "first push for this id" MUST also bind the id to its first-seen owner — a
+  later push presenting the same `kit_id` under a **different** account is rejected (`404`/not-found, no
+  existence leak — the same posture as `storage-and-sync-spec.md`'s SPEC-R20 owner isolation), never
+  treated as "the same kit, new owner." §9's "`kitId`s are unguessable" now cuts both ways: the server no
+  longer just *hands out* an unguessable id, it must *validate* that an incoming one is UUID-shaped before
+  accepting it as a KV/D1 key — rejecting anything else (including a legacy `set-<ts36>` id, see below)
+  forces a client-side re-mint rather than admitting a weak, guessable key into the shared namespace.
+- **Conflict rule: identity is the id, never the name.** `kits.name` (§8) carries no uniqueness constraint
+  and is not part of identity — two kits named "Brand" with different `kit_id`s are simply two different
+  kits; a first sync never needs to detect or resolve a name match, because a name was never a candidate
+  identity in the first place. A *real* conflict — two writes to the **same** `kit_id` that diverge — is
+  exactly SPEC-R15/R16's job (LWW + conflict copy; non-clobbering pull per SPEC-R16), not a first-sync-
+  specific case: the same-id path is identical whether it's a kit's 1st push or its 400th.
+- **What this means for today's local model:** `src/ui/app.js`'s local `sets` array already assigns each
+  saved set a locally-generated id — `newSet` (`app-helpers.mjs`, the primary creation path): a 7-char
+  `Math.random().toString(36)` slice; the config-import and first-run-seed paths: `"set-" +
+  Date.now().toString(36)`. Both are the *shape* `storage-and-sync-spec.md`'s doc id generalizes, but not
+  its *strength*: neither is the unguessable id (comparable to the ≥128-bit anonymous device id, §4.2)
+  that a value serving as a cross-account KV/D1 primary key must be. Upgrading these to real client-minted
+  UUIDs is a **one-time, local, pre-sync re-mint** — Phase A/B implementation work for the storage-and-sync
+  build, done before a kit is ever pushed — not a translation step the server performs at sync time and
+  not a new decision this spec needs to make: it's already what `DocEnvelope.id`'s contract calls for. (An
+  existing local kit whose id is never upgraded simply gets rejected on its first push per the id-format
+  check above, forcing the one-time re-mint then, at latest.)
 
 ---
 
@@ -170,7 +226,7 @@ needed — it de-risks everything downstream by locking the surface first.
 | `sessions` | `session_id` · `user_id` · `expires_at` |
 | `accounts` | `account_id` · `owner_user_id` · `name` (personal or Studio team) |
 | `account_members` | `account_id` · `user_id` · `role` (for Studio seats) |
-| `kits` | `kit_id` · `account_id` · `name` · `active` · `updated_at` (blob is in KV) |
+| `kits` | `kit_id` (the client-minted doc id — see §6a) · `account_id` · `name` · `active` · `updated_at` (blob is in KV) |
 | `ls_subscriptions` | `email` · `ls_subscription_id` · `status` · `variant` (Pro/Studio) · `current_period_end` |
 
 Entitlement(account) = join `accounts → users.email → ls_subscriptions` (active + unexpired). OAuth
@@ -228,7 +284,7 @@ access/refresh tokens are managed by `workers-oauth-provider` (its own KV/DO sto
 |---|---|---|---|
 | **A. Core + parity** | extract `mcp/brand-kit-core.mjs`; stdio server reuses it; parity test | repo only | `npm test` (new `mcp/core` verifier) |
 | **B. Accounts + email** | D1 users/sessions/magic_links; `/auth/start` + `/auth/verify`; Resend | `worker/` | Worker integration tests (mock email) |
-| **C. Kit sync** | `/api/kits/*`; KV blobs + D1 metadata; the `_kitSync` seam (stubbed in tests) | `worker/`, app seam | sync round-trip test |
+| **C. Kit sync** | `/api/kits/*`; KV blobs + D1 metadata; the `_kitSync` seam (stubbed in tests); `kit_id` = the client-minted doc id (§6a) | `worker/`, app seam | sync round-trip test |
 | **D. The authed MCP** | `workers-oauth-provider` + `McpAgent` serving the account's kits (`list_kits` + `kit` arg) | `worker/` | an OAuth-capable MCP client smoke; parity vs the core |
 | **E. App integration** | sign-in UI + sync + the hosted-MCP panel; **un-block `hostedMcp`**; LS webhook → entitlement | `src/main.ts`, `app.js`, `flags.js`, `worker/` | headless `(hm)` leg (seam stubs) + offline-bundle guard |
 | **F. Studio + hardening** | team accounts/members; revocation; rate-limit; PAT fallback; manage UI | `worker/`, app | webhook/revocation + team-access tests |

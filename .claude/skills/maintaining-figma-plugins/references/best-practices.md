@@ -33,12 +33,13 @@ The non-obvious do/don'ts (each cost a real bug or a review cycle), then a worke
   actual raw var names before touching `roleTable`.
 - **Don't hand-pad or hand-build a target.** Always go through `refKey(ref)` / `targetName(n, ref)`. Hand-built
   strings drift; `refKey` is the single normaliser shared with the semantic layer and `bind-plan.mjs`.
-- **A role change is an `adding-semantic-roles` task, not a one-off binder edit.** The binder's `roleTable(n)`
-  is ONE parity site of nine. Editing it alone leaves the answer key, `bind-plan.mjs`, and the count literals
-  drifted. Follow that skill's lockstep. The `parity` gate now deep-equal-compares FULL role objects
-  (`{key, suffix, light, dark}`, in order) against `semantic.js` (TKT-0027), so a row added to one copy but
-  not the other flags loudly as a length mismatch — but still add the binder row by discipline, per that
-  skill's step 4, rather than leaning on the gate to catch an omission after the fact.
+- **A role change is an `adding-semantic-roles` task, not a one-off binder edit.** `roleTable(n)` is GENERATED
+  since TKT-0019 (spliced from `semanticRoles()`'s body — never hand-edit inside its
+  `// === GENERATED:ROLE_TABLE ===` markers), so editing `semantic.js` and regenerating is what reaches it;
+  there is no separate `code.js` row to hand-add anymore. It's still ONE parity site of nine, though: the
+  answer key, `bind-plan.mjs`, and the count literals need the same lockstep. The `parity` gate deep-equal-
+  compares FULL role objects (`{key, suffix, light, dark}`, in order) against `semantic.js` directly
+  (TKT-0027), so a forgotten regenerate now flags loudly as a length or per-field mismatch.
 
 ### The app apply path
 

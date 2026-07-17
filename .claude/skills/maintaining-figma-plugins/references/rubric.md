@@ -23,9 +23,9 @@ binder's `offline`.
 | F8 | Bundle freshness | [gate] | (app path) `figma/plugin/ui.html` regenerated via `npm run gen:figma-ui`; the `ui` gate passes (embeds `<ultimate-tokens>` + the figma-init/pluginMessage/figmaBundle/config-loaded/variables-read bridge); `ui.html` not hand-edited | 1: stale/hand-edited `ui.html`, `ui` gate red · 3: regenerated, passes · 5: passes + the round-trip bridges (config + drift) all present |
 
 **Gate to ship:** F1, F2, F3, F4 must each score ≥ 3 (and F8 for an app-path change). A plugin change that
-goes online (F1), uses `catch {` the Figma VM rejects (F2), drifts the hardcoded `roleTable` from
-`bind-plan` (F3), or leaks a raw error to the user (F4) is not done regardless of how the logic reads — these
-are the four that ship a *broken-in-Figma* plugin past a green Node run.
+goes online (F1), uses `catch {` the Figma VM rejects (F2), drifts the generated `roleTable` from
+`semantic.js` (F3), or leaks a raw error to the user (F4) is not done regardless of how the logic reads —
+these are the four that ship a *broken-in-Figma* plugin past a green Node run.
 
 **Top failure to look for first:** a syntax/parity break that Node hides — a `catch {` (F2) or a drifted
 `roleTable` ref (F3) both pass a casual local check yet break in the sandbox or silently skip a variable.

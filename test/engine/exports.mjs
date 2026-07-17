@@ -216,8 +216,34 @@ if (!/--c-[a-z0-9-]+-key-dominant:\s*oklch\(/.test(kcss)) FAIL("keycolors", "dom
 if (!/--c-[a-z0-9-]+-key-supportive:\s*oklch\(/.test(kcss)) FAIL("keycolors", "supportive key token (oklch) missing");
 const kp = X.exportJSON(withKey)[ALL[0].name.toLowerCase()]; // ADR-016: JSON keys by slug
 if (!kp.keyColors || kp.keyColors.length !== 2 || kp.keyColors[0].role !== "dominant" || !Array.isArray(kp.keyColors[0].oklch) || kp.keyColors[0].oklch.length !== 3) FAIL("keycolors", "JSON keyColors block missing/wrong");
+// derivePalette's internal `rgb` (added for DTCG/UI3, TKT-0022) must not leak into JSON's own {role,oklch,name?} shape
+if ("rgb" in kp.keyColors[0]) FAIL("keycolors", "JSON keyColors leaf leaked the internal rgb field");
 // a palette with no key colors emits no key tokens (opt-in only)
 if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present when none set");
+
+// TKT-0022 — key colors must ALSO surface in DTCG (raw tree's key/ group, mirroring scrim/) and UI3
+// (raw/{n}/key/{role} primitives): they exported fine via CSS/JSON but were silently absent from the
+// two "standards path" formats, with no ADR fencing the omission (checked decision-records.md — none
+// exists). Treated as a bug, not a documented exception.
+const slug0 = ALL[0].name.toLowerCase();
+const kdtcg = X.exportDTCG(withKey)["palette.tokens.json"][slug0];
+if (!kdtcg || !kdtcg.key || !kdtcg.key.dominant || !kdtcg.key.supportive) FAIL("keycolors-dtcg", "DTCG raw tree missing key/ group for a keyColors palette");
+else {
+  for (const role of ["dominant", "supportive"]) {
+    const leaf = kdtcg.key[role];
+    if (!leaf || leaf.$type !== "color" || !leaf.$value || leaf.$value.colorSpace !== "srgb" || leaf.$value.alpha !== 1) FAIL("keycolors-dtcg", `key/${role} not a well-formed, opaque (frac=1) color leaf`);
+  }
+}
+// absent when the palette sets no key colors (opt-in only, same rule as CSS)
+const noKeyDtcg = X.exportDTCG(C(ALL))["palette.tokens.json"][slug0];
+if (noKeyDtcg && noKeyDtcg.key) FAIL("keycolors-dtcg", "DTCG key/ group present when no keyColors set");
+
+const kui3 = X.exportUI3(withKey);
+const primVars = kui3.collections["Color Primitives"].variables;
+if (!primVars[`raw/${slug0}/key/dominant`] || primVars[`raw/${slug0}/key/dominant`].type !== "COLOR" || !primVars[`raw/${slug0}/key/dominant`].values.Base) FAIL("keycolors-ui3", "UI3 raw/{n}/key/dominant missing or malformed");
+if (!primVars[`raw/${slug0}/key/supportive`]) FAIL("keycolors-ui3", "UI3 raw/{n}/key/supportive missing");
+const noKeyUi3 = X.exportUI3(C(ALL)).collections["Color Primitives"].variables;
+if (Object.keys(noKeyUi3).some((k) => k.startsWith(`raw/${slug0}/key/`))) FAIL("keycolors-ui3", "UI3 key/ variables present when no keyColors set");
 
 // ── hpg-export-design-system (the LLM design-system bundle: DESIGN.md universal-dialect core + tokens.json
 // + @dsCard previews + README receipt). The engine gate runs the ported §8 verifier (ds-gates.js) on the
@@ -551,7 +577,7 @@ if (X.exportCSS(C(ALL)).includes("-key-")) FAIL("keycolors", "key tokens present
 
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────────────
-for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn", "keycolors", "design-system", "design-system-stitch", "design-system-make"]) {
+for (const g of ["dtcg-shape", "leaf-valid", "resolved", "css-resolves", "padding", "disabled-palette", "nonempty", "tailwind", "shadcn", "keycolors", "keycolors-dtcg", "keycolors-ui3", "design-system", "design-system-stitch", "design-system-make"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }

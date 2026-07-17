@@ -9,6 +9,7 @@ import * as MAP from "../../figma/binder/mode-apply-plan.mjs";
 import * as TYPE from "../../src/engine/type.mjs";
 import * as GEOM from "../../src/engine/geometry.mjs";
 import { semanticRoles } from "../../src/engine/semantic.js";
+import { extractFunctionSource } from "../../figma/binder/splice-utils.mjs";
 
 const HERE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "figma", "binder"); // the binder lives in figma/binder/
 const RT = JSON.parse(readFileSync(new URL("../../docs/reference/data/role-table.json", import.meta.url), "utf8"));
@@ -68,7 +69,7 @@ const FLOAT_ANCHOR = 'JSON.parse("[]"); /* __ULTIMATE_TOKENS_FLOAT_PLANS__ */';
 // auto-invoke is stripped first: left in place it fires the moment the source loads (this file's `main`
 // is not message-driven like the flagship plugin — it just runs), which would EITHER race an explicit
 // call made afterward on the same mock figma (double-creating collections) OR — when no figma is passed
-// at all (the roleTable/refKey-only PARITY GUARD below) — throw an orphaned, unhandled rejection that
+// at all (the roleTable-only PARITY GUARD below) — throw an orphaned, unhandled rejection that
 // prints console noise once a later `await` in this script gives the microtask queue a chance to flush it.
 function loadBinder(src, figma) {
   const controlled = src.replace(/\nmain\(\)\.catch\([\s\S]*$/, "");
@@ -77,22 +78,24 @@ function loadBinder(src, figma) {
   return fn(figma, "<html>", undefined);
 }
 
-// ── PARITY GUARD: the runtime code.js HARDCODES roleTable() (the Figma sandbox can't import the
-//    .mjs), so it's a second, independently hand-typed copy of the engine's role table that
-//    `node --check` can't catch drifting. Load it (without running main()) and deep-equal-compare
-//    its FULL role objects — {key, suffix, light, dark}, in ORDER, per default palette — against
-//    src/engine/semantic.js's semanticRoles(n), the canonical in-repo table. This is the
-//    engine <-> Figma-binder leg of the role table's 3-impl identity; role-table.json's own
-//    identity with semantic.js (also full-object, key+suffix+light+dark) is a SEPARATE gate,
-//    `refs-canonical` in test/engine/semantic.mjs — the two gates together give transitive
-//    identity across all three implementations.
-//    A derived-ref-name-set diff (the previous shape of this gate) only proves every ref the
-//    binder emits resolves to a real raw-colors target — it CANNOT catch a `key` or `suffix`
-//    typo that happens to keep pointing at the same ref (e.g. a mis-copied semantic variable
-//    name), nor a role dropped from one copy whose refs are already produced by another role.
-//    Full-object, in-order comparison catches both: a length mismatch flags a missing/extra row,
-//    and a per-field mismatch flags a `key`/`suffix` drift even when `light`/`dark` still match.
-//    (Real incident 2026-06-18: the scrim refs drifted here.) ──
+// ── PARITY GUARD: the checked-in code.js's roleTable() is GENERATED (TKT-0019) — spliced verbatim
+//    from src/engine/semantic.js's semanticRoles() function body by scripts/gen-figma-binder-code.mjs
+//    — so this gate is now a TRIPWIRE proving the splice actually landed correctly (a stale build, a
+//    hand-edit inside the `// === GENERATED:ROLE_TABLE ===` markers, or a splice-script bug), not the
+//    mechanism preventing drift the way it was before TKT-0019 (mirrors the `floatparity` gate below,
+//    which plays the same tripwire role for the spliced float-executor functions).
+//    Load the runtime code.js (without running main()) and deep-equal-compare its FULL role objects —
+//    {key, suffix, light, dark}, in ORDER, per default palette — against semantic.js's semanticRoles(n)
+//    directly. This is the engine <-> Figma-binder leg of the role table's 3-impl identity;
+//    role-table.json's own identity with semantic.js (also full-object, key+suffix+light+dark) is a
+//    SEPARATE gate, `refs-canonical` in test/engine/semantic.mjs — the two gates together give
+//    transitive identity across all three implementations.
+//    A derived-ref-name-set diff (the previous shape of this gate, pre-TKT-0027) only proves every ref
+//    resolves to a real raw-colors target — it CANNOT catch a `key` or `suffix` corruption that keeps
+//    pointing at the same ref, nor a role missing from one side whose refs are already produced by
+//    another role. Full-object, in-order comparison catches both: a length mismatch flags a
+//    missing/extra row, and a per-field mismatch flags a `key`/`suffix` drift even when `light`/`dark`
+//    still match. (Real incident 2026-06-18, pre-splice: the scrim refs drifted here.) ──
 try {
   const src = readFileSync(BINDER_PATH, "utf8");
   const { roleTable } = loadBinder(src, undefined);
@@ -239,22 +242,18 @@ if (!/applyFloatPlans/.test(binderSrc)) FAIL("floatanchor", "code.js has no appl
 {
   const FLAGSHIP_PATH = join(HERE, "..", "plugin", "code.js");
   const FLOAT_FNS = ["readFloatRegistry", "writeFloatRegistry", "ensureFloatCollection", "varsByName", "applyFloatPlans"];
-  const extractFn = (src, name) => {
-    const m = new RegExp("(?:async\\s+)?function\\s+" + name + "\\s*\\([^)]*\\)\\s*\\{").exec(src);
-    if (!m) return null;
-    let depth = 0, i = src.indexOf("{", m.index);
-    for (; i < src.length; i++) { if (src[i] === "{") depth++; else if (src[i] === "}" && --depth === 0) { i++; break; } }
-    return src.slice(m.index, i);
-  };
+  // extractFunctionSource is the SAME brace-matched extraction scripts/gen-figma-binder-code.mjs uses
+  // to splice these functions into the binder (TKT-0019) — shared from splice-utils.mjs so the
+  // generator and this tripwire can never quietly disagree on what "the same function" means.
   const norm = (code) => code.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ").trim();
   const keyLit = (src) => (/FLOAT_REGISTRY_KEY\s*=\s*("[^"]*")/.exec(src) || [])[1];
   try {
     const flagSrc = readFileSync(FLAGSHIP_PATH, "utf8");
     for (const fn of FLOAT_FNS) {
-      const a = extractFn(binderSrc, fn), b = extractFn(flagSrc, fn);
+      const a = extractFunctionSource(binderSrc, fn), b = extractFunctionSource(flagSrc, fn);
       if (!a) { FAIL("floatparity", `binder is missing ${fn}()`); continue; }
       if (!b) { FAIL("floatparity", `flagship is missing ${fn}()`); continue; }
-      if (norm(a) !== norm(b)) FAIL("floatparity", `${fn}() body drifted between the binder and the flagship (executor copies must stay byte-identical)`);
+      if (norm(a) !== norm(b)) FAIL("floatparity", `${fn}() body drifted between the binder and the flagship (executor copies must stay byte-identical — regenerate with scripts/gen-figma-binder-code.mjs)`);
     }
     if (!keyLit(binderSrc) || keyLit(binderSrc) !== keyLit(flagSrc)) FAIL("floatparity", `FLOAT_REGISTRY_KEY literal differs (binder ${keyLit(binderSrc)} vs flagship ${keyLit(flagSrc)}) — the two would not converge on one collection set`);
   } catch (e) { FAIL("floatparity", "could not load/compare the flagship executor: " + e.message); }

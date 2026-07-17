@@ -16,6 +16,12 @@
 // target is refKey() of a ref from that table (solid stop -> pad3 "050"; scrim base 250/500/750
 // with alpha% = step/10 -> "{base}-{step}" verbatim), every emitted "{n}/{refKey}" is a member of
 // the canonical raw-colors name set — no unpadded "{n}/50", no out-of-range "{n}/500-999".
+//
+// GENERATED SECTIONS (TKT-0019): the two "// === GENERATED:... ===" blocks below (the five
+// float-executor functions + roleTable()) are SPLICED from their canonical sources at build time by
+// scripts/gen-figma-binder-code.mjs (npm test / npm run build run it as gen:figma-binder-code) — not
+// hand-copied. Regenerate: `node scripts/gen-figma-binder-code.mjs`. Never hand-edit inside a marker
+// pair; edit the canonical source (figma/plugin/code.js or src/engine/semantic.js) and regenerate.
 
 const RAW_COLLECTION = "Color Primitives";
 const SEMANTIC_COLLECTION = "Color Semantic"; // ADR-016 (was "Color Modes")
@@ -47,23 +53,20 @@ const FLOAT_PLANS = JSON.parse("[]"); /* __ULTIMATE_TOKENS_FLOAT_PLANS__ */
 const FLOAT_REGISTRY_KEY = "ultimate-tokens-float-collections";
 
 // MIRRORS figma/plugin/code.js's float executor: readFloatRegistry/writeFloatRegistry/
-// ensureFloatCollection/varsByName/applyFloatPlans are ported VERBATIM — a pure DATA executor (no
-// planner to spec-gate against), using only figma.variables.* + figma.root.get/setPluginData, both
-// available to any plugin (no color-specific state). The executable bodies MUST stay byte-identical to
-// the flagship (the surrounding comments may differ); the `floatparity` gate in test/figma/binder.mjs
-// enforces it by comparing comment-stripped bodies, so running both converges on ONE collection set.
+// ensureFloatCollection/varsByName/applyFloatPlans — a pure DATA executor (no planner to spec-gate
+// against), using only figma.variables.* + figma.root.get/setPluginData, both available to any plugin
+// (no color-specific state). GENERATED (see the file-header note) — the `floatparity` gate in
+// test/figma/binder.mjs is now a TRIPWIRE proving the splice landed byte-identical, not the mechanism
+// keeping the two copies in lockstep.
+// === GENERATED:FLOAT_EXECUTOR START ===
 function readFloatRegistry() {
   const raw = figma.root.getPluginData(FLOAT_REGISTRY_KEY);
   if (!raw) return {};
   try { const r = JSON.parse(raw); return r && typeof r === "object" ? r : {}; } catch (e) { return {}; }
 }
+
 function writeFloatRegistry(reg) { figma.root.setPluginData(FLOAT_REGISTRY_KEY, JSON.stringify(reg)); }
 
-// ensureFloatCollection — OUR managed Type/Geometry collection for `name`, by PROVENANCE (the registry's
-// stored id), creating + registering it if absent. Unlike ensureCollection (color, below), it NEVER
-// adopts a same-named collection it didn't create — so applyFloatPlans' rename/prune can't ever hit a
-// user's own "Typography"/"Geometry". A user manual-rename survives (we track id, not name); a
-// user-deleted one is re-created. `reg` is mutated in place; the caller persists it once via writeFloatRegistry.
 async function ensureFloatCollection(name, reg, renameFrom) {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const known = reg[name] && cols.find((c) => c.id === reg[name]);
@@ -89,13 +92,6 @@ async function varsByName(collectionId) {
   return m;
 }
 
-// applyFloatPlans — execute the UI-computed apply PLANS that figma/binder/mode-apply-plan.mjs produces
-// (one entry per collection: { collection, modes, defaultMode:"Base", addModes, variables:[{name,type,
-// values:[{mode,value}]}] }). The plan is pure DATA the UI already ran validateModeInterchange + ordering
-// over, so this stays a thin EXECUTOR — there is no planner to inline or parity-gate (unlike the color
-// cascade above, which mirrors the role table). Idempotent: collections, modes, and variables are
-// reconciled BY NAME and stale ones pruned, so re-applying after a breakpoint/voice change converges the
-// file to exactly the current plan (never doubling, never leaving a removed breakpoint's mode behind).
 async function applyFloatPlans(plans) {
   let collections = 0, variables = 0;
   const reg = readFloatRegistry(); // provenance: only ever touch a collection this plugin created (see ensureFloatCollection)
@@ -137,7 +133,10 @@ async function applyFloatPlans(plans) {
       byName[v.name] = vr; current.add(v.name); variables++;
     }
     for (const name of Object.keys(byName)) if (!current.has(name)) byName[name].remove();
-    // retire — collections THIS plan supersedes (plan.retire; TKT-0009, see the flagship's comment).
+    // retire — collections THIS plan supersedes (plan.retire; TKT-0009: the pre-merge "Typography"
+    // moded collection, now folded into "Geometry" as the type/ group): registry-tracked ONLY
+    // (provenance — never a user's own same-named collection), removed with their variables. Styles
+    // re-bind to the merged targets in the SAME apply run (applyStylePlans executes after this).
     for (const nm of (Array.isArray(plan.retire) ? plan.retire : [])) {
       if (!reg[nm]) continue;
       const cols = await figma.variables.getLocalVariableCollectionsAsync();
@@ -150,6 +149,7 @@ async function applyFloatPlans(plans) {
   writeFloatRegistry(reg); // persist the name→id provenance map (any newly-created collections)
   return { collections: collections, variables: variables };
 }
+// === GENERATED:FLOAT_EXECUTOR END ===
 
 // refKey: mirror of semantic.js refPath / bind-plan.mjs targetName (ADR-016). Solid stops zero-pad
 // to 3 digits ("50" -> "050"); scrim refs NEST — "500-200" -> "scrim/200" (the canonical 500 base is
@@ -163,106 +163,151 @@ function refKey(ref) {
   return (base === "500" ? "scrim/" : "scrim/" + base.padStart(3, "0") + "/") + step;
 }
 
-// roleTable(n) — the 53 roles for a palette, name-substituted exactly as semantic.js /
-// bind-plan.mjs produce them: accent + on-accent keys carry the palette name; shared roles do
-// not. Refs are the canonical values from data/role-table.json (validated semantic-mapping).
-// The semantic variable name is "{n}/{kebab leaf}" (suffix-derived, ADR-016); `light`/`dark` feed targetName.
-function roleTable(n) {
-  const N = n.charAt(0).toUpperCase() + n.slice(1);
-  return [
-    // 1. ACCENT — name-prefixed; prime role has empty suffix.
-    { key: n, suffix: "", light: "550", dark: "450" },
-    { key: n + "Dim", suffix: "-dim", light: "650", dark: "700" },
-    { key: n + "Bright", suffix: "-bright", light: "350", dark: "400" },
-    { key: n + "Low", suffix: "-low", light: "350", dark: "700" },
-    { key: n + "High", suffix: "-high", light: "650", dark: "400" },
+// roleTable(paletteName) — the 53 roles for a palette, name-substituted exactly as semantic.js /
+// bind-plan.mjs produce them: accent + on-accent keys carry the palette name; shared roles do not.
+// GENERATED (see the file-header note): this is src/engine/semantic.js's semanticRoles() function BODY,
+// spliced verbatim by scripts/gen-figma-binder-code.mjs and re-wrapped under this name — the row shape
+// ({key,suffix,light,dark}) is identical, so there is nothing to reimplement, only re-wrap.
+// === GENERATED:ROLE_TABLE START ===
+const SCRIM_STRENGTH_STEPS = [50, 100, 200, 300, 400, 500, 600];
+const SCRIM_SUFFIXES = [
+  '-scrim-weakest',
+  '-scrim-weaker',
+  '-scrim-weak',
+  '-scrim',
+  '-scrim-strong',
+  '-scrim-stronger',
+  '-scrim-strongest',
+];
+const SCRIM_KEYS = [
+  'scrimWeakest',
+  'scrimWeaker',
+  'scrimWeak',
+  'scrim',
+  'scrimStrong',
+  'scrimStronger',
+  'scrimStrongest',
+];
 
-    // 1b. ACCENT INTERACTION STATES — hover/active are prime ±1/±2 steps (mode-mirrored); disabled a
-    //     translucent wash of the palette's 500 at 60% (no neutral primitive in the per-palette ref model). Lockstep w/ semantic.js.
-    { key: n + "Hover", suffix: "-hover", light: "650", dark: "350" },
-    { key: n + "Active", suffix: "-active", light: "750", dark: "250" },
-    { key: n + "Disabled", suffix: "-disabled", light: "500-600", dark: "500-600" },
+function roleTable(paletteName) {
+  const n = paletteName;
+  const N = paletteName.charAt(0).toUpperCase() + paletteName.slice(1);
 
-    // 2. ON-ACCENT — name-prefixed; fixed to the light end in BOTH modes (OD-001).
-    { key: "on" + N, suffix: "-on-" + n, light: "50", dark: "50" },
-    { key: "on" + N + "Variant", suffix: "-on-" + n + "-variant", light: "200", dark: "200" },
+  const roles = [];
+  const role = (key, suffix, light, dark) =>
+    roles.push({ key, suffix, light, dark });
 
-    // 2b. ON-ACCENT INTERACTION STATES — hover/active track the base on-color; disabled is a translucent
-    //     inert label (opts out of the contrast guarantee). Lockstep w/ semantic.js.
-    { key: "on" + N + "Hover", suffix: "-on-" + n + "-hover", light: "50", dark: "50" },
-    { key: "on" + N + "Active", suffix: "-on-" + n + "-active", light: "50", dark: "50" },
-    { key: "on" + N + "Disabled", suffix: "-on-" + n + "-disabled", light: "500-400", dark: "500-400" },
+  // 1. ACCENT — name-prefixed keys; suffix builds --c-{n}{suffix}.
+  //    Prime role has empty suffix => --c-{n}. Refs are raw solid stops.
+  role(`${n}`, '', '550', '450'); // prime: 550 light / 450 dark
+  role(`${n}Dim`, '-dim', '650', '700');
+  role(`${n}Bright`, '-bright', '350', '400');
+  role(`${n}Low`, '-low', '350', '700');
+  role(`${n}High`, '-high', '650', '400');
 
-    // 3. ON-SURFACE — shared.
-    { key: "onSurface", suffix: "-on-surface", light: "950", dark: "50" },
-    { key: "onSurfaceVariant", suffix: "-on-surface-variant", light: "750", dark: "250" },
+  // 1b. ACCENT INTERACTION STATES — tonal offsets along the palette's own ramp, so they stay in-gamut
+  //     and consistent across every palette for free. Emphasis grows by DARKENING on light surfaces and
+  //     LIGHTENING on dark (mode-mirrored): hover = prime ±1 step, active = prime ±2 (same direction, so
+  //     pressed reads "more" than hover). DISABLED is NOT a tonal sibling — there is no neutral/desaturate
+  //     primitive in the per-palette ref model, so it is a translucent wash of the palette's own 500 at 60%
+  //     (a mid-alpha scrim reads clearly inert without vanishing on any surface; light === dark, like outline/container).
+  role(`${n}Hover`, '-hover', '650', '350'); // prime +1 step toward emphasis (darker light / lighter dark)
+  role(`${n}Active`, '-active', '750', '250'); // prime +2 steps — pressed is "more" than hover
+  role(`${n}Disabled`, '-disabled', '500-600', '500-600'); // 60% wash — inert but legible, mode-independent
 
-    // 3b. ON-SURFACE INTERACTION STATES — shared. onSurface holds at the ceiling (950/50); disabled a
-    //     translucent inert label on the 500 ramp. onSurfaceVariant carries NO states. Lockstep w/ semantic.js.
-    { key: "onSurfaceHover", suffix: "-on-surface-hover", light: "950", dark: "50" },
-    { key: "onSurfaceActive", suffix: "-on-surface-active", light: "950", dark: "50" },
-    { key: "onSurfaceDisabled", suffix: "-on-surface-disabled", light: "500-400", dark: "500-400" },
+  // 2. ON-ACCENT — name-prefixed; fixed to the light end in BOTH modes (OD-001).
+  role(`on${N}`, `-on-${n}`, '50', '50');
+  role(`on${N}Variant`, `-on-${n}-variant`, '200', '200');
 
-    // placeholder — field placeholder text: one mirrored step MORE muted than onSurfaceVariant (650/350);
-    // a SOLID stop (translucent placeholder text is the classic a11y failure), fixed per mode.
-    { key: "placeholder", suffix: "-placeholder", light: "650", dark: "350" },
+  // 2b. ON-ACCENT INTERACTION STATES — the label color on each state fill. Hover/Active TRACK the base
+  //     on-color (the same fixed light end by default; applyOnColorContrast re-points them against their
+  //     OWN state fill — 650/350 hover, 750/250 active — in "contrast" mode). DISABLED deliberately opts
+  //     OUT of the contrast guarantee: a translucent label over the faint fill, intentionally sub-4.5:1
+  //     so the control reads inert.
+  role(`on${N}Hover`, `-on-${n}-hover`, '50', '50');
+  role(`on${N}Active`, `-on-${n}-active`, '50', '50');
+  role(`on${N}Disabled`, `-on-${n}-disabled`, '500-400', '500-400'); // translucent inert label
 
-    // 4. OUTLINE — shared; on the 500 scrim ramp (light === dark).
-    { key: "outline", suffix: "-outline", light: "500-600", dark: "500-600" },
-    { key: "outlineVariant", suffix: "-outline-variant", light: "500-300", dark: "500-300" }, // no interaction states
+  // 3. ON-SURFACE — shared keys (NOT name-prefixed).
+  role('onSurface', '-on-surface', '950', '50');
+  role('onSurfaceVariant', '-on-surface-variant', '750', '250');
 
-    // 4b. OUTLINE INTERACTION STATES — one strength stronger per state; disabled a faint border.
-    //     outlineVariant (the weaker divider) carries NONE. Lockstep w/ semantic.js.
-    { key: "outlineHover", suffix: "-outline-hover", light: "500-700", dark: "500-700" },
-    { key: "outlineActive", suffix: "-outline-active", light: "500-800", dark: "500-800" },
-    { key: "outlineDisabled", suffix: "-outline-disabled", light: "500-400", dark: "500-400" },
+  // 3b. ON-SURFACE INTERACTION STATES — shared. onSurface sits at the contrast CEILING at rest (950/50),
+  //     so hover/active HOLD there (no stronger solid stop exists; the emphasis is carried by the surface/
+  //     container behind the text, like on-accent hover/active). DISABLED is a translucent inert label on
+  //     the 500 ramp (opts out of the contrast guarantee). onSurfaceVariant (the secondary-text tier)
+  //     carries NO interaction states — a per-state secondary-text role earns little, so its emphasis is a
+  //     `hover:`/`active:` opacity modifier on the base role, not a distinct token.
+  role('onSurfaceHover', '-on-surface-hover', '950', '50');
+  role('onSurfaceActive', '-on-surface-active', '950', '50');
+  role('onSurfaceDisabled', '-on-surface-disabled', '500-400', '500-400'); // translucent inert label
 
-    // 5. CONTAINER — shared; on the 500 scrim ramp (light === dark).
-    { key: "container", suffix: "-container", light: "500-200", dark: "500-200" },
-    { key: "containerLow", suffix: "-container-low", light: "500-100", dark: "500-100" },
-    { key: "containerHigh", suffix: "-container-high", light: "500-300", dark: "500-300" },
+  // placeholder — input/field placeholder text: one mirrored step MORE muted than onSurfaceVariant
+  // (650/350 vs 750/250), so it reads as a secondary hint yet still clears a legibility floor against the
+  // field surface. A SOLID stop, NOT a translucent wash — translucent placeholder text is the classic a11y
+  // failure. Like the other on-surface text it is fixed per mode (it is not contrast-repointed).
+  role('placeholder', '-placeholder', '650', '350');
 
-    // 5b. CONTAINER INTERACTION STATES — one strength stronger per state; disabled the faintest.
-    { key: "containerHover", suffix: "-container-hover", light: "500-300", dark: "500-300" },
-    { key: "containerActive", suffix: "-container-active", light: "500-400", dark: "500-400" },
-    { key: "containerDisabled", suffix: "-container-disabled", light: "500-100", dark: "500-100" },
+  // 4. OUTLINE — shared; on the 500 scrim ramp (light === dark).
+  role('outline', '-outline', '500-600', '500-600');
+  role('outlineVariant', '-outline-variant', '500-300', '500-300'); // the weaker divider — NO interaction states (see 4b)
 
-    // 6. INVERSE — shared.
-    { key: "inverseSurface", suffix: "-inverse-surface", light: "900", dark: "100" },
-    { key: "inverseOnSurface", suffix: "-inverse-on-surface", light: "50", dark: "950" },
+  // 4b. OUTLINE INTERACTION STATES — shared; one strength stronger per state (hover +1, active +2 on the
+  //     500 ramp), disabled a faint border. Mode-independent like the base outline. outlineVariant (the
+  //     weaker divider) carries NONE — a divider rarely needs per-state role tokens; when it does, a
+  //     `hover:`/`active:` opacity modifier on the base outlineVariant covers it.
+  role('outlineHover', '-outline-hover', '500-700', '500-700');
+  role('outlineActive', '-outline-active', '500-800', '500-800');
+  role('outlineDisabled', '-outline-disabled', '500-400', '500-400'); // 40% — the disabled content tier (matches on-surface/label), still receding below the 60% resting outline
 
-    // 7. SURFACE — shared base surfaces.
-    { key: "background", suffix: "-background", light: "100", dark: "900" },
-    { key: "surface", suffix: "-surface", light: "125", dark: "875" },
+  // 5. CONTAINER — shared; on the 500 scrim ramp (light === dark).
+  role('container', '-container', '500-200', '500-200');
+  role('containerLow', '-container-low', '500-100', '500-100');
+  role('containerHigh', '-container-high', '500-300', '500-300');
 
-    // 8. SURFACE DIM/BRIGHT — shared; non-mirror.
-    { key: "surfaceDimmest", suffix: "-surface-dimmest", light: "200", dark: "950" },
-    { key: "surfaceDimmer", suffix: "-surface-dimmer", light: "175", dark: "925" },
-    { key: "surfaceDim", suffix: "-surface-dim", light: "150", dark: "900" },
-    { key: "surfaceBright", suffix: "-surface-bright", light: "100", dark: "850" },
-    { key: "surfaceBrighter", suffix: "-surface-brighter", light: "75", dark: "825" },
-    { key: "surfaceBrightest", suffix: "-surface-brightest", light: "50", dark: "800" },
+  // 5b. CONTAINER INTERACTION STATES — shared; one strength stronger per state (hover +1, active +2),
+  //     disabled the faintest. Mode-independent like the base container.
+  role('containerHover', '-container-hover', '500-300', '500-300');
+  role('containerActive', '-container-active', '500-400', '500-400');
+  role('containerDisabled', '-container-disabled', '500-100', '500-100');
 
-    // 9. SURFACE LOW/HIGH — shared; mirror (sum 1000).
-    { key: "surfaceLowest", suffix: "-surface-lowest", light: "50", dark: "950" },
-    { key: "surfaceLower", suffix: "-surface-lower", light: "75", dark: "925" },
-    { key: "surfaceLow", suffix: "-surface-low", light: "100", dark: "900" },
-    { key: "surfaceHigh", suffix: "-surface-high", light: "150", dark: "850" },
-    { key: "surfaceHigher", suffix: "-surface-higher", light: "175", dark: "825" },
-    { key: "surfaceHighest", suffix: "-surface-highest", light: "200", dark: "800" },
+  // 6. INVERSE — shared.
+  role('inverseSurface', '-inverse-surface', '900', '100');
+  role('inverseOnSurface', '-inverse-on-surface', '50', '950');
 
-    // 10. SCRIM — shared; 7 strengths on the 500 ramp (alpha% = step/10), mode-independent.
-    //     Listed LAST (mirrors semantic.js) so the bound variables group regular → containers →
-    //     surfaces → scrims. Sequential 5–60%: weakest..strongest = 50/100/200/300/400/500/600.
-    { key: "scrimWeakest", suffix: "-scrim-weakest", light: "500-050", dark: "500-050" },
-    { key: "scrimWeaker", suffix: "-scrim-weaker", light: "500-100", dark: "500-100" },
-    { key: "scrimWeak", suffix: "-scrim-weak", light: "500-200", dark: "500-200" },
-    { key: "scrim", suffix: "-scrim", light: "500-300", dark: "500-300" },
-    { key: "scrimStrong", suffix: "-scrim-strong", light: "500-400", dark: "500-400" },
-    { key: "scrimStronger", suffix: "-scrim-stronger", light: "500-500", dark: "500-500" },
-    { key: "scrimStrongest", suffix: "-scrim-strongest", light: "500-600", dark: "500-600" },
-  ];
+  // 7. SURFACE — shared base surfaces.
+  role('background', '-background', '100', '900');
+  role('surface', '-surface', '125', '875');
+
+  // 8. SURFACE DIM/BRIGHT — shared; non-mirror (light+dark do NOT sum to 1000).
+  //    Same direction in both modes: a "dim" surface is a darker stop in both.
+  role('surfaceDimmest', '-surface-dimmest', '200', '950');
+  role('surfaceDimmer', '-surface-dimmer', '175', '925');
+  role('surfaceDim', '-surface-dim', '150', '900');
+  role('surfaceBright', '-surface-bright', '100', '850');
+  role('surfaceBrighter', '-surface-brighter', '75', '825');
+  role('surfaceBrightest', '-surface-brightest', '50', '800');
+
+  // 9. SURFACE LOW/HIGH — shared; mirror (light+dark sum toward 1000) so
+  //     "lower" reads recessed and "higher" raised regardless of mode.
+  role('surfaceLowest', '-surface-lowest', '50', '950');
+  role('surfaceLower', '-surface-lower', '75', '925');
+  role('surfaceLow', '-surface-low', '100', '900');
+  role('surfaceHigh', '-surface-high', '150', '850');
+  role('surfaceHigher', '-surface-higher', '175', '825');
+  role('surfaceHighest', '-surface-highest', '200', '800');
+
+  // 10. SCRIM — shared; 7 strengths, all on the 500 ramp at alpha% = step/10. Mode-independent
+  //     (light === dark === `500-${pad3(step)}`, e.g. `500-050`). Listed LAST so the emitted token order
+  //     groups as regular colors → containers → surfaces → scrims — a cleaner Figma variable / CSS list.
+  for (let i = 0; i < SCRIM_STRENGTH_STEPS.length; i++) {
+    const ref = `500-${String(SCRIM_STRENGTH_STEPS[i]).padStart(3, '0')}`; // ADR-006 3-digit alpha: 50 -> "050"
+    role(SCRIM_KEYS[i], SCRIM_SUFFIXES[i], ref, ref);
+  }
+
+  return roles;
 }
+// === GENERATED:ROLE_TABLE END ===
 
 // The raw-colors target a ref resolves to: "{n}/{refKey(ref)}" — the load-bearing grammar.
 // Identical to bind-plan.mjs targetName; guarantees membership in the canonical raw name set.
