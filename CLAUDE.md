@@ -37,11 +37,16 @@ Canonical specs + rubrics: `docs/reference/` (e.g. `docs/reference/data/role-tab
   teach agents to use exported kits in THEIR projects (parity-gated against the engine).
 - `docs/reference/` — canonical specs, rubrics, role-table answer key. `docs/marketing/` — the
   marketing corpus (voice platform · pinned fact sheet · store copy · launch kit); author via the
-  `marketing-manager` agent + `ultimate-tokens-brand-voice` skill. `docs/tickets/` — bug/feature work
-  items (`kind: bug`/`kind: feature` TICKETs, minted via scribe's `/bug-report`/`/feature`); routed by
-  the `project-docs` skill. `docs/site/`, `docs/lld/`, `docs/img/` — hosting/licensing specs, one
+  `marketing-manager` agent + `ultimate-tokens-brand-voice` skill. `docs/tickets/` — the
+  pre-2026-07-17 bug/feature archive (`kind: bug`/`kind: feature` TICKETs); routed by the
+  `project-docs` skill. `docs/site/`, `docs/lld/`, `docs/img/` — hosting/licensing specs, one
   architecture doc, and the generated README preview SVG, respectively. `.claude/docs/other/` —
   **PRIVATE** (see below).
+- **Git-native ticket backend (ADR-017).** Bugs/features/issues now route to **GitHub Issues**
+  (`gh issue create`), not new `docs/tickets/*.md` files — labels `kind:bug`/`kind:feature` +
+  `size:small`/`size:big` carry the machine-read fields the file frontmatter used to. Scribe's
+  `/bug-report`/`/feature` read this ruling and mint issues. Migrating the 18 tickets still open
+  as files into Issues is `TKT-0031`.
 
 ## Conventions (non-obvious only)
 
