@@ -416,6 +416,48 @@ Format: Context → Decision → Rationale → Consequences → Status.
   mechanically.
 - **Status.** DECIDED (ratified 2026-07-17; migration execution `TKT-0031`).
 
+## ADR-018 — `role-table.json` stays a hand-kept answer key; only the Figma-sandbox copy generates
+- **Context.** TKT-0019 (#331) proved a splice-at-build-time generator (`scripts/gen-figma-binder-code.mjs`)
+  for the Figma-sandbox binder's (`figma/binder/figma-semantic-binder/code.js`) hand-duplicated
+  executable bodies: the five float-executor functions AND its 53-row role table, both previously
+  hand-copied because Figma's standalone-plugin sandbox cannot `import` a `.mjs` at runtime — the same
+  constraint the `FLOAT_PLANS` download-time anchor already worked around. TKT-0030 (#342) asked whether
+  the same generate-don't-duplicate technique should extend to the *other* two role-table copies:
+  `docs/reference/data/role-table.json` (the hand-edited answer key) and `src/engine/semantic.js`'s
+  `semanticRoles()` (the actual implementation) — "three role-table copies… hand-kept in lockstep behind
+  test gates," per the issue.
+- **Decision.** Partial: TKT-0019's build already collapsed the count from three copies to two — the
+  binder's `roleTable(paletteName)` is now `semanticRoles()`'s function body, spliced verbatim (plus its
+  3 supporting `SCRIM_*` consts), not hand-copied. The remaining pair — `role-table.json` ↔
+  `semantic.js` — is ruled **WONTFIX** for further generation. `role-table.json` continues to be
+  hand-edited exactly as `adding-semantic-roles` already documents (no `gen:role-table` script), and
+  `test/engine/semantic.mjs`'s `refs-canonical` gate keeps deep-equaling `semanticRoles("primary")`
+  against it.
+- **Rationale.** The binder's role table and `role-table.json` are NOT the same shape of problem, even
+  though both are called "duplication" in the issue. The binder's copy existed for a purely TECHNICAL
+  reason (the sandbox import constraint) and carried ZERO independent verification value — it was pure
+  waste, the ideal generation target, and TKT-0019 eliminated it with no loss of any guarantee.
+  `role-table.json` is the opposite: it is a deliberately hand-authored, INDEPENDENT answer key (the
+  test's own comment calls it exactly that — "the canonical primary-palette table (answer key)"), whose
+  entire job is to catch an ACCIDENTAL behavioral change landing directly inside `semanticRoles()` (a
+  mistyped ref, a reordered role, a dropped state). If `role-table.json` were generated FROM
+  `semanticRoles()`, the `refs-canonical` gate becomes tautological — "X deep-equals a copy of
+  itself" — and would pass unconditionally even if `semanticRoles()`'s logic silently regressed, because
+  there would no longer be an INDEPENDENT reference to diff against. This is the same tension ADR-011
+  already ruled on for this exact file (the cam16-hue encoding "looks wrong" but is the deliberate
+  answer-key snapshot) — a second, load-bearing precedent for treating `role-table.json` as a golden
+  master, not a duplicate implementation. The reverse direction (generating `semanticRoles()` FROM
+  `role-table.json`) is not even coherent to attempt: `role-table.json` carries rows for exactly ONE
+  palette name (`"primary"`), while `semanticRoles(paletteName)` is a general, name-parametric function
+  — there is no data in the JSON sufficient to derive the function for any other palette.
+- **Consequences.** `role-table.json` and `semantic.js` continue to move together BY HAND on every
+  role/count change, per `adding-semantic-roles`' existing lockstep procedure — an accepted, ongoing
+  maintenance cost (not a defect), because the human-authored second copy is the feature, not the bug.
+  No test, script, or skill changes; the `refs-canonical` gate is unchanged and remains the drift-catcher
+  it was designed to be. Revisit only if a genuinely NEW, unrelated reason to keep two independently
+  generated copies ever surfaces — no such reason exists today.
+- **Status.** DECIDED (2026-07-17; TKT-0030/#342, informed by TKT-0019/#331's completed build-out).
+
 ## Quick map: decisions an enhancing agent is most likely to "fix" (don't)
 | ADR | Looks wrong because… | But it's intentional because… |
 |-----|----------------------|-------------------------------|
@@ -426,3 +468,4 @@ Format: Context → Decision → Rationale → Consequences → Status.
 | ADR-007 | a real-looking Figma schema isn't imported | the schema is unverified/non-native |
 | ADR-014 | a pre-rename `.fig` loses its embedded config, and no migration was written | `setPluginData` is namespaced per plugin id — the old keys are unreadable from the new id; a migration cannot exist |
 | ADR-015 | the product has no maker, no logo, and support points at an issue tracker | deliberate: the maker brand was retired; `test/repo/branding.mjs` fails the build if it returns |
+| ADR-018 | `role-table.json` isn't generated from `semantic.js` like the Figma binder's role table now is (TKT-0019) | it's a deliberate independent answer key; generating it would make the `refs-canonical` gate tautological |
