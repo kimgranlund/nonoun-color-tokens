@@ -710,7 +710,10 @@ async function applyBundle(dtcg, opts) {
   // assumes exactly two.
   const firstModeId = sem.modes[0].modeId;
   sem.renameMode(firstModeId, themeNames[0]);
-  const modeIdByName = {};
+  // Object.create(null)/Map/Set, not {}/plain-object membership — a data-driven theme NAME (unlike
+  // the engine's own controlled palette/role names elsewhere in this file) could collide with an
+  // inherited Object.prototype key ("constructor", "toString", …) and read back truthy/defined.
+  const modeIdByName = Object.create(null);
   modeIdByName[themeNames[0]] = firstModeId;
   const findSemMode = (nm) => sem.modes.find((m) => m.name === nm);
   for (let i = 1; i < themeNames.length; i++) {
@@ -720,11 +723,10 @@ async function applyBundle(dtcg, opts) {
   }
   // prune stale theme modes (a theme the doc no longer carries) — never the collection's default
   // mode (just renamed above, always in wantedModes), never the last remaining mode.
-  const wantedModes = {};
-  for (const nm of themeNames) wantedModes[nm] = true;
+  const wantedModes = new Set(themeNames);
   for (const m of sem.modes.slice()) {
     if (m.modeId === firstModeId) continue;
-    if (!wantedModes[m.name] && sem.modes.length > 1) sem.removeMode(m.modeId);
+    if (!wantedModes.has(m.name) && sem.modes.length > 1) sem.removeMode(m.modeId);
   }
 
   const semByName = await varsByName(sem.id);
