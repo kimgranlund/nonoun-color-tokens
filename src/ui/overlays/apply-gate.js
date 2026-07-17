@@ -5,6 +5,8 @@ import { geomTokensFigmaModes } from "../../engine/geometry.mjs";
 import { applyRenameMigrations, mergeModeInterchanges, modeApplyPlan, retirementsFor, validateModeInterchange } from "../../../figma/binder/mode-apply-plan.mjs";
 import { FIGMA_MIGRATIONS, kebabWaveColorRenames, kebabWaveVarRenames } from "../../../figma/binder/migrations.mjs";
 import { primitivesApplyPlan, stylePlans } from "../../../figma/binder/style-plan.mjs";
+import { countChangedValues, flattenModePlanValues, flattenPrimitivesPlanValues } from "../../../figma/binder/live-diff.mjs";
+import { COLLECTIONS } from "../../engine/collections.js";
 import { icon } from "../icons.js";
 import { REPO_URL, btn, h, swatch } from "../app-helpers.mjs";
 
@@ -23,6 +25,11 @@ export class ApplyGateMixinImpl {
     this.applyGateRebuild = !!rebuild;
     this.applyGateDontShow = false;
     this.applyGateOpen = true;
+    // TKT-0020: kick off the live Breakpoints/Font Primitives read-back so the gate can show a
+    // changed-value count before the user commits — reset to null (not stale) until the reply lands;
+    // _figmaChangedCount()/renderApplyGate treat null as "still checking", 0 as a real answer.
+    this._liveFloatVars = null;
+    if (this.inFigma) { try { parent.postMessage({ pluginMessage: { type: "read-float-variables" } }, "*"); } catch { /* no frame */ } }
     this.render();
   }
 
@@ -219,6 +226,47 @@ export class ApplyGateMixinImpl {
   }
 
 
+  // receiveLiveFloatVariables — code.js's reply to the read-float-variables request requestApplyToFigma
+  // fires when the gate opens (TKT-0020: the Geometry/Type counterpart to receiveLiveVariables' color
+  // drift read). Stashes the raw per-collection read-back; _figmaChangedCount derives the count the gate
+  // renders. A safe no-op outside the gate (the message simply arrives and re-renders).
+  receiveLiveFloatVariables(m) {
+    this._liveFloatVars = { breakpoints: (m && m.breakpoints) || { found: false, values: {} }, fontPrimitives: (m && m.fontPrimitives) || { found: false, values: {} } };
+    this.render();
+  }
+
+
+  // _figmaChangedCount() — how many LIVE Breakpoints/Font Primitives values the apply the gate is about
+  // to confirm would actually overwrite (collections-arch review C2 / TKT-0020): the SAME plans
+  // applyToFigma is about to POST (_figmaFloatPlans + the Font Primitives plan, filtered by the SAME
+  // exportSystems toggles), diffed against the read-back via the pure figma/binder/live-diff.mjs helpers.
+  // null while the read-back hasn't landed yet (nothing to show); 0 is a real, valid answer (first apply,
+  // or the file is already in sync).
+  _figmaChangedCount() {
+    if (!this._liveFloatVars) return null;
+    const sys = this.exportSystems || {};
+    let n = 0;
+    if (sys.type !== false || sys.geometry !== false) {
+      const bpLive = (this._liveFloatVars.breakpoints || {}).values || {};
+      for (const p of this._figmaFloatPlans()) {
+        if (p.collection !== COLLECTIONS.breakpoints) continue;
+        n += countChangedValues(flattenModePlanValues(p), bpLive);
+      }
+    }
+    // Font Primitives is only ever WRITTEN alongside text styles (applyToFigma sets msg.fontPrimitives
+    // only inside the styles-on branch; code.js only calls applyFontPrimitives when msg.fontPrimitives
+    // is present) — so counting it while Styles is toggled off would over-report values this apply
+    // never touches.
+    if (sys.type !== false && sys.styles !== false) {
+      try {
+        const plan = primitivesApplyPlan(typeTokensFigmaPrimitives(this._typeScaleFor("base")));
+        if (plan) n += countChangedValues(flattenPrimitivesPlanValues(plan), (this._liveFloatVars.fontPrimitives || {}).values || {});
+      } catch { /* a malformed scale never blocks the rest of the count */ }
+    }
+    return n;
+  }
+
+
   // _syncApplyGate — reconcile the gate <dialog> with applyGateOpen (mirrors _syncDrawer/_syncNewPal).
   _syncApplyGate() {
     const d = this.querySelector(".apply-gate");
@@ -263,6 +311,19 @@ export class ApplyGateMixinImpl {
           icon("warning", { size: 16 }),
           h("div", {}, h("b", {}, "Back up your file first."), " Duplicate the file (or the collections) before applying, so you can roll back if a mapping overwrites something you meant to keep."),
         ),
+        // TKT-0020: the Geometry/Type changed-value count (collections-arch review C2) — a hand-tweaked
+        // dimension is invisible today; this surfaces it BEFORE the overwrite, not just after. Figma-only
+        // (the read-back is a plugin message); null while the read-back is still in flight. Suppressed
+        // entirely on a color-only apply (Type AND Geometry both off) — there is nothing Geometry/Type
+        // -shaped for the count to ever mean there. Regroup still carries floatPlans (it only affects
+        // the Color Semantic rebuild flag), so the count is just as relevant there — no rebuild guard.
+        (this.inFigma && ((this.exportSystems || {}).type !== false || (this.exportSystems || {}).geometry !== false)) ? (() => {
+          const n = this._figmaChangedCount();
+          return h("p", { class: "apply-gate-drift" + (n ? " has-changes" : "") },
+            n === null ? "Checking for hand-edited values in this file…"
+              : n > 0 ? `${n} existing Geometry/Type value${n === 1 ? "" : "s"} in this file will be overwritten by this apply.`
+              : "No hand-edited Geometry/Type values found — nothing will be overwritten.");
+        })() : false,
         h("p", { class: "apply-gate-learn" },
           "Re-routing semantic tokens onto existing variables? ",
           h("button", { type: "button", class: "linklike", onclick: () => { try { window.open(MAPPINGS_DOC, "_blank", "noopener"); } catch {} } }, "Learn how mappings work →"),

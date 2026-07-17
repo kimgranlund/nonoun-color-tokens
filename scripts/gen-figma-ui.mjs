@@ -34,6 +34,9 @@ const BRIDGE = `
     if(m.type==="config-loaded"){ var a=app(); if(a&&typeof a.applyLoadedConfig==="function") a.applyLoadedConfig(m.config); }
     // drift diff: code.js read the live raw-colors variables; hand them to the generator to compare.
     if(m.type==="variables-read"){ var b=app(); if(b&&typeof b.receiveLiveVariables==="function") b.receiveLiveVariables(m); }
+    // TKT-0020: the Geometry/Type counterpart — code.js read the live Breakpoints + Font Primitives
+    // variables; hand them to the generator so the apply gate can show a changed-value count.
+    if(m.type==="float-variables-read"){ var v=app(); if(v&&typeof v.receiveLiveFloatVariables==="function") v.receiveLiveFloatVariables(m); }
     // gallery sets: code.js read the user's "Your Palettes" from figma.clientStorage (the localStorage
     // the sandboxed iframe can't persist). Hand them to the generator to restore the gallery.
     if(m.type==="sets-loaded"){ var c=app(); if(c&&typeof c.receiveStoredSets==="function") c.receiveStoredSets(m.sets); }
