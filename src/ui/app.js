@@ -40,7 +40,8 @@ import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.m
 import { typeScale, typeTokensCSS, typeTokensBreakpointCSS, typeTokensDTCG, typeTokensFigmaModes, typeTokensFigmaPrimitives, TYPE_TREATMENTS, DEFAULT_TYPE, BUNDLED_FONTS, genericFor, siblingWeightDefaults, WEIGHT_NAMES, resolvedFontFor } from "../engine/type.mjs";
 import { geomScale, geomTokensCSS, geomTokensBreakpointCSS, geomTokensDTCG, geomTokensFigma, geomTokensFigmaModes, GEOMETRY_TREATMENTS, DEFAULT_GEOMETRY } from "../engine/geometry.mjs";
 import { zipStore } from "./zip.mjs";
-import { modeApplyPlan, validateModeInterchange, mergeModeInterchanges } from "../../figma/binder/mode-apply-plan.mjs";
+import { modeApplyPlan, validateModeInterchange, mergeModeInterchanges, applyRenameMigrations } from "../../figma/binder/mode-apply-plan.mjs";
+import { FIGMA_MIGRATIONS } from "../../figma/binder/migrations.mjs";
 import { stylePlans, primitivesApplyPlan } from "../../figma/binder/style-plan.mjs";
 import { ICON_SYSTEMS, iconSystem, iconSystemById, iconSystemLabel } from "../engine/icon-systems.mjs";
 import { icon } from "./icons.js";
@@ -6048,7 +6049,7 @@ class HctApp extends HTMLElement {
       // system is NOT written to the file. Color omits `dtcg` (code.js then skips the color collections);
       // Type/Geometry are filtered out of floatPlans below. The config embed travels regardless.
       const sys = this.exportSystems || {};
-      const msg = { type: "apply", config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans(), collections: figmaCollectionNames(this.doc) };
+      const msg = { type: "apply", config: serialize(this.doc), rebuildSemantic: !!rebuild, floatPlans: this._figmaFloatPlans(), collections: figmaCollectionNames(this.doc), renames: { color: FIGMA_MIGRATIONS.color } };
       if (sys.color !== false) msg.dtcg = this.figmaBundle();
       // STYLES (opt-out): the swatch layer bound to the variables — paint styles per semantic role
       // (color on), text styles per voice×step×weight (type on). Pure plans (style-plan.mjs); the
@@ -6065,6 +6066,7 @@ class HctApp extends HTMLElement {
         }
         const plans = stylePlans({ families, scale, include: { color: sys.color !== false, type: sys.type !== false } });
         if (plans.paints.length || plans.texts.length) {
+          plans.renames = FIGMA_MIGRATIONS.styles; // TKT-0012: id-preserving style renames (empty = no-op)
           msg.stylePlans = plans;
           if (plans.texts.length) msg.fontPrimitives = primitivesApplyPlan(typeTokensFigmaPrimitives(scale));
         }
@@ -6183,7 +6185,8 @@ class HctApp extends HTMLElement {
     if (!ix) return [];
     try {
       if (validateModeInterchange(ix).length) return [];
-      const plans = modeApplyPlan(ix);
+      // TKT-0012: stamp the active rename maps (id-preserving; empty maps = byte-identical no-op)
+      const plans = applyRenameMigrations(modeApplyPlan(ix), FIGMA_MIGRATIONS.floats);
       // the merged shape supersedes the two-collection era's moded "Typography" collection — mark it for
       // executor retirement (registry-tracked only) whenever this apply actually lands type/ variables.
       for (const p of plans) {

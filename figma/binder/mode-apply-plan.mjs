@@ -16,7 +16,13 @@
 //     modes:      ["Base", <bp>…],     // every mode, in order
 //     defaultMode:"Base",              // the collection's first mode == Figma's default mode (renamed to this)
 //     addModes:   [<bp>…],             // the rest, created with collection.addMode(name)
-//     variables:  [{ name, type, values: [{ mode, value }, …] }]   // name-sorted; one value PER mode, in modes order
+//     variables:  [{ name, type, values: [{ mode, value }, …] }],  // name-sorted; one value PER mode, in modes order
+//     renameFrom?: ["<oldCollectionName>", …],   // TKT-0012: registry keys this collection supersedes —
+//                                                //   the executor adopts the tracked collection BY ID,
+//                                                //   renames it in place, and re-keys the registry
+//     renames?:    { "<oldVarName>": "<newVarName>" },  // TKT-0012: id-preserving variable renames, run
+//                                                //   FIRST so reconcile-by-name never prunes a renamed var
+//     retire?:     ["<collectionName>", …]       // TKT-0009: registry-tracked collections to remove
 //   }]
 //
 // The code.js apply-path (paired-session work) mirrors this verbatim:
@@ -134,4 +140,26 @@ export function validateModeInterchange(interchange) {
     }
   }
   return out;
+}
+
+// applyRenameMigrations(plans, migrations) — stamp the TKT-0012 rename fields onto apply plans, PURE.
+// `migrations.collections` is keyed by the CURRENT (post-migration) collection name:
+//   { "<collection>": { renameFrom?: ["<old collection name>", …], vars?: { "<old>": "<new>" } } }
+// Only plans whose collection matches get stamped; unknown keys are ignored (a migration for a
+// collection this apply doesn't carry is a no-op, never an error). Returns the SAME array for
+// chaining; entries are shallow-copied before stamping so cached planner output is never mutated.
+// THE POINT (collections-arch review, CRITICAL-1): every executor reconciles by name — without a
+// rename-first pass, any rename is a prune+recreate that orphans every consumer binding. This is
+// the one sanctioned channel for renames; every renaming ticket ships its map here.
+export function applyRenameMigrations(plans, migrations) {
+  const cols = migrations && typeof migrations === "object" && migrations.collections;
+  if (!cols || !Array.isArray(plans)) return plans;
+  return plans.map((plan) => {
+    const m = plan && cols[plan.collection];
+    if (!m) return plan;
+    const out = { ...plan };
+    if (Array.isArray(m.renameFrom) && m.renameFrom.length) out.renameFrom = m.renameFrom.slice();
+    if (m.vars && typeof m.vars === "object" && Object.keys(m.vars).length) out.renames = { ...m.vars };
+    return out;
+  });
 }

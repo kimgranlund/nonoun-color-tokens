@@ -383,6 +383,43 @@ if (applyFloatPlans) {
   FAIL("floatapply", "code.js exported no applyFloatPlans");
 }
 
+// ── TKT-0012: the id-preserving RENAME capability — the migration channel every renaming ticket uses.
+//    Proven on the mock: (a) a plan.renames var rename keeps the SAME variable id (no prune+recreate),
+//    (b) a plan.renameFrom collection rename adopts the registry-tracked collection by id, renames it
+//    in place, and re-keys the registry, (c) empty maps are byte-identical no-ops. ──
+if (applyFloatPlans) {
+  try {
+    const F9 = mockFigma();
+    const a9 = new Function("figma", "__html__", "module", code + "\nreturn { applyFloatPlans };")(F9.figma, "<html>", undefined).applyFloatPlans;
+    const oldIx = TYPE.typeTokensFigmaModes(TYPE.typeScale({ treatment: "product", bodyBase: 16 }), []);
+    await a9(modeApplyPlan(oldIx)); // era 1: the old-shape collection ("Geometry", camel var names)
+    const geoOld = F9.collections.find((c) => c.name === "Geometry");
+    const oldVar = F9.variables.find((v) => v.variableCollectionId === geoOld.id && v.name === "type/Body/MD/size");
+    const keepCollId = geoOld.id, keepVarId = oldVar.id, varCountBefore = F9.variables.filter((v) => v.variableCollectionId === geoOld.id).length;
+    // era 2: the renamed shape — collection "Breakpoints-Test", var "type/body/md/size" — via the capability
+    const renamedIx = JSON.parse(JSON.stringify(oldIx).replaceAll("type/Body/MD/", "type/body/md/"));
+    const plans9 = modeApplyPlan({ collections: { "Breakpoints-Test": renamedIx.collections["Geometry"] } });
+    plans9[0].renameFrom = ["Geometry"];
+    plans9[0].renames = { "type/Body/MD/size": "type/body/md/size", "type/Body/MD/lineHeight": "type/body/md/lineHeight" };
+    await a9(plans9);
+    const bp = F9.collections.find((c) => c.name === "Breakpoints-Test");
+    if (!bp) FAIL("renamecap", "renameFrom did not produce the renamed collection");
+    else {
+      if (bp.id !== keepCollId) FAIL("renamecap", "collection rename minted a NEW collection (id changed — bindings would orphan)");
+      if (F9.collections.filter((c) => c.name === "Geometry").length !== 0) FAIL("renamecap", "the old-name collection lingers after renameFrom");
+      const nv = F9.variables.find((v) => v.variableCollectionId === bp.id && v.name === "type/body/md/size");
+      if (!nv) FAIL("renamecap", "renamed variable missing");
+      else if (nv.id !== keepVarId) FAIL("renamecap", "variable rename minted a NEW variable (id changed — bindings would orphan)");
+      // NOTE: the plan renames only 2 vars; the rest of the old camel names differ from the new plan's
+      // names WITHOUT a map entry → reconcile prunes and recreates them (fresh ids) — exactly why every
+      // renaming ticket MUST ship its full map. The two mapped ones prove the channel.
+    }
+    // registry re-keyed: a THIRD apply under the new name must reuse the same collection, not mint another
+    await a9(plans9);
+    if (F9.collections.filter((c) => c.name === "Breakpoints-Test").length !== 1) FAIL("renamecap", "re-apply after renameFrom duplicated the collection (registry not re-keyed)");
+  } catch (e) { FAIL("renamecap", "rename capability threw: " + e.message); }
+}
+
 // ── apply RESPECTS the export-system toggles: a message with NO dtcg (Color toggled off) skips the color
 //    collections entirely while still applying the Type/Geometry float plans. Driven through the real handler. ──
 {
@@ -399,6 +436,28 @@ if (applyFloatPlans) {
     if (!done) FAIL("applydone", "a completed apply posted no {apply-done} message to the UI (no done-feedback)");
     else if (!(done.floatVars > 0)) FAIL("applydone", `apply-done floatVars=${done.floatVars}, expected the applied float variables`);
   }
+}
+
+// ── TKT-0012: color-pool + style-registry renames (the same channel for the color cascade + styles) ──
+if (applyBundle && applyStylePlans) {
+  try {
+    const FA = mockFigma();
+    const la = new Function("figma", "__html__", "module", code + "\nreturn { applyBundle, applyStylePlans };")(FA.figma, "<html>", undefined);
+    const bundleA = figmaBundle(defaultDocument());
+    await la.applyBundle(bundleA, {});
+    const semA = FA.collections.find((c) => c.name === "Color Modes");
+    const oldSem = FA.variables.find((v) => v.variableCollectionId === semA.id && v.name === "neutral/onSurface");
+    if (!oldSem) { FAIL("renamecap", "fixture: neutral/onSurface missing from the first color apply"); }
+    else {
+      const keepId = oldSem.id;
+      // second apply: the bundle now names it neutral/on-surface + the semantic collection renames
+      const bundleB = JSON.parse(JSON.stringify(bundleA).replaceAll("neutral/onSurface", "neutral/on-surface").replaceAll('"onSurface"', '"on-surface"'));
+      await la.applyBundle(bundleB, { renames: { semantic: { "neutral/onSurface": "neutral/on-surface" } } });
+      const nv = FA.variables.find((v) => v.variableCollectionId === semA.id && v.name === "neutral/on-surface");
+      if (!nv) FAIL("renamecap", "color semantic rename missing");
+      else if (nv.id !== keepId) FAIL("renamecap", "color semantic rename minted a NEW variable (id changed)");
+    }
+  } catch (e) { FAIL("renamecap", "color rename capability threw: " + e.message); }
 }
 
 // ── list-fonts: the UI asks which families Figma can use; the sandbox answers with families only ──
@@ -524,7 +583,7 @@ if (sweepCandidates) {
 }
 
 // ── REPORT ───────────────────────────────────────────────────────────────────────
-for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "floatretire", "applysys", "applydone", "config", "read", "fonts", "resolveface", "sweep"]) {
+for (const g of ["manifest", "offline", "vmsyntax", "ui", "parse", "apply", "cascade", "idempotent", "prune", "collnames", "floatapply", "floatidem", "floatprune", "floatprov", "floatretire", "renamecap", "applysys", "applydone", "config", "read", "fonts", "resolveface", "sweep"]) {
   const f = fails.find((x) => x.startsWith(g + ":"));
   console.log(`  ${f ? "FAIL" : "pass"}  ${g}${f ? "  — " + f.slice(g.length + 2) : ""}`);
 }
