@@ -61,6 +61,6 @@ doesn't cover (an unusual offset, a bespoke grid).
 
 - Don't reach for `--space-N` when a `--inset-*`/`--gap-*` names the job — the semantic tier is why
   you don't guess rungs.
-- Don't pad a card with a control's `--size-*-pad` — that's control-internal; a container uses
-  `--inset-*`.
+- Don't pad a card with a control's `--size-*-padding-narrow`/`-padding-wide` — those are
+  control-internal; a container uses `--inset-*`.
 - Don't hardcode `border-radius`/`padding`/`gap` in px.
