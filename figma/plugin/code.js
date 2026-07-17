@@ -96,7 +96,7 @@ figma.ui.onmessage = async (msg) => {
       setCollectionNames(msg.collections);
       // `dtcg` is OMITTED when the Color system is toggled off in the UI — skip the color collections
       // entirely (the existing ones are left untouched, not pruned). Type/Geometry filtering happens UI-side.
-      const r = msg.dtcg ? await applyBundle(msg.dtcg, { rebuildSemantic: !!msg.rebuildSemantic }) : null;
+      const r = msg.dtcg ? await applyBundle(msg.dtcg, { rebuildSemantic: !!msg.rebuildSemantic, renames: msg.renames && msg.renames.color }) : null;
       // Embed the exact params in the file ALONGSIDE the variables, so a later read round-trips
       // losslessly (the variables alone can only seed an approximate hue/chroma).
       if (msg.config) writeConfig(msg.config);
@@ -194,19 +194,36 @@ function aliasTarget(leaf) {
   const ad = leaf && leaf.$extensions && leaf.$extensions["com.figma.aliasData"];
   return ad ? ad.targetVariableName : null;
 }
-async function ensureCollection(name) {
+async function ensureCollection(name, renameFrom) {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  return cols.find((c) => c.name === name) || figma.variables.createVariableCollection(name);
+  const hit = cols.find((c) => c.name === name);
+  if (hit) return hit;
+  // TKT-0012: adopt a collection under a superseded name (id + every binding preserved) — color
+  // collections are name-adopted (no provenance registry yet, TKT-0024), so the rename is by name too.
+  for (const old of (Array.isArray(renameFrom) ? renameFrom : [])) {
+    const prev = cols.find((c) => c.name === old);
+    if (prev) { prev.name = name; return prev; }
+  }
+  return figma.variables.createVariableCollection(name);
 }
 // ensureFloatCollection — OUR managed Type/Geometry collection for `name`, by PROVENANCE (the registry's
 // stored id), creating + registering it if absent. Unlike ensureCollection (color), it NEVER adopts a
 // same-named collection it didn't create — so applyFloatPlans' rename/prune can't ever hit a user's own
 // "Typography"/"Geometry". A user manual-rename survives (we track id, not name); a user-deleted one is
 // re-created. `reg` is mutated in place; the caller persists it once via writeFloatRegistry.
-async function ensureFloatCollection(name, reg) {
+async function ensureFloatCollection(name, reg, renameFrom) {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const known = reg[name] && cols.find((c) => c.id === reg[name]);
   if (known) return known;
+  for (const old of (Array.isArray(renameFrom) ? renameFrom : [])) {
+    const prev = reg[old] && cols.find((c) => c.id === reg[old]);
+    if (prev) {
+      prev.name = name;
+      reg[name] = prev.id;
+      delete reg[old];
+      return prev;
+    }
+  }
   const made = figma.variables.createVariableCollection(name);
   reg[name] = made.id;
   return made;
@@ -392,6 +409,25 @@ function sweepCandidates(knownTextNames, knownPaintNames, localTexts, localPaint
 // and a FLOAT binding on those fields reads as px, which would mis-set them.
 async function applyStylePlans(sp) {
   const out = { paints: 0, texts: 0, pruned: 0, missingVars: 0 };
+  // TKT-0012 — id-preserving STYLE renames: re-key the provenance registry and rename the live style
+  // object BEFORE reconcile, so a renamed style is adopted instead of pruned+recreated (bindings and
+  // any team-library publish identity survive). sp.renames = { paints: {old:new}, texts: {old:new} }.
+  const spRenames = (sp && sp.renames) || {};
+  const regEarly = readStyleRegistry();
+  for (const kind of ["paints", "texts"]) {
+    for (const oldName of Object.keys(spRenames[kind] || {})) {
+      const newName = spRenames[kind][oldName];
+      if (regEarly[kind][oldName] && !regEarly[kind][newName]) {
+        try {
+          const st = await figma.getStyleByIdAsync(regEarly[kind][oldName]);
+          if (st) st.name = newName;
+        } catch (e) { /* style gone — the re-key below still retires the old registry slot */ }
+        regEarly[kind][newName] = regEarly[kind][oldName];
+        delete regEarly[kind][oldName];
+      }
+    }
+  }
+  writeStyleRegistry(regEarly);
   const reg = readStyleRegistry();
 
   // ── paint styles → Color Modes variables ──
@@ -545,18 +581,34 @@ async function applyStylePlans(sp) {
 // re-created fresh and adopts the bundle's (canonical, grouped) variable order. Figma keeps an
 // existing variable's position on update, so a normal apply never reorders; only a fresh collection
 // does. Color Primitives are untouched; bindings to the dropped Color Modes variables detach.
+// TKT-0012 — id-preserving rename pass: `renames` = { "<old>": "<new>" } applied to a varsByName pool
+// BEFORE the reconcile loop, so a renamed variable is adopted (v.name =) instead of pruned+recreated
+// (which would orphan every consumer binding). Skipped when the new name already exists.
+function renameInPool(pool, renames) {
+  for (const oldName of Object.keys(renames || {})) {
+    const newName = renames[oldName];
+    if (pool[oldName] && !pool[newName]) {
+      pool[oldName].name = newName;
+      pool[newName] = pool[oldName];
+      delete pool[oldName];
+    }
+  }
+}
 async function applyBundle(dtcg, opts) {
   opts = opts || {};
+  const renames = opts.renames || {};
+  const collectionRenames = renames.collections || {};
   const rawTree = dtcg && dtcg["palette.tokens.json"];
   const semLight = dtcg && dtcg["Light_tokens.json"];
   const semDark = dtcg && dtcg["Dark_tokens.json"];
   if (!rawTree || !semLight || !semDark) throw new Error("bundle missing palette/Light/Dark files");
 
   // 1) RAW collection — single "Value" mode, one COLOR var per stop/scrim.
-  const raw = await ensureCollection(COLL.raw);
+  const raw = await ensureCollection(COLL.raw, collectionRenames[COLL.raw]);
   raw.renameMode(raw.modes[0].modeId, "Value");
   const rawMode = raw.modes[0].modeId;
   const rawByName = await varsByName(raw.id);
+  renameInPool(rawByName, renames.raw);
   const currentRaw = new Set(); // names this bundle WANTS in Color Primitives — everything else is stale
   let rawCount = 0;
   for (const n of childKeys(rawTree)) {
@@ -576,15 +628,17 @@ async function applyBundle(dtcg, opts) {
   let rebuilt = false;
   if (opts.rebuildSemantic) {
     const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-    const old = cols0.find((c) => c.name === COLL.semantic);
+    const oldNames = [COLL.semantic].concat(Array.isArray(collectionRenames[COLL.semantic]) ? collectionRenames[COLL.semantic] : []);
+    const old = cols0.find((c) => oldNames.includes(c.name));
     if (old) { old.remove(); rebuilt = true; }
   }
-  const sem = await ensureCollection(COLL.semantic);
+  const sem = await ensureCollection(COLL.semantic, collectionRenames[COLL.semantic]);
   const lightMode = sem.modes[0].modeId;
   sem.renameMode(lightMode, "Light");
   const darkMode = (sem.modes[1] && sem.modes[1].modeId) || sem.addMode("Dark");
   if (sem.modes[1]) sem.renameMode(darkMode, "Dark");
   const semByName = await varsByName(sem.id);
+  renameInPool(semByName, renames.semantic);
   const currentSem = new Set(); // names this bundle WANTS in Color Modes — everything else is stale
   let semCount = 0;
   for (const n of childKeys(semLight)) {
@@ -635,7 +689,7 @@ async function applyFloatPlans(plans) {
   const reg = readFloatRegistry(); // provenance: only ever touch a collection this plugin created (see ensureFloatCollection)
   for (const plan of (Array.isArray(plans) ? plans : [])) {
     if (!plan || !plan.collection || !Array.isArray(plan.modes) || !plan.modes.length) continue;
-    const coll = await ensureFloatCollection(plan.collection, reg);
+    const coll = await ensureFloatCollection(plan.collection, reg, plan.renameFrom);
     // The collection's DEFAULT mode (Figma rejects removing it) — rename it to the plan's first mode ("Base");
     // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a plugin-created
     // collection they coincide, but a foreign same-named collection's default may not be the first mode, and
@@ -654,6 +708,13 @@ async function applyFloatPlans(plans) {
     }
     // variables: create-or-reuse by name; write every mode's value; prune orphans scoped to THIS collection.
     const byName = await varsByName(coll.id);
+    for (const [oldName, newName] of Object.entries(plan.renames || {})) {
+      if (byName[oldName] && !byName[newName]) {
+        byName[oldName].name = newName;
+        byName[newName] = byName[oldName];
+        delete byName[oldName];
+      }
+    }
     const current = new Set();
     for (const v of plan.variables) {
       const vr = byName[v.name] || figma.variables.createVariable(v.name, coll, v.type || "FLOAT");

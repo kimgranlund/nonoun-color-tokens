@@ -78,6 +78,16 @@ ok(mmType.values.Tablet === mmType.values.Base && mmType.values.Mobile !== mmTyp
 ok(mmGeom.values.Mobile === mmGeom.values.Base && mmGeom.values.Tablet !== mmGeom.values.Base, "merge: the geometry half back-fills Mobile from Base, keeps its own Tablet value");
 ok(gTab.collections["Geometry"].variables["size/MD/height"].values.Mobile === undefined, "merge: back-fill CLONES values — the emitter's own interchange is never mutated");
 
+// ── applyRenameMigrations (TKT-0012): pure stamping of the id-preserving rename fields ──
+{
+  const plans = A.modeApplyPlan(A.mergeModeInterchanges(typeIx, geomIx2));
+  const stamped = A.applyRenameMigrations(plans, { collections: { "Geometry": { renameFrom: ["Old Geometry"], vars: { "type/Body/MD/size": "type/body/md/size" } } } });
+  ok(JSON.stringify(stamped[0].renameFrom) === JSON.stringify(["Old Geometry"]) && stamped[0].renames["type/Body/MD/size"] === "type/body/md/size", "stamps renameFrom + renames onto the matching collection's plan");
+  ok(!("renames" in plans[0]) && !("renameFrom" in plans[0]), "planner output is never mutated (shallow-copy before stamping)");
+  ok(A.applyRenameMigrations(plans, { collections: { "Nope": { vars: { a: "b" } } } })[0].renames === undefined, "a migration for an absent collection is a no-op, not an error");
+  ok(A.applyRenameMigrations(plans, {}) === plans && A.applyRenameMigrations(plans, null) === plans, "empty/null migrations pass the SAME array through (identity)");
+}
+
 // ── validateModeInterchange CATCHES the malformed shapes (the half-bound-import failures) ──
 ok(A.validateModeInterchange(null).length > 0 && A.validateModeInterchange({}).length > 0, "validate: null / empty interchange → problems");
 ok(/no collections/.test(A.validateModeInterchange({ collections: {} })[0]), "validate: no collections → reported");

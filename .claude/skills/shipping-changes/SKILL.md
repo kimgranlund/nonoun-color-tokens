@@ -68,6 +68,10 @@ be the smoke gate and download the `smoke-screenshots` artifact if a UI change i
 - Generated artifacts in sync. `figma/plugin/ui.html` + `src/ui/figma-plugin-assets.js` +
   `src/ui/mcp-assets.js` are build outputs: commit them after a clean `npm test` (which regenerates
   them) and let the generators write them — a hand-edit is drift.
+- **Renamed an emitted variable, collection, or style name? Ship its rename map** in
+  `figma/binder/migrations.mjs` (FIGMA_MIGRATIONS) in the SAME change (TKT-0012). Every apply loop
+  reconciles by name — a rename without a map is a prune+recreate that orphans every consumer
+  binding in every existing user file. The `renamecap` gate proves the channel; your map rides it.
 - Role/step count gates. If you changed a role or step count, the count literals in
   `test/engine|figma|ui` and the `role-table.json` ↔ `semanticRoles` ↔ Figma `code.js` parity must all
   move together (the gate is in `npm test`).

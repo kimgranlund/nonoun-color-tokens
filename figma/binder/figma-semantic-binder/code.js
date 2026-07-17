@@ -64,10 +64,19 @@ function writeFloatRegistry(reg) { figma.root.setPluginData(FLOAT_REGISTRY_KEY, 
 // adopts a same-named collection it didn't create — so applyFloatPlans' rename/prune can't ever hit a
 // user's own "Typography"/"Geometry". A user manual-rename survives (we track id, not name); a
 // user-deleted one is re-created. `reg` is mutated in place; the caller persists it once via writeFloatRegistry.
-async function ensureFloatCollection(name, reg) {
+async function ensureFloatCollection(name, reg, renameFrom) {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const known = reg[name] && cols.find((c) => c.id === reg[name]);
   if (known) return known;
+  for (const old of (Array.isArray(renameFrom) ? renameFrom : [])) {
+    const prev = reg[old] && cols.find((c) => c.id === reg[old]);
+    if (prev) {
+      prev.name = name;
+      reg[name] = prev.id;
+      delete reg[old];
+      return prev;
+    }
+  }
   const made = figma.variables.createVariableCollection(name);
   reg[name] = made.id;
   return made;
@@ -92,7 +101,7 @@ async function applyFloatPlans(plans) {
   const reg = readFloatRegistry(); // provenance: only ever touch a collection this plugin created (see ensureFloatCollection)
   for (const plan of (Array.isArray(plans) ? plans : [])) {
     if (!plan || !plan.collection || !Array.isArray(plan.modes) || !plan.modes.length) continue;
-    const coll = await ensureFloatCollection(plan.collection, reg);
+    const coll = await ensureFloatCollection(plan.collection, reg, plan.renameFrom);
     // The collection's DEFAULT mode (Figma rejects removing it) — rename it to the plan's first mode ("Base");
     // the rest are added (or reused) by NAME. Anchor on `defaultModeId`, not modes[0]: for a plugin-created
     // collection they coincide, but a foreign same-named collection's default may not be the first mode, and
@@ -111,6 +120,13 @@ async function applyFloatPlans(plans) {
     }
     // variables: create-or-reuse by name; write every mode's value; prune orphans scoped to THIS collection.
     const byName = await varsByName(coll.id);
+    for (const [oldName, newName] of Object.entries(plan.renames || {})) {
+      if (byName[oldName] && !byName[newName]) {
+        byName[oldName].name = newName;
+        byName[newName] = byName[oldName];
+        delete byName[oldName];
+      }
+    }
     const current = new Set();
     for (const v of plan.variables) {
       const vr = byName[v.name] || figma.variables.createVariable(v.name, coll, v.type || "FLOAT");

@@ -25,13 +25,14 @@ const MODS = [
   ...CATEGORY_FILES.filter((f) => f !== "index.js").map((f) => [categoryKey(f), `${CATEGORY_DIR}/${f}`]),
   ["categoryIndex", `${CATEGORY_DIR}/index.js`],
   ["zip", "src/ui/zip.mjs"],
+  ["figmaMigrations", "figma/binder/migrations.mjs"],
   ["modeApplyPlan", "figma/binder/mode-apply-plan.mjs"],
   ["stylePlan", "figma/binder/style-plan.mjs"],
   ["icons", "src/ui/icons.js"],
   ["model", "src/ui/model.mjs"], ["app", "src/ui/app.js"],
 ];
 const KEY = { "hct.js": "hct", "okhsl.js": "okhsl", "semantic.js": "semantic", "tonal.js": "tonal", "derive.mjs": "derive", "type.mjs": "type", "geometry.mjs": "geometry", "flags.js": "flags", "persist.js": "persist",
-  "ds-gates.js": "dsGates", "exports.js": "exports", "figma-plugin-assets.js": "figmaPlugin", "mcp-assets.js": "mcpAssets", "type-fonts.js": "typeFonts", "zip.mjs": "zip", "mode-apply-plan.mjs": "modeApplyPlan", "style-plan.mjs": "stylePlan", "icon-systems.mjs": "iconSystems", "motion.mjs": "motion", "icons.js": "icons", "model.mjs": "model",
+  "ds-gates.js": "dsGates", "exports.js": "exports", "figma-plugin-assets.js": "figmaPlugin", "mcp-assets.js": "mcpAssets", "type-fonts.js": "typeFonts", "zip.mjs": "zip", "mode-apply-plan.mjs": "modeApplyPlan", "migrations.mjs": "figmaMigrations", "style-plan.mjs": "stylePlan", "icon-systems.mjs": "iconSystems", "motion.mjs": "motion", "icons.js": "icons", "model.mjs": "model",
   ...Object.fromEntries(CATEGORY_FILES.map((f) => [f, categoryKey(f)])) };
 
 function transform(src) {
