@@ -88,6 +88,23 @@ ok(gTab.collections.Breakpoints.variables["size/md/height"].values.Mobile === un
   ok(A.applyRenameMigrations(plans, {}) === plans && A.applyRenameMigrations(plans, null) === plans, "empty/null migrations pass the SAME array through (identity)");
 }
 
+// ── retirementsFor (TKT-0018): pure stamping of registry-tracked collection retirements ──
+{
+  const rules = { retire: [{ collection: "Breakpoints", ifVariablePrefix: "type/", retire: ["Typography"] }] };
+  const withType = A.modeApplyPlan(A.mergeModeInterchanges(typeIx, geomIx2)); // carries type/ vars ⇒ rule fires
+  const stamped = A.retirementsFor(withType, rules);
+  ok(JSON.stringify(stamped[0].retire) === JSON.stringify(["Typography"]), "retirementsFor: stamps retire when the collection carries a matching-prefix variable");
+  ok(!("retire" in withType[0]), "retirementsFor: planner output is never mutated (shallow-copy before stamping)");
+  const geomOnly = A.modeApplyPlan(geomIx2); // NO type/ vars ⇒ rule never fires
+  ok(A.retirementsFor(geomOnly, rules) === geomOnly, "retirementsFor: no matching variable ⇒ identity (same array, no rule fires)");
+  ok(A.retirementsFor(withType, {}) === withType && A.retirementsFor(withType, null) === withType, "retirementsFor: empty/null migrations pass the SAME array through (identity)");
+  ok(A.retirementsFor(withType, { retire: [{ collection: "Nope", ifVariablePrefix: "type/", retire: ["X"] }] }) === withType, "retirementsFor: a rule targeting a collection this apply doesn't carry is a no-op, not an error");
+  // an existing plan.retire (a future second rule) is preserved/merged, never clobbered
+  const seeded = withType.map((p) => (p.collection === "Breakpoints" ? { ...p, retire: ["Already"] } : p));
+  const restamped = A.retirementsFor(seeded, rules);
+  ok(JSON.stringify(restamped.find((p) => p.collection === "Breakpoints").retire.slice().sort()) === JSON.stringify(["Already", "Typography"].sort()), "retirementsFor: merges onto an already-seeded retire list rather than clobbering it");
+}
+
 // ── validateModeInterchange CATCHES the malformed shapes (the half-bound-import failures) ──
 ok(A.validateModeInterchange(null).length > 0 && A.validateModeInterchange({}).length > 0, "validate: null / empty interchange → problems");
 ok(/no collections/.test(A.validateModeInterchange({ collections: {} })[0]), "validate: no collections → reported");

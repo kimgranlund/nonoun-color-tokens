@@ -163,3 +163,33 @@ export function applyRenameMigrations(plans, migrations) {
     return out;
   });
 }
+
+// retirementsFor(plans, migrations) — stamp registry-tracked collection RETIREMENTS onto apply plans,
+// PURE (TKT-0018: lifted out of the UI's `_figmaFloatPlans`, which used to inline this as a post-hoc
+// mutation with no unit coverage of its own). `migrations.retire` is a list of declarative rules:
+//   [{ collection: "<target plan's collection>", ifVariablePrefix: "<prefix>", retire: ["<name>", …] }]
+// A rule fires only once its target collection's plan carries at least one variable whose name starts
+// with `ifVariablePrefix` — e.g. TKT-0009's rule: the merged "Breakpoints" collection supersedes the old
+// two-collection era's "Typography" only once it actually lands type/ variables (retiring it before the
+// merge is stable would drop a user's Typography collection while the apply itself could still fail).
+// Retirement here is REGISTRY-TRACKED-ONLY (code.js's applyFloatPlans matches `retire` names against ITS
+// own provenance registry, never a live file's collection by name) — a user's own same-named collection
+// is never touched. Returns the SAME array when no rule fires (chaining, e.g. after applyRenameMigrations);
+// entries a rule matches are shallow-copied first, so cached planner output is never mutated.
+export function retirementsFor(plans, migrations) {
+  const rules = migrations && typeof migrations === "object" && Array.isArray(migrations.retire) ? migrations.retire : [];
+  if (!rules.length || !Array.isArray(plans)) return plans;
+  let changed = false;
+  const out = plans.map((plan) => {
+    if (!plan || !Array.isArray(plan.variables)) return plan;
+    const names = rules
+      .filter((r) => r && r.collection === plan.collection && typeof r.ifVariablePrefix === "string" && Array.isArray(r.retire) && r.retire.length)
+      .filter((r) => plan.variables.some((v) => typeof v.name === "string" && v.name.startsWith(r.ifVariablePrefix)))
+      .flatMap((r) => r.retire);
+    if (!names.length) return plan;
+    changed = true;
+    const existing = Array.isArray(plan.retire) ? plan.retire : [];
+    return { ...plan, retire: [...new Set([...existing, ...names])] };
+  });
+  return changed ? out : plans;
+}

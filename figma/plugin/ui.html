@@ -7987,7 +7987,12 @@ function kebabWaveColorRenames(paletteSlugs) {
 const FIGMA_MIGRATIONS = {
   // floats: stamped by the app AFTER planning (the var map derives from the live plan's names via
   // kebabWaveVarRenames — see _figmaFloatPlans); the collection rename is static.
-  floats: { collections: { "Breakpoints": { renameFrom: ["Geometry"] } } },
+  // retire (TKT-0009, extracted to retirementsFor at TKT-0018): the merged "Breakpoints" collection
+  // supersedes the old two-collection era's "Typography" once it actually lands type/ variables.
+  floats: {
+    collections: { "Breakpoints": { renameFrom: ["Geometry"] } },
+    retire: [{ collection: "Breakpoints", ifVariablePrefix: "type/", retire: ["Typography"] }],
+  },
   color: { collections: { "Color Semantic": ["Color Modes"] } },
   styles: { paints: {}, texts: {} },
 };
@@ -8161,7 +8166,37 @@ function applyRenameMigrations(plans, migrations) {
   });
 }
 
-return { mergeModeInterchanges, modeApplyPlan, validateModeInterchange, applyRenameMigrations };
+// retirementsFor(plans, migrations) — stamp registry-tracked collection RETIREMENTS onto apply plans,
+// PURE (TKT-0018: lifted out of the UI's `_figmaFloatPlans`, which used to inline this as a post-hoc
+// mutation with no unit coverage of its own). `migrations.retire` is a list of declarative rules:
+//   [{ collection: "<target plan's collection>", ifVariablePrefix: "<prefix>", retire: ["<name>", …] }]
+// A rule fires only once its target collection's plan carries at least one variable whose name starts
+// with `ifVariablePrefix` — e.g. TKT-0009's rule: the merged "Breakpoints" collection supersedes the old
+// two-collection era's "Typography" only once it actually lands type/ variables (retiring it before the
+// merge is stable would drop a user's Typography collection while the apply itself could still fail).
+// Retirement here is REGISTRY-TRACKED-ONLY (code.js's applyFloatPlans matches `retire` names against ITS
+// own provenance registry, never a live file's collection by name) — a user's own same-named collection
+// is never touched. Returns the SAME array when no rule fires (chaining, e.g. after applyRenameMigrations);
+// entries a rule matches are shallow-copied first, so cached planner output is never mutated.
+function retirementsFor(plans, migrations) {
+  const rules = migrations && typeof migrations === "object" && Array.isArray(migrations.retire) ? migrations.retire : [];
+  if (!rules.length || !Array.isArray(plans)) return plans;
+  let changed = false;
+  const out = plans.map((plan) => {
+    if (!plan || !Array.isArray(plan.variables)) return plan;
+    const names = rules
+      .filter((r) => r && r.collection === plan.collection && typeof r.ifVariablePrefix === "string" && Array.isArray(r.retire) && r.retire.length)
+      .filter((r) => plan.variables.some((v) => typeof v.name === "string" && v.name.startsWith(r.ifVariablePrefix)))
+      .flatMap((r) => r.retire);
+    if (!names.length) return plan;
+    changed = true;
+    const existing = Array.isArray(plan.retire) ? plan.retire : [];
+    return { ...plan, retire: [...new Set([...existing, ...names])] };
+  });
+  return changed ? out : plans;
+}
+
+return { mergeModeInterchanges, modeApplyPlan, validateModeInterchange, applyRenameMigrations, retirementsFor };
 })();
 __M.stylePlan = (function(){
 // style-plan.mjs — the PURE, testable planner for the Figma STYLES swatches (paint styles bound to the
@@ -13952,9 +13987,8 @@ const { figmaCollectionNames, slug } = __M.model;
 const { serialize } = __M.persist;
 const { typeTokensFigmaModes, typeTokensFigmaPrimitives } = __M.type;
 const { geomTokensFigmaModes } = __M.geometry;
-const { applyRenameMigrations, mergeModeInterchanges, modeApplyPlan, validateModeInterchange } = __M.modeApplyPlan;
+const { applyRenameMigrations, mergeModeInterchanges, modeApplyPlan, retirementsFor, validateModeInterchange } = __M.modeApplyPlan;
 const { FIGMA_MIGRATIONS, kebabWaveColorRenames, kebabWaveVarRenames } = __M.figmaMigrations;
-const { COLLECTIONS } = __M.collections;
 const { primitivesApplyPlan, stylePlans } = __M.stylePlan;
 const { icon } = __M.icons;
 const { REPO_URL, btn, h, swatch } = __M.appHelpers;
@@ -14162,12 +14196,10 @@ class ApplyGateMixinImpl {
         const waveVars = kebabWaveVarRenames(p.variables.map((v) => v.name));
         if (Object.keys(waveVars).length) p.renames = { ...waveVars, ...(p.renames || {}) };
       }
-      // the merged shape supersedes the two-collection era's moded "Typography" collection — mark it for
-      // executor retirement (registry-tracked only) whenever this apply actually lands type/ variables.
-      for (const p of plans) {
-        if (p.collection === COLLECTIONS.breakpoints && p.variables.some((v) => typeof v.name === "string" && v.name.startsWith("type/"))) p.retire = ["Typography"];
-      }
-      return plans;
+      // TKT-0018: the TKT-0009 retirement rule (the merged Breakpoints collection supersedes the old
+      // two-collection era's "Typography" once it actually lands type/ variables) is pure + unit-tested
+      // in mode-apply-plan.mjs — see FIGMA_MIGRATIONS.floats.retire for the declarative rule.
+      return retirementsFor(plans, FIGMA_MIGRATIONS.floats);
     } catch { return []; }
   }
 
