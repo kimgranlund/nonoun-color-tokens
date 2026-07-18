@@ -999,8 +999,8 @@ class HctApp extends HTMLElement {
   // flagOf(key) — the SINGLE gate check for a Pro/feature flag (item 7). Resolves from the EFFECTIVE tier
   // (tier(), entitlement-backed — not the raw stored tier) plus the dev overrides; returns a boolean or a
   // value (e.g. maxSets → 2|Infinity). Gated surfaces MUST read this, never `this.profile.tier === "pro"`.
-  // Pre-launch it returns the unlocked values (TIERS_ENFORCED is false), so wiring a guard now is a safe
-  // no-op until the product flips enforcement on.
+  // Launched (TIERS_ENFORCED is true): a Free profile resolves the gated values, Pro requires a currently
+  // active entitlement — every gated surface reading this already had its guard wired pre-launch.
   flagOf(key) {
     // resolveFlags resolves the effective tier from the entitlement itself; pass nowMs to enforce expiry.
     return flagFromFlags(resolveFlags(this.profile, { nowMs: Date.now() }), key);
@@ -1207,8 +1207,8 @@ class HctApp extends HTMLElement {
 
 
   // _blockedBySetCap() — true when the plan's maxSets cap is reached; also notifies + routes a web user to
-  // the Account upgrade surface. The cap is flagOf("maxSets") — Infinity while TIERS_ENFORCED is off, so this
-  // is a NO-OP until go-live. Gates the user-initiated "new brand kit" actions (New / Import); a project or
+  // the Account upgrade surface. The cap is flagOf("maxSets") — 2 for Free, Infinity for Pro, now that
+  // TIERS_ENFORCED is on. Gates the user-initiated "new brand kit" actions (New / Import); a project or
   // Figma RESTORE (openConfigAsSet) is intentionally NOT capped — reloading your own work must never block.
   _blockedBySetCap() {
     const cap = this.flagOf("maxSets");
@@ -1219,8 +1219,8 @@ class HctApp extends HTMLElement {
   }
 
 
-  // _proExportLocked(id) — true when an export format is Pro-gated AND the plan doesn't unlock it. A NO-OP
-  // until go-live (flagOf("proExport") is true while TIERS_ENFORCED is off).
+  // _proExportLocked(id) — true when an export format is Pro-gated AND the plan doesn't unlock it. Live now
+  // that TIERS_ENFORCED is on (flagOf("proExport") gates a Free profile; a Pro entitlement unlocks it).
   _proExportLocked(id) {
     return PRO_EXPORT_FORMATS.has(id) && !this.flagOf("proExport");
   }
@@ -1238,8 +1238,8 @@ class HctApp extends HTMLElement {
 
 
   // _treatmentLocked(id, defaultId) — true when a NON-default treatment is Pro-gated and the plan doesn't
-  // unlock it (advancedTreatments). Free keeps the default (Product type / Comfortable geometry). NO-OP until
-  // go-live (flagOf("advancedTreatments") is unlocked while TIERS_ENFORCED is off).
+  // unlock it (advancedTreatments). Free keeps the default (Product type / Comfortable geometry). Live now
+  // that TIERS_ENFORCED is on — a Pro entitlement unlocks flagOf("advancedTreatments").
   _treatmentLocked(id, defaultId) {
     return id !== defaultId && !this.flagOf("advancedTreatments");
   }

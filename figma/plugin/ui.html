@@ -4057,10 +4057,10 @@ const TIER_FLAGS = {
   pro: { maxSets: Infinity, proExport: true, advancedTreatments: true, hostedMcp: true },
 };
 
-// Master enforcement switch. Ships FALSE pre-launch: with NO purchase path yet, gating a feature OFF would
-// just remove it from current users — so everyone resolves to the UNLOCKED (pro) values until Layer 2 wires
-// payment and the product flips this to true. (The free/pro split below is defined + tested now, ready.)
-const TIERS_ENFORCED = false;
+// Master enforcement switch. Now TRUE (launched): the purchase + activation path is wired (Layer 2/3), so a
+// free profile resolves to the FREE values and Pro requires a currently-active entitlement (resolveTier).
+// Pre-launch this shipped FALSE — everyone resolved to the UNLOCKED (pro) values — until payment was wired.
+const TIERS_ENFORCED = true;
 
 // resolveFlags(profile, opts?) → the resolved flag map. base = the tier's values when enforced, else the
 // unlocked (pro) values; then any explicit flagOverrides (dev / QA / early-access) win.
@@ -9472,8 +9472,8 @@ const DOCS_URL = REPO_URL + "#readme";
 const ACCOUNT_URL = "https://app.lemonsqueezy.com/my-orders";
 
 // Pro-gated export formats (the proExport flag). Free = CSS (css/oklch) + the Figma/JSON interchange; Pro =
-// DTCG + the framework configs. flagOf("proExport") is true (unlocked) while TIERS_ENFORCED is off, so these
-// only actually gate after go-live. The single-format preview shows an upsell; Download-All omits them.
+// DTCG + the framework configs. flagOf("proExport") gates on the effective tier now that TIERS_ENFORCED is
+// on (launched) — a Free profile sees the upsell; Download-All omits these folders for Free.
 const PRO_EXPORT_FORMATS = new Set(["dtcg", "tailwind", "shadcn"]);
 
 // README shipped inside the Download-All zip's experimental figma-aliased/ folder (OD-004).
@@ -14064,8 +14064,8 @@ class DrawerMixinImpl {
     const isFigma = this.exportTab === "figma";
     const isConfig = this.exportTab === "config";
     const figCur = FIGMA.find((f) => f[0] === this.figmaFile) || FIGMA[0];
-    // proExport gate: a Pro format the plan doesn't unlock shows an upsell instead of its code (NO-OP until
-    // go-live). PRO_LABEL names the upsell; the format <select> tags the option " · Pro".
+    // proExport gate: a Pro format the plan doesn't unlock shows an upsell instead of its code. Live now
+    // that TIERS_ENFORCED is on. PRO_LABEL names the upsell; the format <select> tags the option " · Pro".
     const proLocked = this._proExportLocked(this.exportTab);
     const PRO_LABEL = { dtcg: "DTCG", tailwind: "Tailwind v4", shadcn: "shadcn/ui" };
     const code = proLocked
@@ -14299,8 +14299,8 @@ class DrawerMixinImpl {
         { name: "figma/palette.tokens.json", data: ex.figma.raw },
         { name: `ui3/${s}.json`, data: ex.ui3 },
       );
-      // proExport-gated formats (DTCG + the framework configs) — omitted from the bundle until the plan
-      // unlocks them (NO-OP while TIERS_ENFORCED is off; flagOf("proExport") is true).
+      // proExport-gated formats (DTCG + the framework configs) — omitted from the bundle unless the plan
+      // unlocks them (TIERS_ENFORCED is on: a Free profile omits these, a Pro entitlement includes them).
       if (this.flagOf("proExport")) files.push(
         { name: `dtcg/${s}.tokens.json`, data: ex.dtcg },
         { name: `tailwind/${s}.css`, data: ex.tailwind },
@@ -16316,8 +16316,8 @@ class HctApp extends HTMLElement {
   // flagOf(key) — the SINGLE gate check for a Pro/feature flag (item 7). Resolves from the EFFECTIVE tier
   // (tier(), entitlement-backed — not the raw stored tier) plus the dev overrides; returns a boolean or a
   // value (e.g. maxSets → 2|Infinity). Gated surfaces MUST read this, never `this.profile.tier === "pro"`.
-  // Pre-launch it returns the unlocked values (TIERS_ENFORCED is false), so wiring a guard now is a safe
-  // no-op until the product flips enforcement on.
+  // Launched (TIERS_ENFORCED is true): a Free profile resolves the gated values, Pro requires a currently
+  // active entitlement — every gated surface reading this already had its guard wired pre-launch.
   flagOf(key) {
     // resolveFlags resolves the effective tier from the entitlement itself; pass nowMs to enforce expiry.
     return flagFromFlags(resolveFlags(this.profile, { nowMs: Date.now() }), key);
@@ -16524,8 +16524,8 @@ class HctApp extends HTMLElement {
 
 
   // _blockedBySetCap() — true when the plan's maxSets cap is reached; also notifies + routes a web user to
-  // the Account upgrade surface. The cap is flagOf("maxSets") — Infinity while TIERS_ENFORCED is off, so this
-  // is a NO-OP until go-live. Gates the user-initiated "new brand kit" actions (New / Import); a project or
+  // the Account upgrade surface. The cap is flagOf("maxSets") — 2 for Free, Infinity for Pro, now that
+  // TIERS_ENFORCED is on. Gates the user-initiated "new brand kit" actions (New / Import); a project or
   // Figma RESTORE (openConfigAsSet) is intentionally NOT capped — reloading your own work must never block.
   _blockedBySetCap() {
     const cap = this.flagOf("maxSets");
@@ -16536,8 +16536,8 @@ class HctApp extends HTMLElement {
   }
 
 
-  // _proExportLocked(id) — true when an export format is Pro-gated AND the plan doesn't unlock it. A NO-OP
-  // until go-live (flagOf("proExport") is true while TIERS_ENFORCED is off).
+  // _proExportLocked(id) — true when an export format is Pro-gated AND the plan doesn't unlock it. Live now
+  // that TIERS_ENFORCED is on (flagOf("proExport") gates a Free profile; a Pro entitlement unlocks it).
   _proExportLocked(id) {
     return PRO_EXPORT_FORMATS.has(id) && !this.flagOf("proExport");
   }
@@ -16555,8 +16555,8 @@ class HctApp extends HTMLElement {
 
 
   // _treatmentLocked(id, defaultId) — true when a NON-default treatment is Pro-gated and the plan doesn't
-  // unlock it (advancedTreatments). Free keeps the default (Product type / Comfortable geometry). NO-OP until
-  // go-live (flagOf("advancedTreatments") is unlocked while TIERS_ENFORCED is off).
+  // unlock it (advancedTreatments). Free keeps the default (Product type / Comfortable geometry). Live now
+  // that TIERS_ENFORCED is on — a Pro entitlement unlocks flagOf("advancedTreatments").
   _treatmentLocked(id, defaultId) {
     return id !== defaultId && !this.flagOf("advancedTreatments");
   }

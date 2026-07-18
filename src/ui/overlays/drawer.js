@@ -79,8 +79,8 @@ export class DrawerMixinImpl {
     const isFigma = this.exportTab === "figma";
     const isConfig = this.exportTab === "config";
     const figCur = FIGMA.find((f) => f[0] === this.figmaFile) || FIGMA[0];
-    // proExport gate: a Pro format the plan doesn't unlock shows an upsell instead of its code (NO-OP until
-    // go-live). PRO_LABEL names the upsell; the format <select> tags the option " · Pro".
+    // proExport gate: a Pro format the plan doesn't unlock shows an upsell instead of its code. Live now
+    // that TIERS_ENFORCED is on. PRO_LABEL names the upsell; the format <select> tags the option " · Pro".
     const proLocked = this._proExportLocked(this.exportTab);
     const PRO_LABEL = { dtcg: "DTCG", tailwind: "Tailwind v4", shadcn: "shadcn/ui" };
     const code = proLocked
@@ -314,8 +314,8 @@ export class DrawerMixinImpl {
         { name: "figma/palette.tokens.json", data: ex.figma.raw },
         { name: `ui3/${s}.json`, data: ex.ui3 },
       );
-      // proExport-gated formats (DTCG + the framework configs) — omitted from the bundle until the plan
-      // unlocks them (NO-OP while TIERS_ENFORCED is off; flagOf("proExport") is true).
+      // proExport-gated formats (DTCG + the framework configs) — omitted from the bundle unless the plan
+      // unlocks them (TIERS_ENFORCED is on: a Free profile omits these, a Pro entitlement includes them).
       if (this.flagOf("proExport")) files.push(
         { name: `dtcg/${s}.tokens.json`, data: ex.dtcg },
         { name: `tailwind/${s}.css`, data: ex.tailwind },

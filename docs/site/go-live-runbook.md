@@ -1,8 +1,10 @@
 # Ultimate Tokens — Monetization go-live runbook
 
 Everything that must happen to turn the **soft launch** (built, but nothing withheld) into a **hard
-launch** (Pro features gated, only an active license unlocks them). Current state: `TIERS_ENFORCED` in
-`src/engine/flags.js` is `false`; the store id (`420293`) and per-seat activation flow are already wired.
+launch** (Pro features gated, only an active license unlocks them). Current state on `main`:
+`TIERS_ENFORCED` in `src/engine/flags.js` is `false`; the store id (`420293`) and per-seat activation flow
+are already wired. This held branch flips it to `true` — `main` stays `false` until steps 1 & 2 clear and
+that PR merges (step 3).
 
 Do steps **1 and 2 yourself** (Lemon Squeezy dashboard + a CORS check I can't run). Step **0** is code I
 do; then tell me and I merge the flip (step 3).
@@ -11,23 +13,23 @@ do; then tell me and I merge the flip (step 3).
 
 ## 0. Wire the Pro gates (code — PREREQUISITE; the flip is a no-op without it)
 
-> **Discovered while prepping the flip:** the flag *resolver* is complete (`flagOf()` returns the right
-> value per tier), but **no feature surface consumes `flagOf()` yet** — the only references are its
-> definition and a comment. So flipping `TIERS_ENFORCED` today changes nothing a user can see. Each gate
-> must be wired to *read* `flagOf()` and withhold the feature. Since `flagOf()` returns the unlocked values
-> while `TIERS_ENFORCED` is `false`, the gates can be wired and shipped **now with zero user impact** — the
-> flip (step 3) then activates them all at once.
+> **Update (2026-07-18):** the three gates with a shipped decision (`maxSets` / `proExport` /
+> `advancedTreatments`) are wired and consume `flagOf()` — see the checkboxes below. `hostedMcp` stays
+> open until a hosted MCP server ships. Flipping `TIERS_ENFORCED` today activates all three wired gates
+> at once, exactly as this section originally planned.
 
-Gates to wire (and the decisions each needs):
-- [ ] **`maxSets`** → block creating a brand kit past the cap (gallery) + upsell to checkout. Cap is
-      already defined (free 2 / pro ∞), so this one needs no product decision — just the UX (block vs.
-      upsell modal).
-- [ ] **`proExport`** → gate the Pro export formats in the export drawer. **Decision needed:** which
-      formats are Free vs Pro (e.g. CSS + DTCG free; Tailwind + shadcn Pro?).
-- [ ] **`advancedTreatments`** → gate the advanced type/geometry treatments. **Decision needed:** which
-      treatments count as "advanced."
-- [ ] **`hostedMcp`** → the hosted Brand-Kit MCP endpoint. **Blocked:** no hosted MCP server is deployed
-      yet, so only the free *download* exists — nothing to gate until one ships.
+Gates to wire (and the decisions each needed):
+- [x] **`maxSets`** → blocks creating a brand kit past the cap (gallery) + routes a web user to Settings
+      « Account ». Free 2 / Pro ∞. Wired as `_blockedBySetCap()`, tested at `(cap)` in
+      `test/ui/headless-boot.mjs`.
+- [x] **`proExport`** → gates the Pro export formats in the export drawer + Download-All. **Shipped
+      decision:** Free = CSS (hex/oklch) + the Figma/JSON interchange; Pro = DTCG + Tailwind + shadcn.
+      Wired as `_proExportLocked()`, tested at `(pe)`/`(fl)`.
+- [x] **`advancedTreatments`** → gates non-default type/geometry treatments. **Shipped decision:** Free
+      keeps the defaults (Product type / Comfortable geometry); every other treatment is Pro. Wired as
+      `_treatmentLocked()`, tested at `(at)`.
+- [ ] **`hostedMcp`** → the hosted Brand-Kit MCP endpoint. **Still blocked:** no hosted MCP server is
+      deployed yet (Phase A/local shipped; Phase B/accounts not yet) — nothing to gate until one ships.
 
 ---
 
@@ -84,8 +86,8 @@ fetch("https://api.lemonsqueezy.com/v1/licenses/validate", {
 ## 3. Flip enforcement (I do this on your word)
 
 One line: `TIERS_ENFORCED = true` in `src/engine/flags.js`, plus the handful of tests that assert the
-pre-launch `false` default. I've **prepared this as a draft PR** (CI-green, not merged) so go-live is a
-single merge once steps 1 & 2 are confirmed.
+pre-launch `false` default. Prepared as a draft PR (CI-green, not merged, kept in sync with `main`) so
+go-live is a single merge once steps 1 & 2 are confirmed.
 
 **Effect the moment it merges + deploys (assuming step 0's gates are wired):**
 - Free users → capped at **2 brand kits**, and `proExport` / `advancedTreatments` / `hostedMcp` turn off.
