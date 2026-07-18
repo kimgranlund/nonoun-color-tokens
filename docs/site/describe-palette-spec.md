@@ -221,11 +221,11 @@ A brief carries only the families the theme determined; the core fills the rest 
 
 - **Neutral** absent → the brief's Primary hue at the role-table default chroma/skew/lift
   (`chroma 29 · skew −20 · lift 0` — the role-table's own Neutral-follows-Primary shape).
-- **Secondary / Tertiary** absent → harmony recipes (#370/#372). **Tertiary is ruled** (#372):
-  analogous of Secondary. **Secondary's own recipe from Primary is NOT yet ruled anywhere** — a real
-  open fork, not a settled default (see §12 item 7). Whichever recipe #370's rubric teaches, the core
-  must implement the identical one, or an underdetermined brief and a rubric-following agent disagree
-  and the determinism goal (§1) breaks.
+- **Secondary / Tertiary** absent → harmony recipes, both now ruled (§12 item 7): **Secondary** is
+  the **complement** of Primary (180°); **Tertiary** (#372) is the **analogous** of Secondary (30°).
+  Named constants in `describe-kit-core.mjs` (`SECONDARY_HARMONY_OFFSET`, `TERTIARY_ANALOGOUS_OFFSET`)
+  — #370's rubric must teach agents the identical recipe, or an underdetermined brief and a
+  rubric-following agent disagree and the determinism goal (§1) breaks.
 - **Info / Success / Warning / Danger** absent → the `role-table.json` conventional defaults —
   **Info 235 · Success 145 · Warning 70 · Danger 27** (chroma 40 · 55 · 100 · 55 respectively, with
   the role-table's skew/lift) — plus a **brand-hue nudge**: a bounded, deterministic pull of each
@@ -264,9 +264,9 @@ Any object sent as `brief` generates. Per-field: numbers clamp to the `persist.j
 (nearest bound, per-field isolation — an out-of-domain field never resets its siblings), unknown
 enum values fall to defaults, unknown properties are dropped — each divergence emitting a `clamped`
 lint entry. Only a non-object `brief` is a tool error. This is #371's acceptance ("schema-invalid
-briefs degrading to clamped docs") made precise. *How* the core shares persist's `DOMAINS` without
-importing UI code is #369's open item (§12) — the contract here is only that the effective domains
-are identical to persist's, gate-verified.
+briefs degrading to clamped docs") made precise. The core shares persist's `DOMAINS`/`clampPalette`/
+`clampStory` by direct import (§12 item 1, resolved in #369's build) — the effective domains are
+persist's, by construction.
 
 ---
 
@@ -468,11 +468,17 @@ not bundled with the free downloadable kit. Concretely:
 
 ## 12. Open decisions
 
-1. **Clamp-domain sharing** (#369): how `describe-kit-core.mjs` reuses `persist.js` `DOMAINS`
-   without importing UI code — extract the domain table to a pure module vs a generator-time copy
-   with a parity gate. Contract either way: effective domains identical to persist's (§4.4).
+1. ~~**Clamp-domain sharing**~~ — **RESOLVED (#369's build):** `describe-kit-core.mjs` imports
+   `DOMAINS`/`clampPalette`/`clampStory` directly from `persist.js` (all three newly exported —
+   already pure, dependency-free) rather than duplicating the domain table. `persist.js` living under
+   `src/ui/` is a directory-ownership convention, not a DOM-purity boundary; the same is already true
+   of `model.mjs`'s `brandKit`, which every flavor imports. Effective domains ARE persist's, by
+   import, not by restatement — no separate parity gate needed for this half of §4.4's contract.
 2. **The open-in-app doc-import path** (#369): how a user loads the emitted `doc` JSON into the app
-   (existing config import vs a dedicated route).
+   (existing config import vs a dedicated route). `describe-kit-core.mjs`'s build proved the
+   *mechanism* — `hydrate(doc)` plus reattaching `doc.name` (which `hydrate` drops, same as
+   `app.js#_restore`) round-trips a generated doc back to the exact original kit — but the UI
+   *route* a user takes to do this is still open.
 3. **Packaging** (#371 × #374): standalone zip vs inside the existing export-drawer MCP zip; and
    whether the merged server *replaces* the current brand-kit zip or ships beside it (one server
    serving both a downloaded and a generated kit). Interacts with §7's "doc present" condition for
@@ -482,11 +488,13 @@ not bundled with the free downloadable kit. Concretely:
 5. **Exemplar count vs briefing-payload token budget** (#370): ~15 is the target; the briefing
    payload returns a retrieved subset — subset size vs payload weight is tuned in-build.
 6. **Eval ops** (#375): CI custody of the provider key; run cadence given nondeterminism.
-7. **The Secondary-from-Primary harmony recipe** (#369/#370): no source rules which recipe (e.g.
-   complementary, split-complementary, a fixed hue offset) governs an absent Secondary. Tertiary's
-   recipe IS ruled (analogous of Secondary, #372) and depends on whichever Secondary recipe is
-   chosen. Must be decided in #369's or #370's build, stated as a named constant (mirroring
-   `STATUS_BANDS`/`MIN_HUE_SEP`), before either implements it independently of the other.
+7. ~~**The Secondary-from-Primary harmony recipe**~~ — **RESOLVED (#369's build):** Secondary
+   (absent) is the **complement** of Primary (`SECONDARY_HARMONY_OFFSET = 180°`, the classic
+   two-color brand pairing); Tertiary (absent) is the **analogous** of Secondary
+   (`TERTIARY_ANALOGOUS_OFFSET = 30°`), both named constants in `describe-kit-core.mjs`. #370's
+   rubric must teach agents the identical recipe, or an underdetermined brief and a rubric-following
+   agent will disagree (the determinism goal, §1) — #370's build reads these two constants rather
+   than re-deriving the choice.
 
 ## 13. Risks & open questions
 

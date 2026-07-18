@@ -134,7 +134,7 @@ function clampKeyColors(arr) {
   return out;
 }
 
-function clampPalette(p) {
+export function clampPalette(p) {
   const src = (p && typeof p === "object") ? p : {};
   const D = DOMAINS.palette;
   const out = {
@@ -164,7 +164,7 @@ function clampPalette(p) {
 
 // clampStory — the set-level concept narrative from a curated preset (optional). Free strings +
 // a groups array of {hier,pct,note}; shape-clamped only. Returns null when nothing valid is present.
-function clampStory(s) {
+export function clampStory(s) {
   if (!s || typeof s !== "object") return null;
   const str = (x) => (typeof x === "string" && x.trim() ? x : undefined);
   const out = {};

@@ -147,7 +147,7 @@ export function slug(name) {
 // hue that, fed to effHue→oklchToCam16Hue under hueSpace:"oklch", recovers the same color family —
 // so a starter authored as a CAM16 hue renders ≈ identically once the doc is OKLCH-native. The
 // accurate oklchToCam16Hue inverse closes the round-trip to within ~2° (the hct.js hct-oklch-inverse gate).
-function camHueToOklch(camHue, chromaFrac = 1) {
+export function camHueToOklch(camHue, chromaFrac = 1) {
   const pk = peakC(camHue);
   const c = Math.max(Math.min(1, Math.max(0, chromaFrac)) * pk.c, 8); // anchor at the starter's OWN chroma
   return Math.round(((hctToOklch(camHue, c, pk.tone)[2] % 360) + 360) % 360);

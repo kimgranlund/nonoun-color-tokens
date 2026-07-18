@@ -9,6 +9,7 @@ const ok = (c, m) => { if (!c) fails.push(m); };
 ok(F.FLAG_KEYS.length >= 1 && F.FLAG_KEYS.every((k) => k in F.TIER_FLAGS.free && k in F.TIER_FLAGS.pro), "every FLAG_KEY has a free + pro value");
 ok(F.TIER_FLAGS.free.maxSets === 2 && F.TIER_FLAGS.pro.maxSets === Infinity, `free caps brand kits at 2; pro unlimited (got ${F.TIER_FLAGS.free.maxSets}/${F.TIER_FLAGS.pro.maxSets})`);
 ok(F.TIER_FLAGS.free.proExport === false && F.TIER_FLAGS.pro.proExport === true, "proExport is a pro capability");
+ok(F.TIER_FLAGS.free.describePalette === false && F.TIER_FLAGS.pro.describePalette === true, "describePalette (#379) is a pro capability");
 
 // ── resolveFlags ENFORCED: the tier drives the values ──
 {

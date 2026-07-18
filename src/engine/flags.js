@@ -8,12 +8,14 @@
 // WEB APP, flips tier→pro; (3) the Settings « Account » home. The offline Figma plugin stays free.
 
 // The flag keys + their per-tier values (the product's Pro line, from the item-7 Ratified Design).
-// `maxSets` is VALUED (the free brand-kit cap); the rest are boolean capability gates.
-export const FLAG_KEYS = ["maxSets", "proExport", "advancedTreatments", "hostedMcp"];
+// `maxSets` is VALUED (the free brand-kit cap); the rest are boolean capability gates. `describePalette`
+// (#379, ruled 2026-07-18) gates the describe-palette generator (both the local and hosted flavors) —
+// a premium, recurring-revenue-adjacent capability, not bundled with the free downloadable brand kit.
+export const FLAG_KEYS = ["maxSets", "proExport", "advancedTreatments", "hostedMcp", "describePalette"];
 
 export const TIER_FLAGS = {
-  free: { maxSets: 2, proExport: false, advancedTreatments: false, hostedMcp: false },
-  pro: { maxSets: Infinity, proExport: true, advancedTreatments: true, hostedMcp: true },
+  free: { maxSets: 2, proExport: false, advancedTreatments: false, hostedMcp: false, describePalette: false },
+  pro: { maxSets: Infinity, proExport: true, advancedTreatments: true, hostedMcp: true, describePalette: true },
 };
 
 // Master enforcement switch. Ships FALSE pre-launch: with NO purchase path yet, gating a feature OFF would

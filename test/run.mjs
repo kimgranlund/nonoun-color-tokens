@@ -13,7 +13,7 @@ const TESTS = [
   "engine/hct.mjs", "engine/tonal.mjs", "engine/semantic.mjs", "engine/exports.mjs", "engine/okhsl.mjs", "engine/derive.mjs", "engine/type.mjs", "engine/geometry.mjs", "engine/flags.mjs", "engine/ds-gates.mjs", "engine/categories.mjs",
   "ui/persist.mjs", "ui/shell.mjs", "ui/zip.mjs", "ui/headless-boot.mjs",
   "figma/plugin.mjs", "figma/binder.mjs", "figma/mode-apply.mjs", "figma/style-plan.mjs", "figma/migrations.mjs", "figma/live-diff.mjs",
-  "mcp/core.mjs", "mcp/brand-kit.mjs",
+  "mcp/core.mjs", "mcp/brand-kit.mjs", "mcp/describe-kit-core.mjs",
   "plugin/manifest.mjs", "plugin/color-tokens.mjs", "plugin/typography-tokens.mjs", "plugin/geometry-tokens.mjs", "plugin/hosted-pack.mjs",
   "repo/branding.mjs",
 ];
