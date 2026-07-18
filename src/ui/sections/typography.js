@@ -4,6 +4,15 @@ import { BUNDLED_FONTS, DEFAULT_TYPE, TYPE_TREATMENTS, WEIGHT_NAMES, genericFor,
 import { icon } from "../icons.js";
 import { GENERIC_FONTS, SELF_HOSTED_FONTS, TYPE_PARA, TYPE_SAMPLE, btn, ensureTypeFonts, ensureWebFonts, field, fmt, h } from "../app-helpers.mjs";
 
+// STANDARD_TYPE_RUNGS — the ratified desktop-anchored Standard set (Kim, 2026-07-10): Tablet/Mobile
+// derive DOWN via a hierarchy-aware factor (body frozen, display compressed). STABLE ids (not
+// seeded/random) so a token override written against a not-yet-materialized rung (see
+// _typeEffectiveModes / setTypeTokenOverride) keeps resolving once it IS materialized.
+const STANDARD_TYPE_RUNGS = [
+  { id: "std-tablet", name: "Tablet", w: 992, factor: 5 / 6 },
+  { id: "std-mobile", name: "Mobile", w: 476, factor: 2 / 3 },
+];
+
 // Prototype mixin (TKT-0023): a class body used ONLY as a verbatim, comma-free carrier for these
 // methods — copied onto HctApp.prototype (see app.js's mixin() call), never instantiated directly.
 export class TypeSectionImpl {
@@ -149,9 +158,8 @@ export class TypeSectionImpl {
   // the resolved type scale at the ACTIVE mode, WITH that mode's per-cell overrides (so the specimen +
   // inspector reflect the matrix edits). A deleted/unknown mode resolves through "base" in _typeScaleFor.
   _activeTypeScale() {
-    const t = this.doc.type || DEFAULT_TYPE;
     const mode = this._effTypeMode();
-    const key = mode === "base" || !(t.modes || []).some((m) => m.id === mode) ? "base" : mode;
+    const key = mode === "base" || !this._typeEffectiveModes().some((m) => m.id === mode) ? "base" : mode;
     return this._typeScaleFor(key);
   }
 
@@ -160,7 +168,7 @@ export class TypeSectionImpl {
   // desktop-first (Desktop · Tablet · Mobile), matching the Figma mode-column order the emitters produce.
   typeModeControl() {
     const t = this.doc.type || DEFAULT_TYPE;
-    const modes = t.modes || [];
+    const modes = this._typeEffectiveModes();
     const { baseName: bn, baseLast } = this._typeBaseOpts();
     // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
     if (this.typeMode !== "base" && this.typeMode !== "compare" && !modes.some((m) => m.id === this.typeMode)) this.typeMode = "base";
@@ -169,7 +177,7 @@ export class TypeSectionImpl {
     const items = [
       ...(baseLast ? [...modeItems, baseItem] : [baseItem, ...modeItems]),
       // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only the base, so only when ≥1 mode.
-      ...(modes.length ? [{ id: "compare", label: "Compare", title: "All breakpoints side by side" }] : []),
+      ...(modes.length ? [{ id: "compare", label: "All", title: "All breakpoints side by side" }] : []),
     ];
     return h(
       "div",
@@ -177,9 +185,6 @@ export class TypeSectionImpl {
       this.segmented(items, this.typeMode, (id) => { this.typeMode = id; this.render(); },
         { cls: "canvas-seg", ariaLabel: "Typography breakpoint mode", role: "group", idPrefix: "tmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named scale with its own body size", onclick: () => this.addTypeMode() }),
-      // one-click standard set — only while no modes exist (it would duplicate names otherwise). It
-      // MATERIALIZES the intrinsic synthesized modes as editable doc modes (same values, same law).
-      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Materialize the standard breakpoints for editing — your scale IS Desktop (1280, Figma's default mode); Tablet 992 and Mobile ≤476 derive down with body frozen and display compressed (×83% / ×67% at the top of the ramp).", onclick: () => this.addStandardTypeModes() })] : []),
     );
   }
 
@@ -190,13 +195,11 @@ export class TypeSectionImpl {
   // shape exports — committing just makes them matrix-editable. The split CSS export (typeTokensCSS for
   // the unconditional Desktop base + typeTokensBreakpointCSS per mode) reads these directly, no re-anchor.
   addStandardTypeModes() {
-    const seed = Date.now().toString(36);
-    const rungs = [{ name: "Tablet", w: 992, factor: 5 / 6 }, { name: "Mobile", w: 476, factor: 2 / 3 }];
     this.typeMode = "base"; // stay on Desktop (the designed scale — nothing about it changed)
     this.commit((d) => {
       d.type = { ...(d.type || DEFAULT_TYPE), baseName: "Desktop" };
       const modes = d.type.modes ? [...d.type.modes] : [];
-      rungs.forEach((r, i) => modes.push({ id: `tm-${seed}-${i}`, name: r.name, factor: r.factor, minWidth: r.w }));
+      STANDARD_TYPE_RUNGS.forEach((r) => modes.push({ id: r.id, name: r.name, factor: r.factor, minWidth: r.w }));
       d.type.modes = modes;
     });
   }
@@ -360,8 +363,7 @@ export class TypeSectionImpl {
   // mode, side by side, inside ONE pannable .canvas-scene (so pan/zoom/fit move all columns together).
   // Mirrors Color's renderCompareArea; each column forces its breakpoint via _typeModeOverride while it builds.
   renderTypeCompareArea(view) {
-    const t = this.doc.type || DEFAULT_TYPE;
-    const modes = t.modes || [];
+    const modes = this._typeEffectiveModes();
     const area = h(
       "div",
       { class: "canvas-area canvas-compare type-canvas canvas-scheme-" + this.resolvedCanvasScheme(),
@@ -400,6 +402,17 @@ export class TypeSectionImpl {
     return Object.keys(out).length ? out : undefined;
   }
 
+  // _typeEffectiveModes — doc.type.modes if any have been materialized, else the Standard set rendered
+  // LIVE (STANDARD_TYPE_RUNGS) so Tablet/Mobile are visible/selectable/previewable without an explicit
+  // materialize step. Shaped identically to a real mode entry so every consumer (the mode tabs, the
+  // tokens matrix, _typeScaleFor) treats them the same way; only an actual EDIT materializes them for
+  // real (setTypeTokenOverride), using these SAME ids so the edit keeps resolving afterward.
+  _typeEffectiveModes() {
+    const t = this.doc.type || DEFAULT_TYPE;
+    if ((t.modes || []).length) return t.modes;
+    return STANDARD_TYPE_RUNGS.map((r) => ({ id: r.id, name: r.name, factor: r.factor, minWidth: r.w }));
+  }
+
   // _typeScaleFor(modeKey) — the resolved typeScale for a mode WITH that mode's per-cell overrides applied.
   // "base" → doc.type; a mode id → the mode's own levers layered on doc.type: EITHER a bodyBase override
   // (legacy custom modes) or a hierarchy-aware compression `factor` (the Standard set: Tablet 5/6 ·
@@ -407,7 +420,7 @@ export class TypeSectionImpl {
   // reach the matrix, the specimen, and every export consistently.
   _typeScaleFor(modeKey) {
     const t = this.doc.type || DEFAULT_TYPE;
-    const base = modeKey === "base" ? t : (() => { const m = (t.modes || []).find((x) => x.id === modeKey); return m ? { ...t, bodyBase: m.bodyBase ?? t.bodyBase, modeFactor: m.factor ?? 1 } : t; })();
+    const base = modeKey === "base" ? t : (() => { const m = this._typeEffectiveModes().find((x) => x.id === modeKey); return m ? { ...t, bodyBase: m.bodyBase ?? t.bodyBase, modeFactor: m.factor ?? 1 } : t; })();
     const overrides = { ...this._modeTierNudge(base.modeFactor), ...this._typeOverridesFor(modeKey) };
     return typeScale({ ...base, overrides });
   }
@@ -415,6 +428,9 @@ export class TypeSectionImpl {
 
   // setTypeTokenOverride / clearTypeTokenOverride — write/reset one per-cell SIZE override (one undo step;
   // persisted). Mirrors setRoleOverride/clearRoleOverride. A non-positive/NaN size is ignored (use ↺ to reset).
+  // A first edit against a not-yet-materialized Standard-set rung (std-tablet/std-mobile) materializes
+  // BOTH rungs in the SAME commit — one undo step, matching addStandardTypeModes' existing contract —
+  // using the SAME stable ids so this write keeps resolving once real.
   setTypeTokenOverride(voice, step, modeKey, size) {
     let n = Math.round(Number(size));
     if (!Number.isFinite(n) || n <= 0) return;
@@ -422,6 +438,10 @@ export class TypeSectionImpl {
     const key = voice + "|" + step + "|" + modeKey;
     this.commit((d) => {
       d.type = { ...(d.type || DEFAULT_TYPE) };
+      if (!(d.type.modes || []).length && STANDARD_TYPE_RUNGS.some((r) => r.id === modeKey)) {
+        d.type.baseName = d.type.baseName || "Desktop";
+        d.type.modes = STANDARD_TYPE_RUNGS.map((r) => ({ id: r.id, name: r.name, factor: r.factor, minWidth: r.w }));
+      }
       d.type.tokenOverrides = { ...(d.type.tokenOverrides || {}), [key]: n };
     });
   }
@@ -442,10 +462,9 @@ export class TypeSectionImpl {
   // the resolved (override-aware) typeScale + its real modeKey so a cell can build its override key and read
   // the value at that step × that mode. Built via _typeScaleFor so overrides match the specimen + exports.
   _typeTokenColumns() {
-    const t = this.doc.type || DEFAULT_TYPE; // the DOCUMENT base — mode-independent (NOT _activeType, which tracks the header Mode selector)
     const { baseName: bn, baseLast } = this._typeBaseOpts();
     const baseCol = { id: "base", modeKey: "base", name: bn, minWidth: null, scale: this._typeScaleFor("base") };
-    const modes = (t.modes || [])
+    const modes = this._typeEffectiveModes()
       .map((m) => ({ id: m.id, modeKey: m.id, name: m.name || "Mode", minWidth: Number(m.minWidth) || 0, scale: this._typeScaleFor(m.id) }))
       // a named base reads desktop-first (widest first); the legacy "Base" shape stays ascending.
       .sort((a, b) => (bn === "Base" ? a.minWidth - b.minWidth : b.minWidth - a.minWidth));
