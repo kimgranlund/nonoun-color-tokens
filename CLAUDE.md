@@ -77,11 +77,8 @@ Canonical specs + rubrics: `docs/reference/` (e.g. `docs/reference/data/role-tab
 
 ## Shipping
 
-Branch from `origin/main` → `npm test` (+ `npm run build` if the build is touched) green → PR → CI
-(build · test · smoke) → `gh pr merge <n> --squash` → sync local `main` with `git merge --ff-only
-origin/main` (squash leaves branches looking unmerged → `git branch -D`). End commit messages with the
-`Co-Authored-By: Claude Opus 4.8 (1M context)` trailer. When background agents edit the shared tree
-concurrently, isolate your commit in a `git worktree` off `origin/main`.
+Full release workflow (branch → gates → PR → CI → squash-merge → sync) is owned by the
+`shipping-changes` skill — invoke it when a change is ready to land.
 
 ## Always
 
