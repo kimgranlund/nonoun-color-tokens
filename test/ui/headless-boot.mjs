@@ -1776,12 +1776,29 @@ app.setTypeSpecMode("tokens"); flushRaf();
 ok(!!app.querySelector(".tok-table") && !app.querySelector(".type-spec"), "(ty-tok) the Specimen·Tokens toggle renders the token matrix table (no specimen scene)");
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(ty-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
 ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Desktop")).length === 1 && walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 0, "(ty-tok) the base column header reads Desktop (the designed scale, the intrinsic anchor — no 'Base' column)");
-ok(app._typeTokenColumns().length === 1, "(ty-tok) base-only — exactly one column (Base) with no breakpoints");
+ok(app._typeTokenColumns().length === 3 && app._typeTokenColumns()[1].id === "std-tablet" && app._typeTokenColumns()[2].id === "std-mobile", "(ty-tok) Base + the Standard-set Tablet/Mobile columns render LIVE before any breakpoint is materialized");
 ok(app.querySelectorAll(".tok-row").length === TYPE_STEPS, `(ty-tok) one row per type step (${TYPE_STEPS}) (got ${app.querySelectorAll(".tok-row").length})`);
 ok(app.querySelectorAll(".tok-group").length === VOICES, `(ty-tok) the rows are grouped by voice — ${VOICES} group headers (got ${app.querySelectorAll(".tok-group").length})`);
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}).startsWith("--type-display-lg"), `(ty-tok) the first (sticky) token name is the --type-display-lg step (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setTypeSpecMode("specimen"); flushRaf();
 ok(!!app.querySelector(".type-spec") && !app.querySelector(".tok-table"), "(ty-tok) toggling back to Specimen restores the live specimen (token table gone)");
+// (ty-slider-automat) the inspector's Body-base slider (a SEPARATE write path from the tokens-matrix
+// cell) must ALSO materialize on first touch — a silent no-op here was the actual bug this covers.
+ok(!app.doc.type.modes, "(ty-slider-automat) fresh doc has no materialized modes yet");
+app.typeMode = "std-tablet";
+app._setActiveTypeBodyBase(18); app.commitDrag?.(); flushRaf();
+ok(Array.isArray(app.doc.type.modes) && app.doc.type.modes.length === 2 && app.doc.type.modes.some((m) => m.id === "std-tablet") && app.doc.type.modes.some((m) => m.id === "std-mobile"), "(ty-slider-automat) dragging the Body-base slider on std-tablet materializes BOTH Standard-set rungs");
+ok(app.doc.type.modes.find((m) => m.id === "std-tablet").bodyBase === 18, "(ty-slider-automat) the slider's edit itself is written, not silently dropped");
+app.commit((d) => { delete d.type.modes; delete d.type.tokenOverrides; }); flushRaf(); // reset before (ty-tok-automat) below
+// (ty-tok-automat) editing a cell under a not-yet-materialized Standard-set rung materializes BOTH
+// rungs in ONE commit (matching addStandardTypeModes' contract), using the SAME stable ids the
+// pre-materialization preview used — so the write resolves correctly and nothing needs a second edit.
+ok(!app.doc.type.modes, "(ty-tok-automat) fresh doc has no materialized modes yet");
+app.setTypeTokenOverride("Body", "MD", "std-tablet", 30); flushRaf();
+ok(Array.isArray(app.doc.type.modes) && app.doc.type.modes.length === 2 && app.doc.type.modes.some((m) => m.id === "std-tablet") && app.doc.type.modes.some((m) => m.id === "std-mobile"), "(ty-tok-automat) the first edit against std-tablet materializes BOTH Standard-set rungs in one commit");
+ok(app.doc.type.tokenOverrides["Body|MD|std-tablet"] === 30, "(ty-tok-automat) the override that triggered materialization is itself written correctly");
+ok(app._typeScaleFor("std-tablet").categories.Body.MD.size === 30, "(ty-tok-automat) the materialized mode still resolves through _typeScaleFor by its stable id");
+// (ty-bp) below fully replaces d.type, so the modes/overrides just materialized here don't leak forward.
 // ── (ty-bp) Typography breakpoint MODES (Phase 5) — add/switch/edit/delete a named bodyBase variant ──
 app.commit((d) => { d.type = { treatment: "product", bodyBase: 16 }; }); flushRaf();
 app.addTypeMode(); flushRaf();
@@ -1901,7 +1918,8 @@ app.typeMode = "compare"; app.render(); flushRaf();
 }
 app.typeMode = "base"; app.render(); flushRaf();
 ok(!app.querySelector(".compare-col") && !!app.querySelector(".type-spec") && app.querySelectorAll(".type-spec-line").length === TYPE_STEPS, "(ty-cmp) leaving Compare restores the single specimen scene");
-// Compare is omitted when only Base exists (after the mode is deleted below) — asserted in (ty-cmp-omit).
+// Compare/All stays present after the last real mode is deleted below — the Standard-set fallback keeps
+// Tablet/Mobile (and All) visible even pre-materialization — asserted in (ty-cmp-present).
 // (ty-tok-orphan) MAJOR 5 — deleting a mode STRIPS that mode's per-cell overrides (no "...|<id>" orphans
 // survive serialize→hydrate forever). Set a per-mode override, delete the mode, assert the key is gone.
 app.setTypeTokenOverride("Body", "MD", _bpId, 21); flushRaf();
@@ -1909,7 +1927,7 @@ ok(app.doc.type.tokenOverrides && app.doc.type.tokenOverrides["Body|MD|" + _bpId
 app.typeMode = "compare"; app.render(); flushRaf(); // delete the LAST mode WHILE in Compare → must fall back to Base
 app.deleteTypeMode(_bpId); flushRaf();
 ok(!app.doc.type.modes && app.typeMode === "base", "(ty-cmp) deleting the last mode while in Compare drops it + falls back to Base (no orphaned compare-of-one)");
-ok(walk(app, (e) => e.tagName === "BUTTON" && e.getAttribute && e.getAttribute("data-fk") === "tmode:compare").length === 0, "(ty-cmp-omit) the Compare item is omitted when only Base exists (no breakpoint modes)");
+ok(walk(app, (e) => e.tagName === "BUTTON" && e.getAttribute && e.getAttribute("data-fk") === "tmode:compare").length === 1, "(ty-cmp-present) the Compare/All item stays present after deleting the last real mode — the Standard-set fallback keeps Tablet/Mobile visible");
 ok(!app.doc.type.tokenOverrides, "(ty-tok-orphan) deleting the mode strips its per-cell override AND drops the now-empty tokenOverrides map");
 app.commit((d) => { d.type = { treatment: "product", bodyBase: 16 }; }); // restore default
 app.setSection("color"); flushRaf();
@@ -1961,11 +1979,27 @@ app.setGeomSpecMode("tokens"); flushRaf();
 ok(!!app.querySelector(".tok-table") && !app.querySelector(".geom-spec"), "(geo-tok) the Controls·Tokens toggle renders the token matrix table (no controls scene)");
 ok(!!app.querySelector(".is-table") && !!app.querySelector(".is-table").querySelector(".tok-table"), "(geo-tok) the token table lives in the scrolling .is-table canvas shell (no pan/zoom)");
 ok(walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Desktop")).length === 1 && walk(app, (e) => e.classList && e.classList.contains("tok-col") && txtOf(e).includes("Base")).length === 0, "(geo-tok) the base column header reads Desktop (the designed scale, the intrinsic anchor — no 'Base' column)");
-ok(app._geomTokenColumns().length === 1, "(geo-tok) base-only — exactly one column (Base) with no breakpoints");
+ok(app._geomTokenColumns().length === 3 && app._geomTokenColumns()[1].id === "std-tablet" && app._geomTokenColumns()[2].id === "std-mobile", "(geo-tok) Base + the Standard-set Tablet/Mobile columns render LIVE before any breakpoint is materialized");
 ok(app.querySelectorAll(".tok-row").length === GEOM_SIZES, `(geo-tok) one row per control size (${GEOM_SIZES}) (got ${app.querySelectorAll(".tok-row").length})`);
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}) === "--size-2xl", `(geo-tok) the first (sticky) token name is --size-2xl (largest→smallest) (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setGeomSpecMode("controls"); flushRaf();
 ok(!!app.querySelector(".geom-spec") && !app.querySelector(".tok-table"), "(geo-tok) toggling back to Controls restores the live controls scene (token table gone)");
+// (geo-slider-automat) mirror of (ty-slider-automat): the inspector's Base-height/Ramp-contrast sliders
+// are a SEPARATE write path from the tokens-matrix cell and must ALSO materialize on first touch.
+ok(!app.doc.geometry.modes, "(geo-slider-automat) fresh doc has no materialized modes yet");
+app.geomMode = "std-tablet";
+app._setActiveGeomBaseHeight(24); app.commitDrag?.(); flushRaf();
+ok(Array.isArray(app.doc.geometry.modes) && app.doc.geometry.modes.length === 2 && app.doc.geometry.modes.some((m) => m.id === "std-tablet") && app.doc.geometry.modes.some((m) => m.id === "std-mobile"), "(geo-slider-automat) dragging Base-height on std-tablet materializes BOTH Standard-set rungs");
+ok(app.doc.geometry.modes.find((m) => m.id === "std-tablet").baseHeight === 24, "(geo-slider-automat) the slider's edit itself is written, not silently dropped");
+app.commit((d) => { delete d.geometry.modes; delete d.geometry.tokenOverrides; }); flushRaf(); // reset before (geo-tok-automat) below
+// (geo-tok-automat) mirror of (ty-tok-automat): editing a cell under a not-yet-materialized Standard-set
+// rung materializes BOTH rungs in ONE commit, using the SAME stable ids the preview used.
+ok(!app.doc.geometry.modes, "(geo-tok-automat) fresh doc has no materialized modes yet");
+app.setGeomTokenOverride("MD", "std-tablet", 26); flushRaf();
+ok(Array.isArray(app.doc.geometry.modes) && app.doc.geometry.modes.length === 2 && app.doc.geometry.modes.some((m) => m.id === "std-tablet") && app.doc.geometry.modes.some((m) => m.id === "std-mobile"), "(geo-tok-automat) the first edit against std-tablet materializes BOTH Standard-set rungs in one commit");
+ok(app.doc.geometry.tokenOverrides["MD|std-tablet"] === 26, "(geo-tok-automat) the override that triggered materialization is itself written correctly");
+ok(app._geomScaleFor("std-tablet").sizes.MD.height === 26, "(geo-tok-automat) the materialized mode still resolves through _geomScaleFor by its stable id");
+// (geo-bp) below fully replaces d.geometry, so the modes/overrides just materialized here don't leak forward.
 // ── (geo-bp) Geometry breakpoint MODES (Phase 5) — mirror of (ty-bp): add/switch/edit/delete a baseHeight variant ──
 app.commit((d) => { d.geometry = { treatment: "comfortable", baseHeight: 28 }; }); flushRaf();
 app.addGeomMode(); flushRaf();
@@ -2053,7 +2087,7 @@ ok(app.doc.geometry.tokenOverrides && app.doc.geometry.tokenOverrides["MD|" + _g
 app.geomMode = "compare"; app.render(); flushRaf(); // delete the LAST mode WHILE in Compare → must fall back to Base
 app.deleteGeomMode(_gbpId); flushRaf();
 ok(!app.doc.geometry.modes && app.geomMode === "base", "(geo-cmp) deleting the last mode while in Compare drops it + falls back to Base (no orphaned compare-of-one)");
-ok(walk(app, (e) => e.tagName === "BUTTON" && e.getAttribute && e.getAttribute("data-fk") === "gmode:compare").length === 0, "(geo-cmp-omit) the Compare item is omitted when only Base exists (no breakpoint modes)");
+ok(walk(app, (e) => e.tagName === "BUTTON" && e.getAttribute && e.getAttribute("data-fk") === "gmode:compare").length === 1, "(geo-cmp-present) the Compare/All item stays present after deleting the last real mode — the Standard-set fallback keeps Tablet/Mobile visible");
 ok(!app.doc.geometry.tokenOverrides, "(geo-tok-orphan) deleting the mode strips its per-cell override AND drops the now-empty tokenOverrides map");
 app.commit((d) => { d.geometry = { treatment: "comfortable", baseHeight: 28 }; }); // restore default
 app.setSection("color"); flushRaf();

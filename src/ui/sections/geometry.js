@@ -5,6 +5,15 @@ import { DEFAULT_GEOMETRY, GEOMETRY_TREATMENTS, geomScale, geomTokensBreakpointC
 import { icon } from "../icons.js";
 import { btn, chip, ensureTypeFonts, field, fmt, h, swatch } from "../app-helpers.mjs";
 
+// STANDARD_GEOM_RUNGS — the ratified desktop-anchored Standard set: Tablet/Mobile derive DOWN via a
+// fixed height DROP from the doc's current baseHeight (floor 20). STABLE ids (not seeded/random) so a
+// token override written against a not-yet-materialized rung (see _geomEffectiveModes /
+// setGeomTokenOverride) keeps resolving once it IS materialized.
+const STANDARD_GEOM_RUNGS = [
+  { id: "std-tablet", name: "Tablet", w: 992, drop: 2 },
+  { id: "std-mobile", name: "Mobile", w: 476, drop: 4 },
+];
+
 // Prototype mixin (TKT-0023): a class body used ONLY as a verbatim, comma-free carrier for these
 // methods — copied onto HctApp.prototype (see app.js's mixin() call), never instantiated directly.
 export class GeomSectionImpl {
@@ -21,6 +30,31 @@ export class GeomSectionImpl {
     return Object.keys(out).length ? out : undefined;
   }
 
+  // _geomEffectiveModes — doc.geometry.modes if any have been materialized, else the Standard set
+  // rendered LIVE (STANDARD_GEOM_RUNGS, height derived from the doc's CURRENT baseHeight) so
+  // Tablet/Mobile are visible/selectable/previewable without an explicit materialize step. Shaped
+  // identically to a real mode entry so every consumer treats them the same way; only an actual EDIT
+  // materializes them for real (setGeomTokenOverride), using these SAME ids so the edit keeps resolving
+  // afterward.
+  _geomEffectiveModes() {
+    const g = this.doc.geometry || DEFAULT_GEOMETRY;
+    if ((g.modes || []).length) return g.modes;
+    const bh = Number(g.baseHeight) || DEFAULT_GEOMETRY.baseHeight || 28;
+    return STANDARD_GEOM_RUNGS.map((r) => ({ id: r.id, name: r.name, baseHeight: Math.max(20, bh - r.drop), minWidth: r.w }));
+  }
+
+  // _ensureGeomModesMaterialized(d) — if d.geometry has no real modes yet AND modeKey is one of the
+  // Standard-set rungs, materialize BOTH rungs (same stable ids _geomEffectiveModes already previewed)
+  // so a write against modeKey has a real entry to land in. Mutates d.geometry in place; call inside a
+  // commit/editDrag closure BEFORE writing the actual per-mode value. A no-op for "base", a real custom
+  // mode id, or when modes already exist.
+  _ensureGeomModesMaterialized(d, modeKey) {
+    if ((d.geometry.modes || []).length || !STANDARD_GEOM_RUNGS.some((r) => r.id === modeKey)) return;
+    const bh = Number(d.geometry.baseHeight) || DEFAULT_GEOMETRY.baseHeight || 28;
+    d.geometry.baseName = d.geometry.baseName || "Desktop";
+    d.geometry.modes = STANDARD_GEOM_RUNGS.map((r) => ({ id: r.id, name: r.name, baseHeight: Math.max(20, bh - r.drop), minWidth: r.w }));
+  }
+
   // _geomScaleFor(modeKey) — the resolved geometry scale for a mode WITH that mode's per-cell HEIGHT
   // overrides applied, COMPOSED with the type scale at the SAME mode — a control's text size (SM/MD/LG
   // `font`) is the UI-CONTROL voice at that mode (TKT-0008; XS/XL/2XL fall back to the engine's fixed
@@ -31,10 +65,13 @@ export class GeomSectionImpl {
     // shape — base isn't compressed, so inheritance is natural). Legacy #251 committed sets always carry
     // explicit per-mode values, so they resolve identically; a legacy compressed base (contrast 0) with a
     // silent mode keeps the old full-ramp default via the ?? 1 tail.
-    const cfg = modeKey === "base" ? g : (() => { const m = (g.modes || []).find((x) => x.id === modeKey); return m ? { ...g, baseHeight: m.baseHeight, rampContrast: m.rampContrast ?? ((g.baseName || "Base") === "Desktop" ? g.rampContrast : undefined) ?? 1 } : g; })();
+    const cfg = modeKey === "base" ? g : (() => { const m = this._geomEffectiveModes().find((x) => x.id === modeKey); return m ? { ...g, baseHeight: m.baseHeight, rampContrast: m.rampContrast ?? ((g.baseName || "Base") === "Desktop" ? g.rampContrast : undefined) ?? 1 } : g; })();
     return geomScale(cfg, { typeScale: this._typeScaleFor(modeKey), overrides: this._geomOverridesFor(modeKey) });
   }
 
+  // A first edit against a not-yet-materialized Standard-set rung (std-tablet/std-mobile) materializes
+  // BOTH rungs in the SAME commit — one undo step, matching addStandardGeomModes' existing contract —
+  // using the SAME stable ids so this write keeps resolving once real.
   setGeomTokenOverride(size, modeKey, height) {
     let n = Math.round(Number(height));
     if (!Number.isFinite(n) || n <= 0) return;
@@ -42,6 +79,7 @@ export class GeomSectionImpl {
     const key = size + "|" + modeKey;
     this.commit((d) => {
       d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
+      this._ensureGeomModesMaterialized(d, modeKey);
       d.geometry.tokenOverrides = { ...(d.geometry.tokenOverrides || {}), [key]: n };
     });
   }
@@ -78,10 +116,9 @@ export class GeomSectionImpl {
   // per breakpoint MODE sorted ascending by minWidth. Mirrors _typeTokenColumns / _geomModeScales but
   // prepends Base = the DOCUMENT base composed geometry scale (mode-independent — NOT _activeGeomScale).
   _geomTokenColumns() {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
     const { baseName: bn, baseLast } = this._geomBaseOpts();
     const baseCol = { id: "base", modeKey: "base", name: bn, minWidth: null, scale: this._geomScaleFor("base") };
-    const modes = (g.modes || [])
+    const modes = this._geomEffectiveModes()
       .map((m) => ({ id: m.id, modeKey: m.id, name: m.name || "Mode", minWidth: Number(m.minWidth) || 0, scale: this._geomScaleFor(m.id) }))
       // a named base reads desktop-first (widest first); the legacy "Base" shape stays ascending.
       .sort((a, b) => (bn === "Base" ? a.minWidth - b.minWidth : b.minWidth - a.minWidth));
@@ -179,9 +216,8 @@ export class GeomSectionImpl {
   // applies that mode's per-cell height overrides (so the canvas/inspector reflect the matrix). Routed
   // through _geomScaleFor so overrides are consistent with the matrix + every export.
   _activeGeomScale() {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
     const mode = this._effGeomMode();
-    const key = mode === "base" || !(g.modes || []).some((m) => m.id === mode) ? "base" : mode;
+    const key = mode === "base" || !this._geomEffectiveModes().some((m) => m.id === mode) ? "base" : mode;
     return this._geomScaleFor(key);
   }
 
@@ -229,7 +265,7 @@ export class GeomSectionImpl {
   // canonical desktop-first order (Desktop · Tablet · Mobile), matching the Figma mode-column order.
   geomModeControl() {
     const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const modes = g.modes || [];
+    const modes = this._geomEffectiveModes();
     const { baseName: bn, baseLast } = this._geomBaseOpts();
     // reset an unknown/deleted mode to base — but "compare" (Phase 5.3) is a valid pseudo-mode, allow it.
     if (this.geomMode !== "base" && this.geomMode !== "compare" && !modes.some((m) => m.id === this.geomMode)) this.geomMode = "base";
@@ -238,7 +274,7 @@ export class GeomSectionImpl {
     const items = [
       ...(baseLast ? [...modeItems, baseItem] : [baseItem, ...modeItems]),
       // Compare = all breakpoints side by side (Phase 5.3). Meaningless with only the base, so only when ≥1 mode.
-      ...(modes.length ? [{ id: "compare", label: "Compare", title: "All breakpoints side by side" }] : []),
+      ...(modes.length ? [{ id: "compare", label: "All", title: "All breakpoints side by side" }] : []),
     ];
     return h(
       "div",
@@ -246,9 +282,6 @@ export class GeomSectionImpl {
       this.segmented(items, this.geomMode, (id) => { this.geomMode = id; this.render(); },
         { cls: "canvas-seg", ariaLabel: "Geometry breakpoint mode", role: "group", idPrefix: "gmode" }),
       btn(icon("plus"), { cls: "mode-add", ariaLabel: "Add a breakpoint mode", title: "Add a breakpoint — a named ramp with its own base control height", onclick: () => this.addGeomMode() }),
-      // one-click standard set — only while no modes exist (mirrors the Typography control). It
-      // MATERIALIZES the intrinsic synthesized modes as editable doc modes (same values, same law).
-      ...(modes.length === 0 ? [btn("Standard set", { cls: "mode-add", ariaLabel: "Add the standard breakpoint set", title: "Materialize the standard breakpoints for editing — your ramp IS Desktop (1280, Figma's default mode); Tablet 992 (heights −2) and Mobile ≤476 (heights −4) derive down. One undo step.", onclick: () => this.addStandardGeomModes() })] : []),
     );
   }
 
@@ -261,13 +294,11 @@ export class GeomSectionImpl {
   // One commit = one undo step.
   addStandardGeomModes() {
     const bh = (this.doc.geometry && this.doc.geometry.baseHeight) ?? 28;
-    const seed = Date.now().toString(36);
-    const rungs = [{ name: "Tablet", w: 992, drop: 2 }, { name: "Mobile", w: 476, drop: 4 }];
     this.geomMode = "base"; // stay on Desktop (the designed ramp — nothing about it changed)
     this.commit((d) => {
       d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY), baseName: "Desktop" };
       const modes = d.geometry.modes ? [...d.geometry.modes] : [];
-      rungs.forEach((r, i) => modes.push({ id: `gm-${seed}-${i}`, name: r.name, baseHeight: Math.max(20, bh - r.drop), minWidth: r.w }));
+      STANDARD_GEOM_RUNGS.forEach((r) => modes.push({ id: r.id, name: r.name, baseHeight: Math.max(20, bh - r.drop), minWidth: r.w }));
       d.geometry.modes = modes;
     });
   }
@@ -313,7 +344,10 @@ export class GeomSectionImpl {
       d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
       // Compare shows the Base scale in the inspector, so its slider edits Base (not a per-mode no-op).
       if (this.geomMode === "base" || this.geomMode === "compare") d.geometry.baseHeight = bh;
-      else d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, baseHeight: bh } : m));
+      else {
+        this._ensureGeomModesMaterialized(d, this.geomMode); // a not-yet-materialized std-tablet/std-mobile needs a real entry to land in
+        d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, baseHeight: bh } : m));
+      }
     });
   }
 
@@ -323,7 +357,10 @@ export class GeomSectionImpl {
     this.editDrag((d) => {
       d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
       if (this.geomMode === "base" || this.geomMode === "compare") d.geometry.rampContrast = c;
-      else d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, rampContrast: c } : m));
+      else {
+        this._ensureGeomModesMaterialized(d, this.geomMode);
+        d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, rampContrast: c } : m));
+      }
     });
   }
 
@@ -435,8 +472,7 @@ export class GeomSectionImpl {
   // mode, side by side, in ONE pannable .canvas-scene. Mirrors renderTypeCompareArea / Color's renderCompareArea;
   // each column forces its breakpoint via _geomModeOverride while it builds.
   renderGeomCompareArea(view) {
-    const g = this.doc.geometry || DEFAULT_GEOMETRY;
-    const modes = g.modes || [];
+    const modes = this._geomEffectiveModes();
     const area = h(
       "div",
       { class: "canvas-area canvas-compare geom-canvas canvas-scheme-" + this.resolvedCanvasScheme(),
