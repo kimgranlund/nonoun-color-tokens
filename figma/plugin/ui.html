@@ -1439,24 +1439,31 @@ a.account-manage:hover { text-decoration: underline; }
 .tyi-example .ex-btn { align-self: flex-start; margin-top: 4px; }
 
 /* ── Geometry section — the canvas scene (full dimensional dataset) mirrors the Typography specimen ── */
-.geom-spec { display: flex; flex-direction: column; gap: 20px; padding: 16px 20px; width: 600px; max-width: 600px; }
+.geom-spec { display: flex; flex-direction: column; gap: 20px; padding: 16px 20px; width: 720px; max-width: 720px; }
 .geom-spec-head { display: flex; align-items: baseline; gap: 10px; }
 .geom-spec-head b { font-size: 14px; color: var(--ink); }
 .geom-spec-head small { color: var(--ink-dim); font-size: 12px; }
 .geom-spec-note { color: var(--ink-dim); font-size: 12px; line-height: 1.55; margin: 0; }
 .geom-shared-note { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--r-sm); background: var(--c-neutral-container); color: var(--ink-dim); font-size: 11.5px; line-height: 1.45; }
 .geom-shared-note .ic { flex: none; color: var(--accent); }
-.geom-spec-group { display: flex; flex-direction: column; gap: 10px; }
+.geom-spec-group { display: flex; flex-direction: column; gap: 16px; }
 .geom-spec-grouphead { display: flex; gap: 8px; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 5px; }
 .geom-spec-grouphead b { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-dim); }
 .geom-spec-grouphead small { color: var(--ink-faint); font-size: 11px; }
 .geom-spec-count { margin-left: auto; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
-.geom-spec-line { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: var(--r); border: 1px solid transparent; }
+.geom-spec-line { display: flex; flex-direction: column; gap: 10px; padding: 8px; border-radius: var(--r); border: 1px solid transparent; }
 .geom-spec-line:hover { border-color: var(--line); }
 .geom-spec-meta { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--ink-faint); }
 .geom-spec-token { font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px; color: var(--ink-dim); background: color-mix(in srgb, var(--line) 60%, transparent); padding: 1px 5px; border-radius: 4px; }
 .geom-spec-dims { color: var(--ink-faint); }
-.geom-spec-render { display: flex; }
+/* the per-size component row: Button · Select · Switch side by side, one gap between siblings. */
+.geom-spec-render { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+/* Select — the outlined sibling (border color = the palette's outlineVariant, set inline). */
+.geom-select { display: inline-flex; align-items: center; box-sizing: border-box; flex: none;
+  background: transparent; border: 1.5px solid; font-weight: 500; line-height: 1; }
+/* Switch (ON) — track + a right-inset circular thumb; every dimension/color set inline from the ramp. */
+.geom-switch { flex: none; position: relative; display: inline-block; box-sizing: border-box; }
+.geom-switch-thumb { position: absolute; top: 50%; transform: translateY(-50%); border-radius: 50%; }
 .geom-scale-row { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; }
 /* the live mock control on the ramp (and the inspector example reuse the glyph/caret idiom) — background/
    color come from the selected palette's own roles, set inline (see _geomPaletteColors in geometry.js). */
@@ -13549,9 +13556,9 @@ class GeomSectionImpl {
     const scale = this._activeGeomScale(); // composed with the type scale — per-step `font` is the brand UI size
     const t = GEOMETRY_TREATMENTS.find((x) => x.id === cfg.treatment) || GEOMETRY_TREATMENTS[0];
     const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    // painted in the SELECTED palette's own prime/on-prime — same resolution geomExampleCard uses, so
+    // painted in the SELECTED palette's own roles — same resolution geomExampleCard uses, so
     // the canvas ramp isn't a generic-accent mock while the pinned inspector card is palette-real.
-    const { pick, main, onMain } = this._geomPaletteColors(view);
+    const { pick, byKey, main, onMain } = this._geomPaletteColors(view);
     // the control ramp renders LARGEST → smallest (biggest example first); heights are monotonic by step.
     const SIZE_NAMES = ["2XL", "XL", "LG", "MD", "SM", "XS"];
     const ctlLine = (name) => {
@@ -13568,6 +13575,30 @@ class GeomSectionImpl {
         h("span", { class: "geom-ctl-label" }, "Button"),
         h("span", { class: "geom-caret", style: `width:${s.caret}px;height:${s.caret}px` }, icon("caret-left")),
       );
+      // Select — the outlined sibling (outlineVariant border, per the app's own input-border mapping):
+      // same height/font/pad/gap/radius tokens on a bordered, unfilled shape.
+      const sel = h(
+        "div",
+        {
+          class: "geom-select",
+          style: `border-color:${pick(byKey.outlineVariant)};color:${pick(byKey.onSurface)};height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
+          title: `select · height ${s.height} · font ${s.font} · pad ${s.paddingNarrow} · radius ${s.radiusPill}`,
+        },
+        h("span", { class: "geom-ctl-label" }, "Select"),
+        h("span", { class: "geom-caret", style: `width:${s.caret}px;height:${s.caret}px` }, icon("caret-left")),
+      );
+      // Switch (ON) — the thumb IS the glyph cell: diameter = icon, inset = paddingNarrow, so the
+      // centering law renders literally ((height − icon)/2 on all sides). Track ≈ 1.75× height.
+      const swW = Math.round(s.height * 1.75);
+      const sw = h(
+        "span",
+        {
+          class: "geom-switch",
+          style: `width:${swW}px;height:${s.height}px;background:${pick(main)};border-radius:${s.radiusPill}px`,
+          title: `switch · track ${swW}×${s.height} · thumb ${s.icon} · inset ${s.paddingNarrow} (the centering law)`,
+        },
+        h("span", { class: "geom-switch-thumb", style: `width:${s.icon}px;height:${s.icon}px;right:${s.paddingNarrow}px;background:${pick(onMain)}` }),
+      );
       return h(
         "div",
         { class: "geom-spec-line" },
@@ -13581,7 +13612,7 @@ class GeomSectionImpl {
           h("span", { class: "geom-spec-dims" }, `pad ${s.paddingNarrow}`),
           h("span", { class: "geom-spec-dims" }, `r ${s.radiusPill}`),
         ),
-        h("div", { class: "geom-spec-render" }, box),
+        h("div", { class: "geom-spec-render" }, box, sel, sw),
       );
     };
     const ladderRow = (entries, swatch) =>

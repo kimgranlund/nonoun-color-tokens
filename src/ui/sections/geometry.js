@@ -510,9 +510,9 @@ export class GeomSectionImpl {
     const scale = this._activeGeomScale(); // composed with the type scale — per-step `font` is the brand UI size
     const t = GEOMETRY_TREATMENTS.find((x) => x.id === cfg.treatment) || GEOMETRY_TREATMENTS[0];
     const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    // painted in the SELECTED palette's own prime/on-prime — same resolution geomExampleCard uses, so
+    // painted in the SELECTED palette's own roles — same resolution geomExampleCard uses, so
     // the canvas ramp isn't a generic-accent mock while the pinned inspector card is palette-real.
-    const { pick, main, onMain } = this._geomPaletteColors(view);
+    const { pick, byKey, main, onMain } = this._geomPaletteColors(view);
     // the control ramp renders LARGEST → smallest (biggest example first); heights are monotonic by step.
     const SIZE_NAMES = ["2XL", "XL", "LG", "MD", "SM", "XS"];
     const ctlLine = (name) => {
@@ -529,6 +529,30 @@ export class GeomSectionImpl {
         h("span", { class: "geom-ctl-label" }, "Button"),
         h("span", { class: "geom-caret", style: `width:${s.caret}px;height:${s.caret}px` }, icon("caret-left")),
       );
+      // Select — the outlined sibling (outlineVariant border, per the app's own input-border mapping):
+      // same height/font/pad/gap/radius tokens on a bordered, unfilled shape.
+      const sel = h(
+        "div",
+        {
+          class: "geom-select",
+          style: `border-color:${pick(byKey.outlineVariant)};color:${pick(byKey.onSurface)};height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
+          title: `select · height ${s.height} · font ${s.font} · pad ${s.paddingNarrow} · radius ${s.radiusPill}`,
+        },
+        h("span", { class: "geom-ctl-label" }, "Select"),
+        h("span", { class: "geom-caret", style: `width:${s.caret}px;height:${s.caret}px` }, icon("caret-left")),
+      );
+      // Switch (ON) — the thumb IS the glyph cell: diameter = icon, inset = paddingNarrow, so the
+      // centering law renders literally ((height − icon)/2 on all sides). Track ≈ 1.75× height.
+      const swW = Math.round(s.height * 1.75);
+      const sw = h(
+        "span",
+        {
+          class: "geom-switch",
+          style: `width:${swW}px;height:${s.height}px;background:${pick(main)};border-radius:${s.radiusPill}px`,
+          title: `switch · track ${swW}×${s.height} · thumb ${s.icon} · inset ${s.paddingNarrow} (the centering law)`,
+        },
+        h("span", { class: "geom-switch-thumb", style: `width:${s.icon}px;height:${s.icon}px;right:${s.paddingNarrow}px;background:${pick(onMain)}` }),
+      );
       return h(
         "div",
         { class: "geom-spec-line" },
@@ -542,7 +566,7 @@ export class GeomSectionImpl {
           h("span", { class: "geom-spec-dims" }, `pad ${s.paddingNarrow}`),
           h("span", { class: "geom-spec-dims" }, `r ${s.radiusPill}`),
         ),
-        h("div", { class: "geom-spec-render" }, box),
+        h("div", { class: "geom-spec-render" }, box, sel, sw),
       );
     };
     const ladderRow = (entries, swatch) =>

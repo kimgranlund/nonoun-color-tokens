@@ -1992,6 +1992,14 @@ ok(!!app.querySelector(".tyi-voices") || !!app.querySelector(".insp-title"), "(g
   const exChip = app.querySelector(".geom-ex-chip");
   ok(!!exChip && !!containerHighHex && (exChip.getAttribute("style") || "").includes(`background:${containerHighHex}`), `(geo-palette) the Chip is painted with the palette's containerHigh tone (${containerHighHex}, got "${exChip && exChip.getAttribute("style")}")`);
   ok(!!app.querySelector(".geom-ex-input"), "(geo-palette) the pinned example now shows Button + Chip + Input, not just Button");
+  // (geo-row) every size row renders Button + Select + Switch side by side; the switch's thumb is
+  // the glyph cell (diameter = icon, right-inset = paddingNarrow — the centering law, literally).
+  ok(app.querySelectorAll(".geom-select").length === GEOM_SIZES && app.querySelectorAll(".geom-switch").length === GEOM_SIZES, `(geo-row) each of the ${GEOM_SIZES} size rows carries a Select + Switch alongside the Button (got ${app.querySelectorAll(".geom-select").length}/${app.querySelectorAll(".geom-switch").length})`);
+  const swEl = app.querySelector(".geom-switch");
+  ok(!!swEl && (swEl.getAttribute("style") || "").includes(`background:${mainHex}`), "(geo-row) the switch track is painted with the palette's own resolved color");
+  const gsMD = app._activeGeomScale().sizes["2XL"];
+  const thumbEl = app.querySelector(".geom-switch-thumb");
+  ok(!!thumbEl && (thumbEl.getAttribute("style") || "").includes(`width:${gsMD.icon}px`) && (thumbEl.getAttribute("style") || "").includes(`right:${gsMD.paddingNarrow}px`), `(geo-row) the first (2XL) switch thumb = icon ${gsMD.icon} inset paddingNarrow ${gsMD.paddingNarrow} (got "${thumbEl && thumbEl.getAttribute("style")}")`);
 }
 const { geomScale: gScale } = await import("../../src/engine/geometry.mjs");
 const { brandKit: bkGeo, geometryScale: geoScaleOf } = await import("../../src/ui/model.mjs");
