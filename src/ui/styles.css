@@ -1317,7 +1317,7 @@ a.account-manage:hover { text-decoration: underline; }
 .type-spec-grouphead b { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-dim); }
 .type-spec-grouphead small { color: var(--ink-faint); font-size: 11px; }
 .type-spec-count { margin-left: auto; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
-.type-spec-line { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: var(--r); border: 1px solid transparent; background: color-mix(in srgb, var(--panel) 70%, transparent); }
+.type-spec-line { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: var(--r); border: 1px solid transparent; }
 .type-spec-line:hover { border-color: var(--line); }
 .type-spec-meta { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--ink-faint); }
 .type-spec-token { font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px; color: var(--ink-dim); background: color-mix(in srgb, var(--line) 60%, transparent); padding: 1px 5px; border-radius: 4px; }
@@ -1434,7 +1434,7 @@ a.account-manage:hover { text-decoration: underline; }
 .geom-spec-grouphead b { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-dim); }
 .geom-spec-grouphead small { color: var(--ink-faint); font-size: 11px; }
 .geom-spec-count { margin-left: auto; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
-.geom-spec-line { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: var(--r); border: 1px solid transparent; background: color-mix(in srgb, var(--panel) 70%, transparent); }
+.geom-spec-line { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: var(--r); border: 1px solid transparent; }
 .geom-spec-line:hover { border-color: var(--line); }
 .geom-spec-meta { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--ink-faint); }
 .geom-spec-token { font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px; color: var(--ink-dim); background: color-mix(in srgb, var(--line) 60%, transparent); padding: 1px 5px; border-radius: 4px; }
