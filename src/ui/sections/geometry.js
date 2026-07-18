@@ -510,6 +510,9 @@ export class GeomSectionImpl {
     const scale = this._activeGeomScale(); // composed with the type scale — per-step `font` is the brand UI size
     const t = GEOMETRY_TREATMENTS.find((x) => x.id === cfg.treatment) || GEOMETRY_TREATMENTS[0];
     const kebab = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    // painted in the SELECTED palette's own prime/on-prime — same resolution geomExampleCard uses, so
+    // the canvas ramp isn't a generic-accent mock while the pinned inspector card is palette-real.
+    const { pick, main, onMain } = this._geomPaletteColors(view);
     // the control ramp renders LARGEST → smallest (biggest example first); heights are monotonic by step.
     const SIZE_NAMES = ["2XL", "XL", "LG", "MD", "SM", "XS"];
     const ctlLine = (name) => {
@@ -519,7 +522,7 @@ export class GeomSectionImpl {
         "div",
         {
           class: "geom-ctl",
-          style: `height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline-start:${s.paddingNarrow}px;padding-inline-end:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
+          style: `background:${pick(main)};color:${pick(onMain)};height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline-start:${s.paddingNarrow}px;padding-inline-end:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
           title: `height ${s.height} · icon ${s.icon} · font ${s.font} · pad ${s.paddingNarrow} · gap ${s.gap} · radius ${s.radiusPill}`,
         },
         h("span", { class: "geom-glyph", style: `width:${s.icon}px;height:${s.icon}px` }, icon("calendar-blank", { size: s.icon })),
@@ -837,12 +840,11 @@ export class GeomSectionImpl {
   }
 
 
-  // geomExampleCard — the pinned live card: a real MD control built from the resolved geometry AND painted
-  // in the SELECTED palette's roles (surface / onSurface + primary). Mirrors typeExampleCard's resolution.
-  geomExampleCard(view) {
-    const scale = this._activeGeomScale();
-    const s = scale.sizes.MD || Object.values(scale.sizes)[0];
-    if (!s) return h("div", { class: "example-card" });
+  // _geomPaletteColors(view) — the SELECTED palette's resolved roles, ready to paint a mock control:
+  // surface/onSurface (the card ground) + the palette's own prime/on-prime (a "primary button" look).
+  // Shared by geomExampleCard and the canvas ramp's ctlLine so every mock control — canvas or inspector
+  // — reflects the actual palette being designed, not a generic fallback accent.
+  _geomPaletteColors(view) {
     const p = view.palettes[this.selectedIndex()];
     const roles = (p && p.roles) || [];
     const dark = this.resolvedCanvasScheme() === "dark";
@@ -852,20 +854,56 @@ export class GeomSectionImpl {
     const pick = (role) => (role ? (dark ? role.darkHex : role.lightHex) : "transparent");
     const main = roles.find((r) => r.suffix === "");
     const onMain = roles.find((r) => r.suffix === "-on-" + sl);
+    return { pick, byKey, main, onMain };
+  }
+
+  // geomExampleCard — the pinned live card: a few real controls (Button · Chip · Input) built from the
+  // resolved geometry AND painted in the SELECTED palette's roles. Mirrors typeExampleCard's resolution.
+  geomExampleCard(view) {
+    const scale = this._activeGeomScale();
+    const s = scale.sizes.MD || Object.values(scale.sizes)[0];
+    if (!s) return h("div", { class: "example-card" });
+    const { pick, byKey, main, onMain } = this._geomPaletteColors(view);
     return h(
       "div",
       { class: "example-card geom-example", style: "background:" + pick(byKey.surface) },
       h("div", { class: "geom-ex-title", style: "color:" + pick(byKey.onSurface) }, `MD · ${s.height}px control`),
       h(
-        "button",
-        {
-          class: "geom-ex-ctl",
-          tabindex: "-1",
-          style: `background:${pick(main)};color:${pick(onMain)};height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
-        },
-        h("span", { class: "geom-ex-glyph", style: `width:${s.icon}px;height:${s.icon}px` }),
-        "Button",
-        h("span", { class: "geom-ex-caret", style: `width:${s.caret}px;height:${s.caret}px` }, icon("caret-left")),
+        "div",
+        { class: "geom-ex-row" },
+        h(
+          "button",
+          {
+            class: "geom-ex-ctl",
+            tabindex: "-1",
+            style: `background:${pick(main)};color:${pick(onMain)};height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
+          },
+          h("span", { class: "geom-ex-glyph", style: `width:${s.icon}px;height:${s.icon}px` }),
+          "Button",
+          h("span", { class: "geom-ex-caret", style: `width:${s.caret}px;height:${s.caret}px` }, icon("caret-left")),
+        ),
+        // Chip — a smaller, pill-only affordance (no caret): containerHigh, a visible-but-quieter tint
+        // of the palette's own hue rather than its full-strength prime, since a chip is lower-emphasis.
+        h(
+          "span",
+          {
+            class: "geom-ex-chip",
+            style: `background:${pick(byKey.containerHigh)};color:${pick(byKey.onSurface)};height:${s.height}px;font-size:${s.font}px;gap:${s.gap}px;padding-inline:${s.paddingNarrow}px;border-radius:${s.radiusPill}px`,
+          },
+          "Chip",
+          h("span", { class: "geom-ex-chip-x", style: `width:${s.icon}px;height:${s.icon}px` }, icon("x", { size: s.icon })),
+        ),
+        // Input — an outlined field (never filled with the prime color; a field's own ground is surface).
+        // outlineVariant matches how this app's own shadcn export maps an input border (exports.js);
+        // placeholder is the role built specifically for this exact text archetype (semantic.js).
+        h(
+          "span",
+          {
+            class: "geom-ex-input",
+            style: `border-color:${pick(byKey.outlineVariant)};color:${pick(byKey.placeholder)};height:${s.height}px;font-size:${s.font}px;padding-inline:${s.paddingNarrow}px;border-radius:${Math.min(s.radiusPill, 10)}px`,
+          },
+          "Search…",
+        ),
       ),
     );
   }

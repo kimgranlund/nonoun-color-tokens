@@ -1942,6 +1942,27 @@ ok(app.querySelectorAll(".geom-spec-line").length === GEOM_SIZES, `(geo) the can
 ok(txtOf(app.querySelectorAll(".geom-spec-token")[0] || {}) === "--size-2xl", `(geo) the control ramp lists largest→smallest (first token is --size-2xl, got ${txtOf(app.querySelectorAll(".geom-spec-token")[0] || {})})`);
 ok(app.querySelectorAll(".an-card").length >= 4, `(geo) the left rail shows the geometry analysis cards (got ${app.querySelectorAll(".an-card").length})`);
 ok(!!app.querySelector(".tyi-voices") || !!app.querySelector(".insp-title"), "(geo) the right pane shows the Geometry inspector");
+// (geo-palette) the canvas ramp's mock control AND the pinned inspector example are painted with the
+// SELECTED palette's own resolved roles (real hex), not a generic fixed accent — both must agree.
+{
+  const { projectView: pvGeo } = await import("../../src/ui/model.mjs");
+  const viewGeo = pvGeo(app.doc);
+  const pal = viewGeo.palettes[app.selectedIndex()];
+  const roles = pal.roles;
+  const byKeyGeo = {};
+  for (const r of roles) byKeyGeo[r.key] = r;
+  const dark = app.resolvedCanvasScheme() === "dark";
+  const hexOfGeo = (role) => (role ? (dark ? role.darkHex : role.lightHex) : null);
+  const mainHex = hexOfGeo(roles.find((r) => r.suffix === ""));
+  const containerHighHex = hexOfGeo(byKeyGeo.containerHigh);
+  const ctlEl = app.querySelector(".geom-ctl");
+  ok(!!ctlEl && (ctlEl.getAttribute("style") || "").includes(`background:${mainHex}`), `(geo-palette) the canvas ramp's mock control is painted with the selected palette's own resolved color (${mainHex}, got "${ctlEl && ctlEl.getAttribute("style")}")`);
+  const exCtl = app.querySelector(".geom-ex-ctl");
+  ok(!!exCtl && (exCtl.getAttribute("style") || "").includes(`background:${mainHex}`), "(geo-palette) the pinned inspector example agrees with the canvas ramp's color");
+  const exChip = app.querySelector(".geom-ex-chip");
+  ok(!!exChip && !!containerHighHex && (exChip.getAttribute("style") || "").includes(`background:${containerHighHex}`), `(geo-palette) the Chip is painted with the palette's containerHigh tone (${containerHighHex}, got "${exChip && exChip.getAttribute("style")}")`);
+  ok(!!app.querySelector(".geom-ex-input"), "(geo-palette) the pinned example now shows Button + Chip + Input, not just Button");
+}
 const { geomScale: gScale } = await import("../../src/engine/geometry.mjs");
 const { brandKit: bkGeo, geometryScale: geoScaleOf } = await import("../../src/ui/model.mjs");
 const { typeScale: tScaleGeo } = await import("../../src/engine/type.mjs");
