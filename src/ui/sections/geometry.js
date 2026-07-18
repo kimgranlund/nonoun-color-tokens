@@ -43,6 +43,18 @@ export class GeomSectionImpl {
     return STANDARD_GEOM_RUNGS.map((r) => ({ id: r.id, name: r.name, baseHeight: Math.max(20, bh - r.drop), minWidth: r.w }));
   }
 
+  // _ensureGeomModesMaterialized(d) — if d.geometry has no real modes yet AND modeKey is one of the
+  // Standard-set rungs, materialize BOTH rungs (same stable ids _geomEffectiveModes already previewed)
+  // so a write against modeKey has a real entry to land in. Mutates d.geometry in place; call inside a
+  // commit/editDrag closure BEFORE writing the actual per-mode value. A no-op for "base", a real custom
+  // mode id, or when modes already exist.
+  _ensureGeomModesMaterialized(d, modeKey) {
+    if ((d.geometry.modes || []).length || !STANDARD_GEOM_RUNGS.some((r) => r.id === modeKey)) return;
+    const bh = Number(d.geometry.baseHeight) || DEFAULT_GEOMETRY.baseHeight || 28;
+    d.geometry.baseName = d.geometry.baseName || "Desktop";
+    d.geometry.modes = STANDARD_GEOM_RUNGS.map((r) => ({ id: r.id, name: r.name, baseHeight: Math.max(20, bh - r.drop), minWidth: r.w }));
+  }
+
   // _geomScaleFor(modeKey) — the resolved geometry scale for a mode WITH that mode's per-cell HEIGHT
   // overrides applied, COMPOSED with the type scale at the SAME mode — a control's text size (SM/MD/LG
   // `font`) is the UI-CONTROL voice at that mode (TKT-0008; XS/XL/2XL fall back to the engine's fixed
@@ -67,11 +79,7 @@ export class GeomSectionImpl {
     const key = size + "|" + modeKey;
     this.commit((d) => {
       d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
-      if (!(d.geometry.modes || []).length && STANDARD_GEOM_RUNGS.some((r) => r.id === modeKey)) {
-        const bh = Number(d.geometry.baseHeight) || DEFAULT_GEOMETRY.baseHeight || 28;
-        d.geometry.baseName = d.geometry.baseName || "Desktop";
-        d.geometry.modes = STANDARD_GEOM_RUNGS.map((r) => ({ id: r.id, name: r.name, baseHeight: Math.max(20, bh - r.drop), minWidth: r.w }));
-      }
+      this._ensureGeomModesMaterialized(d, modeKey);
       d.geometry.tokenOverrides = { ...(d.geometry.tokenOverrides || {}), [key]: n };
     });
   }
@@ -336,7 +344,10 @@ export class GeomSectionImpl {
       d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
       // Compare shows the Base scale in the inspector, so its slider edits Base (not a per-mode no-op).
       if (this.geomMode === "base" || this.geomMode === "compare") d.geometry.baseHeight = bh;
-      else d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, baseHeight: bh } : m));
+      else {
+        this._ensureGeomModesMaterialized(d, this.geomMode); // a not-yet-materialized std-tablet/std-mobile needs a real entry to land in
+        d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, baseHeight: bh } : m));
+      }
     });
   }
 
@@ -346,7 +357,10 @@ export class GeomSectionImpl {
     this.editDrag((d) => {
       d.geometry = { ...(d.geometry || DEFAULT_GEOMETRY) };
       if (this.geomMode === "base" || this.geomMode === "compare") d.geometry.rampContrast = c;
-      else d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, rampContrast: c } : m));
+      else {
+        this._ensureGeomModesMaterialized(d, this.geomMode);
+        d.geometry.modes = (d.geometry.modes || []).map((m) => (m.id === this.geomMode ? { ...m, rampContrast: c } : m));
+      }
     });
   }
 

@@ -247,7 +247,10 @@ export class TypeSectionImpl {
       d.type = { ...(d.type || DEFAULT_TYPE) };
       // Compare shows the Base scale in the inspector, so its slider edits Base (not a per-mode no-op).
       if (this.typeMode === "base" || this.typeMode === "compare") d.type.bodyBase = bb;
-      else d.type.modes = (d.type.modes || []).map((m) => (m.id === this.typeMode ? { ...m, bodyBase: bb } : m));
+      else {
+        this._ensureTypeModesMaterialized(d, this.typeMode); // a not-yet-materialized std-tablet/std-mobile needs a real entry to land in
+        d.type.modes = (d.type.modes || []).map((m) => (m.id === this.typeMode ? { ...m, bodyBase: bb } : m));
+      }
     });
   }
 
@@ -413,6 +416,17 @@ export class TypeSectionImpl {
     return STANDARD_TYPE_RUNGS.map((r) => ({ id: r.id, name: r.name, factor: r.factor, minWidth: r.w }));
   }
 
+  // _ensureTypeModesMaterialized(d, modeKey) — if d.type has no real modes yet AND modeKey is one of the
+  // Standard-set rungs, materialize BOTH rungs (same stable ids _typeEffectiveModes already previewed) so
+  // a write against modeKey has a real entry to land in. Mutates d.type in place; call inside a
+  // commit/editDrag closure BEFORE writing the actual per-mode value. A no-op for "base", a real custom
+  // mode id, or when modes already exist.
+  _ensureTypeModesMaterialized(d, modeKey) {
+    if ((d.type.modes || []).length || !STANDARD_TYPE_RUNGS.some((r) => r.id === modeKey)) return;
+    d.type.baseName = d.type.baseName || "Desktop";
+    d.type.modes = STANDARD_TYPE_RUNGS.map((r) => ({ id: r.id, name: r.name, factor: r.factor, minWidth: r.w }));
+  }
+
   // _typeScaleFor(modeKey) — the resolved typeScale for a mode WITH that mode's per-cell overrides applied.
   // "base" → doc.type; a mode id → the mode's own levers layered on doc.type: EITHER a bodyBase override
   // (legacy custom modes) or a hierarchy-aware compression `factor` (the Standard set: Tablet 5/6 ·
@@ -438,10 +452,7 @@ export class TypeSectionImpl {
     const key = voice + "|" + step + "|" + modeKey;
     this.commit((d) => {
       d.type = { ...(d.type || DEFAULT_TYPE) };
-      if (!(d.type.modes || []).length && STANDARD_TYPE_RUNGS.some((r) => r.id === modeKey)) {
-        d.type.baseName = d.type.baseName || "Desktop";
-        d.type.modes = STANDARD_TYPE_RUNGS.map((r) => ({ id: r.id, name: r.name, factor: r.factor, minWidth: r.w }));
-      }
+      this._ensureTypeModesMaterialized(d, modeKey);
       d.type.tokenOverrides = { ...(d.type.tokenOverrides || {}), [key]: n };
     });
   }

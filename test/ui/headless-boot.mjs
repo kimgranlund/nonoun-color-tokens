@@ -1782,6 +1782,14 @@ ok(app.querySelectorAll(".tok-group").length === VOICES, `(ty-tok) the rows are 
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}).startsWith("--type-display-lg"), `(ty-tok) the first (sticky) token name is the --type-display-lg step (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setTypeSpecMode("specimen"); flushRaf();
 ok(!!app.querySelector(".type-spec") && !app.querySelector(".tok-table"), "(ty-tok) toggling back to Specimen restores the live specimen (token table gone)");
+// (ty-slider-automat) the inspector's Body-base slider (a SEPARATE write path from the tokens-matrix
+// cell) must ALSO materialize on first touch — a silent no-op here was the actual bug this covers.
+ok(!app.doc.type.modes, "(ty-slider-automat) fresh doc has no materialized modes yet");
+app.typeMode = "std-tablet";
+app._setActiveTypeBodyBase(18); app.commitDrag?.(); flushRaf();
+ok(Array.isArray(app.doc.type.modes) && app.doc.type.modes.length === 2 && app.doc.type.modes.some((m) => m.id === "std-tablet") && app.doc.type.modes.some((m) => m.id === "std-mobile"), "(ty-slider-automat) dragging the Body-base slider on std-tablet materializes BOTH Standard-set rungs");
+ok(app.doc.type.modes.find((m) => m.id === "std-tablet").bodyBase === 18, "(ty-slider-automat) the slider's edit itself is written, not silently dropped");
+app.commit((d) => { delete d.type.modes; delete d.type.tokenOverrides; }); flushRaf(); // reset before (ty-tok-automat) below
 // (ty-tok-automat) editing a cell under a not-yet-materialized Standard-set rung materializes BOTH
 // rungs in ONE commit (matching addStandardTypeModes' contract), using the SAME stable ids the
 // pre-materialization preview used — so the write resolves correctly and nothing needs a second edit.
@@ -1976,6 +1984,14 @@ ok(app.querySelectorAll(".tok-row").length === GEOM_SIZES, `(geo-tok) one row pe
 ok(txtOf(app.querySelectorAll(".tok-name")[1] || {}) === "--size-2xl", `(geo-tok) the first (sticky) token name is --size-2xl (largest→smallest) (got ${txtOf(app.querySelectorAll(".tok-name")[1] || {})})`);
 app.setGeomSpecMode("controls"); flushRaf();
 ok(!!app.querySelector(".geom-spec") && !app.querySelector(".tok-table"), "(geo-tok) toggling back to Controls restores the live controls scene (token table gone)");
+// (geo-slider-automat) mirror of (ty-slider-automat): the inspector's Base-height/Ramp-contrast sliders
+// are a SEPARATE write path from the tokens-matrix cell and must ALSO materialize on first touch.
+ok(!app.doc.geometry.modes, "(geo-slider-automat) fresh doc has no materialized modes yet");
+app.geomMode = "std-tablet";
+app._setActiveGeomBaseHeight(24); app.commitDrag?.(); flushRaf();
+ok(Array.isArray(app.doc.geometry.modes) && app.doc.geometry.modes.length === 2 && app.doc.geometry.modes.some((m) => m.id === "std-tablet") && app.doc.geometry.modes.some((m) => m.id === "std-mobile"), "(geo-slider-automat) dragging Base-height on std-tablet materializes BOTH Standard-set rungs");
+ok(app.doc.geometry.modes.find((m) => m.id === "std-tablet").baseHeight === 24, "(geo-slider-automat) the slider's edit itself is written, not silently dropped");
+app.commit((d) => { delete d.geometry.modes; delete d.geometry.tokenOverrides; }); flushRaf(); // reset before (geo-tok-automat) below
 // (geo-tok-automat) mirror of (ty-tok-automat): editing a cell under a not-yet-materialized Standard-set
 // rung materializes BOTH rungs in ONE commit, using the SAME stable ids the preview used.
 ok(!app.doc.geometry.modes, "(geo-tok-automat) fresh doc has no materialized modes yet");
