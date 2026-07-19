@@ -6,6 +6,7 @@
 import { spawn } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
@@ -60,6 +61,26 @@ try {
 
   const bad = await rpc("nope/nope", {});
   ok(bad.error && bad.error.code === -32601, "unknown method → JSON-RPC -32601");
+
+  // #373: the generating call's REAL stdio response carries a decodable PNG image block, over the wire.
+  const genRes = await rpc("tools/call", { name: "generate_kit", arguments: { brief } });
+  ok(genRes.result.content.length === 2 && genRes.result.content[1].type === "image" && genRes.result.content[1].mimeType === "image/png", `the real dispatch reply carries a PNG image block alongside the text digest (got ${genRes.result.content.map((c) => c.type).join()})`);
+  const pngBytes = Buffer.from(genRes.result.content[1].data, "base64");
+  ok(pngBytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), "the image block's base64 data decodes to a real PNG signature");
+  { // parse chunks properly (don't hardcode byte offsets) to find IDAT and inflate it with Node's own zlib
+    let offset = 8, idat = null;
+    while (offset < pngBytes.length) {
+      const len = pngBytes.readUInt32BE(offset);
+      const type = pngBytes.subarray(offset + 4, offset + 8).toString("ascii");
+      if (type === "IDAT") idat = pngBytes.subarray(offset + 8, offset + 8 + len);
+      offset += 8 + len + 4;
+    }
+    ok(idat && zlib.inflateSync(idat).length > 0, "the PNG's IDAT zlib stream inflates cleanly with Node's own zlib (independent verification, over real stdio bytes)");
+  }
+
+  // teaching mode over real stdio carries no image block.
+  const teachRes = await rpc("tools/call", { name: "generate_kit", arguments: { description: "x" } });
+  ok(teachRes.result.content.length === 1, "a teaching-mode reply over real stdio carries only the text block");
 } catch (e) {
   fails.push("threw: " + e.message);
 } finally {

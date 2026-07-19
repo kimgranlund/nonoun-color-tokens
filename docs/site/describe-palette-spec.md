@@ -341,20 +341,49 @@ images) + an image block (the PNG swatch board)**.
 | `lint` | the advice array (§6.3) |
 | `meta` | the reproducibility stamp (§6.4) |
 
-### 6.2 The PNG swatch board (image block, #373)
+### 6.2 The PNG swatch board — RESOLVED (#373's build)
 
-A flat-color swatch board encoded with **zero dependencies** (stored-deflate PNG, ~100 lines),
-returned as an MCP image content block. Swatches must match the generated families (the #373
-acceptance: decodable, swatch colors deep-match the kit).
+A flat-color swatch board (`mcp/png-swatch-board.mjs`) encoded with **zero dependencies** — a
+hand-rolled PNG writer (CRC-32, Adler-32, DEFLATE's "stored" uncompressed block type, PNG chunk
+framing) rather than a real compression library, since a few dozen solid-color pixels need none —
+returned as an MCP image content block (`{type:"image", data: base64, mimeType:"image/png"}`). A
+**4×2 grid, 80px swatches** (320×160 total), FAMILY_NAMES order (brand families top row, status
+families bottom row), each swatch sourced from that family's own ramp **500-stop hex** — the exact
+value the #373 acceptance checks against ("swatch colors deep-match the kit"). Verified against a
+REAL independent decoder (Node's own `zlib.inflateSync`, in tests only — the shipped encoder stays
+dependency-free) and deterministic (the same kit always encodes to byte-identical bytes, spec §6.4).
+Computed **lazily at dispatch time**, not baked into `generateKit`'s own return shape — the pure core
+and the MCP-tool wrapper (`generateKitTool`) stay unaware of images; only the transport layer
+(`attachImageBlock`, appended to `describe-mcp-core.mjs`) builds one, for any dispatcher whose reply
+carries a generated kit — including the merged server (#374), via the SAME exported helper, with no
+changes to `brand-kit-core.mjs`.
 
-### 6.3 The lint array (#373)
+### 6.3 The lint array — RESOLVED (#373's build)
 
-`lint: [{ level: "error"|"warn"|"info", code: string, message: string, ...context }]`. Codes this
-spec reserves: `contrast` (WCAG results over the resolved roles), `chroma-budget` (e.g. all 8
-families near max chroma; supporting families usually stay muted), `clamped` (§4.4 divergences),
-`status-distinctness` (§4.2 resolutions), `key-color-precedence` (§3.2), `description-ignored`
-(§5 precedence). The array is the text-only caller's signal channel — every automatic correction the
-core makes is visible in it.
+`lint: [{ level: "error"|"warn"|"info", code: string, message: string, ...context }]`. Codes:
+`contrast`, `chroma-budget`, `clamped` (§4.4 divergences), `status-distinctness` (§4.2 resolutions),
+`key-color-precedence` (§3.2), `description-ignored` (§5 precedence). The array is the text-only
+caller's signal channel — every automatic correction OR advisory is visible in it, silent otherwise
+(no routine "everything's fine" noise, matching the existing codes' own philosophy).
+
+- **`contrast`** — the prime/on-prime pairing's WCAG ratio (light AND dark), warned when either falls
+  under **`CONTRAST_MIN = 3.0`** (`describe-mcp-core.mjs`) — the large-text/UI-component floor, not
+  the stricter 4.5 body-text one: the app's own "fixed" `onColorMode` (ADR-003) targets exactly this
+  floor, and the DEFAULT document's own dark-mode ratios already cluster at 3.0-3.4. A fine sweep of
+  the brief's exposed per-family parameters (hue/chroma/skew/lift) found a worst reachable case of
+  ~3.028 — THIN headroom, not a wide margin: this floor is close to being exercised by legal input, so
+  a regression test pins the exact worst-known config (`test/mcp/describe-mcp-core.mjs`) rather than
+  trusting the margin to hold across future engine changes.
+- **`chroma-budget`** — ONE advisory (not per-family) when the 8 families' average chroma clears
+  **`CHROMA_BUDGET_AVG_THRESHOLD = 80`** (near the rubric's "vivid" tier, #370). The app's own default
+  document already averages ~63 (role-table.json mixes vivid brand accents with muted status/support
+  families by convention), so this only fires on a theme that has deliberately pushed most families
+  high — info level, not a warning: a bold, near-neon kit can be entirely intentional.
+
+Both checks read the FINAL resolved kit/doc (not construction-time concerns like the others), and
+live at the MCP-tool layer (`describe-mcp-core.mjs`'s `generateKitTool`), not inside
+`describe-kit-core.mjs`'s own `generateKit` — that module's scope stays clamp/default/distinctness
+only, matching its own stated header comment.
 
 ### 6.4 The reproducibility stamp
 

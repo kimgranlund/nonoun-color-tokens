@@ -108,6 +108,25 @@ const callTool = (session, name, args) => JSON.parse(req(session, "tools/call", 
   ok(figma.error && /unknown format/.test(figma.error), `"figma" is rejected even though it's a real projectView().exports key — not one of the 8 documented formats (got ${JSON.stringify(figma)})`);
 }
 
+// ── #373's attachImageBlock threads through the MERGED server too (it post-processes handleRead's own
+// reply, entirely outside brand-kit-core.mjs, so this proves the composition actually works end to end) ──
+{
+  const session = createSession();
+  const res = req(session, "tools/call", { name: "generate_kit", arguments: { brief: { families: { Primary: { hue: 40, chroma: 90 } } } } });
+  ok(res.result.content.length === 2 && res.result.content[1].type === "image" && res.result.content[1].mimeType === "image/png", `the merged server's generate_kit reply ALSO carries the PNG image block (got ${res.result.content.map((c) => c.type).join()})`);
+}
+{
+  const session = createSession();
+  const res = req(session, "tools/call", { name: "generate_kit", arguments: { description: "x" } });
+  ok(res.result.content.length === 1, "a teaching-mode reply through the merged server carries no image block");
+}
+{
+  // a READ-surface tool's reply (unrelated to generate_kit) is untouched by attachImageBlock.
+  const session = createSession(brandKit(defaultDocument()));
+  const res = req(session, "tools/call", { name: "list_palettes", arguments: {} });
+  ok(res.result.content.length === 1, "a non-generate_kit tool's reply is never touched by the image-attachment step");
+}
+
 if (fails.length) { console.error(`brand-kit-merged-core FAIL (${fails.length}):\n  ` + fails.join("\n  ")); process.exit(1); }
-console.log("brand-kit-merged-core PASS — kitless boot · generate_kit rebinding (last-generate-wins, teach-never-rebinds) · the read surface serving a GENERATED kit · export_tokens (7 named formats + all, matching projectView exactly)");
+console.log("brand-kit-merged-core PASS — kitless boot · generate_kit rebinding (last-generate-wins, teach-never-rebinds) · the read surface serving a GENERATED kit · export_tokens (7 named formats + all, matching projectView exactly) · the #373 image block threading through the merged dispatch");
 process.exit(0);

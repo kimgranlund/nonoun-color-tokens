@@ -12,7 +12,7 @@
 // invalidation) and (b) appends the two new tools, generate_kit and export_tokens.
 
 import { buildSurface as buildReadSurface, handle as handleRead } from "./brand-kit-core.mjs";
-import { generateKitTool } from "./describe-mcp-core.mjs";
+import { generateKitTool, attachImageBlock } from "./describe-mcp-core.mjs";
 import { projectView } from "../src/ui/model.mjs";
 
 // FORMAT_META — the 7 named color formats export_tokens can serve (the 8th enum value, "all", aggregates
@@ -88,7 +88,10 @@ export function createSession(initialKit) {
   }
 
   return {
-    handle: (msg) => handleRead(msg, surface()),
+    // attachImageBlock (from describe-mcp-core.mjs, #373) post-processes the reply AFTER handleRead
+    // returns it — brand-kit-core.mjs's own dispatch stays fully unaware of image blocks; the enrichment
+    // is entirely external to it.
+    handle: (msg) => attachImageBlock(handleRead(msg, surface()), msg),
     // exposed for tests only — not part of the MCP protocol surface.
     getState: () => state,
   };

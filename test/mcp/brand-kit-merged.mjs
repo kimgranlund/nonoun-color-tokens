@@ -56,6 +56,11 @@ function spawnClient(args) {
     const generated = await c.callTool("generate_kit", { brief });
     ok(generated.kit && generated.kit.palettes.length === 8, "step 2: brief → a real 8-palette kit");
 
+    // #373: the MERGED server's own generate_kit reply carries the PNG image block too, over its own
+    // real spawned stdio — attachImageBlock threads through handleRead's reply, not just in-process.
+    const rawGenerated = await c.rpc("tools/call", { name: "generate_kit", arguments: { brief } });
+    ok(rawGenerated.result.content.length === 2 && rawGenerated.result.content[1].type === "image" && rawGenerated.result.content[1].mimeType === "image/png", `the merged server's real stdio reply for generate_kit carries a PNG image block (got ${rawGenerated.result.content.map((c) => c.type).join()})`);
+
     const toolsAfter = (await c.rpc("tools/list")).result.tools.map((t) => t.name);
     ok(toolsAfter.includes("list_palettes") && toolsAfter.includes("resolve_token") && toolsAfter.includes("export_tokens"), `post-generate, the FULL read surface appears over the real stdio connection (got ${toolsAfter})`);
 
