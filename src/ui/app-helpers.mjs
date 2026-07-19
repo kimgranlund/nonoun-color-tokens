@@ -40,8 +40,8 @@ export const DOCS_URL = REPO_URL + "#readme";
 export const ACCOUNT_URL = "https://app.lemonsqueezy.com/my-orders";
 
 // Pro-gated export formats (the proExport flag). Free = CSS (css/oklch) + the Figma/JSON interchange; Pro =
-// DTCG + the framework configs. flagOf("proExport") is true (unlocked) while TIERS_ENFORCED is off, so these
-// only actually gate after go-live. The single-format preview shows an upsell; Download-All omits them.
+// DTCG + the framework configs. flagOf("proExport") gates on the effective tier now that TIERS_ENFORCED is
+// on (launched) — a Free profile sees the upsell; Download-All omits these folders for Free.
 export const PRO_EXPORT_FORMATS = new Set(["dtcg", "tailwind", "shadcn"]);
 
 // README shipped inside the Download-All zip's experimental figma-aliased/ folder (OD-004).
