@@ -3,7 +3,7 @@
 // #369). Contract: docs/site/describe-palette-spec.md.
 import { DOMAINS, hydrate } from "../../src/ui/persist.js";
 import { brandKit, hexToOklch, seedFromKeyColor } from "../../src/ui/model.mjs";
-import { PALETTE_BRIEF_SCHEMA, FAMILY_NAMES, SECONDARY_HARMONY_OFFSET, TERTIARY_ANALOGOUS_OFFSET, generateKit } from "../../mcp/describe-kit-core.mjs";
+import { PALETTE_BRIEF_SCHEMA, FAMILY_NAMES, SECONDARY_HARMONY_OFFSET, TERTIARY_ANALOGOUS_OFFSET, STATUS_BANDS, MIN_HUE_SEP, BRAND_NUDGE, generateKit } from "../../mcp/describe-kit-core.mjs";
 
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
@@ -25,6 +25,12 @@ ok(PALETTE_BRIEF_SCHEMA.properties.families.additionalProperties === false, "no 
   ok(fs.keyColor.pattern === "^#[0-9a-fA-F]{6}$" && fs.supportColor.pattern === fs.keyColor.pattern, "keyColor/supportColor are 6-digit hex patterns");
 }
 ok(PALETTE_BRIEF_SCHEMA.properties.global.properties.vibrancy.minimum === DOMAINS.vibrancy.min && PALETTE_BRIEF_SCHEMA.properties.global.properties.vibrancy.maximum === DOMAINS.vibrancy.max, "schema global.vibrancy bounds match persist DOMAINS.vibrancy");
+
+// ── the §4.2 named constants the spec promises (#372) ──
+ok(Object.keys(STATUS_BANDS).join() === "Info,Success,Warning,Danger", `STATUS_BANDS covers exactly the 4 status families (got ${Object.keys(STATUS_BANDS).join()})`);
+ok(Object.values(STATUS_BANDS).every((b) => Number.isFinite(b.center) && b.center >= 0 && b.center < 360 && Number.isFinite(b.halfWidth) && b.halfWidth > 0), "every band has a valid {center, halfWidth}");
+ok(typeof MIN_HUE_SEP === "number" && MIN_HUE_SEP > 0, `MIN_HUE_SEP is a positive degree threshold (got ${MIN_HUE_SEP})`);
+ok(typeof BRAND_NUDGE === "number" && BRAND_NUDGE >= 0 && Object.values(STATUS_BANDS).every((b) => BRAND_NUDGE <= b.halfWidth), `BRAND_NUDGE (${BRAND_NUDGE}) never exceeds any band's halfWidth — the nudge can never itself leave the band`);
 
 // ── generateKit: the basic shape, non-object / empty briefs still generate (§4.4 — never reject) ──
 {
@@ -84,12 +90,79 @@ ok(generateKit(undefined).kit.palettes.length === 8, "an undefined brief still g
   ok(info.chroma === 40, `Info absent → role-table's own chroma 40 (got ${info.chroma})`);
   ok(info.skew === -20 && info.lift === 0, `Info absent → role-table's own skew/lift (got skew=${info.skew} lift=${info.lift})`);
 }
+
+// ── §4.1's brand-hue nudge (#372): an ABSENT status family pulls toward Primary's hue, bounded within its
+// own band, and ONLY when it's actually absent — an explicit status hue skips the nudge entirely (below). ──
 {
-  // an EXPLICITLY given status seed is taken as-is (no nudge exists yet in #369 — #372's job), only clamped.
-  const { doc: rawDoc } = generateKit({ families: { Primary: { hue: 40, chroma: 90 }, Danger: { hue: 40, chroma: 90 } } });
-  const danger = hydrate(rawDoc).palettes.find((p) => p.name === "Danger");
-  ok(danger.hue === 40 && danger.chroma === 90, `an explicit Danger seed passes through untouched even when it collides with Primary (got hue=${danger.hue} chroma=${danger.chroma}) — the distinctness gate is #372's, not built here`);
+  // Primary=110 keeps Info gate-free (worstDist to every brand hue stays ≥ MIN_HUE_SEP) so the nudge's
+  // effect is isolated and directly checkable: Info's band center is STATUS_BANDS.Info.center; the nudge
+  // pulls toward Primary by up to BRAND_NUDGE degrees.
+  const { doc: rawDoc, lint } = generateKit({ families: { Primary: { hue: 110, chroma: 90 } } });
+  const info = hydrate(rawDoc).palettes.find((p) => p.name === "Info");
+  const band = STATUS_BANDS.Info;
+  let delta = ((110 - band.center) % 360 + 360) % 360;
+  if (delta > 180) delta -= 360;
+  const pull = Math.max(-BRAND_NUDGE, Math.min(BRAND_NUDGE, delta));
+  const expected = ((band.center + pull) % 360 + 360) % 360;
+  ok(info.hue === expected, `Info's absent hue nudges toward Primary by up to BRAND_NUDGE=${BRAND_NUDGE}° from its band center ${band.center} (got ${info.hue}, want ${expected})`);
+  ok(!lint.some((l) => l.family === "Info"), "no distinctness-gate lint for Info when the nudge alone already clears MIN_HUE_SEP from every brand hue");
 }
+{
+  // an EXPLICIT status hue skips the nudge (taken as-is) — only the distinctness gate below may still move it.
+  const { doc: rawDoc } = generateKit({ families: { Primary: { hue: 110, chroma: 90 }, Danger: { hue: 200 } } });
+  const danger = hydrate(rawDoc).palettes.find((p) => p.name === "Danger");
+  ok(danger.hue === 200, `an explicit Danger hue is taken as-is, not nudged toward Primary (got ${danger.hue}, want 200 — no collision here so the gate leaves it alone too)`);
+}
+
+// ── the status-distinctness gate (#372) — the tiger-orange acceptance case ──
+{
+  // #372's own acceptance: "a primary at hue 27-50 still yields visually distinguishable danger and warning
+  // roles." Danger/Warning absent (role-table defaults collide directly: Danger's OKLCH center sits at ~30,
+  // Warning's at ~69 — squarely inside 27-50's neighborhood).
+  const { doc: rawDoc, lint } = generateKit({ families: { Primary: { hue: 40, chroma: 90 } } });
+  const p = hydrate(rawDoc).palettes;
+  const primary = p.find((x) => x.name === "Primary");
+  const danger = p.find((x) => x.name === "Danger");
+  const warning = p.find((x) => x.name === "Warning");
+  const hueDist = (a, b) => { const d = Math.abs(((a % 360) + 360) % 360 - ((b % 360) + 360) % 360) % 360; return d > 180 ? 360 - d : d; };
+  ok(hueDist(danger.hue, primary.hue) >= MIN_HUE_SEP, `tiger-orange: Danger (${danger.hue}) stays ≥${MIN_HUE_SEP}° from Primary (${primary.hue}) — got ${hueDist(danger.hue, primary.hue)}°`);
+  ok(hueDist(warning.hue, primary.hue) >= MIN_HUE_SEP, `tiger-orange: Warning (${warning.hue}) stays ≥${MIN_HUE_SEP}° from Primary (${primary.hue}) — got ${hueDist(warning.hue, primary.hue)}°`);
+  ok(lint.some((l) => l.code === "status-distinctness" && l.family === "Danger") && lint.some((l) => l.code === "status-distinctness" && l.family === "Warning"), "both resolutions are lint-visible (status-distinctness)");
+  // in this exact scenario Info ALSO collides — not with Primary, but with Secondary/Tertiary (both land
+  // near Info's own band once Primary sits at 40: Secondary = Primary+180 = 220, Tertiary = Secondary+30 =
+  // 250, both close to Info's ~237 center). Info's band can't clear MIN_HUE_SEP by hue alone here, so it
+  // takes the chroma-fallback path — a real, legitimate resolution, not a bug, but worth pinning so a
+  // regression in this exact canonical case doesn't silently mangle Info instead.
+  const info = p.find((x) => x.name === "Info");
+  const secondary = p.find((x) => x.name === "Secondary");
+  const tertiary = p.find((x) => x.name === "Tertiary");
+  const infoWorstDist = Math.min(hueDist(info.hue, primary.hue), hueDist(info.hue, secondary.hue), hueDist(info.hue, tertiary.hue));
+  ok(infoWorstDist < MIN_HUE_SEP && info.chroma === 100, `tiger-orange also drives Info into the chroma fallback (hue-only distance ${infoWorstDist}° < ${MIN_HUE_SEP}°, chroma boosted to ${info.chroma}) — Secondary/Tertiary crowd Info's band here`);
+}
+{
+  // an EXPLICIT status seed is taken as-is (no nudge) but is NOT exempt from the gate — a real collision
+  // still gets resolved, just without the pre-gate nudge step.
+  const { doc: rawDoc, lint } = generateKit({ families: { Primary: { hue: 40, chroma: 90 }, Danger: { hue: 40, chroma: 90 } } });
+  const p = hydrate(rawDoc).palettes;
+  const primary = p.find((x) => x.name === "Primary");
+  const danger = p.find((x) => x.name === "Danger");
+  const hueDist = (a, b) => { const d = Math.abs(((a % 360) + 360) % 360 - ((b % 360) + 360) % 360) % 360; return d > 180 ? 360 - d : d; };
+  ok(hueDist(danger.hue, primary.hue) >= MIN_HUE_SEP, `an explicit, colliding Danger hue is still resolved by the gate (got Danger=${danger.hue}, Primary=${primary.hue}, dist=${hueDist(danger.hue, primary.hue)})`);
+  ok(lint.some((l) => l.code === "status-distinctness" && l.family === "Danger"), "the gate's resolution is lint-visible even for an explicit (unnudged) seed");
+}
+{
+  // band exhausted → chroma differentiation (§4.2's second resolution step). Primary pinned EXACTLY on a
+  // status family's own band center puts both band edges at the SAME 20°<MIN_HUE_SEP distance — hue alone
+  // structurally cannot clear the gate, so chroma must take over.
+  const { doc: rawDoc, lint } = generateKit({ families: { Primary: { hue: STATUS_BANDS.Danger.center, chroma: 90 } } });
+  const danger = hydrate(rawDoc).palettes.find((p) => p.name === "Danger");
+  ok(danger.chroma === 100, `band-exhausted Danger boosts chroma to the domain max (got ${danger.chroma})`);
+  const entry = lint.find((l) => l.code === "status-distinctness" && l.family === "Danger");
+  ok(entry && entry.level === "warn", `the band-exhausted resolution is a WARN-level lint entry (got ${entry && entry.level})`);
+}
+
+// ── §4.3's referent-count mapping rules need no new code (module header) — confirm the claim ──
+ok(generateKit({ families: { Primary: { hue: 40, chroma: 80 }, NinthFamily: { hue: 99, chroma: 99 } } }).kit.palettes.length === 8, "an unknown 9th family key is silently dropped, never becomes a 9th palette (structural via the schema's additionalProperties:false; enforced here by simply never being read)");
 
 // ── keyColor precedence + supportColor (§3.2) ──
 {

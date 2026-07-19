@@ -6,11 +6,15 @@
 // toneMode "perceptual") -> brandKit(doc). The contract this implements: docs/site/describe-palette-spec.md.
 //
 // Scope: this module builds the schema + the core generation pipeline + §4.1's absent-family defaulting
-// (Neutral-follows-Primary, the Secondary/Tertiary harmony recipe, the role-table status defaults). It does
-// NOT YET apply the brand-hue nudge or the status-distinctness gate (§4.2), or the referent-count mapping
-// rules (§4.3) — those are #372's follow-on ticket, so a status family can currently collide with a theme's
-// brand hue (the tiger-orange case) until #372 lands. No server, no MCP framing, no I/O beyond reading the
-// two static JSON answer-keys (role-table.json, package.json) — that lands in #371.
+// (Neutral-follows-Primary, the Secondary/Tertiary harmony recipe, the role-table status defaults) + the
+// brand-hue nudge and the status-distinctness gate (§4.2, #372) — so a theme whose brand hue lands on a
+// status convention (the tiger-orange case: Primary ~27-50° sitting on Danger 27° / near Warning 70°)
+// still resolves to visually distinguishable roles. The referent-count mapping rules (§4.3) turn out to
+// need no NEW code here: "fewer referents than families" IS §4.1's absent-family defaulting (already
+// built), and "more referents than families never become a 9th family" is already structural — the
+// PaletteBrief schema's `families.additionalProperties: false` makes a 9th family unconstructable, not
+// just discouraged. No server, no MCP framing, no I/O beyond reading the two static JSON answer-keys
+// (role-table.json, package.json) — that lands in #371.
 
 import { readFileSync } from "node:fs";
 import { DOMAINS, clampPalette, clampStory, serialize, hydrate } from "../src/ui/persist.js";
@@ -44,6 +48,68 @@ function roleHueOklch(name) {
   return camHueToOklch(rt.hue, (rt.chroma ?? 0) / 100);
 }
 
+// hueDist(a, b) → the shortest circular distance between two OKLCH hues, in [0, 180].
+function hueDist(a, b) {
+  const d = Math.abs(wrapHue(a) - wrapHue(b)) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+const STATUS_FAMILIES = ["Info", "Success", "Warning", "Danger"];
+const BRAND_FAMILIES = ["Primary", "Secondary", "Tertiary"];
+
+// STATUS_BANDS / MIN_HUE_SEP / BRAND_NUDGE (§4.2, #372) — the three named constants the spec promises.
+// STATUS_BANDS[name] = {center, halfWidth}: `center` is the family's OWN role-table hue (OKLCH-converted,
+// §4.1's default); `halfWidth` bounds how far the gate below may shift that hue before it stops reading as
+// that status color. MIN_HUE_SEP is the minimum circular separation a status family must keep from EVERY
+// brand family (Primary/Secondary/Tertiary — Neutral excluded, per the ticket's own stated scope). BRAND_NUDGE
+// is the max pull toward Primary's hue applied only when DEFAULTING an absent status family (§4.1) — always
+// starting exactly at `center`, so BRAND_NUDGE ≤ halfWidth keeps every nudge inside the band by construction.
+// Numbers are centered on the role-table defaults and tuned against the tiger-orange acceptance case below.
+const STATUS_BAND_HALF_WIDTH = 20;
+export const STATUS_BANDS = Object.fromEntries(STATUS_FAMILIES.map((name) => [name, { center: roleHueOklch(name), halfWidth: STATUS_BAND_HALF_WIDTH }]));
+export const MIN_HUE_SEP = 25;
+export const BRAND_NUDGE = 8;
+
+// nudgeTowardBrand(band, brandHue) — pull a status family's band CENTER toward brandHue by up to
+// BRAND_NUDGE degrees (a small cohesion pull for an absent status family, §4.1 — NOT the distinctness
+// gate below, which runs regardless of provenance and can shift much farther).
+function nudgeTowardBrand(band, brandHue) {
+  let delta = wrapHue(brandHue - band.center);
+  if (delta > 180) delta -= 360; // signed shortest rotation from center toward brandHue, in (-180, 180]
+  const pull = Math.max(-BRAND_NUDGE, Math.min(BRAND_NUDGE, delta));
+  return wrapHue(band.center + pull);
+}
+
+// applyDistinctnessGate(palettes, lint) — mutates the status palettes IN PLACE so each stays MIN_HUE_SEP
+// degrees from every brand family's hue, regardless of whether that hue was given or defaulted (§4.2's
+// resolution order): (1) shift the status hue to whichever of its OWN band's two edges maximizes its
+// worst-case distance to any brand hue; (2) band exhausted (still short of MIN_HUE_SEP even at the best
+// edge) → keep that best-effort hue and differentiate by chroma instead (push to the domain max — a
+// status role reads as vivid/saturated anyway, so this rarely reads as a compromise).
+function applyDistinctnessGate(palettes, lint) {
+  const byName = new Map(palettes.map((p) => [p.name, p]));
+  const brandHues = BRAND_FAMILIES.map((n) => byName.get(n)).filter(Boolean).map((p) => p.hue);
+  if (!brandHues.length) return;
+  const worstDist = (hue) => Math.min(...brandHues.map((h) => hueDist(hue, h)));
+  for (const name of STATUS_FAMILIES) {
+    const status = byName.get(name);
+    if (!status || worstDist(status.hue) >= MIN_HUE_SEP) continue;
+    const band = STATUS_BANDS[name];
+    const edgeA = wrapHue(band.center - band.halfWidth);
+    const edgeB = wrapHue(band.center + band.halfWidth);
+    const best = worstDist(edgeA) >= worstDist(edgeB) ? edgeA : edgeB;
+    const bestDist = worstDist(best);
+    const fromHue = status.hue;
+    status.hue = best;
+    if (bestDist >= MIN_HUE_SEP) {
+      lint.push({ level: "info", code: "status-distinctness", family: name, message: `${name}: hue shifted from ${Math.round(fromHue)} to ${Math.round(best)} within its own band to stay ${MIN_HUE_SEP}° from every brand family.` });
+    } else {
+      status.chroma = DOMAINS.palette.chroma.max;
+      lint.push({ level: "warn", code: "status-distinctness", family: name, message: `${name}: hue alone can't clear ${MIN_HUE_SEP}° within its band (best ${Math.round(bestDist)}° at hue ${Math.round(best)}) — chroma boosted to ${status.chroma} to stay visually distinct.` });
+    }
+  }
+}
+
 // defaultHueChroma(name, resolved) — §4.1's absent-family hue/chroma default. `resolved` is a name->{hue}
 // map of already-resolved EARLIER families in RESOLUTION_ORDER (Primary before Neutral/Secondary; Secondary
 // before Tertiary) — the dependency the harmony/follow recipes need.
@@ -52,7 +118,16 @@ function defaultHueChroma(name, resolved) {
   if (name === "Neutral") return { hue: resolved.get("Primary").hue, chroma: rt.chroma };
   if (name === "Secondary") return { hue: wrapHue(resolved.get("Primary").hue + SECONDARY_HARMONY_OFFSET), chroma: rt.chroma };
   if (name === "Tertiary") return { hue: wrapHue(resolved.get("Secondary").hue + TERTIARY_ANALOGOUS_OFFSET), chroma: rt.chroma };
-  // Primary and the 4 status families (Info/Success/Warning/Danger) fall back to their OWN role-table row.
+  if (STATUS_BANDS[name]) {
+    // an absent status family: its own role-table hue, NUDGED toward Primary's resolved hue — a small
+    // cohesion pull (§4.1), bounded within its own band. An EXPLICITLY given status hue skips this
+    // function entirely (seedOf only calls it for the missing half) and is taken as-is, per §4.1 — only
+    // the distinctness gate (applyDistinctnessGate, below) may still move it, regardless of provenance.
+    const primary = resolved.get("Primary");
+    const hue = primary ? nudgeTowardBrand(STATUS_BANDS[name], primary.hue) : STATUS_BANDS[name].center;
+    return { hue, chroma: rt.chroma };
+  }
+  // Primary itself falls back to its own role-table row.
   return { hue: roleHueOklch(name), chroma: rt.chroma };
 }
 
@@ -126,7 +201,11 @@ function buildPalettes(families) {
     resolved.set(name, { hue: clamped.hue, chroma: clamped.chroma });
     byName.set(name, clamped);
   }
-  return { palettes: FAMILY_NAMES.map((n) => byName.get(n)), lint };
+  const palettes = FAMILY_NAMES.map((n) => byName.get(n));
+  // the distinctness gate runs LAST, over every fully-resolved+clamped palette — it doesn't care whether
+  // a status hue was given, defaulted, or already nudged; only the final resolved values matter (§4.2).
+  applyDistinctnessGate(palettes, lint);
+  return { palettes, lint };
 }
 
 // buildDoc(brief) → a full State (defaultDocument()'s shape, every non-palette control at its persist
