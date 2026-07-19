@@ -1,0 +1,29 @@
+name: Describe-palette golden eval
+
+# Scheduled + manual only — deliberately NOT on push/pull_request. This calls a real provider model
+# (LLM cost + nondeterminism, #375's own acceptance: "LLM cost/flake makes per-PR gating optional") to
+# catch rubric regressions in mcp/describe-rubric.mjs's teaching, not to gate a merge.
+on:
+  workflow_dispatch: {}
+  schedule:
+    # weekly — frequent enough to catch a rubric/exemplar regression before it's stale, infrequent enough
+    # to keep provider cost negligible for a 15-entry eval set.
+    - cron: "0 6 * * 1"
+
+jobs:
+  describe-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      # CI secret custody (#375's own stated open item): ANTHROPIC_API_KEY must be added as a repository
+      # secret before this step does anything but skip. Until then, describe-eval-runner.mjs's own
+      # no-key path prints a clear message and exits 0 — this job stays green, not silently broken, while
+      # the key is genuinely absent.
+      - name: Run the golden-description eval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node mcp/describe-eval-runner.mjs

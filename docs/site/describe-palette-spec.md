@@ -503,8 +503,12 @@ not bundled with the free downloadable kit. Concretely:
 - **~15 exemplar entries** span categories (eras, nature, film, brand moods) + cheap keyword
   retrieval, bundled in the MCP package; the two canonical retrieval test asks are *"1980s at the
   Bel Air Hotel Pool Party"* and *"Siberian Tigers on Parade"* (#370 acceptance).
-- The **golden-description eval set** (#375) — descriptions → acceptable per-family hue/chroma bands
-  — reuses the exemplar entries as few-shot, so rubric, exemplars, and evals cannot drift apart.
+- The **golden-description eval set — BUILT (#375)**: `mcp/describe-eval.mjs` derives `GOLDEN_EVALS`
+  directly from `describe-rubric.mjs`'s own `EXEMPLARS` (their `theme` + resolved `families` seeds) —
+  descriptions → acceptable per-family hue/chroma bands (±30° hue, ±20 chroma) — so rubric, exemplars,
+  and evals structurally cannot drift apart; there is only one dataset. `mcp/describe-eval-runner.mjs`
+  is the live-model half: calls a real provider with the SAME briefing payload a real caller receives,
+  forced tool-use against the PaletteBrief schema, scored by the same pure `scoreBrief`/`scoreRun`.
 
 ---
 
@@ -547,7 +551,11 @@ not bundled with the free downloadable kit. Concretely:
    families at once, not just the one that originally collided.
 5. **Exemplar count vs briefing-payload token budget** (#370): ~15 is the target; the briefing
    payload returns a retrieved subset — subset size vs payload weight is tuned in-build.
-6. **Eval ops** (#375): CI custody of the provider key; run cadence given nondeterminism.
+6. **Eval ops** (#375) — **partially resolved**: run cadence is decided (`.github/workflows/
+   describe-eval.yml`, weekly `schedule` + `workflow_dispatch`, never PR-gating). **CI custody of the
+   provider key remains genuinely open** — the workflow reads `secrets.ANTHROPIC_API_KEY`, but adding
+   that secret to the repo is the user's own action; `describe-eval-runner.mjs` degrades to a clean,
+   green no-op skip until it exists, so the workflow is safe to ship ahead of that decision.
 7. ~~**The Secondary-from-Primary harmony recipe**~~ — **RESOLVED (#369's build):** Secondary
    (absent) is the **complement** of Primary (`SECONDARY_HARMONY_OFFSET = 180°`, the classic
    two-color brand pairing); Tertiary (absent) is the **analogous** of Secondary
