@@ -744,6 +744,30 @@ ok(mcpColorOnly && /-mcp\.zip$/.test(mcpColorOnly.n), "(mc10) the Brand-Kit MCP 
 app.exportSystems = { color: true, type: true, geometry: true }; // restore default
 
 app.downloadBytes = realDBmcp;
+
+// ── (mcd) Describe-Palette MCP — the Pro sibling: the merged read+generate server, ships BESIDE the
+// free Brand-Kit MCP, gated by flagOf("describePalette") AT DOWNLOAD TIME (spec §9) ──
+const { DESCRIBE_MCP_FILES: DMF } = await import("../../src/ui/describe-mcp-assets.js");
+ok(DMF && DMF.length >= 20 && DMF.some((f) => f.path === "mcp/brand-kit-merged-server.mjs"), `(mcd1) the merged server's full source closure is inlined (${DMF && DMF.length} files)`);
+app.exportTab = "config"; app.render(); flushRaf();
+ok(walk(app, (e) => e.tagName === "BUTTON" && txtOf(e).includes("Describe-Palette MCP")).length >= 1, "(mcd2) the Config tab offers a Describe-Palette MCP download button");
+ok(app.flagOf("describePalette") === true, "(mcd3) pre-launch (TIERS_ENFORCED off) describePalette is unlocked by default");
+let describeZip = null; const realDBdesc = app.downloadBytes.bind(app);
+app.downloadBytes = (bytes, name) => { describeZip = { bytes, name }; };
+app.downloadDescribePaletteMcp();
+ok(describeZip && /-describe-mcp\.zip$/.test(describeZip.name) && describeZip.bytes && describeZip.bytes.length > 50000, `(mcd4) unlocked: downloadDescribePaletteMcp emits a real .zip (${describeZip && describeZip.name}, ${describeZip && describeZip.bytes.length} bytes)`);
+
+// locked (simulate the enforced Free plan via the same dev-flag-override seam (fl)/(cap)/(at) use)
+app.setProfile({ flagOverrides: { describePalette: false } }); flushRaf();
+app.render(); flushRaf();
+ok(walk(app, (e) => e.tagName === "BUTTON" && txtOf(e).includes("Describe-Palette MCP · Pro")).length >= 1, "(mcd5) locked: the button label tags itself · Pro, same convention as the format <select>'s Pro options");
+describeZip = null;
+app.downloadDescribePaletteMcp();
+ok(describeZip === null, "(mcd6) locked: downloadDescribePaletteMcp is blocked — no zip emitted");
+ok(app.settingsOpen === true && app.settingsSection === "account", "(mcd7) locked: the blocked download routes a web user to Settings « Account »");
+app.closeSettings(); app.settingsSection = "mapping"; flushRaf(); // restore the default nav section (closeSettings doesn't reset it) so later (set) assertions aren't polluted
+app.setProfile({ flagOverrides: {} }); flushRaf(); // restore unlocked
+app.downloadBytes = realDBdesc;
 app.exportOpen = false; app.render(); flushRaf();
 
 // ── (u) per-palette edge hue rotation slider + engine effect ──────────────────────────

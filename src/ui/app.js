@@ -34,6 +34,7 @@ import { STORAGE_KEY, serialize, hydrate } from "./persist.js";
 import { clampProfile, resolveFlags, flagOf as flagFromFlags, resolveTier, entitlementActive } from "../engine/flags.js";
 import { FIGMA_PLUGIN } from "./figma-plugin-assets.js";
 import { MCP_BRAND_KIT } from "./mcp-assets.js";
+import { DESCRIBE_MCP_FILES, DESCRIBE_MCP_README, DESCRIBE_MCP_ENGINE_VERSION } from "./describe-mcp-assets.js";
 import { TYPE_FONTS_CSS } from "./type-fonts.js";
 import { CATEGORY_INDEX, loadCategory } from "./categories/index.js";
 import { deriveNeutral, deriveRelative, RELATIONSHIPS } from "../engine/derive.mjs";
@@ -2430,6 +2431,41 @@ class HctApp extends HTMLElement {
     ];
     this.downloadBytes(zipStore(files), `${base}-mcp.zip`, "application/zip");
     this.toast("Brand-Kit MCP downloaded — `node brand-kit-server.mjs`");
+  }
+
+
+  // downloadDescribePaletteMcp — the Pro sibling of downloadBrandKitMcp: the MERGED read+generate server
+  // (mcp/brand-kit-merged-server.mjs, #374) as one ready-to-run .zip, ships BESIDE the free brand-kit
+  // download rather than replacing it (spec §12 item 3). generate_kit needs the real engine, not just a
+  // resolved kit.json, so DESCRIBE_MCP_FILES ships the whole self-sufficient source tree at its exact
+  // repo-relative paths (mcp/ + src/ui/ + src/engine/ + docs/reference/data/role-table.json) — Node
+  // resolves the same relative imports unmodified, no bundler needed. Gated by flagOf("describePalette")
+  // AT DOWNLOAD TIME (spec §9): once downloaded, a zero-dep offline stdio server has no live entitlement
+  // check left to call, so the gate that matters is here, not inside the shipped code.
+  downloadDescribePaletteMcp() {
+    if (!this.flagOf("describePalette")) {
+      this.toast("Describe-Palette MCP is a Pro feature — upgrade to download it.");
+      if (!this.inFigma) { this.settingsSection = "account"; this.openSettings(); }
+      return;
+    }
+    const kit = brandKit(this.doc, this.exportSystems);
+    const base = slug(kit.name) || "brand-kit";
+    // version is the REAL engine version, not a placeholder — describe-kit-core.mjs reads its own
+    // shipped package.json for every generated kit's meta.engineVersion (spec §6.4's reproducibility stamp).
+    const pkg = JSON.stringify(
+      { name: "ultimate-tokens-describe-palette-mcp", version: DESCRIBE_MCP_ENGINE_VERSION, type: "module", description: `Describe-Palette MCP (read "${kit.name}" + generate new kits from text)`, bin: { "describe-palette-mcp": "mcp/brand-kit-merged-server.mjs" }, private: true },
+      null, 2,
+    );
+    const files = [
+      ...DESCRIBE_MCP_FILES.map(({ path, data }) => ({ name: path, data })),
+      // the server's own HERE resolves to its own directory (mcp/, since it lives at mcp/brand-kit-merged-
+      // server.mjs here, unlike the flat single-file brand-kit-server.mjs) — the sibling kit sits beside it.
+      { name: "mcp/brand-kit.json", data: JSON.stringify(kit, null, 2) }, // the seeded read surface — additive, not required to call generate_kit
+      { name: "README.md", data: DESCRIBE_MCP_README },
+      { name: "package.json", data: pkg },
+    ];
+    this.downloadBytes(zipStore(files), `${base}-describe-mcp.zip`, "application/zip");
+    this.toast("Describe-Palette MCP downloaded — `node mcp/brand-kit-merged-server.mjs`");
   }
 
 

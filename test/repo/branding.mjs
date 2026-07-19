@@ -35,7 +35,7 @@ const LEGACY_TAG_ALLOWLIST = new Set([
 // Generated artifacts mirror their sources; gating the source is what matters. This file must NAME the
 // banned strings to ban them, so it exempts itself.
 const SKIP_FILES = new Set([
-  "figma/plugin/ui.html", "src/ui/figma-plugin-assets.js", "src/ui/mcp-assets.js",
+  "figma/plugin/ui.html", "src/ui/figma-plugin-assets.js", "src/ui/mcp-assets.js", "src/ui/describe-mcp-assets.js",
   "test/repo/branding.mjs",
 ]);
 const SKIP_DIRS = new Set([".git", "node_modules", "dist", "other", "worktrees"]); // .claude/docs/other/ is local-only; .claude/worktrees/ is transient agent checkouts (a full nested copy of the repo — never gate on it, it just mirrors whatever's already gated at the real paths)

@@ -227,6 +227,12 @@ export class DrawerMixinImpl {
       btn([icon("upload"), "Save to project"], { title: this.inFigma ? "Save this config into this Figma file (travels with the file)" : "Save this config to the project (localStorage)", onclick: () => this.saveToProject() }),
       btn([icon("download"), "Load from project"], { title: this.inFigma ? "Load the config saved in this Figma file" : "Load the config saved to the project", onclick: () => this.loadFromProject() }),
       btn([icon("download"), "Brand-Kit MCP"], { title: "Download a ready-to-run MCP server (your tokens, for Claude Code / Cursor / any agent) — a .zip with the zero-dep server + your brand-kit.json + setup README", onclick: () => this.downloadBrandKitMcp() }),
+      btn([icon("download"), this.flagOf("describePalette") ? "Describe-Palette MCP" : "Describe-Palette MCP · Pro"], {
+        title: this.flagOf("describePalette")
+          ? "Download the Brand-Kit MCP's Pro sibling: a .zip that ALSO generates new brand kits from a text description — everything Brand-Kit MCP does, plus generate_kit + export_tokens"
+          : "Generate new brand kits from a text description via MCP — a Pro feature. Upgrade to download it.",
+        onclick: () => this.downloadDescribePaletteMcp(),
+      }),
       h("span", { class: "config-note" }, this.inFigma ? "Source of truth: this Figma file (travels with the file)" : "Source of truth: your browser (localStorage)"),
     );
   }
