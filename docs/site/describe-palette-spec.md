@@ -233,22 +233,30 @@ A brief carries only the families the theme determined; the core fills the rest 
   (§4.2). An *explicitly provided* status seed is taken as-is (no nudge) and only subject to the
   distinctness gate.
 
-### 4.2 The status distinctness gate (#372)
+### 4.2 The status distinctness gate — RESOLVED (#372's build)
 
 Theme palettes collide with status conventions (the canonical case: a Siberian-tiger Primary at hue
 ~27–50 sits on Danger 27 and near Warning 70). After defaulting, the core enforces a **minimum
-OKLCH-hue separation between each brand family (Primary/Secondary/Tertiary) and each status family**,
-resolved in a stated order:
+OKLCH-hue separation between each brand family (Primary/Secondary/Tertiary) and each status family**
+(Neutral excluded — the ticket's own stated scope), resolved in a stated order, over every fully
+resolved+clamped palette regardless of whether its hue was given or defaulted:
 
-1. **Shift the status hue deeper into its conventional band**, away from the colliding brand hue.
-2. **Band exhausted** → keep the hue and differentiate by **chroma and/or lightness** (lift) instead.
+1. **Shift the status hue to whichever edge of its own band maximizes the worst-case distance** to
+   any brand hue (not just the one that originally collided — a status family is checked against all
+   three brand families at once).
+2. **Band exhausted** (even the best edge stays under the threshold) → keep that best-effort hue and
+   differentiate by **chroma** instead (pushed to the domain max — a status role reads as
+   vivid/saturated anyway, so this rarely reads as a compromise; lift differentiation was scoped out
+   as unneeded once chroma alone cleared every real case tested).
 
 The band edges per status family, the minimum-separation threshold, and the nudge magnitude (§4.1)
-are **named constants in `describe-kit-core.mjs`** (`STATUS_BANDS`, `MIN_HUE_SEP`, `BRAND_NUDGE`).
-Their exact numeric values are tuned in #372's build under its acceptance predicate — *a Primary at
-hue 27–50 still yields visually distinguishable Danger and Warning roles* — and are centered on the
-role-table defaults above. (The shape of the gate is fixed here; the numbers are #372's, see §12.)
-Every gate resolution emits a `status-distinctness` lint entry (§6.3).
+are **named constants in `describe-kit-core.mjs`**: `STATUS_BANDS[name] = {center, halfWidth}` (center
+= the family's own role-table hue, OKLCH-converted; `halfWidth = 20°`), `MIN_HUE_SEP = 25°`,
+`BRAND_NUDGE = 8°` (≤ every band's halfWidth by construction, so the nudge alone can never leave the
+band). Centered on the role-table defaults above; verified against the tiger-orange acceptance case
+(Primary hue 40 → Danger and Warning both land ≥25° from Primary) plus a forced band-exhausted case
+(Primary pinned exactly on a status band's center, where both edges tie at 20° < 25°, forcing the
+chroma fallback). Every gate resolution emits a `status-distinctness` lint entry (§6.3).
 
 ### 4.3 Referent count ≠ family count
 
@@ -483,8 +491,11 @@ not bundled with the free downloadable kit. Concretely:
    whether the merged server *replaces* the current brand-kit zip or ships beside it (one server
    serving both a downloaded and a generated kit). Interacts with §7's "doc present" condition for
    `export_tokens`.
-4. **Numeric constants** (#372/#369): `STATUS_BANDS` edges, `MIN_HUE_SEP`, `BRAND_NUDGE` magnitude —
-   shape fixed in §4; values tuned in-build under the tiger-orange acceptance test.
+4. ~~**Numeric constants**~~ — **RESOLVED (#372's build):** `STATUS_BANDS` halfWidth `20°`,
+   `MIN_HUE_SEP = 25°`, `BRAND_NUDGE = 8°`, tuned against the tiger-orange case (§4.2) and a forced
+   band-exhausted case. Open only if a future theme surfaces a real collision these don't resolve —
+   not expected to be common, since the gate checks the WORST-CASE distance across all three brand
+   families at once, not just the one that originally collided.
 5. **Exemplar count vs briefing-payload token budget** (#370): ~15 is the target; the briefing
    payload returns a retrieved subset — subset size vs payload weight is tuned in-build.
 6. **Eval ops** (#375): CI custody of the provider key; run cadence given nondeterminism.
