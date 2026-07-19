@@ -374,25 +374,37 @@ echoes the brief for the same reason (#377).
 
 ---
 
-## 7. The merged server surface (#374)
+## 7. The merged server surface — RESOLVED (#374's build)
 
 The generator merges **into** the brand-kit read server — one core, one surface — so a generated kit
-never dead-ends:
+never dead-ends. Shipped as new, additional files (`mcp/brand-kit-merged-core.mjs` +
+`mcp/brand-kit-merged-server.mjs`) — the existing standalone `brand-kit-server.mjs` and
+`describe-mcp-server.mjs` are both left intact; deliberate reuse of `brand-kit-core.mjs`'s own
+`handle` dispatcher (already fully generic over a `surface` object) rather than a third near-copy of
+the same JSON-RPC switch:
 
 - **Boot:** the merged server starts with or without a sibling `brand-kit.json` (unlike today's
   read-only server, which exits without one). Kitless boot serves the generator surface only; the
-  read surface appears once a kit exists — consistent with `buildSurface`'s existing
-  presence-driven tool list.
+  read surface appears once a kit exists — this falls out of composition for free (`buildSurface(kit
+  || {})`'s own presence-driven tool list naturally contributes zero read tools for an empty kit),
+  not special-cased.
 - **Post-generate:** the surface rebinds to the generated kit — `list_palettes` · `get_ramp` ·
   `resolve_token` · `get_semantic` · `nearest_token` · `get_type` · `get_geometry`, the
   `brand://…` resources, and the `apply_brand` prompt all serve it immediately. Within a session,
-  last generate wins; a loaded sibling kit is the initial binding.
-- **`export_tokens(format)`** — wraps `src/engine/exports.js` over the generated doc's state.
-  `format` enum: `css` · `oklch` · `json` · `dtcg` · `ui3` · `tailwind` · `shadcn` · `all` (the 8
-  documented emitters incl. the aggregator). Response: `{ files: [{ name, mimeType, text }] }` —
-  array-shaped because several formats are multi-file (DTCG's 3-file set, the split breakpoint CSS).
+  last generate wins; a loaded sibling kit is the initial binding. A **teaching-mode** (`{description}`)
+  call never rebinds — only a successful generation does, so exploring the method mid-session can't
+  clobber an already-bound kit.
+- **`export_tokens(format)`** — wraps `src/engine/exports.js`, via the SAME `projectView(doc).exports`
+  the app's own export drawer reads from (no duplicated exporter wiring). `format` enum: `css` ·
+  `oklch` · `json` · `dtcg` · `ui3` · `tailwind` · `shadcn` · `all` (the 7 named formats aggregated
+  into one multi-file response — `all` is the only one of the 8 enum values that's actually
+  multi-file; each named format alone is one file). Response: `{ files: [{ name, mimeType, text }] }`
+  — array-shaped for `all`'s sake, not because any single named format is itself multi-file.
   Available whenever the server holds a **doc** (always true post-generate); a downloaded-kit-only
-  session has no doc, and whether the downloadable zip grows one rides #374's packaging open (§12).
+  session has no doc, so `export_tokens` returns a graceful `{ error }` (matching the read tools' own
+  precedent, e.g. `get_ramp`'s "no palette …" shape) until a real generate call happens. Whether the
+  downloadable zip itself grows a doc (so a *downloaded* kit could also export_tokens) still rides
+  #374's packaging open (§12 item 3) — unresolved; this build only wires the mechanism.
 
 ---
 
