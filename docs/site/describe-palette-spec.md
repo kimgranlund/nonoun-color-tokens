@@ -345,13 +345,21 @@ images) + an image block (the PNG swatch board)**.
 
 A flat-color swatch board (`mcp/png-swatch-board.mjs`) encoded with **zero dependencies** — a
 hand-rolled PNG writer (CRC-32, Adler-32, DEFLATE's "stored" uncompressed block type, PNG chunk
-framing) rather than a real compression library, since a few dozen solid-color pixels need none —
+framing) rather than a real compression library, since flat-color shapes need no real compression —
 returned as an MCP image content block (`{type:"image", data: base64, mimeType:"image/png"}`). A
-**4×2 grid, 80px swatches** (320×160 total), FAMILY_NAMES order (brand families top row, status
-families bottom row), each swatch sourced from that family's own ramp **500-stop hex** — the exact
-value the #373 acceptance checks against ("swatch colors deep-match the kit"). Verified against a
-REAL independent decoder (Node's own `zlib.inflateSync`, in tests only — the shipped encoder stays
-dependency-free) and deterministic (the same kit always encodes to byte-identical bytes, spec §6.4).
+**4×2 grid, 80px swatches** with 16px margins and 8px gaps on the kit's own `surface` color
+(376×264 total), FAMILY_NAMES order (brand families top row, status families bottom row), each
+swatch sourced from that family's own ramp **500-stop hex** — the exact value the #373 acceptance
+checks against ("swatch colors deep-match the kit") — plus a **mock control strip** under the grid
+(the PNG sibling of the app's Geometry-ramp mocks, #383): a Button (primary/onPrimary pill), a
+Select (outlineVariant border, placeholder bar, onSurface caret), and a Switch ON (primary track,
+onPrimary thumb), each a flat shape (bars, never text) **sized from the kit's own geometry LG
+tokens** (height · pill radius · icon-as-thumb with paddingNarrow inset per the centering law ·
+caret) and painted from its real semantic roles, light mode. Shared `boardLayout(kit)` geometry
+keeps the verifier sampling the exact rects the renderer painted while colors resolve independently
+from the kit. Verified against a REAL independent decoder (Node's own `zlib.inflateSync`, in tests
+only — the shipped encoder stays dependency-free) and deterministic (the same kit always encodes to
+byte-identical bytes, spec §6.4).
 Computed **lazily at dispatch time**, not baked into `generateKit`'s own return shape — the pure core
 and the MCP-tool wrapper (`generateKitTool`) stay unaware of images; only the transport layer
 (`attachImageBlock`, appended to `describe-mcp-core.mjs`) builds one, for any dispatcher whose reply
@@ -564,5 +572,6 @@ not bundled with the free downloadable kit. Concretely:
   non-blocking eval (§11); treat eval misses as defects, not noise.
 - **Briefing-payload weight:** the rubric + schema + exemplars ride inside a tool result on every
   description-mode call; hosts with small context windows are the constraint driving open decision 5.
-- **PNG encoder scope creep:** stored-deflate stays ~100 lines and flat swatches only — resist
-  gradients/labels that would pull in a real encoder (the zero-dep constraint is load-bearing).
+- **PNG encoder scope creep:** stored-deflate stays ~100 lines and flat shapes only (solid
+  swatches + the hard-edged control mocks) — resist text, gradients, or anti-aliasing that would
+  pull in a real encoder or font rasterizer (the zero-dep constraint is load-bearing).
